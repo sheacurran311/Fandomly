@@ -154,22 +154,14 @@ export const rewardRedemptions = pgTable("reward_redemptions", {
   redeemedAt: timestamp("redeemed_at").defaultNow(),
 });
 
-// Social verification tracking for reduced onboarding
-export const socialVerifications = pgTable("social_verifications", {
+// User social profiles (just for display/quest targeting, Dynamic handles verification)
+export const userSocialProfiles = pgTable("user_social_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   platform: text("platform").notNull(), // instagram, twitter, tiktok, youtube, linkedin
   username: text("username").notNull(),
   profileUrl: text("profile_url"),
-  verificationStatus: text("verification_status").notNull().default("pending"), // pending, verified, failed
-  followerCount: integer("follower_count"),
-  verificationData: jsonb("verification_data").$type<{
-    verificationCode?: string;
-    verificationPost?: string;
-    lastChecked?: string;
-    apiData?: any;
-  }>(),
-  verifiedAt: timestamp("verified_at"),
+  isVisible: boolean("is_visible").default(true), // user can choose to show/hide
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -289,6 +281,32 @@ export const rewardRedemptionsRelations = relations(rewardRedemptions, ({ one })
   reward: one(rewards, {
     fields: [rewardRedemptions.rewardId],
     references: [rewards.id],
+  }),
+}));
+
+export const userSocialProfilesRelations = relations(userSocialProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [userSocialProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+export const fanQuestsRelations = relations(fanQuests, ({ one, many }) => ({
+  creator: one(creators, {
+    fields: [fanQuests.creatorId],
+    references: [creators.id],
+  }),
+  participations: many(questParticipations),
+}));
+
+export const questParticipationsRelations = relations(questParticipations, ({ one }) => ({
+  quest: one(fanQuests, {
+    fields: [questParticipations.questId],
+    references: [fanQuests.id],
+  }),
+  user: one(users, {
+    fields: [questParticipations.userId],
+    references: [users.id],
   }),
 }));
 
