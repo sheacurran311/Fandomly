@@ -63,7 +63,17 @@ export const rewards = pgTable("rewards", {
   pointsCost: integer("points_cost").notNull(),
   rewardType: text("reward_type").notNull(), // "traditional" | "nft" | "token" | "experience"
   rewardData: jsonb("reward_data").$type<{
-    nftMetadata?: any;
+    nftMetadata?: {
+      name: string;
+      description: string;
+      image: string;
+      attributes: Array<{ trait_type: string; value: string; }>;
+      contractAddress?: string;
+      tokenId?: string;
+      blockchain: string; // "ethereum" | "solana" | "polygon" | "bsc"
+      rarity?: string;
+      collection?: string;
+    };
     tokenAmount?: string;
     experienceDetails?: string;
     downloadLink?: string;

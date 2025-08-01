@@ -34,6 +34,7 @@ export interface IStorage {
   // Reward operations
   getReward(id: string): Promise<Reward | undefined>;
   getRewardsByProgram(programId: string): Promise<Reward[]>;
+  getAllRewards(): Promise<Reward[]>;
   createReward(reward: InsertReward): Promise<Reward>;
   updateReward(id: string, updates: Partial<InsertReward>): Promise<Reward>;
 
@@ -133,6 +134,10 @@ export class DatabaseStorage implements IStorage {
 
   async getRewardsByProgram(programId: string): Promise<Reward[]> {
     return await db.select().from(rewards).where(eq(rewards.programId, programId));
+  }
+
+  async getAllRewards(): Promise<Reward[]> {
+    return await db.select().from(rewards);
   }
 
   async createReward(insertReward: InsertReward): Promise<Reward> {

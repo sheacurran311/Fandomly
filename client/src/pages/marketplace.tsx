@@ -4,16 +4,29 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Filter, Users, Trophy, Star } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Filter, Users, Trophy, Star, Grid, List, Sparkles, Coins } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
-import { type Creator } from "@shared/schema";
+import NFTCard from "@/components/marketplace/nft-card";
+import BlockchainFilter from "@/components/marketplace/blockchain-filter";
+import { type Creator, type Reward } from "@shared/schema";
+import { sampleNFTRewards } from "@/data/sampleNFTs";
 
 export default function Marketplace() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedChains, setSelectedChains] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [rarityFilter, setRarityFilter] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const { data: creators = [], isLoading } = useQuery<Creator[]>({
+  const { data: creators = [], isLoading: creatorsLoading } = useQuery<Creator[]>({
     queryKey: ["/api/creators"],
+  });
+
+  const { data: rewards = sampleNFTRewards, isLoading: rewardsLoading } = useQuery<Reward[]>({
+    queryKey: ["/api/rewards"],
+    initialData: sampleNFTRewards,
   });
 
   const filteredCreators = creators.filter((creator) => {
@@ -23,14 +36,43 @@ export default function Marketplace() {
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ["athlete", "musician", "creator"];
+  // Filter NFT rewards
+  const nftRewards = rewards.filter(reward => reward.rewardType === "nft" && reward.rewardData?.nftMetadata);
 
-  if (isLoading) {
+  const filteredNFTs = nftRewards.filter((reward) => {
+    const nftData = reward.rewardData?.nftMetadata;
+    if (!nftData) return false;
+
+    const matchesSearch = reward.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         reward.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         nftData.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesChain = selectedChains.length === 0 || selectedChains.includes(nftData.blockchain.toLowerCase());
+    const matchesPrice = reward.pointsCost >= priceRange[0] && reward.pointsCost <= priceRange[1];
+    const matchesRarity = !rarityFilter || nftData.rarity?.toLowerCase() === rarityFilter.toLowerCase();
+
+    return matchesSearch && matchesChain && matchesPrice && matchesRarity;
+  });
+
+  const categories = ["athlete", "musician", "creator"];
+  const rarities = ["common", "uncommon", "rare", "epic", "legendary"];
+
+  const handleChainToggle = (chain: string) => {
+    setSelectedChains(prev => 
+      prev.includes(chain) 
+        ? prev.filter(c => c !== chain)
+        : [...prev, chain]
+    );
+  };
+
+  const clearChainFilters = () => setSelectedChains([]);
+
+  if (creatorsLoading || rewardsLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading creators...</p>
+          <p className="text-gray-300">Loading marketplace...</p>
         </div>
       </div>
     );
@@ -43,10 +85,10 @@ export default function Marketplace() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h1 className="text-4xl lg:text-6xl font-bold mb-6 gradient-text">
-              Creator Marketplace
+              NFT & Creator Marketplace
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Discover amazing creators and join their exclusive loyalty programs. Earn rewards, get exclusive access, and support your favorites.
+              Discover exclusive NFTs, join creator loyalty programs, and earn rewards across multiple blockchains. Your gateway to Web3 fan experiences.
             </p>
           </div>
 
@@ -84,7 +126,7 @@ export default function Marketplace() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-6 text-center">
                   <Users className="h-8 w-8 text-brand-secondary mx-auto mb-2" />
@@ -94,14 +136,21 @@ export default function Marketplace() {
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-6 text-center">
-                  <Trophy className="h-8 w-8 text-brand-primary mx-auto mb-2" />
+                  <Sparkles className="h-8 w-8 text-brand-primary mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-white">{nftRewards.length}</div>
+                  <div className="text-sm text-gray-400">Exclusive NFTs</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="p-6 text-center">
+                  <Trophy className="h-8 w-8 text-brand-accent mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">2.1M</div>
                   <div className="text-sm text-gray-400">Total Fans</div>
                 </CardContent>
               </Card>
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-6 text-center">
-                  <Star className="h-8 w-8 text-brand-accent mx-auto mb-2" />
+                  <Coins className="h-8 w-8 text-brand-secondary mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">850K</div>
                   <div className="text-sm text-gray-400">Rewards Claimed</div>
                 </CardContent>
@@ -111,38 +160,174 @@ export default function Marketplace() {
         </div>
       </section>
 
-      {/* Creators Grid */}
+      {/* Marketplace Content */}
       <section className="py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {filteredCreators.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-2xl font-bold text-gray-300 mb-2">No creators found</h3>
-              <p className="text-gray-400">
-                {searchQuery || selectedCategory 
-                  ? "Try adjusting your search or filter criteria."
-                  : "No creators have joined the marketplace yet."}
-              </p>
+          <Tabs defaultValue="nfts" className="w-full">
+            <div className="flex justify-center mb-8">
+              <TabsList className="bg-white/10 border border-white/20">
+                <TabsTrigger value="nfts" className="data-[state=active]:bg-brand-primary">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  NFT Rewards ({filteredNFTs.length})
+                </TabsTrigger>
+                <TabsTrigger value="creators" className="data-[state=active]:bg-brand-primary">
+                  <Users className="h-4 w-4 mr-2" />
+                  Creators ({filteredCreators.length})
+                </TabsTrigger>
+              </TabsList>
             </div>
-          ) : (
-            <>
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold text-white">
-                  {filteredCreators.length} Creator{filteredCreators.length !== 1 ? 's' : ''} Found
-                </h2>
-                <div className="text-gray-400">
-                  {searchQuery && `Search: "${searchQuery}"`}
-                  {selectedCategory && ` • Category: ${selectedCategory}`}
+
+            <TabsContent value="nfts" className="space-y-8">
+              <div className="grid lg:grid-cols-4 gap-8">
+                {/* Filters Sidebar */}
+                <div className="lg:col-span-1 space-y-6">
+                  <BlockchainFilter 
+                    selectedChains={selectedChains}
+                    onChainToggle={handleChainToggle}
+                    onClear={clearChainFilters}
+                  />
+                  
+                  {/* Rarity Filter */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6">
+                      <h3 className="font-semibold text-white mb-4">Rarity</h3>
+                      <div className="space-y-2">
+                        <Button
+                          variant={rarityFilter === "" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setRarityFilter("")}
+                          className="w-full justify-start"
+                        >
+                          All Rarities
+                        </Button>
+                        {rarities.map((rarity) => (
+                          <Button
+                            key={rarity}
+                            variant={rarityFilter === rarity ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setRarityFilter(rarity)}
+                            className="w-full justify-start capitalize"
+                          >
+                            {rarity}
+                          </Button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Price Range */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6">
+                      <h3 className="font-semibold text-white mb-4">Point Cost</h3>
+                      <div className="space-y-4">
+                        <div className="flex space-x-2">
+                          <Input
+                            type="number"
+                            placeholder="Min"
+                            value={priceRange[0]}
+                            onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
+                            className="bg-white/10 border-white/20 text-white"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Max"
+                            value={priceRange[1]}
+                            onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 10000])}
+                            className="bg-white/10 border-white/20 text-white"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPriceRange([0, 10000])}
+                          className="w-full"
+                        >
+                          Reset Price
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* NFTs Grid */}
+                <div className="lg:col-span-3">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-white">
+                      {filteredNFTs.length} NFT{filteredNFTs.length !== 1 ? 's' : ''} Available
+                    </h2>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {filteredNFTs.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="text-6xl mb-4">✨</div>
+                      <h3 className="text-2xl font-bold text-gray-300 mb-2">No NFTs found</h3>
+                      <p className="text-gray-400">
+                        Try adjusting your filters or check back later for new drops.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={`grid gap-6 ${viewMode === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"}`}>
+                      {filteredNFTs.map((reward) => (
+                        <NFTCard 
+                          key={reward.id} 
+                          reward={reward}
+                          onClaim={() => console.log("Claim NFT:", reward.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
+            </TabsContent>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {filteredCreators.map((creator) => (
-                  <CreatorCard key={creator.id} creator={creator} />
-                ))}
-              </div>
-            </>
-          )}
+            <TabsContent value="creators" className="space-y-8">
+              {filteredCreators.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-2xl font-bold text-gray-300 mb-2">No creators found</h3>
+                  <p className="text-gray-400">
+                    {searchQuery || selectedCategory 
+                      ? "Try adjusting your search or filter criteria."
+                      : "No creators have joined the marketplace yet."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-white">
+                      {filteredCreators.length} Creator{filteredCreators.length !== 1 ? 's' : ''} Found
+                    </h2>
+                    <div className="text-gray-400">
+                      {searchQuery && `Search: "${searchQuery}"`}
+                      {selectedCategory && ` • Category: ${selectedCategory}`}
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    {filteredCreators.map((creator) => (
+                      <CreatorCard key={creator.id} creator={creator} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </section>
     </div>

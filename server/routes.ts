@@ -82,6 +82,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rewards routes
+  app.get("/api/rewards", async (req, res) => {
+    try {
+      const rewards = await storage.getAllRewards();
+      res.json(rewards);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch rewards" });
+    }
+  });
+
   // Loyalty program routes
   app.post("/api/loyalty-programs", async (req, res) => {
     try {
