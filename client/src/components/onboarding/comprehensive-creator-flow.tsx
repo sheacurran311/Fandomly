@@ -133,7 +133,11 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
 
   const brandingForm = useForm<BrandingData>({
     resolver: zodResolver(brandingSchema),
-    defaultValues: brandingData,
+    defaultValues: {
+      primaryColor: "#dd20be",
+      secondaryColor: "#a4fc07", 
+      accentColor: "#03a0fd"
+    },
   });
 
   const socialForm = useForm<SocialData>({
@@ -483,13 +487,15 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
                       <div className="space-y-3">
                         <Input
                           type="color"
-                          {...field}
+                          value={field.value || "#dd20be"}
+                          onChange={field.onChange}
                           className="h-16 w-full border-2 border-white/20 rounded-lg cursor-pointer"
                         />
                         <Input
                           type="text"
                           placeholder="#dd20be"
-                          {...field}
+                          value={field.value || ""}
+                          onChange={field.onChange}
                           className="bg-white/10 border-white/20 text-white text-center font-mono"
                         />
                       </div>
@@ -510,13 +516,15 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
                       <div className="space-y-3">
                         <Input
                           type="color"
-                          {...field}
+                          value={field.value || "#a4fc07"}
+                          onChange={field.onChange}
                           className="h-16 w-full border-2 border-white/20 rounded-lg cursor-pointer"
                         />
                         <Input
                           type="text"
                           placeholder="#a4fc07"
-                          {...field}
+                          value={field.value || ""}
+                          onChange={field.onChange}
                           className="bg-white/10 border-white/20 text-white text-center font-mono"
                         />
                       </div>
@@ -537,13 +545,15 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
                       <div className="space-y-3">
                         <Input
                           type="color"
-                          {...field}
+                          value={field.value || "#03a0fd"}
+                          onChange={field.onChange}
                           className="h-16 w-full border-2 border-white/20 rounded-lg cursor-pointer"
                         />
                         <Input
                           type="text"
                           placeholder="#03a0fd"
-                          {...field}
+                          value={field.value || ""}
+                          onChange={field.onChange}
                           className="bg-white/10 border-white/20 text-white text-center font-mono"
                         />
                       </div>
