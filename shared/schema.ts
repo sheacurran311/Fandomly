@@ -7,6 +7,121 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum('user_role', ['fandomly_admin', 'customer_admin', 'customer_end_user']);
 export const customerTierEnum = pgEnum('customer_tier', ['basic', 'premium', 'vip']);
 
+// Multi-Tenant Structure
+export const tenantStatusEnum = pgEnum('tenant_status', ['active', 'inactive', 'suspended', 'trial']);
+export const subscriptionTierEnum = pgEnum('subscription_tier', ['starter', 'professional', 'enterprise']);
+
+// Tenant (Store) Table - Each creator gets their own tenant/store
+export const tenants = pgTable("tenants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Tenant Identity
+  slug: varchar("slug", { length: 100 }).unique().notNull(), // e.g., "aerial-ace-athletics"
+  name: text("name").notNull(), // e.g., "Aerial Ace Athletics"
+  domain: text("domain").unique(), // Custom domain support: aerialace.fandomly.com
+  
+  // Owner Information
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  
+  // Tenant Settings
+  status: tenantStatusEnum("status").notNull().default('trial'),
+  subscriptionTier: subscriptionTierEnum("subscription_tier").notNull().default('starter'),
+  subscriptionStatus: text("subscription_status").default('trial'), // "trial" | "active" | "past_due" | "canceled"
+  
+  // Branding & Customization
+  branding: jsonb("branding").$type<{
+    logo?: string;
+    primaryColor: string;
+    secondaryColor: string;
+    accentColor: string;
+    customCSS?: string;
+    favicon?: string;
+    fontFamily?: string;
+  }>(),
+  
+  // Business Information
+  businessInfo: jsonb("business_info").$type<{
+    businessType: 'individual' | 'team' | 'organization';
+    sport?: string; // For athletes
+    position?: string; // For athletes
+    school?: string; // For college athletes
+    division?: string; // For college athletes
+    year?: 'freshman' | 'sophomore' | 'junior' | 'senior' | 'graduate';
+    industryType?: string; // For creators/musicians
+    teamSize?: number;
+    website?: string;
+    socialLinks?: {
+      instagram?: string;
+      tiktok?: string;
+      twitter?: string;
+      youtube?: string;
+      spotify?: string;
+    };
+  }>(),
+  
+  // Limits & Usage
+  limits: jsonb("limits").$type<{
+    maxMembers: number;
+    maxCampaigns: number;
+    maxRewards: number;
+    maxApiCalls: number;
+    storageLimit: number; // in MB
+    customDomain: boolean;
+    advancedAnalytics: boolean;
+    whiteLabel: boolean;
+  }>(),
+  
+  // Usage Tracking
+  usage: jsonb("usage").$type<{
+    currentMembers: number;
+    currentCampaigns: number;
+    currentRewards: number;
+    apiCallsThisMonth: number;
+    storageUsed: number;
+  }>().default({
+    currentMembers: 0,
+    currentCampaigns: 0,
+    currentRewards: 0,
+    apiCallsThisMonth: 0,
+    storageUsed: 0
+  }),
+  
+  // Billing
+  billingInfo: jsonb("billing_info").$type<{
+    stripeCustomerId?: string;
+    subscriptionId?: string;
+    trialEndsAt?: string;
+    nextBillingDate?: string;
+    billingEmail?: string;
+  }>(),
+  
+  // Configuration
+  settings: jsonb("settings").$type<{
+    timezone: string;
+    currency: string;
+    language: string;
+    nilCompliance: boolean; // For athlete tenants
+    publicProfile: boolean;
+    allowRegistration: boolean;
+    requireEmailVerification: boolean;
+    enableSocialLogin: boolean;
+    customTermsUrl?: string;
+    customPrivacyUrl?: string;
+  }>().default({
+    timezone: 'UTC',
+    currency: 'USD',
+    language: 'en',
+    nilCompliance: false,
+    publicProfile: true,
+    allowRegistration: true,
+    requireEmailVerification: false,
+    enableSocialLogin: true
+  }),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dynamicUserId: text("dynamic_user_id").unique(),
@@ -16,9 +131,14 @@ export const users = pgTable("users", {
   walletAddress: text("wallet_address"),
   walletChain: text("wallet_chain"),
   userType: text("user_type").notNull().default("fan"), // "creator" | "fan" - legacy field
+  
+  // Multi-Tenant Support
+  currentTenantId: varchar("current_tenant_id").references(() => tenants.id), // Current active tenant
+  
   // Role-Based Access Control
   role: userRoleEnum("role").notNull().default('customer_end_user'),
   customerTier: customerTierEnum("customer_tier").default('basic'), // Only applies to customer_end_user role
+  
   // Admin permissions for fandomly_admin role
   adminPermissions: jsonb("admin_permissions").$type<{
     canManageAllCreators?: boolean;
@@ -27,6 +147,7 @@ export const users = pgTable("users", {
     canManagePlatformSettings?: boolean;
     canManagePayments?: boolean;
   }>(),
+  
   // Customer admin metadata for customer_admin role (creators)
   customerAdminData: jsonb("customer_admin_data").$type<{
     organizationName?: string;
@@ -44,9 +165,40 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Tenant Memberships - Users can be members of multiple tenants
+export const tenantMemberships = pgTable("tenant_memberships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  
+  // Role within this specific tenant
+  role: text("role").notNull().default('member'), // 'owner' | 'admin' | 'moderator' | 'member'
+  
+  // Member-specific data for this tenant
+  memberData: jsonb("member_data").$type<{
+    displayName?: string;
+    bio?: string;
+    points: number;
+    tier: string;
+    joinedVia?: 'invitation' | 'registration' | 'social';
+    referredBy?: string;
+    customAttributes?: Record<string, any>;
+  }>().default({
+    points: 0,
+    tier: 'basic'
+  }),
+  
+  // Status
+  status: text("status").notNull().default('active'), // 'active' | 'inactive' | 'banned'
+  
+  joinedAt: timestamp("joined_at").defaultNow(),
+  lastActiveAt: timestamp("last_active_at").defaultNow(),
+});
+
 export const creators = pgTable("creators", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Each creator belongs to a tenant
   displayName: text("display_name").notNull(),
   bio: text("bio"),
   category: text("category").notNull(), // "athlete" | "musician" | "creator"
@@ -69,6 +221,7 @@ export const creators = pgTable("creators", {
 
 export const loyaltyPrograms = pgTable("loyalty_programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   creatorId: varchar("creator_id").references(() => creators.id).notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -86,6 +239,7 @@ export const loyaltyPrograms = pgTable("loyalty_programs", {
 
 export const rewards = pgTable("rewards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   programId: varchar("program_id").references(() => loyaltyPrograms.id).notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -117,6 +271,7 @@ export const rewards = pgTable("rewards", {
 
 export const fanPrograms = pgTable("fan_programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   fanId: varchar("fan_id").references(() => users.id).notNull(),
   programId: varchar("program_id").references(() => loyaltyPrograms.id).notNull(),
   currentPoints: integer("current_points").default(0),
@@ -127,6 +282,7 @@ export const fanPrograms = pgTable("fan_programs", {
 
 export const pointTransactions = pgTable("point_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   fanProgramId: varchar("fan_program_id").references(() => fanPrograms.id).notNull(),
   points: integer("points").notNull(),
   type: text("type").notNull(), // "earned" | "spent"
@@ -142,6 +298,7 @@ export const pointTransactions = pgTable("point_transactions", {
 
 export const rewardRedemptions = pgTable("reward_redemptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   fanId: varchar("fan_id").references(() => users.id).notNull(),
   rewardId: varchar("reward_id").references(() => rewards.id).notNull(),
   pointsSpent: integer("points_spent").notNull(),
@@ -165,6 +322,7 @@ export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive
 
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   creatorId: varchar("creator_id").references(() => creators.id).notNull(),
   
   // Basic Info
@@ -254,6 +412,7 @@ export const campaignRules = pgTable("campaign_rules", {
 // Campaign Participation Tracking
 export const campaignParticipations = pgTable("campaign_participations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
   memberId: varchar("member_id").references(() => users.id).notNull(),
   
@@ -278,7 +437,31 @@ export const campaignParticipations = pgTable("campaign_participations", {
 
 
 // Relations
+export const tenantsRelations = relations(tenants, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [tenants.ownerId],
+    references: [users.id],
+  }),
+  memberships: many(tenantMemberships),
+  creators: many(creators),
+  loyaltyPrograms: many(loyaltyPrograms),
+  campaigns: many(campaigns),
+  rewards: many(rewards),
+  fanPrograms: many(fanPrograms),
+  pointTransactions: many(pointTransactions),
+  rewardRedemptions: many(rewardRedemptions),
+  campaignParticipations: many(campaignParticipations),
+}));
+
 export const usersRelations = relations(users, ({ one, many }) => ({
+  currentTenant: one(tenants, {
+    fields: [users.currentTenantId],
+    references: [tenants.id],
+  }),
+  ownedTenants: many(tenants, {
+    relationName: "ownedTenants",
+  }),
+  tenantMemberships: many(tenantMemberships),
   creator: one(creators, {
     fields: [users.id],
     references: [creators.userId],
@@ -287,16 +470,35 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   rewardRedemptions: many(rewardRedemptions),
 }));
 
+export const tenantMembershipsRelations = relations(tenantMemberships, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [tenantMemberships.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(users, {
+    fields: [tenantMemberships.userId],
+    references: [users.id],
+  }),
+}));
+
 export const creatorsRelations = relations(creators, ({ one, many }) => ({
   user: one(users, {
     fields: [creators.userId],
     references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [creators.tenantId],
+    references: [tenants.id],
   }),
   loyaltyPrograms: many(loyaltyPrograms),
   campaigns: many(campaigns),
 }));
 
 export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [loyaltyPrograms.tenantId],
+    references: [tenants.id],
+  }),
   creator: one(creators, {
     fields: [loyaltyPrograms.creatorId],
     references: [creators.id],
@@ -306,6 +508,10 @@ export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many 
 }));
 
 export const rewardsRelations = relations(rewards, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [rewards.tenantId],
+    references: [tenants.id],
+  }),
   program: one(loyaltyPrograms, {
     fields: [rewards.programId],
     references: [loyaltyPrograms.id],
@@ -314,6 +520,10 @@ export const rewardsRelations = relations(rewards, ({ one, many }) => ({
 }));
 
 export const fanProgramsRelations = relations(fanPrograms, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [fanPrograms.tenantId],
+    references: [tenants.id],
+  }),
   fan: one(users, {
     fields: [fanPrograms.fanId],
     references: [users.id],
@@ -326,6 +536,10 @@ export const fanProgramsRelations = relations(fanPrograms, ({ one, many }) => ({
 }));
 
 export const pointTransactionsRelations = relations(pointTransactions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [pointTransactions.tenantId],
+    references: [tenants.id],
+  }),
   fanProgram: one(fanPrograms, {
     fields: [pointTransactions.fanProgramId],
     references: [fanPrograms.id],
@@ -333,6 +547,10 @@ export const pointTransactionsRelations = relations(pointTransactions, ({ one })
 }));
 
 export const rewardRedemptionsRelations = relations(rewardRedemptions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [rewardRedemptions.tenantId],
+    references: [tenants.id],
+  }),
   fan: one(users, {
     fields: [rewardRedemptions.fanId],
     references: [users.id],
@@ -345,6 +563,10 @@ export const rewardRedemptionsRelations = relations(rewardRedemptions, ({ one })
 
 // Campaign Relations
 export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [campaigns.tenantId],
+    references: [tenants.id],
+  }),
   creator: one(creators, {
     fields: [campaigns.creatorId],
     references: [creators.id],
@@ -361,6 +583,10 @@ export const campaignRulesRelations = relations(campaignRules, ({ one }) => ({
 }));
 
 export const campaignParticipationsRelations = relations(campaignParticipations, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [campaignParticipations.tenantId],
+    references: [tenants.id],
+  }),
   campaign: one(campaigns, {
     fields: [campaignParticipations.campaignId],
     references: [campaigns.id],
@@ -430,7 +656,25 @@ export const insertCampaignParticipationSchema = createInsertSchema(campaignPart
   createdAt: true,
 });
 
+// Tenant Schemas
+export const insertTenantSchema = createInsertSchema(tenants).omit({
+  id: true,
+  usage: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantMembershipSchema = createInsertSchema(tenantMemberships).omit({
+  id: true,
+  joinedAt: true,
+  lastActiveAt: true,
+});
+
 // Types
+export type Tenant = typeof tenants.$inferSelect;
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type TenantMembership = typeof tenantMemberships.$inferSelect;
+export type InsertTenantMembership = z.infer<typeof insertTenantMembershipSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
