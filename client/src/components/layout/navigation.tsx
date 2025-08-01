@@ -37,10 +37,10 @@ export default function Navigation() {
     <>
       <nav className="bg-brand-dark-purple/90 backdrop-blur-lg border-b border-brand-primary/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-4">
               <Link href="/" className="flex items-center">
-                <img src="/fandomly-logo.png" alt="Fandomly" className="h-12 w-auto" />
+                <img src="/fandomly-logo.png" alt="Fandomly" className="h-16 w-auto" />
               </Link>
             </div>
             
