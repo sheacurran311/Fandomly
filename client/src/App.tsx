@@ -8,6 +8,7 @@ import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
 import Marketplace from "@/pages/marketplace";
+import CreatorOnboarding from "@/pages/creator-onboarding";
 import CreatorDashboard from "@/pages/creator-dashboard";
 import FanDashboard from "@/pages/fan-dashboard";
 import Auth from "@/pages/auth";
@@ -18,6 +19,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/dashboard" component={FanDashboard} />

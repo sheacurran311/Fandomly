@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X } from "lucide-react";
+import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X, ArrowRight } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
 import { type Creator } from "@shared/schema";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
@@ -25,8 +25,8 @@ export default function Home() {
       setShowAuthFlow(true);
       return;
     }
-    // Navigate to creator onboarding
-    window.location.href = "/creator-dashboard";
+    // Navigate to enhanced creator onboarding
+    window.location.href = "/creator-onboarding";
   };
 
   return (
@@ -50,10 +50,11 @@ export default function Home() {
               <Button 
                 onClick={handleStartCreatorSignup}
                 size="lg"
-                className="gradient-primary text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-200 hover:scale-105 shadow-xl"
+                className="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-110 shadow-2xl hover:shadow-brand-primary/25 relative overflow-hidden group"
               >
-                Start Your Program
-                <Play className="ml-2 h-5 w-5" />
+                <span className="relative z-10">🚀 Build Your Loyalty Empire</span>
+                <ArrowRight className="ml-3 h-6 w-6 relative z-10 transition-transform group-hover:translate-x-1" />
+                <div className="absolute inset-0 bg-gradient-to-r from-brand-secondary/20 to-brand-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </Button>
               <Link href="/marketplace">
                 <Button
