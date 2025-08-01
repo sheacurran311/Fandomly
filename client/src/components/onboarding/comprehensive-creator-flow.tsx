@@ -491,7 +491,7 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
             Design Your Brand Identity
           </h2>
           <p className="text-gray-300 text-xl">
-            Choose colors that represent your brand and create a cohesive visual experience
+            Choose colors that represent your brand and create a cohesive visual experience for your fans
           </p>
         </div>
 
@@ -1048,139 +1048,122 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
   );
 
   const renderIdealUsersSetup = () => {
-    const idealUsersCategories = [
-      {
-        id: "athletes",
-        title: "Athletes",
-        description: "Sports professionals and competitive athletes",
-        icon: Trophy,
-        color: "from-amber-400 to-orange-500",
-        subcategories: [
-          { id: "professional", name: "Professional", description: "Pro leagues and teams" },
-          { id: "college", name: "College", description: "University and collegiate sports" },
-          { id: "highschool", name: "High School", description: "Local and regional competitions" },
-          { id: "nil", name: "NIL", description: "Name, Image, Likeness opportunities" }
-        ]
-      },
-      {
-        id: "creators",
-        title: "Content Creators",
-        description: "Digital content and online influence",
-        icon: Camera,
-        color: "from-blue-400 to-cyan-500",
-        subcategories: [
-          { id: "influencers", name: "Influencers", description: "Social media personalities" },
-          { id: "vloggers", name: "Vloggers", description: "Video content creators" },
-          { id: "photographers", name: "Photographers", description: "Visual content specialists" },
-          { id: "videographers", name: "Videographers", description: "Professional video production" }
-        ]
-      },
-      {
-        id: "musicians",
-        title: "Musicians",
-        description: "Music creation and performance",
-        icon: Music,
-        color: "from-purple-400 to-pink-500",
-        subcategories: [
-          { id: "grammy-winners", name: "Grammy Winners", description: "Award-winning artists" },
-          { id: "indie", name: "Indie", description: "Independent music artists" },
-          { id: "backyard", name: "Backyard", description: "Local and amateur musicians" },
-          { id: "karaoke", name: "Karaoke", description: "Entertainment and cover artists" }
-        ]
-      }
-    ];
-
-    const handleCategoryToggle = (categoryId: string) => {
-      setSelectedCategories(prev => 
-        prev.includes(categoryId) 
-          ? prev.filter(id => id !== categoryId)
-          : [...prev, categoryId]
-      );
+    // Get the creator category to determine which subcategories to show
+    const currentCategory = categoryData?.category;
+    
+    const creatorSubcategories = {
+      athlete: [
+        { id: "professional", name: "Professional", description: "Pro leagues, Olympic, and elite competitive athletes" },
+        { id: "college", name: "College", description: "University and collegiate sports programs" },
+        { id: "highschool", name: "High School", description: "Local and regional high school competitions" },
+        { id: "nil", name: "NIL", description: "Name, Image, Likeness monetization opportunities" }
+      ],
+      creator: [
+        { id: "influencers", name: "Influencers", description: "Social media personalities and brand ambassadors" },
+        { id: "vloggers", name: "Vloggers", description: "Video content creators and storytellers" },
+        { id: "photographers", name: "Photographers", description: "Visual content specialists and artists" },
+        { id: "videographers", name: "Videographers", description: "Professional video production and cinematography" }
+      ],
+      musician: [
+        { id: "grammy-winners", name: "Grammy Winners", description: "Award-winning and recognized professional artists" },
+        { id: "indie", name: "Indie", description: "Independent music artists and bands" },
+        { id: "backyard", name: "Backyard", description: "Local performers and amateur musicians" },
+        { id: "karaoke", name: "Karaoke", description: "Entertainment performers and cover artists" }
+      ]
     };
 
-    const handleSubcategoryToggle = (categoryId: string, subcategoryId: string) => {
-      setSelectedSubcategories(prev => ({
-        ...prev,
-        [categoryId]: prev[categoryId]?.includes(subcategoryId)
-          ? prev[categoryId].filter(id => id !== subcategoryId)
-          : [...(prev[categoryId] || []), subcategoryId]
-      }));
+    const categoryIcons = {
+      athlete: Trophy,
+      creator: Camera,
+      musician: Music
+    };
+
+    const categoryColors = {
+      athlete: "from-amber-400 to-orange-500",
+      creator: "from-blue-400 to-cyan-500", 
+      musician: "from-purple-400 to-pink-500"
+    };
+
+    const categoryTitles = {
+      athlete: "Athlete",
+      creator: "Content Creator",
+      musician: "Musician"
+    };
+
+    const subcategories = creatorSubcategories[currentCategory as keyof typeof creatorSubcategories] || [];
+    const IconComponent = categoryIcons[currentCategory as keyof typeof categoryIcons] || Users;
+    const colorClass = categoryColors[currentCategory as keyof typeof categoryColors] || "from-gray-400 to-gray-500";
+    const categoryTitle = categoryTitles[currentCategory as keyof typeof categoryTitles] || "Creator";
+
+    const handleSubcategoryToggle = (subcategoryId: string) => {
+      setSelectedCategories(prev => 
+        prev.includes(subcategoryId) 
+          ? prev.filter(id => id !== subcategoryId)
+          : [...prev, subcategoryId]
+      );
     };
 
     const handleSubmit = () => {
       setIdealUsersData({
         targetAudience: selectedCategories,
-        audienceDetails: selectedSubcategories
+        audienceDetails: { [currentCategory || 'creator']: selectedCategories }
       });
       setCurrentStep("branding");
     };
 
     return (
-      <div className="space-y-8 max-w-5xl mx-auto">
+      <div className="space-y-8 max-w-4xl mx-auto">
         <div className="text-center mb-8">
+          <div className={`inline-flex p-4 rounded-full bg-gradient-to-r ${colorClass} mb-6`}>
+            <IconComponent className="h-12 w-12 text-white" />
+          </div>
           <h2 className="text-4xl font-bold gradient-text mb-4">
-            Who Are Your Ideal Users?
+            What Type of {categoryTitle} Are You?
           </h2>
           <p className="text-gray-300 text-xl">
-            Select the types of users you want to attract to your loyalty program
+            Help us customize your experience by selecting your specific category
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {idealUsersCategories.map((category) => {
-            const IconComponent = category.icon;
-            const isSelected = selectedCategories.includes(category.id);
+        <div className="grid md:grid-cols-2 gap-4">
+          {subcategories.map((subcategory) => {
+            const isSelected = selectedCategories.includes(subcategory.id);
             
             return (
               <Card 
-                key={category.id}
+                key={subcategory.id}
                 className={`bg-white/5 border-white/10 cursor-pointer transition-all duration-300 ${
                   isSelected ? 'ring-2 ring-brand-primary bg-brand-primary/10' : 'hover:border-white/20'
                 }`}
-                onClick={() => handleCategoryToggle(category.id)}
+                onClick={() => handleSubcategoryToggle(subcategory.id)}
               >
                 <CardContent className="p-6">
-                  <div className="text-center mb-4">
-                    <div className={`inline-flex p-4 rounded-full bg-gradient-to-r ${category.color} mb-4`}>
-                      <IconComponent className="h-8 w-8 text-white" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-white mb-2">{subcategory.name}</h3>
+                      <p className="text-gray-400 text-sm">{subcategory.description}</p>
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">{category.title}</h3>
-                    <p className="text-gray-400 text-sm">{category.description}</p>
+                    {isSelected && (
+                      <Check className="h-5 w-5 text-brand-primary ml-4" />
+                    )}
                   </div>
-                  
-                  {isSelected && (
-                    <div className="space-y-2 mt-4 pt-4 border-t border-white/10">
-                      <p className="text-sm font-medium text-gray-300 mb-3">Select specific types:</p>
-                      {category.subcategories.map((sub) => (
-                        <div 
-                          key={sub.id}
-                          className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                            selectedSubcategories[category.id]?.includes(sub.id)
-                              ? 'border-brand-primary bg-brand-primary/20'
-                              : 'border-white/20 hover:border-white/40'
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSubcategoryToggle(category.id, sub.id);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-white">{sub.name}</p>
-                              <p className="text-xs text-gray-400">{sub.description}</p>
-                            </div>
-                            {selectedSubcategories[category.id]?.includes(sub.id) && (
-                              <Check className="h-4 w-4 text-brand-primary" />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
           })}
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-lg p-6">
+          <div className="flex items-start space-x-3">
+            <Sparkles className="h-6 w-6 text-brand-accent mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-brand-accent mb-2">Why This Matters</h4>
+              <p className="text-gray-300 text-sm">
+                Your category helps us recommend the best loyalty program features, reward types, 
+                and engagement strategies that work best for your specific audience and goals.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-between">
