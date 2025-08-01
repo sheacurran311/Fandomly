@@ -99,14 +99,6 @@ export default function FacebookConnect({
   };
 
   const connectFacebook = async () => {
-    if (!import.meta.env.VITE_FACEBOOK_APP_ID) {
-      toast({
-        title: "Configuration Required",
-        description: "Facebook App ID is not configured. Please add VITE_FACEBOOK_APP_ID to environment variables.",
-        variant: "destructive"
-      });
-      return;
-    }
 
     setIsConnecting(true);
     try {
@@ -182,17 +174,7 @@ export default function FacebookConnect({
     }
   };
 
-  if (!import.meta.env.VITE_FACEBOOK_APP_ID) {
-    return (
-      <Alert className="border-yellow-500/20 bg-yellow-500/10">
-        <AlertCircle className="h-4 w-4 text-yellow-400" />
-        <AlertDescription className="text-yellow-300">
-          <strong>Facebook Configuration Required:</strong><br />
-          Add your Facebook App ID to environment variables as <code>VITE_FACEBOOK_APP_ID</code> to enable Facebook connections.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  // Facebook SDK integration available
 
   return (
     <div className="space-y-4">

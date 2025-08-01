@@ -25,7 +25,6 @@ declare global {
       };
     };
     fbAsyncInit: () => void;
-    VITE_FACEBOOK_APP_ID: string;
   }
 }
 

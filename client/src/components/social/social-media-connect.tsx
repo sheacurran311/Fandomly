@@ -67,7 +67,13 @@ const platforms: SocialPlatform[] = [
   }
 ];
 
-interface ConnectedAccount extends SocialMediaAccount {
+interface ConnectedAccount {
+  platform: string;
+  username: string;
+  displayName: string;
+  followers: number;
+  verified: boolean;
+  profileUrl: string;
   lastSync?: Date;
   status: 'connected' | 'error' | 'expired';
 }
