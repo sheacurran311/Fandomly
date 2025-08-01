@@ -12,6 +12,7 @@ import {
 import { FaTiktok, FaSpotify } from "react-icons/fa";
 import { socialManager, type SocialMediaAccount } from "@/lib/social-integrations";
 import { useToast } from "@/hooks/use-toast";
+import FacebookConnect from "./facebook-connect";
 
 interface SocialPlatform {
   id: string;
@@ -239,6 +240,37 @@ export default function SocialMediaConnect({
           </CardContent>
         </Card>
       )}
+
+      {/* Facebook Integration */}
+      <FacebookConnect 
+        onAccountConnected={(account) => {
+          const facebookAccount: ConnectedAccount = {
+            platform: 'facebook',
+            username: account.name,
+            displayName: account.name,
+            followers: account.followers,
+            verified: account.verified,
+            profileUrl: `https://facebook.com/${account.id}`,
+            lastSync: new Date(),
+            status: 'connected'
+          };
+          
+          setConnectedAccounts(prev => {
+            const filtered = prev.filter(acc => acc.platform !== 'facebook');
+            const updated = [...filtered, facebookAccount];
+            onAccountsChange?.(updated);
+            return updated;
+          });
+        }}
+        onAccountDisconnected={() => {
+          setConnectedAccounts(prev => {
+            const updated = prev.filter(acc => acc.platform !== 'facebook');
+            onAccountsChange?.(updated);
+            return updated;
+          });
+        }}
+        showMetrics={showMetrics}
+      />
 
       {/* Platform Connection Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
