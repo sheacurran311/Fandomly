@@ -7,26 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   User, 
   Music, 
   Trophy, 
   Palette, 
-  Instagram, 
-  Facebook, 
-  Twitter, 
-  MessageSquare,
-  TrendingUp,
+  Store,
   ArrowRight,
   Check,
   Camera,
-  Gamepad2
+  Building2,
+  Users2,
+  GraduationCap
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import MockSocialConnect from "@/components/social/mock-social-connect";
 
-type OnboardingStep = "theme" | "profile" | "complete";
+type OnboardingStep = "theme" | "profile" | "tenant" | "complete";
 type CreatorTheme = "athlete" | "musician" | "creator";
 
 interface CreatorOnboardingFlowProps {
@@ -44,12 +42,19 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     bio: "",
     website: "",
   });
-  const [socialConnections, setSocialConnections] = useState({
-    instagram: "",
-    tiktok: "",
-    twitter: "",
-    facebook: "",
-    discord: "",
+  const [tenantData, setTenantData] = useState({
+    tenantName: "",
+    tenantSlug: "",
+    businessType: "individual" as "individual" | "team" | "organization",
+    sport: "",
+    position: "",
+    school: "",
+    division: "",
+    year: "" as "" | "freshman" | "sophomore" | "junior" | "senior" | "graduate",
+    industryType: "",
+    primaryColor: "#7C3AED",
+    secondaryColor: "#10B981",
+    accentColor: "#3B82F6",
   });
 
   const createCreatorMutation = useMutation({
@@ -68,25 +73,47 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
       };
 
       // Create or get user
-      const userRecord: any = await apiRequest("POST", "/api/auth/register", userData);
+      const userRecord = await apiRequest("POST", "/api/auth/register", userData);
       
+      // Create tenant for the creator
+      const tenantResponse = await apiRequest("POST", "/api/tenants", {
+        name: tenantData.tenantName,
+        slug: tenantData.tenantSlug,
+        ownerId: userRecord.id,
+        businessInfo: {
+          businessType: tenantData.businessType,
+          sport: tenantData.sport || undefined,
+          position: tenantData.position || undefined,
+          school: tenantData.school || undefined,
+          division: tenantData.division || undefined,
+          year: tenantData.year || undefined,
+          industryType: tenantData.industryType || undefined,
+          website: profileData.website || undefined,
+        },
+        branding: {
+          primaryColor: tenantData.primaryColor,
+          secondaryColor: tenantData.secondaryColor,
+          accentColor: tenantData.accentColor,
+        },
+        settings: {
+          timezone: 'UTC',
+          currency: 'USD',
+          language: 'en',
+          nilCompliance: selectedTheme === 'athlete',
+          publicProfile: true,
+          allowRegistration: true,
+          requireEmailVerification: false,
+          enableSocialLogin: true,
+        }
+      });
+
       return apiRequest("POST", "/api/creators", {
         userId: userRecord.id,
+        tenantId: tenantResponse.id,
         displayName: profileData.displayName,
         bio: profileData.bio,
         category: selectedTheme,
-        brandColors: {
-          primary: "#dd20be",
-          secondary: "#a4fc07", 
-          accent: "#03a0fd",
-        },
-        socialLinks: {
-          instagram: socialConnections.instagram,
-          tiktok: socialConnections.tiktok,
-          twitter: socialConnections.twitter,
-          facebook: socialConnections.facebook,
-          discord: socialConnections.discord,
-        },
+        website: profileData.website,
         followerCount: 0,
         isVerified: false,
       });
@@ -94,7 +121,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     onSuccess: () => {
       toast({
         title: "Welcome to Fandomly!",
-        description: "Your creator profile has been created successfully.",
+        description: "Your store has been created successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
       setCurrentStep("complete");
@@ -108,14 +135,38 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     },
   });
 
+  // Auto-generate slug from tenant name
+  const handleTenantNameChange = (name: string) => {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 50);
+    
+    setTenantData(prev => ({ 
+      ...prev, 
+      tenantName: name,
+      tenantSlug: slug 
+    }));
+  };
+
   const getProgressPercentage = () => {
     switch (currentStep) {
-      case "theme": return 33;
-      case "profile": return 66;
+      case "theme": return 25;
+      case "profile": return 50;
+      case "tenant": return 75;
       case "complete": return 100;
       default: return 0;
     }
   };
+
+  const steps = [
+    { id: "theme", label: "Choose Theme", completed: selectedTheme !== null },
+    { id: "profile", label: "Your Profile", completed: currentStep === "tenant" || currentStep === "complete" },
+    { id: "tenant", label: "Your Store", completed: currentStep === "complete" },
+    { id: "complete", label: "All Set!", completed: false }
+  ];
 
   const themes = [
     {
@@ -184,8 +235,8 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
                   ))}
                 </div>
                 {isSelected && (
-                  <div className="mt-4">
-                    <Check className="h-6 w-6 text-brand-secondary mx-auto" />
+                  <div className="mt-4 p-2 rounded-full bg-brand-primary/20">
+                    <Check className="h-6 w-6 text-brand-primary mx-auto" />
                   </div>
                 )}
               </CardContent>
@@ -212,10 +263,10 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold gradient-text mb-4">
-          Build Your Profile
+          Tell us about yourself
         </h2>
         <p className="text-gray-300 text-lg">
-          Tell your fans who you are and what you're about
+          Create your public profile that fans will see
         </p>
       </div>
 
@@ -227,7 +278,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
                 Display Name *
               </label>
               <Input
-                placeholder="Your name or brand"
+                placeholder="How you want to be known to your fans"
                 value={profileData.displayName}
                 onChange={(e) => setProfileData(prev => ({ ...prev, displayName: e.target.value }))}
                 className="bg-white/10 border-white/20 text-white"
@@ -270,7 +321,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
           Back
         </Button>
         <Button
-          onClick={() => setCurrentStep("complete")}
+          onClick={() => setCurrentStep("tenant")}
           disabled={!profileData.displayName.trim()}
           className="bg-brand-primary hover:bg-brand-primary/80"
           size="lg"
@@ -282,97 +333,205 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     </div>
   );
 
-  const renderSocialConnections = () => (
-    <div className="space-y-6 max-w-3xl mx-auto">
+  const renderTenantSetup = () => (
+    <div className="space-y-6 max-w-2xl mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold gradient-text mb-4">
-          Connect Your Social Platforms
+          Set up your store
         </h2>
         <p className="text-gray-300 text-lg">
-          Link your social accounts to enable powerful fan engagement features
+          Create your dedicated space where fans can join your loyalty program
         </p>
       </div>
 
       <Card className="bg-white/5 border-white/10">
         <CardContent className="p-8">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Instagram className="h-6 w-6 text-pink-500" />
-                <label className="text-sm font-medium text-gray-300">Instagram</label>
-              </div>
+          <form className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Store Name *
+              </label>
               <Input
-                placeholder="@username or profile URL"
-                value={socialConnections.instagram}
-                onChange={(e) => setSocialConnections(prev => ({ ...prev, instagram: e.target.value }))}
+                placeholder="Your brand or team name"
+                value={tenantData.tenantName}
+                onChange={(e) => handleTenantNameChange(e.target.value)}
                 className="bg-white/10 border-white/20 text-white"
               />
+              <p className="text-xs text-gray-400 mt-1">
+                This will be your store's main identifier
+              </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="h-6 w-6 bg-black rounded flex items-center justify-center text-white text-xs font-bold">T</div>
-                <label className="text-sm font-medium text-gray-300">TikTok</label>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Store URL
+              </label>
+              <div className="flex items-center space-x-2">
+                <span className="text-gray-400 text-sm">fandomly.com/</span>
+                <Input
+                  value={tenantData.tenantSlug}
+                  onChange={(e) => setTenantData(prev => ({ ...prev, tenantSlug: e.target.value }))}
+                  className="bg-white/10 border-white/20 text-white"
+                />
               </div>
-              <Input
-                placeholder="@username or profile URL"
-                value={socialConnections.tiktok}
-                onChange={(e) => setSocialConnections(prev => ({ ...prev, tiktok: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
-              />
+              <p className="text-xs text-gray-400 mt-1">
+                Your fans will visit your store at this URL
+              </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Twitter className="h-6 w-6 text-blue-400" />
-                <label className="text-sm font-medium text-gray-300">X (Twitter)</label>
-              </div>
-              <Input
-                placeholder="@username or profile URL"
-                value={socialConnections.twitter}
-                onChange={(e) => setSocialConnections(prev => ({ ...prev, twitter: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
-              />
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Business Type
+              </label>
+              <Select value={tenantData.businessType} onValueChange={(value: "individual" | "team" | "organization") => 
+                setTenantData(prev => ({ ...prev, businessType: value }))
+              }>
+                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Individual Creator</SelectItem>
+                  <SelectItem value="team">Team/Group</SelectItem>
+                  <SelectItem value="organization">Organization</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Facebook className="h-6 w-6 text-blue-600" />
-                <label className="text-sm font-medium text-gray-300">Facebook</label>
-              </div>
-              <Input
-                placeholder="Page or profile URL"
-                value={socialConnections.facebook}
-                onChange={(e) => setSocialConnections(prev => ({ ...prev, facebook: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
-              />
-            </div>
+            {/* Athlete-specific fields */}
+            {selectedTheme === "athlete" && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Sport
+                    </label>
+                    <Input
+                      placeholder="e.g., Football, Basketball"
+                      value={tenantData.sport}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, sport: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Position
+                    </label>
+                    <Input
+                      placeholder="e.g., Quarterback, Forward"
+                      value={tenantData.position}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, position: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-4 md:col-span-2">
-              <div className="flex items-center space-x-3">
-                <MessageSquare className="h-6 w-6 text-indigo-500" />
-                <label className="text-sm font-medium text-gray-300">Discord</label>
-              </div>
-              <Input
-                placeholder="Server invite link or username"
-                value={socialConnections.discord}
-                onChange={(e) => setSocialConnections(prev => ({ ...prev, discord: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
-              />
-            </div>
-          </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      School (if applicable)
+                    </label>
+                    <Input
+                      placeholder="University name"
+                      value={tenantData.school}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, school: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Year
+                    </label>
+                    <Select value={tenantData.year} onValueChange={(value: "" | "freshman" | "sophomore" | "junior" | "senior" | "graduate") => 
+                      setTenantData(prev => ({ ...prev, year: value }))
+                    }>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="freshman">Freshman</SelectItem>
+                        <SelectItem value="sophomore">Sophomore</SelectItem>
+                        <SelectItem value="junior">Junior</SelectItem>
+                        <SelectItem value="senior">Senior</SelectItem>
+                        <SelectItem value="graduate">Graduate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            )}
 
-          <div className="mt-8 p-4 bg-brand-accent/10 rounded-lg border border-brand-accent/20">
-            <div className="flex items-start space-x-3">
-              <TrendingUp className="h-5 w-5 text-brand-accent mt-0.5" />
+            {/* Creator/Musician-specific fields */}
+            {(selectedTheme === "creator" || selectedTheme === "musician") && (
               <div>
-                <h4 className="font-semibold text-brand-accent mb-1">Pro Tip</h4>
-                <p className="text-sm text-gray-300">
-                  Connect your social accounts to automatically track fan engagement and reward interactions across platforms.
-                </p>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Industry/Genre
+                </label>
+                <Input
+                  placeholder={selectedTheme === "musician" ? "e.g., Pop, Hip-Hop, Electronic" : "e.g., Gaming, Lifestyle, Tech"}
+                  value={tenantData.industryType}
+                  onChange={(e) => setTenantData(prev => ({ ...prev, industryType: e.target.value }))}
+                  className="bg-white/10 border-white/20 text-white"
+                />
+              </div>
+            )}
+
+            {/* Brand Colors */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-4">
+                Brand Colors
+              </label>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-2">Primary</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="color"
+                      value={tenantData.primaryColor}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                      className="w-12 h-8 rounded border-white/20"
+                    />
+                    <Input
+                      value={tenantData.primaryColor}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white text-xs"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-2">Secondary</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="color"
+                      value={tenantData.secondaryColor}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                      className="w-12 h-8 rounded border-white/20"
+                    />
+                    <Input
+                      value={tenantData.secondaryColor}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white text-xs"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-2">Accent</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="color"
+                      value={tenantData.accentColor}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, accentColor: e.target.value }))}
+                      className="w-12 h-8 rounded border-white/20"
+                    />
+                    <Input
+                      value={tenantData.accentColor}
+                      onChange={(e) => setTenantData(prev => ({ ...prev, accentColor: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </form>
         </CardContent>
       </Card>
 
@@ -386,41 +545,53 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         </Button>
         <Button
           onClick={() => createCreatorMutation.mutate()}
-          disabled={createCreatorMutation.isPending}
+          disabled={!tenantData.tenantName.trim() || !tenantData.tenantSlug.trim() || createCreatorMutation.isPending}
           className="bg-brand-primary hover:bg-brand-primary/80"
           size="lg"
         >
-          {createCreatorMutation.isPending ? "Creating Profile..." : "Complete Setup"}
-          <ArrowRight className="h-5 w-5 ml-2" />
+          {createCreatorMutation.isPending ? "Creating..." : "Create Store"}
+          <Store className="h-5 w-5 ml-2" />
         </Button>
       </div>
     </div>
   );
 
   const renderComplete = () => (
-    <div className="text-center space-y-8 max-w-2xl mx-auto">
-      <div className="text-6xl mb-6">🎉</div>
-      <h2 className="text-4xl font-bold gradient-text mb-4">
-        Welcome to Fandomly!
-      </h2>
-      <p className="text-xl text-gray-300 mb-8">
-        Your {selectedTheme} profile is ready. Start building your loyalty program and engaging with your fans.
-      </p>
+    <div className="space-y-6 text-center max-w-2xl mx-auto">
+      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center mx-auto mb-8">
+        <Check className="h-12 w-12 text-white" />
+      </div>
       
-      <div className="grid md:grid-cols-2 gap-6">
+      <h2 className="text-4xl font-bold gradient-text mb-4">
+        You're all set!
+      </h2>
+      
+      <p className="text-gray-300 text-lg mb-8">
+        Your {selectedTheme} store is ready. Start building your loyalty program and connecting with fans!
+      </p>
+
+      <div className="grid md:grid-cols-3 gap-6 mb-8">
         <Card className="bg-white/5 border-white/10">
           <CardContent className="p-6 text-center">
-            <Palette className="h-8 w-8 text-brand-secondary mx-auto mb-4" />
-            <h3 className="font-semibold text-white mb-2">Customize Your Program</h3>
-            <p className="text-sm text-gray-400">Set up rewards, tiers, and branding</p>
+            <Users2 className="h-8 w-8 text-brand-primary mx-auto mb-3" />
+            <h4 className="font-semibold text-white mb-2">Invite Fans</h4>
+            <p className="text-sm text-gray-400">Share your store URL and start growing your community</p>
           </CardContent>
         </Card>
         
         <Card className="bg-white/5 border-white/10">
           <CardContent className="p-6 text-center">
-            <TrendingUp className="h-8 w-8 text-brand-accent mx-auto mb-4" />
-            <h3 className="font-semibold text-white mb-2">Track Analytics</h3>
-            <p className="text-sm text-gray-400">Monitor fan engagement and growth</p>
+            <Trophy className="h-8 w-8 text-brand-secondary mx-auto mb-3" />
+            <h4 className="font-semibold text-white mb-2">Create Rewards</h4>
+            <p className="text-sm text-gray-400">Set up exclusive rewards and perks for your loyal fans</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-6 text-center">
+            <Palette className="h-8 w-8 text-brand-accent mx-auto mb-3" />
+            <h4 className="font-semibold text-white mb-2">Customize</h4>
+            <p className="text-sm text-gray-400">Personalize your store's branding and campaigns</p>
           </CardContent>
         </Card>
       </div>
@@ -437,21 +608,45 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
   );
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg py-16">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Progress Bar */}
-        <div className="max-w-4xl mx-auto mb-12">
+    <div className="min-h-screen bg-brand-dark-bg p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Progress Header */}
+        <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-gray-400">Step {currentStep === "theme" ? 1 : currentStep === "profile" ? 2 : 3} of 3</span>
-            <span className="text-sm text-gray-400">{getProgressPercentage()}% Complete</span>
+            <h1 className="text-2xl font-bold text-white">Creator Onboarding</h1>
+            <span className="text-sm text-gray-400">{Math.round(getProgressPercentage())}% Complete</span>
           </div>
-          <Progress value={getProgressPercentage()} className="h-2" />
+          
+          <Progress value={getProgressPercentage()} className="mb-6" />
+          
+          <div className="flex items-center justify-center space-x-4">
+            {steps.map((step, index) => (
+              <div key={step.id} className="flex items-center">
+                <div className={`flex items-center space-x-2 ${
+                  step.completed ? "text-brand-primary" : 
+                  currentStep === step.id ? "text-white" : "text-gray-500"
+                }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step.completed ? "bg-brand-primary text-white" :
+                    currentStep === step.id ? "bg-white/20 text-white" : "bg-gray-600 text-gray-400"
+                  }`}>
+                    {step.completed ? <Check className="h-4 w-4" /> : index + 1}
+                  </div>
+                  <span className="text-sm font-medium hidden md:block">{step.label}</span>
+                </div>
+                {index < steps.length - 1 && (
+                  <div className="w-8 h-px bg-gray-600 mx-4" />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Step Content */}
-        <div className="max-w-6xl mx-auto">
+        <div className="pb-8">
           {currentStep === "theme" && renderThemeSelection()}
           {currentStep === "profile" && renderProfileSetup()}
+          {currentStep === "tenant" && renderTenantSetup()}
           {currentStep === "complete" && renderComplete()}
         </div>
       </div>

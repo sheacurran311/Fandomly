@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerSocialRoutes } from "./social-routes";
+import { registerTenantRoutes } from "./tenant-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema
@@ -230,6 +231,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register social media routes
   registerSocialRoutes(app);
+
+  // Register tenant routes
+  registerTenantRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

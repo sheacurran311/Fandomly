@@ -1,11 +1,12 @@
 import { 
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
-  pointTransactions, rewardRedemptions,
+  pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
   type PointTransaction, type InsertPointTransaction,
-  type RewardRedemption, type InsertRewardRedemption
+  type RewardRedemption, type InsertRewardRedemption,
+  type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -53,7 +54,17 @@ export interface IStorage {
   getRewardRedemptionsByUser(fanId: string): Promise<RewardRedemption[]>;
   updateRewardRedemption(id: string, updates: Partial<InsertRewardRedemption>): Promise<RewardRedemption>;
 
+  // Tenant operations
+  createTenant(data: InsertTenant): Promise<Tenant>;
+  getTenant(id: string): Promise<Tenant | undefined>;
+  getTenantBySlug(slug: string): Promise<Tenant | undefined>;
+  updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined>;
+  getUserTenants(userId: string): Promise<Tenant[]>;
 
+  // Tenant Membership operations
+  createTenantMembership(data: InsertTenantMembership): Promise<TenantMembership>;
+  getTenantMembers(tenantId: string): Promise<TenantMembership[]>;
+  getUserMemberships(userId: string): Promise<TenantMembership[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -203,7 +214,55 @@ export class DatabaseStorage implements IStorage {
     return redemption;
   }
 
+  // Tenant operations
+  async createTenant(data: InsertTenant): Promise<Tenant> {
+    const [tenant] = await db.insert(tenants).values({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return tenant;
+  }
 
+  async getTenant(id: string): Promise<Tenant | undefined> {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+    return tenant;
+  }
+
+  async getTenantBySlug(slug: string): Promise<Tenant | undefined> {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.slug, slug));
+    return tenant;
+  }
+
+  async updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined> {
+    const [tenant] = await db.update(tenants).set({
+      ...data,
+      updatedAt: new Date()
+    }).where(eq(tenants.id, id)).returning();
+    return tenant;
+  }
+
+  async getUserTenants(userId: string): Promise<Tenant[]> {
+    return await db.select().from(tenants).where(eq(tenants.ownerId, userId));
+  }
+
+  // Tenant Membership operations
+  async createTenantMembership(data: InsertTenantMembership): Promise<TenantMembership> {
+    const [membership] = await db.insert(tenantMemberships).values({
+      ...data,
+      joinedAt: new Date(),
+      lastActiveAt: new Date()
+    }).returning();
+    return membership;
+  }
+
+  async getTenantMembers(tenantId: string): Promise<TenantMembership[]> {
+    return await db.select().from(tenantMemberships).where(eq(tenantMemberships.tenantId, tenantId));
+  }
+
+  async getUserMemberships(userId: string): Promise<TenantMembership[]> {
+    return await db.select().from(tenantMemberships).where(eq(tenantMemberships.userId, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();

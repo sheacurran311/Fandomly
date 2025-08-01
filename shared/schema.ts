@@ -11,7 +11,7 @@ export const customerTierEnum = pgEnum('customer_tier', ['basic', 'premium', 'vi
 export const tenantStatusEnum = pgEnum('tenant_status', ['active', 'inactive', 'suspended', 'trial']);
 export const subscriptionTierEnum = pgEnum('subscription_tier', ['starter', 'professional', 'enterprise']);
 
-// Tenant (Store) Table - Each creator gets their own tenant/store
+// Tenant (Store) Table - Each creator gets their own tenant/store  
 export const tenants = pgTable("tenants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   
@@ -21,7 +21,7 @@ export const tenants = pgTable("tenants", {
   domain: text("domain").unique(), // Custom domain support: aerialace.fandomly.com
   
   // Owner Information
-  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  ownerId: varchar("owner_id").notNull(),
   
   // Tenant Settings
   status: tenantStatusEnum("status").notNull().default('trial'),
@@ -133,7 +133,7 @@ export const users = pgTable("users", {
   userType: text("user_type").notNull().default("fan"), // "creator" | "fan" - legacy field
   
   // Multi-Tenant Support
-  currentTenantId: varchar("current_tenant_id").references(() => tenants.id), // Current active tenant
+  currentTenantId: varchar("current_tenant_id"), // Current active tenant
   
   // Role-Based Access Control
   role: userRoleEnum("role").notNull().default('customer_end_user'),
