@@ -10,7 +10,7 @@ import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
-  app.post("/api/auth/user", async (req, res) => {
+  app.post("/api/auth/register", async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       
@@ -55,8 +55,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Creator routes (require customer_admin role)
-  app.post("/api/creators", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
+  // Creator routes (public creation for onboarding)
+  app.post("/api/creators", async (req, res) => {
     try {
       const creatorData = insertCreatorSchema.parse(req.body);
       const creator = await storage.createCreator(creatorData);
