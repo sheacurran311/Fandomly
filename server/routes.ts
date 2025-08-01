@@ -1,7 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, insertRewardSchema, insertFanProgramSchema } from "@shared/schema";
+import { 
+  insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
+  insertRewardSchema, insertFanProgramSchema, insertUserSocialProfileSchema,
+  insertFanQuestSchema, insertQuestParticipationSchema
+} from "@shared/schema";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
 import { z } from "zod";
 
@@ -203,6 +207,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(redemptions);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch reward redemptions" });
+    }
+  });
+
+  // Social Profile routes
+  app.post("/api/social-profiles", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const profileData = insertUserSocialProfileSchema.parse(req.body);
+      const profile = await storage.createUserSocialProfile(profileData);
+      res.json(profile);
+    } catch (error) {
+      console.error("Social profile creation error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid profile data" });
+    }
+  });
+
+  app.get("/api/social-profiles/:userId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const profiles = await storage.getUserSocialProfiles(req.params.userId);
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch social profiles" });
+    }
+  });
+
+  // Fan Quest routes
+  app.post("/api/fan-quests", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const questData = insertFanQuestSchema.parse(req.body);
+      const quest = await storage.createFanQuest(questData);
+      res.json(quest);
+    } catch (error) {
+      console.error("Quest creation error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid quest data" });
+    }
+  });
+
+  app.get("/api/fan-quests", async (req, res) => {
+    try {
+      const quests = await storage.getFanQuests();
+      
+      // Enhance with creator data
+      const enhancedQuests = await Promise.all(
+        quests.map(async (quest) => {
+          const creator = await storage.getCreator(quest.creatorId);
+          return {
+            ...quest,
+            creator: creator ? {
+              displayName: creator.displayName,
+              category: creator.category,
+              avatar: null,
+            } : {
+              displayName: "Unknown Creator",
+              category: "creator",
+              avatar: null,
+            }
+          };
+        })
+      );
+      
+      res.json(enhancedQuests);
+    } catch (error) {
+      console.error("Failed to fetch quests:", error);
+      res.status(500).json({ error: "Failed to fetch quests" });
+    }
+  });
+
+  // Quest Participation routes
+  app.post("/api/fan-quests/:questId/join", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const questId = req.params.questId;
+      const userId = req.user.id;
+
+      // Check if already participating
+      const existing = await storage.getUserQuestParticipation(userId, questId);
+      if (existing) {
+        return res.status(400).json({ error: "Already participating in this quest" });
+      }
+
+      // Check quest exists and is active
+      const quest = await storage.getFanQuestById(questId);
+      if (!quest || !quest.isActive) {
+        return res.status(404).json({ error: "Quest not found or inactive" });
+      }
+
+      const participationData = {
+        questId,
+        userId,
+        status: "started" as const,
+      };
+
+      const participation = await storage.createQuestParticipation(participationData);
+      res.json(participation);
+    } catch (error) {
+      console.error("Quest join error:", error);
+      res.status(500).json({ error: "Failed to join quest" });
+    }
+  });
+
+  app.get("/api/my-quest-participations", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const participations = await storage.getQuestParticipationsByUser(req.user.id);
+      res.json(participations);
+    } catch (error) {
+      console.error("Failed to fetch participations:", error);
+      res.status(500).json({ error: "Failed to fetch participations" });
     }
   });
 

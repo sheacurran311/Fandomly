@@ -240,7 +240,7 @@ export default function FanQuests() {
               <Button
                 onClick={() => joinQuestMutation.mutate(quest.id)}
                 disabled={joinQuestMutation.isPending || 
-                         (quest.maxParticipants && quest.currentParticipants >= quest.maxParticipants)}
+                         Boolean(quest.maxParticipants && quest.currentParticipants >= quest.maxParticipants)}
                 className="w-full bg-brand-primary hover:bg-brand-primary/80"
               >
                 {joinQuestMutation.isPending ? "Joining..." : "Join Quest"}
