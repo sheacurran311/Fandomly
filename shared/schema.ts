@@ -154,6 +154,79 @@ export const rewardRedemptions = pgTable("reward_redemptions", {
   redeemedAt: timestamp("redeemed_at").defaultNow(),
 });
 
+// Social verification tracking for reduced onboarding
+export const socialVerifications = pgTable("social_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  platform: text("platform").notNull(), // instagram, twitter, tiktok, youtube, linkedin
+  username: text("username").notNull(),
+  profileUrl: text("profile_url"),
+  verificationStatus: text("verification_status").notNull().default("pending"), // pending, verified, failed
+  followerCount: integer("follower_count"),
+  verificationData: jsonb("verification_data").$type<{
+    verificationCode?: string;
+    verificationPost?: string;
+    lastChecked?: string;
+    apiData?: any;
+  }>(),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Fan quests/challenges system
+export const fanQuests = pgTable("fan_quests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => creators.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  questType: text("quest_type").notNull(), // social_follow, social_share, social_post, engagement, custom
+  requirements: jsonb("requirements").$type<{
+    platforms?: string[];
+    actions?: string[];
+    minimumFollowers?: number;
+    hashtags?: string[];
+    mentions?: string[];
+    customInstructions?: string;
+    duration?: number; // days
+  }>(),
+  rewards: jsonb("rewards").$type<{
+    points: number;
+    tier?: string;
+    exclusiveContent?: string;
+    nft?: string;
+    physicalReward?: string;
+    badgeId?: string;
+  }>(),
+  isActive: boolean("is_active").notNull().default(true),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  maxParticipants: integer("max_participants"),
+  currentParticipants: integer("current_participants").default(0),
+  difficultyLevel: text("difficulty_level").default("easy"), // easy, medium, hard
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Track quest participation and completion
+export const questParticipations = pgTable("quest_participations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  questId: varchar("quest_id").references(() => fanQuests.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  status: text("status").notNull().default("started"), // started, submitted, verified, completed, rewarded
+  submissionData: jsonb("submission_data").$type<{
+    socialPosts?: string[];
+    screenshots?: string[];
+    verificationLinks?: string[];
+    notes?: string;
+    completionProof?: string;
+  }>(),
+  pointsEarned: integer("points_earned").default(0),
+  startedAt: timestamp("started_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+  verifiedAt: timestamp("verified_at"),
+  completedAt: timestamp("completed_at"),
+  rewardedAt: timestamp("rewarded_at"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   creator: one(creators, {
