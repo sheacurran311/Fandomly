@@ -5,6 +5,10 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X, ArrowRight, Trophy, Camera, Music, Users } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
+import NILAthleteSpotlight from "@/components/nil/nil-athlete-spotlight";
+import NILValueCalculator from "@/components/nil/nil-value-calculator";
+import SocialIntegrationTracker from "@/components/nil/social-integration-tracker";
+import ComplianceChecker from "@/components/nil/compliance-checker";
 import { type Creator } from "@shared/schema";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 
@@ -369,6 +373,12 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* NIL Features Sections */}
+      <NILAthleteSpotlight />
+      <NILValueCalculator />
+      <SocialIntegrationTracker />
+      <ComplianceChecker />
     </div>
   );
 }
