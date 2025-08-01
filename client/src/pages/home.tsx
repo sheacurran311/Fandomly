@@ -400,7 +400,7 @@ export default function Home() {
                   </Button>
                 </Link>
                 <Link href="/nil-dashboard">
-                  <Button variant="outline" className="border-white/20 text-gray-300 hover:bg-white/5">
+                  <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
                     View Dashboard
                   </Button>
                 </Link>

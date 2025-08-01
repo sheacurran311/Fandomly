@@ -59,7 +59,7 @@ export default function Navigation() {
               {user ? (
                 <div className="flex items-center space-x-4">
                   <Link href="/dashboard">
-                    <Button variant="outline" className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg">
+                    <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
                       Dashboard
                     </Button>
                   </Link>
