@@ -48,6 +48,7 @@ interface ComprehensiveCreatorFlowProps {
 type OnboardingStep = 
   | "category" 
   | "profile" 
+  | "ideal-users"
   | "branding" 
   | "social" 
   | "loyalty-setup" 
@@ -65,6 +66,11 @@ const profileSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters").max(50, "Display name must be under 50 characters"),
   bio: z.string().min(20, "Bio must be at least 20 characters").max(500, "Bio must be under 500 characters"),
   followerCount: z.coerce.number().min(0, "Follower count must be positive").max(100000000, "Please enter a valid number"),
+});
+
+const idealUsersSchema = z.object({
+  targetAudience: z.array(z.string()).min(1, "Please select at least one target audience"),
+  audienceDetails: z.record(z.array(z.string())).optional(),
 });
 
 const brandingSchema = z.object({
@@ -89,6 +95,7 @@ const loyaltySetupSchema = z.object({
 
 type CategoryData = z.infer<typeof categorySchema>;
 type ProfileData = z.infer<typeof profileSchema>;
+type IdealUsersData = z.infer<typeof idealUsersSchema>;
 type BrandingData = z.infer<typeof brandingSchema>;
 type SocialData = z.infer<typeof socialSchema>;
 type LoyaltySetupData = z.infer<typeof loyaltySetupSchema>;
@@ -109,6 +116,7 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
   // Form data state
   const [categoryData, setCategoryData] = useState<CategoryData | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [idealUsersData, setIdealUsersData] = useState<IdealUsersData | null>(null);
   const [brandingData, setBrandingData] = useState<BrandingData>({
     primaryColor: "#dd20be",
     secondaryColor: "#a4fc07",
@@ -129,6 +137,14 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
 
   const profileForm = useForm<ProfileData>({
     resolver: zodResolver(profileSchema),
+  });
+
+  const idealUsersForm = useForm<IdealUsersData>({
+    resolver: zodResolver(idealUsersSchema),
+    defaultValues: {
+      targetAudience: [],
+      audienceDetails: {}
+    },
   });
 
   const brandingForm = useForm<BrandingData>({
@@ -220,12 +236,13 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
 
   const getProgressPercentage = () => {
     switch (currentStep) {
-      case "category": return 14;
-      case "profile": return 28;
-      case "branding": return 42;
-      case "social": return 57;
-      case "loyalty-setup": return 71;
-      case "tier-setup": return 85;
+      case "category": return 12;
+      case "profile": return 25;
+      case "ideal-users": return 37;
+      case "branding": return 50;
+      case "social": return 62;
+      case "loyalty-setup": return 75;
+      case "tier-setup": return 87;
       case "complete": return 100;
       default: return 0;
     }
@@ -366,7 +383,7 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
     <Form {...profileForm}>
       <form onSubmit={profileForm.handleSubmit((data) => {
         setProfileData(data);
-        setCurrentStep("branding");
+        setCurrentStep("ideal-users");
       })} className="space-y-8 max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-bold gradient-text mb-4">
@@ -588,7 +605,7 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
         <div className="flex justify-between">
           <Button
             type="button"
-            onClick={() => setCurrentStep("profile")}
+            onClick={() => setCurrentStep("ideal-users")}
             variant="outline"
             className="border-white/20 text-gray-300 px-6"
           >
@@ -1026,12 +1043,176 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
     </div>
   );
 
+  const renderIdealUsersSetup = () => {
+    const idealUsersCategories = [
+      {
+        id: "athletes",
+        title: "Athletes",
+        description: "Sports professionals and competitive athletes",
+        icon: Trophy,
+        color: "from-amber-400 to-orange-500",
+        subcategories: [
+          { id: "professional", name: "Professional", description: "Pro leagues and teams" },
+          { id: "college", name: "College", description: "University and collegiate sports" },
+          { id: "highschool", name: "High School", description: "Local and regional competitions" },
+          { id: "nil", name: "NIL", description: "Name, Image, Likeness opportunities" }
+        ]
+      },
+      {
+        id: "creators",
+        title: "Content Creators",
+        description: "Digital content and online influence",
+        icon: Camera,
+        color: "from-blue-400 to-cyan-500",
+        subcategories: [
+          { id: "influencers", name: "Influencers", description: "Social media personalities" },
+          { id: "vloggers", name: "Vloggers", description: "Video content creators" },
+          { id: "photographers", name: "Photographers", description: "Visual content specialists" },
+          { id: "videographers", name: "Videographers", description: "Professional video production" }
+        ]
+      },
+      {
+        id: "musicians",
+        title: "Musicians",
+        description: "Music creation and performance",
+        icon: Music,
+        color: "from-purple-400 to-pink-500",
+        subcategories: [
+          { id: "grammy-winners", name: "Grammy Winners", description: "Award-winning artists" },
+          { id: "indie", name: "Indie", description: "Independent music artists" },
+          { id: "backyard", name: "Backyard", description: "Local and amateur musicians" },
+          { id: "karaoke", name: "Karaoke", description: "Entertainment and cover artists" }
+        ]
+      }
+    ];
+
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [selectedSubcategories, setSelectedSubcategories] = useState<Record<string, string[]>>({});
+
+    const handleCategoryToggle = (categoryId: string) => {
+      setSelectedCategories(prev => 
+        prev.includes(categoryId) 
+          ? prev.filter(id => id !== categoryId)
+          : [...prev, categoryId]
+      );
+    };
+
+    const handleSubcategoryToggle = (categoryId: string, subcategoryId: string) => {
+      setSelectedSubcategories(prev => ({
+        ...prev,
+        [categoryId]: prev[categoryId]?.includes(subcategoryId)
+          ? prev[categoryId].filter(id => id !== subcategoryId)
+          : [...(prev[categoryId] || []), subcategoryId]
+      }));
+    };
+
+    const handleSubmit = () => {
+      setIdealUsersData({
+        targetAudience: selectedCategories,
+        audienceDetails: selectedSubcategories
+      });
+      setCurrentStep("branding");
+    };
+
+    return (
+      <div className="space-y-8 max-w-5xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold gradient-text mb-4">
+            Who Are Your Ideal Users?
+          </h2>
+          <p className="text-gray-300 text-xl">
+            Select the types of users you want to attract to your loyalty program
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {idealUsersCategories.map((category) => {
+            const IconComponent = category.icon;
+            const isSelected = selectedCategories.includes(category.id);
+            
+            return (
+              <Card 
+                key={category.id}
+                className={`bg-white/5 border-white/10 cursor-pointer transition-all duration-300 ${
+                  isSelected ? 'ring-2 ring-brand-primary bg-brand-primary/10' : 'hover:border-white/20'
+                }`}
+                onClick={() => handleCategoryToggle(category.id)}
+              >
+                <CardContent className="p-6">
+                  <div className="text-center mb-4">
+                    <div className={`inline-flex p-4 rounded-full bg-gradient-to-r ${category.color} mb-4`}>
+                      <IconComponent className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">{category.title}</h3>
+                    <p className="text-gray-400 text-sm">{category.description}</p>
+                  </div>
+                  
+                  {isSelected && (
+                    <div className="space-y-2 mt-4 pt-4 border-t border-white/10">
+                      <p className="text-sm font-medium text-gray-300 mb-3">Select specific types:</p>
+                      {category.subcategories.map((sub) => (
+                        <div 
+                          key={sub.id}
+                          className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                            selectedSubcategories[category.id]?.includes(sub.id)
+                              ? 'border-brand-primary bg-brand-primary/20'
+                              : 'border-white/20 hover:border-white/40'
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSubcategoryToggle(category.id, sub.id);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-white">{sub.name}</p>
+                              <p className="text-xs text-gray-400">{sub.description}</p>
+                            </div>
+                            {selectedSubcategories[category.id]?.includes(sub.id) && (
+                              <Check className="h-4 w-4 text-brand-primary" />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            onClick={() => setCurrentStep("profile")}
+            variant="outline"
+            className="border-white/20 text-gray-300 px-6"
+          >
+            Back
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={selectedCategories.length === 0}
+            className="bg-brand-primary hover:bg-brand-primary/80 text-lg px-8"
+            size="lg"
+          >
+            Continue to Branding
+            <ArrowRight className="h-5 w-5 ml-2" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const renderCurrentStep = () => {
     switch (currentStep) {
       case "category":
         return renderCategorySelection();
       case "profile":
         return renderProfileSetup();
+      case "ideal-users":
+        return renderIdealUsersSetup();
       case "branding":
         return renderBrandingSetup();
       case "social":
@@ -1054,7 +1235,7 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
         <div className="mb-12">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm font-medium text-gray-400">
-              Step {Object.keys({category: 1, profile: 2, branding: 3, social: 4, "loyalty-setup": 5, "tier-setup": 6, complete: 7}).findIndex(key => key === currentStep) + 1} of 7
+              Step {Object.keys({category: 1, profile: 2, "ideal-users": 3, branding: 4, social: 5, "loyalty-setup": 6, "tier-setup": 7, complete: 8}).findIndex(key => key === currentStep) + 1} of 8
             </div>
             <div className="text-sm font-medium text-gray-400">
               {Math.round(getProgressPercentage())}% Complete
