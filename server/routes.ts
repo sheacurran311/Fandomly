@@ -26,6 +26,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register endpoint for onboarding flows
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Check if user already exists by dynamic user ID
+      if (userData.dynamicUserId) {
+        const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId);
+        if (existingUser) {
+          return res.json(existingUser);
+        }
+      }
+
+      // Create new user
+      const user = await storage.createUser(userData);
+      res.json(user);
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid user data" });
+    }
+  });
+
   app.get("/api/auth/user/:dynamicUserId", async (req, res) => {
     try {
       const user = await storage.getUserByDynamicId(req.params.dynamicUserId);
@@ -73,6 +95,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/creators/user/:userId", async (req, res) => {
     try {
       const creator = await storage.getCreatorByUserId(req.params.userId);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      res.json(creator);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch creator" });
+    }
+  });
+
+  // Loyalty program routes
+  app.post("/api/loyalty-programs", async (req, res) => {
+    try {
+      const programData = insertLoyaltyProgramSchema.parse(req.body);
+      const program = await storage.createLoyaltyProgram(programData);
+      res.json(program);
+    } catch (error) {
+      console.error("Loyalty program creation error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid program data" });
+    }
+  });
+
+  app.get("/api/loyalty-programs/creator/:creatorId", async (req, res) => {
+    try {
+      const programs = await storage.getLoyaltyProgramsByCreator(req.params.creatorId);
+      res.json(programs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch loyalty programs" });
+    }
+  });
+
+  app.get("/api/loyalty-programs/:id", async (req, res) => {
+    try {
+      const program = await storage.getLoyaltyProgram(req.params.id);
+      if (!program) {
+        return res.status(404).json({ error: "Loyalty program not found" });
+      }
+      res.json(program);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch loyalty program" });
+    }
+  });
       if (!creator) {
         return res.status(404).json({ error: "Creator not found" });
       }
