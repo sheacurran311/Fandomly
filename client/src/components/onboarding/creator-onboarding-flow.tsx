@@ -121,26 +121,26 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     {
       id: "athlete" as const,
       title: "Athlete",
-      description: "Sports, fitness, competitions, and athletic achievements",
+      description: "Olympic, college, and professional athletes - NIL compliant",
       icon: Trophy,
-      gradient: "from-brand-secondary to-brand-accent",
-      examples: ["Basketball player", "UFC fighter", "Marathon runner", "Swimmer"]
-    },
-    {
-      id: "musician" as const,
-      title: "Musician",
-      description: "Music creation, performances, tours, and fan engagement",
-      icon: Music,
-      gradient: "from-brand-primary to-brand-secondary",
-      examples: ["DJ", "Singer", "Producer", "Band member"]
+      gradient: "from-orange-400 to-red-500",
+      examples: ["Olympic Sports", "College Football", "Basketball", "Track & Field"]
     },
     {
       id: "creator" as const,
-      title: "Creator",
-      description: "Content creation, streaming, gaming, and digital influence",
+      title: "Content Creator",
+      description: "Digital creators, streamers, and online influencers",
       icon: Camera,
-      gradient: "from-brand-accent to-brand-primary",
-      examples: ["YouTuber", "Streamer", "Influencer", "Artist"]
+      gradient: "from-blue-400 to-purple-500",
+      examples: ["YouTuber", "TikTok Creator", "Streamer", "Influencer"]
+    },
+    {
+      id: "musician" as const,
+      title: "Musician/Artist",
+      description: "Musicians, artists, and performers building their fanbase",
+      icon: Music,
+      gradient: "from-green-400 to-blue-500",
+      examples: ["Singer", "Band", "Producer", "DJ"]
     }
   ];
 
@@ -151,7 +151,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
           What best describes you?
         </h2>
         <p className="text-gray-300 text-lg">
-          Choose your category to get personalized features and recommendations
+          Choose your category to get personalized features, NIL compliance tools, and recommendations
         </p>
       </div>
 
