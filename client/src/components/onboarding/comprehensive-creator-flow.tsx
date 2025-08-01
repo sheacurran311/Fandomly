@@ -455,8 +455,566 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
     </Form>
   );
 
-  // Continue with branding, social, loyalty setup, tier setup, and complete steps...
-  // For brevity, I'll show the structure but implement the key steps
+  const renderBrandingSetup = () => (
+    <Form {...brandingForm}>
+      <form onSubmit={brandingForm.handleSubmit((data) => {
+        setBrandingData(data);
+        setCurrentStep("social");
+      })} className="space-y-8 max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold gradient-text mb-4">
+            Design Your Brand Identity
+          </h2>
+          <p className="text-gray-300 text-xl">
+            Choose colors that represent your brand and create a cohesive visual experience
+          </p>
+        </div>
+
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-8">
+            <div className="grid md:grid-cols-3 gap-8">
+              <FormField
+                control={brandingForm.control}
+                name="primaryColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-semibold text-white">Primary Color</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
+                        <Input
+                          type="color"
+                          {...field}
+                          className="h-16 w-full border-2 border-white/20 rounded-lg cursor-pointer"
+                        />
+                        <Input
+                          type="text"
+                          placeholder="#dd20be"
+                          {...field}
+                          className="bg-white/10 border-white/20 text-white text-center font-mono"
+                        />
+                      </div>
+                    </FormControl>
+                    <p className="text-sm text-gray-400">Main brand color for buttons and highlights</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={brandingForm.control}
+                name="secondaryColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-semibold text-white">Secondary Color</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
+                        <Input
+                          type="color"
+                          {...field}
+                          className="h-16 w-full border-2 border-white/20 rounded-lg cursor-pointer"
+                        />
+                        <Input
+                          type="text"
+                          placeholder="#a4fc07"
+                          {...field}
+                          className="bg-white/10 border-white/20 text-white text-center font-mono"
+                        />
+                      </div>
+                    </FormControl>
+                    <p className="text-sm text-gray-400">Supporting color for accents and CTAs</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={brandingForm.control}
+                name="accentColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-semibold text-white">Accent Color</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
+                        <Input
+                          type="color"
+                          {...field}
+                          className="h-16 w-full border-2 border-white/20 rounded-lg cursor-pointer"
+                        />
+                        <Input
+                          type="text"
+                          placeholder="#03a0fd"
+                          {...field}
+                          className="bg-white/10 border-white/20 text-white text-center font-mono"
+                        />
+                      </div>
+                    </FormControl>
+                    <p className="text-sm text-gray-400">Accent color for special elements</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-8 p-6 bg-white/5 rounded-lg border border-white/10">
+              <h3 className="text-lg font-semibold text-white mb-4">Brand Preview</h3>
+              <div className="flex space-x-4">
+                <div className="flex-1 p-4 rounded-lg" style={{ backgroundColor: brandingForm.watch("primaryColor") || "#dd20be" }}>
+                  <div className="text-white font-semibold">Primary Color</div>
+                  <div className="text-white/80 text-sm">Buttons & Main Elements</div>
+                </div>
+                <div className="flex-1 p-4 rounded-lg" style={{ backgroundColor: brandingForm.watch("secondaryColor") || "#a4fc07" }}>
+                  <div className="text-black font-semibold">Secondary Color</div>
+                  <div className="text-black/80 text-sm">Highlights & CTAs</div>
+                </div>
+                <div className="flex-1 p-4 rounded-lg" style={{ backgroundColor: brandingForm.watch("accentColor") || "#03a0fd" }}>
+                  <div className="text-white font-semibold">Accent Color</div>
+                  <div className="text-white/80 text-sm">Special Elements</div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            onClick={() => setCurrentStep("profile")}
+            variant="outline"
+            className="border-white/20 text-gray-300 px-6"
+          >
+            Back
+          </Button>
+          <Button
+            type="submit"
+            className="bg-brand-primary hover:bg-brand-primary/80 text-lg px-8"
+            size="lg"
+          >
+            Continue to Social
+            <ArrowRight className="h-5 w-5 ml-2" />
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  const renderSocialSetup = () => (
+    <Form {...socialForm}>
+      <form onSubmit={socialForm.handleSubmit((data) => {
+        setSocialData(data);
+        setCurrentStep("loyalty-setup");
+      })} className="space-y-8 max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold gradient-text mb-4">
+            Connect Your Social Platforms
+          </h2>
+          <p className="text-gray-300 text-xl">
+            Link your social accounts to enable automatic fan engagement tracking and rewards
+          </p>
+        </div>
+
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-8">
+            <div className="grid md:grid-cols-2 gap-8">
+              <FormField
+                control={socialForm.control}
+                name="instagram"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center space-x-3 text-lg font-semibold">
+                      <Instagram className="h-6 w-6 text-pink-500" />
+                      <span className="text-white">Instagram</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="@username or full URL"
+                        {...field}
+                        className="bg-white/10 border-white/20 text-white text-lg py-3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={socialForm.control}
+                name="twitter"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center space-x-3 text-lg font-semibold">
+                      <Twitter className="h-6 w-6 text-blue-400" />
+                      <span className="text-white">X (Twitter)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="@username or full URL"
+                        {...field}
+                        className="bg-white/10 border-white/20 text-white text-lg py-3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={socialForm.control}
+                name="tiktok"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center space-x-3 text-lg font-semibold">
+                      <div className="h-6 w-6 bg-black rounded flex items-center justify-center text-white text-xs font-bold">T</div>
+                      <span className="text-white">TikTok</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="@username or full URL"
+                        {...field}
+                        className="bg-white/10 border-white/20 text-white text-lg py-3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={socialForm.control}
+                name="facebook"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center space-x-3 text-lg font-semibold">
+                      <Facebook className="h-6 w-6 text-blue-600" />
+                      <span className="text-white">Facebook</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Page or profile URL"
+                        {...field}
+                        className="bg-white/10 border-white/20 text-white text-lg py-3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={socialForm.control}
+                name="discord"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="flex items-center space-x-3 text-lg font-semibold">
+                      <MessageCircle className="h-6 w-6 text-indigo-500" />
+                      <span className="text-white">Discord</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Server invite link or username"
+                        {...field}
+                        className="bg-white/10 border-white/20 text-white text-lg py-3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="mt-8 p-6 bg-brand-accent/10 rounded-lg border border-brand-accent/20">
+              <div className="flex items-start space-x-3">
+                <TrendingUp className="h-6 w-6 text-brand-accent mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-brand-accent mb-2">Pro Tip</h4>
+                  <p className="text-gray-300">
+                    Connect your social accounts to automatically track fan engagement and reward interactions across platforms. 
+                    This enables features like "Follow on Instagram for 100 points" or "Share this post for rewards."
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            onClick={() => setCurrentStep("branding")}
+            variant="outline"
+            className="border-white/20 text-gray-300 px-6"
+          >
+            Back
+          </Button>
+          <Button
+            type="submit"
+            className="bg-brand-primary hover:bg-brand-primary/80 text-lg px-8"
+            size="lg"
+          >
+            Continue to Loyalty Program
+            <ArrowRight className="h-5 w-5 ml-2" />
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  const renderLoyaltySetup = () => (
+    <Form {...loyaltyForm}>
+      <form onSubmit={loyaltyForm.handleSubmit((data) => {
+        setLoyaltyData(data);
+        setCurrentStep("tier-setup");
+      })} className="space-y-8 max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold gradient-text mb-4">
+            Create Your Loyalty Program
+          </h2>
+          <p className="text-gray-300 text-xl">
+            Design a program that rewards your most engaged fans and builds lasting relationships
+          </p>
+        </div>
+
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-8 space-y-8">
+            <FormField
+              control={loyaltyForm.control}
+              name="programName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-lg font-semibold text-white">Program Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., 'Thunder Squad' or 'Luna's Legion'"
+                      {...field}
+                      className="bg-white/10 border-white/20 text-white text-lg py-3"
+                    />
+                  </FormControl>
+                  <p className="text-sm text-gray-400">Give your loyalty program a catchy, memorable name that reflects your brand</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={loyaltyForm.control}
+              name="pointsName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-lg font-semibold text-white">Points Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., 'Thunder Points' or 'Luna Coins'"
+                      {...field}
+                      className="bg-white/10 border-white/20 text-white text-lg py-3"
+                    />
+                  </FormControl>
+                  <p className="text-sm text-gray-400">What will fans call the points they earn in your program?</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={loyaltyForm.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-lg font-semibold text-white">Program Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe what fans can expect from your loyalty program, what they'll earn points for, and what rewards await them..."
+                      {...field}
+                      className="bg-white/10 border-white/20 text-white min-h-[120px] text-base"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white/5 rounded-lg border border-white/10 text-center">
+                <Coins className="h-12 w-12 text-brand-secondary mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Earn Points</h3>
+                <p className="text-sm text-gray-400">Social follows, content engagement, purchases</p>
+              </div>
+              <div className="p-6 bg-white/5 rounded-lg border border-white/10 text-center">
+                <Crown className="h-12 w-12 text-brand-accent mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Unlock Tiers</h3>
+                <p className="text-sm text-gray-400">Bronze, Silver, Gold with increasing benefits</p>
+              </div>
+              <div className="p-6 bg-white/5 rounded-lg border border-white/10 text-center">
+                <Gift className="h-12 w-12 text-brand-primary mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Claim Rewards</h3>
+                <p className="text-sm text-gray-400">NFTs, merchandise, exclusive experiences</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            onClick={() => setCurrentStep("social")}
+            variant="outline"
+            className="border-white/20 text-gray-300 px-6"
+          >
+            Back
+          </Button>
+          <Button
+            type="submit"
+            className="bg-brand-primary hover:bg-brand-primary/80 text-lg px-8"
+            size="lg"
+          >
+            Continue to Tier Setup
+            <ArrowRight className="h-5 w-5 ml-2" />
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  const renderTierSetup = () => (
+    <div className="space-y-8 max-w-5xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-4xl font-bold gradient-text mb-4">
+          Configure Loyalty Tiers
+        </h2>
+        <p className="text-gray-300 text-xl">
+          Set up reward tiers that motivate fans to engage more and climb the loyalty ladder
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        {tiersData.map((tier, index) => (
+          <Card key={index} className="bg-white/5 border-white/10">
+            <CardContent className="p-6">
+              <div className="grid md:grid-cols-4 gap-6 items-center">
+                <div>
+                  <Label className="text-sm font-medium text-gray-300">Tier Name</Label>
+                  <Input
+                    value={tier.name}
+                    onChange={(e) => {
+                      const newTiers = [...tiersData];
+                      newTiers[index].name = e.target.value;
+                      setTiersData(newTiers);
+                    }}
+                    className="bg-white/10 border-white/20 text-white mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-300">Minimum Points</Label>
+                  <Input
+                    type="number"
+                    value={tier.minPoints}
+                    onChange={(e) => {
+                      const newTiers = [...tiersData];
+                      newTiers[index].minPoints = parseInt(e.target.value) || 0;
+                      setTiersData(newTiers);
+                    }}
+                    className="bg-white/10 border-white/20 text-white mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-300">Tier Color</Label>
+                  <Input
+                    type="color"
+                    value={tier.color}
+                    onChange={(e) => {
+                      const newTiers = [...tiersData];
+                      newTiers[index].color = e.target.value;
+                      setTiersData(newTiers);
+                    }}
+                    className="h-10 w-full mt-1"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-300">Benefits</Label>
+                  {tier.benefits.map((benefit, benefitIndex) => (
+                    <Input
+                      key={benefitIndex}
+                      value={benefit}
+                      onChange={(e) => {
+                        const newTiers = [...tiersData];
+                        newTiers[index].benefits[benefitIndex] = e.target.value;
+                        setTiersData(newTiers);
+                      }}
+                      className="bg-white/10 border-white/20 text-white text-sm"
+                      placeholder="Enter benefit"
+                    />
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="flex justify-between">
+        <Button
+          onClick={() => setCurrentStep("loyalty-setup")}
+          variant="outline"
+          className="border-white/20 text-gray-300 px-6"
+        >
+          Back
+        </Button>
+        <Button
+          onClick={() => createCompleteMutation.mutate()}
+          disabled={createCompleteMutation.isPending}
+          className="bg-brand-primary hover:bg-brand-primary/80 text-lg px-8"
+          size="lg"
+        >
+          {createCompleteMutation.isPending ? "Creating Your Program..." : "Complete Setup"}
+          <Sparkles className="h-5 w-5 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderComplete = () => (
+    <div className="text-center space-y-8 max-w-3xl mx-auto">
+      <div className="text-8xl mb-8">🎉</div>
+      <h2 className="text-5xl font-bold gradient-text mb-6">
+        Welcome to Fandomly!
+      </h2>
+      <p className="text-2xl text-gray-300 mb-8">
+        Your {categoryData?.category} profile and loyalty program are live. 
+        Ready to start building your fan community?
+      </p>
+      
+      <div className="grid md:grid-cols-2 gap-8">
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-8 text-center">
+            <Users className="h-12 w-12 text-brand-secondary mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-3">Invite Fans</h3>
+            <p className="text-gray-400 mb-4">Share your program and start building your community</p>
+            <Button className="bg-brand-secondary hover:bg-brand-secondary/80 text-black">
+              Get Started
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-8 text-center">
+            <TrendingUp className="h-12 w-12 text-brand-accent mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-3">Track Progress</h3>
+            <p className="text-gray-400 mb-4">Monitor engagement and program performance</p>
+            <Button className="bg-brand-accent hover:bg-brand-accent/80">
+              View Analytics
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Button
+        onClick={onComplete}
+        className="bg-brand-primary hover:bg-brand-primary/80 text-xl px-12 py-4"
+        size="lg"
+      >
+        Go to Creator Dashboard
+        <ArrowRight className="h-6 w-6 ml-3" />
+      </Button>
+    </div>
+  );
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -465,15 +1023,15 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
       case "profile":
         return renderProfileSetup();
       case "branding":
-        return <div className="text-center text-white">Branding step - Color selection, logo upload, etc.</div>;
+        return renderBrandingSetup();
       case "social":
-        return <div className="text-center text-white">Social connections step</div>;
+        return renderSocialSetup();
       case "loyalty-setup":
-        return <div className="text-center text-white">Loyalty program setup</div>;
+        return renderLoyaltySetup();
       case "tier-setup":
-        return <div className="text-center text-white">Tier configuration</div>;
+        return renderTierSetup();
       case "complete":
-        return <div className="text-center text-white">Completion celebration</div>;
+        return renderComplete();
       default:
         return renderCategorySelection();
     }
