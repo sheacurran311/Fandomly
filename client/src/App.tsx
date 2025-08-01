@@ -12,6 +12,7 @@ import CreatorOnboarding from "@/pages/creator-onboarding";
 import CreatorDashboard from "@/pages/creator-dashboard";
 import FanDashboard from "@/pages/fan-dashboard";
 import NILDashboard from "@/pages/nil-dashboard";
+import RBACDashboard from "@/pages/rbac-dashboard";
 import Auth from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 import DashboardRouter from "@/components/auth/dashboard-router";
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/creator-dashboard" component={CreatorDashboard} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/nil-dashboard" component={NILDashboard} />
+      <Route path="/rbac-dashboard" component={RBACDashboard} />
       <Route path="/dashboard" component={DashboardRouter} />
       <Route path="/auth" component={Auth} />
       <Route component={NotFound} />

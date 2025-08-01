@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, Settings, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, User, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
 import AuthModal from "@/components/auth/auth-modal";
 
 export default function Navigation() {
@@ -11,6 +12,7 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { user, setShowAuthFlow, handleLogOut } = useDynamicContext();
+  const { isFandomlyAdmin, isCustomerAdmin } = useRBAC();
 
   const handleConnectWallet = () => {
     if (user) {
@@ -82,6 +84,20 @@ export default function Navigation() {
                         </div>
                       </div>
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
+                      <Link href="/rbac-dashboard">
+                        <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
+                          <Shield className="mr-2 h-4 w-4" />
+                          Role Dashboard
+                        </DropdownMenuItem>
+                      </Link>
+                      <RoleGuard allowedRoles={['customer_admin']}>
+                        <Link href="/nil-dashboard">
+                          <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
+                            <Shield className="mr-2 h-4 w-4" />
+                            NIL Dashboard
+                          </DropdownMenuItem>
+                        </Link>
+                      </RoleGuard>
                       <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
                         <User className="mr-2 h-4 w-4" />
                         Profile
