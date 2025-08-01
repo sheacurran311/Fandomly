@@ -141,6 +141,11 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
 
   const profileForm = useForm<ProfileData>({
     resolver: zodResolver(profileSchema),
+    defaultValues: {
+      displayName: "",
+      bio: "",
+      followerCount: 0,
+    },
   });
 
   const idealUsersForm = useForm<IdealUsersData>({
@@ -162,10 +167,22 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
 
   const socialForm = useForm<SocialData>({
     resolver: zodResolver(socialSchema),
+    defaultValues: {
+      instagram: "",
+      twitter: "",
+      tiktok: "",
+      facebook: "",
+      discord: "",
+    },
   });
 
   const loyaltyForm = useForm<LoyaltySetupData>({
     resolver: zodResolver(loyaltySetupSchema),
+    defaultValues: {
+      programName: "",
+      pointsName: "",
+      description: "",
+    },
   });
 
   const createCompleteMutation = useMutation({

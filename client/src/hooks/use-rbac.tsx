@@ -30,9 +30,10 @@ export interface UserRole {
 export function useRBAC() {
   const { user } = useDynamicContext();
 
-  const { data: userRole, isLoading } = useQuery<UserRole>({
+  const { data: userRole, isLoading } = useQuery<UserRole | null>({
     queryKey: ['/api/auth/role'],
     enabled: !!user,
+    retry: false,
   });
 
   const hasRole = (allowedRoles: Array<'fandomly_admin' | 'customer_admin' | 'customer_end_user'>): boolean => {

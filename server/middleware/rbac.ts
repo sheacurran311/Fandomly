@@ -24,14 +24,14 @@ export interface AuthenticatedRequest extends Request {
 // Middleware to verify user authentication and attach role information
 export async function authenticateUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
-    // Extract user ID from session or JWT token
-    const userId = req.session?.userId;
+    // Extract Dynamic user ID from headers or body
+    const dynamicUserId = req.headers['x-dynamic-user-id'] as string || req.body?.dynamicUserId;
     
-    if (!userId) {
+    if (!dynamicUserId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Fetch user with role information
+    // Fetch user with role information using Dynamic user ID
     const [user] = await db
       .select({
         id: users.id,
@@ -41,7 +41,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
         customerAdminData: users.customerAdminData,
       })
       .from(users)
-      .where(eq(users.id, userId))
+      .where(eq(users.dynamicUserId, dynamicUserId))
       .limit(1);
 
     if (!user) {
