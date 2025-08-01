@@ -7,8 +7,9 @@ export default function Footer() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
-            <div className="text-3xl font-bold gradient-text mb-4">
-              FanRewards
+            <div className="flex items-center space-x-3 mb-4">
+              <img src="/fandomly-logo.png" alt="Fandomly" className="h-8 w-auto" />
+              <span className="text-3xl font-bold gradient-text">Fandomly</span>
             </div>
             <p className="text-gray-300 mb-6 max-w-md">
               The ultimate platform for creators to build lasting relationships with their fans through innovative loyalty programs and Web3 rewards.
@@ -52,7 +53,7 @@ export default function Footer() {
         
         <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <div className="text-gray-400 text-sm">
-            © 2024 FanRewards. All rights reserved.
+            © 2024 Fandomly. All rights reserved.
           </div>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a href="#" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Privacy Policy</a>

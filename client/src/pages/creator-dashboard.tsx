@@ -119,7 +119,7 @@ export default function CreatorDashboard() {
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
                 <CardTitle className="text-3xl font-bold gradient-text text-center">
-                  Welcome to FanRewards!
+                  Welcome to Fandomly!
                 </CardTitle>
                 <p className="text-gray-300 text-center">
                   Let's set up your creator profile to start building your loyalty program.

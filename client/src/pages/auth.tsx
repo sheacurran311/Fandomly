@@ -63,7 +63,7 @@ export default function Auth() {
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl font-bold text-white mb-4">Successfully Connected!</h2>
             <p className="text-gray-300 mb-6">
-              Welcome to FanRewards, {user.alias || user.email}!
+              Welcome to Fandomly, {user.alias || user.email}!
             </p>
             <div className="space-y-3">
               <Button 
@@ -94,7 +94,7 @@ export default function Auth() {
             Connect Your Wallet
           </CardTitle>
           <p className="text-gray-300 text-center">
-            Get started with FanRewards by connecting your Web3 wallet
+            Get started with Fandomly by connecting your Web3 wallet
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
