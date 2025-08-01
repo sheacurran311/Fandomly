@@ -9,11 +9,16 @@ export const dynamicConfig = {
   walletConnectors: [],
   multiWallet: true,
   enableVisitTrackingOnConnectOnly: true,
+  // Disable 2FA and email requirements
+  privacyPolicy: undefined,
+  termsOfService: undefined,
+  socialProvidersFilter: undefined,
+  overrides: {
+    evmNetworks: [],
+  },
   appMetadata: {
     name: "FanRewards",
     shortName: "FanRewards", 
     description: "Web3-enabled loyalty rewards platform for creators and fans",
-    url: window.location.origin,
-    iconUrl: `${window.location.origin}/favicon.ico`,
   },
 };

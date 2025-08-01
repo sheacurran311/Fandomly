@@ -35,7 +35,8 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
           StarknetWalletConnectors,
         ],
         appName: "FanRewards",
-        appLogoUrl: "/logo.png",
+        // Disable email requirements - wallet-only authentication
+        bridgeChains: [],
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;

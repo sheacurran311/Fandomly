@@ -57,17 +57,17 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
       
       // First ensure we have a user record in our database
       const userData = {
-        dynamicUserId: user.userId,
+        dynamicUserId: user.userId || "",
         email: user.email || "",
-        username: user.alias || user.firstName || "Creator",
-        avatar: user.avatar || "",
+        username: user.alias || user.firstName || profileData.displayName || "Creator",
+        avatar: "",
         walletAddress: user.verifiedCredentials?.[0]?.address || "",
         walletChain: user.verifiedCredentials?.[0]?.chain || "",
         userType: "creator" as const,
       };
 
       // Create or get user
-      const userRecord = await apiRequest("POST", "/api/auth/register", userData);
+      const userRecord: any = await apiRequest("POST", "/api/auth/register", userData);
       
       return apiRequest("POST", "/api/creators", {
         userId: userRecord.id,
