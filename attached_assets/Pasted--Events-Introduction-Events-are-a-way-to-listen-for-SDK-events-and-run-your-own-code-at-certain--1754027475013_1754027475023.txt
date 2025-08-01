@@ -1,0 +1,59 @@
+# Events Introduction
+
+Events are a way to listen for SDK events and run your own code at certain points.
+
+### Dynamic Events
+
+An alternative to using event callbacks or [`useDynamicEvents`](/react-sdk/hooks/usedynamicevents) react hook is to [use `dynamicEvents` emitter directly.](/react-sdk/events/dynamic-events)
+
+```jsx
+dynamicEvents.on(eventName, listener);
+```
+
+### Event callbacks
+
+You do not need to import anything extra to make use of event callbacks, instead simply add them using the events field inside the settings prop on [DynamicContextProvider](/react-sdk/providers/dynamiccontextprovider).
+
+If you are looking for synchronous actions that will block the user until completion, please look at [**Handlers**](/react-sdk/handlers/handlers-introduction)
+
+```jsx
+<DynamicContextProvider
+  settings={{
+    events: {
+      // events callbacks go here
+    },
+  }}
+>
+  ...
+</DynamicContextProvider>
+```
+
+[**onAuthFlowCancel**](/react-sdk/events/onauthflowclose): Called when the auth modal is closed before authentication is successful (alongside `onAuthFlowClose`).
+
+[**onAuthFlowClose**](/react-sdk/events/onauthflowclose): Called whenever the auth flow modal is closed.
+
+[**onAuthFlowOpen**](/react-sdk/events/onauthflowopen): Called after the auth flow modal is opened.
+
+[**onAuthFailure**](/react-sdk/events/onauthfailure): Called when authentication fails.
+
+[**onAuthInit**](/react-sdk/events/onauthinit): Called when an authentication process begins.
+
+[**onAuthSuccess**](/react-sdk/events/onauthsuccess): Called after the user successfully authenticates.
+
+[**onEmbeddedWalletCreated**](/react-sdk/events/onembeddedwalletcreated): Called after embedded wallet created for user.
+
+[**onLogout**](/react-sdk/events/onlogout): Called after the user logs out.
+
+[**onOtpVerificationResult**](/react-sdk/events/onotpverificationresult): Called when an email or SMS OTP verification succeeds or fails.
+
+[**onSignedMessage**](/react-sdk/events/onsignedmessage): Called when the user signs a message and it allows you to act on that message.
+
+[**onUserProfileUpdate**](/react-sdk/events/onuserprofileupdate): Called when the user successfully updated their profile.
+
+[**onWalletAdded**](/react-sdk/events/onwalletadded): Called when a new wallet is added to the user wallets.
+
+[**onWalletRemoved**](/react-sdk/events/onwalletremoved): Called when a wallet is removed from the user wallets.
+
+[**onWalletTabSelected**](/react-sdk/events/onWalletTabSelected): Called when a wallet tab is selected by the user.
+
+[**onWalletConnectionFailed**](/react-sdk/events/onWalletConnectionFailed): Called when a wallet connection fails.

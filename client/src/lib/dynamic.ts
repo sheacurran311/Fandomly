@@ -21,4 +21,18 @@ export const dynamicConfig = {
     shortName: "Fandomly", 
     description: "AI-powered loyalty platform for creators and fans",
   },
+  events: {
+    onAuthSuccess: (args: any) => {
+      console.log('Dynamic Auth Success:', args);
+    },
+    onLogout: (args: any) => {
+      console.log('Dynamic Logout:', args);
+      // Clear any local storage or cached data
+      localStorage.removeItem('userType');
+      localStorage.removeItem('onboardingCompleted');
+    },
+    onAuthFlowClose: (args: any) => {
+      console.log('Dynamic Auth Flow Closed:', args);
+    }
+  }
 };

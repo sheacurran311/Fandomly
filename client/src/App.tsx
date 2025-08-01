@@ -13,6 +13,7 @@ import CreatorDashboard from "@/pages/creator-dashboard";
 import FanDashboard from "@/pages/fan-dashboard";
 import Auth from "@/pages/auth";
 import NotFound from "@/pages/not-found";
+import DashboardRouter from "@/components/auth/dashboard-router";
 
 function Router() {
   return (
@@ -22,7 +23,7 @@ function Router() {
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
       <Route path="/fan-dashboard" component={FanDashboard} />
-      <Route path="/dashboard" component={FanDashboard} />
+      <Route path="/dashboard" component={DashboardRouter} />
       <Route path="/auth" component={Auth} />
       <Route component={NotFound} />
     </Switch>
