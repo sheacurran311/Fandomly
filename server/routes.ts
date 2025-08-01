@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, insertRewardSchema, insertFanProgramSchema } from "@shared/schema";
+import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -39,8 +40,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Creator routes
-  app.post("/api/creators", async (req, res) => {
+  // Role-based authentication route
+  app.get("/api/auth/role", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      res.json(req.user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user role" });
+    }
+  });
+
+  // Creator routes (require customer_admin role)
+  app.post("/api/creators", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const creatorData = insertCreatorSchema.parse(req.body);
       const creator = await storage.createCreator(creatorData);

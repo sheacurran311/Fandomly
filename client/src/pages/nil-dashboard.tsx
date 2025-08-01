@@ -19,12 +19,14 @@ import {
 } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Link } from "wouter";
+import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
 
 export default function NILDashboard() {
   const { user } = useDynamicContext();
+  const { hasFeatureAccess, isCustomerAdmin, isNILAthlete, userRole } = useRBAC();
   const [activeTab, setActiveTab] = useState("overview");
 
-  if (!user) {
+  if (!user || !hasFeatureAccess('nil_dashboard')) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
@@ -35,7 +37,10 @@ export default function NILDashboard() {
             <Alert className="border-yellow-500/20 bg-yellow-500/10">
               <Shield className="h-4 w-4 text-yellow-400" />
               <AlertDescription className="text-gray-300">
-                Please connect your wallet to access your NIL dashboard and compliance tools.
+                {!user 
+                  ? "Please connect your wallet to access your NIL dashboard and compliance tools."
+                  : "NIL Dashboard access requires Customer Admin (Creator/Athlete) role. Contact support to upgrade your account."
+                }
               </AlertDescription>
             </Alert>
             <Link href="/auth">
@@ -91,7 +96,9 @@ export default function NILDashboard() {
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">NIL Dashboard</h1>
               <p className="text-gray-300">
-                Welcome back! Monitor your NIL activities, compliance, and earnings.
+                Welcome back{isNILAthlete() && userRole?.customerAdminData?.nilAthleteData 
+                  ? `, ${userRole.customerAdminData.nilAthleteData.sport} athlete` 
+                  : ""}! Monitor your NIL activities, compliance, and earnings.
               </p>
             </div>
             <div className="flex items-center space-x-3">
@@ -99,9 +106,16 @@ export default function NILDashboard() {
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Compliant
               </Badge>
-              <Badge className="bg-brand-primary/20 text-brand-primary">
-                Premium Athlete
-              </Badge>
+              <RoleGuard allowedRoles={['customer_admin']}>
+                <Badge className="bg-brand-primary/20 text-brand-primary">
+                  {isNILAthlete() ? 'NIL Athlete' : 'Creator'}
+                </Badge>
+              </RoleGuard>
+              <RoleGuard allowedRoles={['fandomly_admin']}>
+                <Badge className="bg-purple-500/20 text-purple-400">
+                  Platform Admin
+                </Badge>
+              </RoleGuard>
             </div>
           </div>
         </div>

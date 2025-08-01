@@ -1,7 +1,11 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, decimal, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Role-Based Access Control Enums
+export const userRoleEnum = pgEnum('user_role', ['fandomly_admin', 'customer_admin', 'customer_end_user']);
+export const customerTierEnum = pgEnum('customer_tier', ['basic', 'premium', 'vip']);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -11,7 +15,32 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   walletAddress: text("wallet_address"),
   walletChain: text("wallet_chain"),
-  userType: text("user_type").notNull().default("fan"), // "creator" | "fan"
+  userType: text("user_type").notNull().default("fan"), // "creator" | "fan" - legacy field
+  // Role-Based Access Control
+  role: userRoleEnum("role").notNull().default('customer_end_user'),
+  customerTier: customerTierEnum("customer_tier").default('basic'), // Only applies to customer_end_user role
+  // Admin permissions for fandomly_admin role
+  adminPermissions: jsonb("admin_permissions").$type<{
+    canManageAllCreators?: boolean;
+    canManageUsers?: boolean;
+    canAccessAnalytics?: boolean;
+    canManagePlatformSettings?: boolean;
+    canManagePayments?: boolean;
+  }>(),
+  // Customer admin metadata for customer_admin role (creators)
+  customerAdminData: jsonb("customer_admin_data").$type<{
+    organizationName?: string;
+    businessType?: string; // "individual" | "team" | "organization"
+    nilAthleteData?: {
+      sport: string;
+      division: string;
+      school: string;
+      position: string;
+      year: string; // "freshman" | "sophomore" | "junior" | "senior"
+    };
+    subscriptionStatus?: "active" | "inactive" | "trial";
+    subscriptionTier?: "starter" | "professional" | "enterprise";
+  }>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
