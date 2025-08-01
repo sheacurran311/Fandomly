@@ -161,7 +161,7 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
         userType: "creator" as const,
       };
 
-      const userRecord: any = await apiRequest("POST", "/api/auth/register", userData);
+      const userRecord: any = await apiRequest("POST", "/api/auth/user", userData);
       
       // Create creator profile
       const creatorData = {

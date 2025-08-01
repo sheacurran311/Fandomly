@@ -22,28 +22,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser(userData);
       res.json(user);
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid user data" });
-    }
-  });
-
-  // Register endpoint for onboarding flows
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      
-      // Check if user already exists by dynamic user ID
-      if (userData.dynamicUserId) {
-        const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId);
-        if (existingUser) {
-          return res.json(existingUser);
-        }
-      }
-
-      // Create new user
-      const user = await storage.createUser(userData);
-      res.json(user);
-    } catch (error) {
-      console.error("Registration error:", error);
+      console.error("User creation error:", error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid user data" });
     }
   });
@@ -67,6 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const creator = await storage.createCreator(creatorData);
       res.json(creator);
     } catch (error) {
+      console.error("Creator creation error:", error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid creator data" });
     }
   });
@@ -136,14 +116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch loyalty program" });
     }
   });
-      if (!creator) {
-        return res.status(404).json({ error: "Creator not found" });
-      }
-      res.json(creator);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch creator" });
-    }
-  });
 
   // Rewards routes
   app.get("/api/rewards", async (req, res) => {
@@ -155,39 +127,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Loyalty program routes
-  app.post("/api/loyalty-programs", async (req, res) => {
-    try {
-      const programData = insertLoyaltyProgramSchema.parse(req.body);
-      const program = await storage.createLoyaltyProgram(programData);
-      res.json(program);
-    } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid program data" });
-    }
-  });
-
-  app.get("/api/loyalty-programs/creator/:creatorId", async (req, res) => {
-    try {
-      const programs = await storage.getLoyaltyProgramsByCreator(req.params.creatorId);
-      res.json(programs);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch loyalty programs" });
-    }
-  });
-
-  app.get("/api/loyalty-programs/:id", async (req, res) => {
-    try {
-      const program = await storage.getLoyaltyProgram(req.params.id);
-      if (!program) {
-        return res.status(404).json({ error: "Loyalty program not found" });
-      }
-      res.json(program);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch loyalty program" });
-    }
-  });
-
-  // Reward routes
   app.post("/api/rewards", async (req, res) => {
     try {
       const rewardData = insertRewardSchema.parse(req.body);
