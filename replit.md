@@ -1,6 +1,6 @@
 # Overview
 
-FanRewards is a Web3-powered loyalty platform that enables creators to build lasting relationships with their fans through customizable reward programs. The application allows creators to establish loyalty programs with point systems, tiers, and exclusive rewards, while fans can join programs, earn points, and redeem rewards. The platform integrates with multiple blockchain wallets and social media platforms to create an engaging fan experience.
+Fandomly is a Web3-powered loyalty platform that enables creators to build lasting relationships with their fans through customizable reward programs. The application allows creators to establish loyalty programs with point systems, tiers, and exclusive rewards, while fans can join programs, earn points, and redeem rewards. The platform integrates with multiple blockchain wallets and social media platforms to create an engaging fan experience.
 
 # User Preferences
 

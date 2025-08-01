@@ -34,7 +34,7 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
           CosmosWalletConnectors,
           StarknetWalletConnectors,
         ],
-        appName: "FanRewards",
+        appName: "Fandomly",
         // Disable email requirements - wallet-only authentication
         bridgeChains: [],
         cssOverrides: `

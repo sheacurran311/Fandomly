@@ -92,7 +92,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     },
     onSuccess: () => {
       toast({
-        title: "Welcome to FanRewards!",
+        title: "Welcome to Fandomly!",
         description: "Your creator profile has been created successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
@@ -401,7 +401,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     <div className="text-center space-y-8 max-w-2xl mx-auto">
       <div className="text-6xl mb-6">🎉</div>
       <h2 className="text-4xl font-bold gradient-text mb-4">
-        Welcome to FanRewards!
+        Welcome to Fandomly!
       </h2>
       <p className="text-xl text-gray-300 mb-8">
         Your {selectedTheme} profile is ready. Start building your loyalty program and engaging with your fans.

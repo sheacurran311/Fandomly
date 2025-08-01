@@ -39,11 +39,11 @@ export default function Home() {
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold mb-8 leading-tight">
-              <span className="gradient-text">Launch Loyalty Programs</span><br />
-              <span className="text-white">That Build Your Fanbase</span>
+              <span className="gradient-text">AI-Powered Loyalty</span><br />
+              <span className="text-white">That Grows Your Fandom</span>
             </h1>
             <p className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Create customizable loyalty and rewards programs for your fans. Integrate social media, offer exclusive perks, and build lasting relationships with Web3-powered rewards.
+              Create AI-powered loyalty programs that reward your fans for engagement. Integrate social media, offer exclusive perks, and build lasting relationships with smart Web3 rewards.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">

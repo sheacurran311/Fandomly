@@ -17,8 +17,8 @@ export const dynamicConfig = {
     evmNetworks: [],
   },
   appMetadata: {
-    name: "FanRewards",
-    shortName: "FanRewards", 
-    description: "Web3-enabled loyalty rewards platform for creators and fans",
+    name: "Fandomly",
+    shortName: "Fandomly", 
+    description: "AI-powered loyalty platform for creators and fans",
   },
 };

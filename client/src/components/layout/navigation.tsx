@@ -25,8 +25,8 @@ export default function Navigation() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Link href="/" className="text-2xl font-bold gradient-text">
-                FanRewards
+              <Link href="/" className="flex items-center space-x-3">
+                <img src="/logo.svg" alt="Fandomly" className="h-8 w-auto" />
               </Link>
             </div>
             

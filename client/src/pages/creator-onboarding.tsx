@@ -42,7 +42,7 @@ export default function CreatorOnboardingPage() {
               </Button>
             </div>
             <div className="text-2xl font-bold gradient-text">
-              FanRewards
+              Fandomly
             </div>
             <div className="w-24"></div> {/* Spacer for centering */}
           </div>
