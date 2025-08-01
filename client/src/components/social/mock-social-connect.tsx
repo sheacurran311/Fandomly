@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { FaTiktok, FaSpotify } from "react-icons/fa";
 import { useToast } from "@/hooks/use-toast";
-import FacebookConnect from "./facebook-connect";
 
 interface MockSocialAccount {
   platform: string;
@@ -229,36 +228,6 @@ export default function MockSocialConnect({
           </CardContent>
         </Card>
       )}
-
-      {/* Facebook Integration */}
-      <FacebookConnect 
-        onAccountConnected={(account) => {
-          const facebookAccount: MockSocialAccount = {
-            platform: 'facebook',
-            username: account.name,
-            displayName: account.name,
-            followers: account.followers,
-            verified: account.verified,
-            profileImage: account.profileImage || 'https://graph.facebook.com/' + account.id + '/picture',
-            connected: true
-          };
-          
-          setConnectedAccounts(prev => {
-            const filtered = prev.filter(acc => acc.platform !== 'facebook');
-            const updated = [...filtered, facebookAccount];
-            onAccountsChange?.(updated);
-            return updated;
-          });
-        }}
-        onAccountDisconnected={() => {
-          setConnectedAccounts(prev => {
-            const updated = prev.filter(acc => acc.platform !== 'facebook');
-            onAccountsChange?.(updated);
-            return updated;
-          });
-        }}
-        showMetrics={showMetrics}
-      />
 
       {/* Platform Connection Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
