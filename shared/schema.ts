@@ -32,6 +32,7 @@ export const creators = pgTable("creators", {
     tiktok?: string;
     twitter?: string;
     facebook?: string;
+    discord?: string;
   }>(),
   isVerified: boolean("is_verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),

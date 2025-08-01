@@ -55,8 +55,22 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
     mutationFn: async () => {
       if (!user || !selectedTheme) throw new Error("Missing required data");
       
+      // First ensure we have a user record in our database
+      const userData = {
+        dynamicUserId: user.userId,
+        email: user.email || "",
+        username: user.alias || user.firstName || "Creator",
+        avatar: user.avatar || "",
+        walletAddress: user.verifiedCredentials?.[0]?.address || "",
+        walletChain: user.verifiedCredentials?.[0]?.chain || "",
+        userType: "creator" as const,
+      };
+
+      // Create or get user
+      const userRecord = await apiRequest("POST", "/api/auth/register", userData);
+      
       return apiRequest("POST", "/api/creators", {
-        userId: user.id,
+        userId: userRecord.id,
         displayName: profileData.displayName,
         bio: profileData.bio,
         category: selectedTheme,
