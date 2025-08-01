@@ -24,12 +24,23 @@
   --ring: hsl(315, 76%, 49%);
   --radius: 0.75rem;
   
-  /* Custom brand colors */
+  /* Custom brand colors - Can be overridden by tenant branding */
   --brand-primary: hsl(315, 76%, 49%);
   --brand-secondary: hsl(78, 94%, 51%);
+  --brand-accent: hsl(195, 98%, 50%);
   --brand-dark-purple: hsl(280, 65%, 16%);
   --brand-blue: hsl(195, 98%, 50%);
   --brand-dark-bg: hsl(278, 8%, 11%);
+  
+  /* Brand Color Variations for Dynamic Theming */
+  --brand-primary-rgb: 233, 63, 193;
+  --brand-secondary-rgb: 181, 238, 52;
+  --brand-accent-rgb: 12, 194, 255;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, hsl(315, 76%, 49%), hsl(78, 94%, 51%));
+  --gradient-secondary: linear-gradient(135deg, hsl(78, 94%, 51%), hsl(195, 98%, 50%));
+  --gradient-accent: linear-gradient(135deg, hsl(195, 98%, 50%), hsl(315, 76%, 49%));
 }
 
 .dark {
@@ -71,8 +82,61 @@
 }
 
 @layer utilities {
+  /* Dynamic Gradient Classes */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+  
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Dynamic Brand Color Classes */
   .brand-primary {
-    color: hsl(315, 76%, 49%);
+    color: var(--brand-primary);
+  }
+
+  .brand-secondary {
+    color: var(--brand-secondary);
+  }
+  
+  .brand-accent {
+    color: var(--brand-accent);
+  }
+  
+  .bg-brand-primary {
+    background-color: var(--brand-primary);
+  }
+  
+  .bg-brand-secondary {
+    background-color: var(--brand-secondary);
+  }
+  
+  .bg-brand-accent {
+    background-color: var(--brand-accent);
+  }
+  
+  .border-brand-primary {
+    border-color: var(--brand-primary);
+  }
+  
+  .border-brand-secondary {
+    border-color: var(--brand-secondary);
+  }
+  
+  .border-brand-accent {
+    border-color: var(--brand-accent);
   }
   
   .brand-secondary {

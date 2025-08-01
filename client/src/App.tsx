@@ -12,6 +12,7 @@ import Marketplace from "@/pages/marketplace";
 import CreatorOnboarding from "@/pages/creator-onboarding";
 import CampaignBuilder from "@/pages/campaign-builder";
 import TenantSetup from "@/pages/tenant-setup";
+import BrandingStudio from "@/pages/branding-studio";
 import CreatorDashboard from "@/pages/creator-dashboard";
 import FanDashboard from "@/pages/fan-dashboard";
 import NILDashboard from "@/pages/nil-dashboard";
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />
+      <Route path="/branding-studio" component={BrandingStudio} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/nil-dashboard" component={NILDashboard} />
