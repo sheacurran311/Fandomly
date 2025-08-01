@@ -3,12 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X, ArrowRight, Trophy, Camera, Music, Users } from "lucide-react";
+import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X, ArrowRight, Trophy, Camera, Music, Users, Shield } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
 import NILAthleteSpotlight from "@/components/nil/nil-athlete-spotlight";
 import NILValueCalculator from "@/components/nil/nil-value-calculator";
-import SocialIntegrationTracker from "@/components/nil/social-integration-tracker";
-import ComplianceChecker from "@/components/nil/compliance-checker";
 import { type Creator } from "@shared/schema";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 
@@ -377,8 +375,40 @@ export default function Home() {
       {/* NIL Features Sections */}
       <NILAthleteSpotlight />
       <NILValueCalculator />
-      <SocialIntegrationTracker />
-      <ComplianceChecker />
+      
+      {/* Privacy Notice for Protected Features */}
+      <section className="py-16 bg-gradient-to-b from-brand-dark-bg to-brand-dark-purple/20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-4xl mx-auto">
+            <CardContent className="p-8">
+              <div className="flex items-center justify-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-2xl flex items-center justify-center">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">
+                Advanced NIL Tools & Compliance Monitoring
+              </h3>
+              <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
+                Access personalized social media tracking, earnings analytics, and automated compliance monitoring. 
+                Your data is protected and encrypted for your privacy and NCAA eligibility.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/auth">
+                  <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-8">
+                    Connect Wallet to Access
+                  </Button>
+                </Link>
+                <Link href="/nil-dashboard">
+                  <Button variant="outline" className="border-white/20 text-gray-300 hover:bg-white/5">
+                    View Dashboard
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }
