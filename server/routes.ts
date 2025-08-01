@@ -55,6 +55,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile route to check if user has completed onboarding
+  app.get("/api/auth/profile", async (req, res) => {
+    try {
+      // For now, return a simple response to avoid auth complexity
+      // This will be enhanced when we implement proper Dynamic auth middleware
+      res.json({
+        user: null,
+        creator: null,
+        hasCompletedOnboarding: false
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
   // Creator routes (public creation for onboarding)
   app.post("/api/creators", async (req, res) => {
     try {

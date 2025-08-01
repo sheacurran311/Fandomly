@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DynamicProvider from "@/components/auth/dynamic-provider";
+import WalletAuthRouter from "@/components/auth/wallet-auth-router";
 import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
@@ -41,14 +42,16 @@ function App() {
     <DynamicProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <div className="min-h-screen bg-brand-dark-bg">
-            <Navigation />
-            <main>
-              <Router />
-            </main>
-            <Footer />
-          </div>
-          <Toaster />
+          <WalletAuthRouter>
+            <div className="min-h-screen bg-brand-dark-bg">
+              <Navigation />
+              <main>
+                <Router />
+              </main>
+              <Footer />
+            </div>
+            <Toaster />
+          </WalletAuthRouter>
         </TooltipProvider>
       </QueryClientProvider>
     </DynamicProvider>
