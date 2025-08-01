@@ -40,7 +40,7 @@ export default function Navigation() {
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-4">
               <Link href="/" className="flex items-center">
-                <img src="/fandomly-logo.png" alt="Fandomly" className="h-16 w-auto" />
+                <img src="/fandomly-logo-with-text.png" alt="Fandomly" className="h-12 w-auto" />
               </Link>
             </div>
             

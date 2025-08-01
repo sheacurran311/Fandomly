@@ -41,9 +41,8 @@ export default function CreatorOnboardingPage() {
                 Back to Home
               </Button>
             </div>
-            <div className="flex items-center space-x-3">
-              <img src="/fandomly-logo.png" alt="Fandomly" className="h-8 w-auto" />
-              <span className="text-2xl font-bold gradient-text">Fandomly</span>
+            <div className="flex items-center">
+              <img src="/fandomly-logo-with-text.png" alt="Fandomly" className="h-8 w-auto" />
             </div>
             <div className="w-24"></div> {/* Spacer for centering */}
           </div>
