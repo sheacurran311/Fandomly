@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(27, 9%, 98%);
+  --foreground: hsl(280, 65%, 90%);
+  --muted: hsl(280, 20%, 15%);
+  --muted-foreground: hsl(280, 30%, 60%);
+  --popover: hsl(280, 20%, 15%);
+  --popover-foreground: hsl(280, 65%, 90%);
+  --card: hsl(280, 20%, 15%);
+  --card-foreground: hsl(280, 65%, 90%);
+  --border: hsl(280, 30%, 25%);
+  --input: hsl(280, 30%, 25%);
+  --primary: hsl(315, 76%, 49%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(78, 94%, 51%);
+  --secondary-foreground: hsl(280, 20%, 15%);
+  --accent: hsl(195, 98%, 50%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(315, 76%, 49%);
+  --radius: 0.75rem;
+  
+  /* Custom brand colors */
+  --brand-primary: hsl(315, 76%, 49%);
+  --brand-secondary: hsl(78, 94%, 51%);
+  --brand-dark-purple: hsl(280, 65%, 16%);
+  --brand-blue: hsl(195, 98%, 50%);
+  --brand-dark-bg: hsl(278, 8%, 11%);
+}
+
+.dark {
+  --background: hsl(278, 8%, 11%);
+  --foreground: hsl(280, 65%, 90%);
+  --muted: hsl(280, 20%, 15%);
+  --muted-foreground: hsl(280, 30%, 60%);
+  --popover: hsl(280, 20%, 15%);
+  --popover-foreground: hsl(280, 65%, 90%);
+  --card: hsl(280, 20%, 15%);
+  --card-foreground: hsl(280, 65%, 90%);
+  --border: hsl(280, 30%, 25%);
+  --input: hsl(280, 30%, 25%);
+  --primary: hsl(315, 76%, 49%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(78, 94%, 51%);
+  --secondary-foreground: hsl(280, 20%, 15%);
+  --accent: hsl(195, 98%, 50%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(315, 76%, 49%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background: hsl(278, 8%, 11%);
+    color: hsl(280, 65%, 90%);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .brand-primary {
+    color: hsl(315, 76%, 49%);
+  }
+  
+  .brand-secondary {
+    color: hsl(78, 94%, 51%);
+  }
+  
+  .brand-accent {
+    color: hsl(195, 98%, 50%);
+  }
+  
+  .bg-brand-primary {
+    background-color: hsl(315, 76%, 49%);
+  }
+  
+  .bg-brand-secondary {
+    background-color: hsl(78, 94%, 51%);
+  }
+  
+  .bg-brand-accent {
+    background-color: hsl(195, 98%, 50%);
+  }
+  
+  .bg-brand-dark-purple {
+    background-color: hsl(280, 65%, 16%);
+  }
+  
+  .bg-brand-dark-bg {
+    background-color: hsl(278, 8%, 11%);
+  }
+  
+  .border-brand-primary {
+    border-color: hsl(315, 76%, 49%);
+  }
+  
+  .border-brand-secondary {
+    border-color: hsl(78, 94%, 51%);
+  }
+  
+  .border-brand-accent {
+    border-color: hsl(195, 98%, 50%);
+  }
+  
+  .text-brand-primary {
+    color: hsl(315, 76%, 49%);
+  }
+  
+  .text-brand-secondary {
+    color: hsl(78, 94%, 51%);
+  }
+  
+  .text-brand-accent {
+    color: hsl(195, 98%, 50%);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(315, 76%, 49%) 0%, hsl(78, 94%, 51%) 100%);
+  }
+
+  .gradient-accent {
+    background: linear-gradient(135deg, hsl(195, 98%, 50%) 0%, hsl(315, 76%, 49%) 100%);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(315, 76%, 49%) 0%, hsl(78, 94%, 51%) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
