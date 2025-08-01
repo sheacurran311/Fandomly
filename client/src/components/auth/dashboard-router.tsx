@@ -4,12 +4,15 @@ import { useLocation } from "wouter";
 import AccountTypeModal from "./account-type-modal";
 import FanDashboard from "@/pages/fan-dashboard";
 import CreatorDashboard from "@/pages/creator-dashboard";
+import ComprehensiveCreatorFlow from "@/components/onboarding/comprehensive-creator-flow";
+import SimpleFanFlow from "@/components/onboarding/simple-fan-flow";
 
 export default function DashboardRouter() {
   const { user } = useDynamicContext();
   const [, setLocation] = useLocation();
   const [showAccountTypeModal, setShowAccountTypeModal] = useState(false);
   const [userType, setUserType] = useState<'fan' | 'creator' | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -32,9 +35,13 @@ export default function DashboardRouter() {
   const handleAccountTypeSelect = (type: 'fan' | 'creator') => {
     setUserType(type);
     setShowAccountTypeModal(false);
-    
-    // Redirect to specific dashboard
-    if (type === 'creator') {
+    setShowOnboarding(true);
+  };
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    // Redirect to appropriate dashboard
+    if (userType === 'creator') {
       setLocation('/creator-dashboard');
     } else {
       setLocation('/fan-dashboard');
@@ -60,7 +67,15 @@ export default function DashboardRouter() {
         onSelect={handleAccountTypeSelect}
       />
       
-      {userType === 'creator' ? <CreatorDashboard /> : <FanDashboard />}
+      {showOnboarding ? (
+        userType === 'creator' ? (
+          <ComprehensiveCreatorFlow onComplete={handleOnboardingComplete} />
+        ) : (
+          <SimpleFanFlow onComplete={handleOnboardingComplete} />
+        )
+      ) : (
+        userType === 'creator' ? <CreatorDashboard /> : <FanDashboard />
+      )}
     </>
   );
 }
