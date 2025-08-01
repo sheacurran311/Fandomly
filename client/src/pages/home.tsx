@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X, ArrowRight } from "lucide-react";
+import { Palette, Share2, Coins, BarChart3, Layers, Smartphone, Play, CheckCircle, X, ArrowRight, Trophy, Camera, Music, Users } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
 import { type Creator } from "@shared/schema";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
@@ -213,147 +213,160 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-gradient-to-b from-brand-dark-purple/20 to-brand-dark-bg">
+      {/* Who Fandomly Is For Section */}
+      <section id="ideal-users" className="py-24 bg-gradient-to-b from-brand-dark-purple/20 to-brand-dark-bg">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl lg:text-5xl font-bold mb-6 gradient-text">
-              Choose Your Plan
+              Who Fandomly Is For
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Start free and scale as you grow. All plans include our core loyalty features with increasing customization and analytics.
+              Built specifically for athletes, content creators, and musicians who want to build lasting relationships with their fans through innovative loyalty programs.
             </p>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {/* Starter Plan */}
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-secondary/50 transition-all duration-300">
+            {/* Athletes */}
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-amber-500/50 transition-all duration-300 hover:scale-105">
               <CardContent className="p-8">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">Starter</h3>
-                  <div className="text-4xl font-bold text-brand-secondary mb-2">Free</div>
-                  <p className="text-gray-400">Perfect for getting started</p>
+                  <div className="w-20 h-20 bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Trophy className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4">Athletes</h3>
+                  <p className="text-gray-300 mb-6">
+                    From professional leagues to high school sports, connect with your fans and build your personal brand.
+                  </p>
                 </div>
                 
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-secondary mr-3" />
-                    Up to 1,000 fans
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-secondary mr-3" />
-                    Basic loyalty program
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-secondary mr-3" />
-                    Social media integration
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-secondary mr-3" />
-                    Standard support
-                  </li>
-                  <li className="flex items-center text-gray-400">
-                    <X className="h-5 w-5 mr-3" />
-                    NFT rewards
-                  </li>
-                </ul>
+                <div className="space-y-3 mb-8">
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Professional & Olympic Athletes</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">College & University Sports</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">High School Athletes</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">NIL Opportunities</span>
+                  </div>
+                </div>
                 
                 <Button
-                  onClick={handleConnectWallet}
-                  className="w-full border-2 border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg py-3 rounded-2xl font-semibold transition-all duration-200"
-                  variant="outline"
+                  onClick={handleStartCreatorSignup}
+                  className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
                 >
-                  Get Started
+                  Start as Athlete
                 </Button>
               </CardContent>
             </Card>
             
-            {/* Creator Plan */}
-            <Card className="bg-white/5 backdrop-blur-lg border-2 border-brand-primary relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-brand-primary text-white px-4 py-1 text-sm font-semibold">
+            {/* Content Creators */}
+            <Card className="bg-white/5 backdrop-blur-lg border-2 border-blue-500 relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold">
                 Popular
               </div>
               <CardContent className="p-8">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">Creator</h3>
-                  <div className="text-4xl font-bold text-brand-primary mb-2">
-                    $49<span className="text-lg text-gray-400">/mo</span>
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Camera className="h-10 w-10 text-white" />
                   </div>
-                  <p className="text-gray-400">For serious creators</p>
+                  <h3 className="text-2xl font-bold text-white mb-4">Content Creators</h3>
+                  <p className="text-gray-300 mb-6">
+                    Turn your content into a thriving community with rewards that keep fans coming back for more.
+                  </p>
                 </div>
                 
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-primary mr-3" />
-                    Up to 25,000 fans
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-primary mr-3" />
-                    Advanced analytics
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-primary mr-3" />
-                    NFT & token rewards
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-primary mr-3" />
-                    White-label branding
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-primary mr-3" />
-                    Priority support
-                  </li>
-                </ul>
+                <div className="space-y-3 mb-8">
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-blue-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Social Media Influencers</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-blue-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Video Content & Vloggers</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-blue-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Photographers & Visual Artists</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-blue-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Videographers & Filmmakers</span>
+                  </div>
+                </div>
                 
                 <Button
-                  onClick={handleConnectWallet}
-                  className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  onClick={handleStartCreatorSignup}
+                  className="w-full bg-gradient-to-r from-blue-400 to-cyan-500 hover:from-blue-500 hover:to-cyan-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
                 >
-                  Start Free Trial
+                  Start as Creator
                 </Button>
               </CardContent>
             </Card>
             
-            {/* Enterprise Plan */}
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-accent/50 transition-all duration-300">
+            {/* Musicians */}
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105">
               <CardContent className="p-8">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">Enterprise</h3>
-                  <div className="text-4xl font-bold text-brand-accent mb-2">Custom</div>
-                  <p className="text-gray-400">For organizations</p>
+                  <div className="w-20 h-20 bg-gradient-to-r from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Music className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4">Musicians</h3>
+                  <p className="text-gray-300 mb-6">
+                    Build deeper connections with your audience and monetize your music in new and exciting ways.
+                  </p>
                 </div>
                 
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-accent mr-3" />
-                    Unlimited fans
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-accent mr-3" />
-                    Custom integrations
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-accent mr-3" />
-                    Multi-chain support
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-accent mr-3" />
-                    Dedicated account manager
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <CheckCircle className="h-5 w-5 text-brand-accent mr-3" />
-                    SLA guarantee
-                  </li>
-                </ul>
+                <div className="space-y-3 mb-8">
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-purple-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Grammy & Award Winners</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-purple-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Independent Artists</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-purple-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Local & Emerging Artists</span>
+                  </div>
+                  <div className="flex items-center text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-purple-400 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Cover Artists & Entertainers</span>
+                  </div>
+                </div>
                 
                 <Button
-                  variant="outline"
-                  className="w-full border-2 border-brand-accent text-brand-accent hover:bg-brand-accent hover:text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  onClick={handleStartCreatorSignup}
+                  className="w-full bg-gradient-to-r from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
                 >
-                  Contact Sales
+                  Start as Musician
                 </Button>
               </CardContent>
             </Card>
+          </div>
+          
+          <div className="text-center mt-12">
+            <div className="bg-white/5 border border-white/10 rounded-lg p-6 max-w-4xl mx-auto">
+              <div className="flex items-start space-x-4">
+                <Users className="h-8 w-8 text-brand-accent mt-1 flex-shrink-0" />
+                <div className="text-left">
+                  <h4 className="font-semibold text-brand-accent mb-2">No matter your level or niche</h4>
+                  <p className="text-gray-300">
+                    Whether you're just starting out or already have millions of fans, Fandomly scales with you. 
+                    Our platform works for everyone from local performers to global superstars, providing the tools 
+                    you need to build meaningful relationships with your audience.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

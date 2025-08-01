@@ -51,8 +51,8 @@ export default function Navigation() {
               <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
                 Marketplace
               </Link>
-              <Link href="/#pricing" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                Pricing
+              <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                Who It's For
               </Link>
               {user ? (
                 <div className="flex items-center space-x-4">
