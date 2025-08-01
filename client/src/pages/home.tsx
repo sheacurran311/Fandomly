@@ -45,7 +45,7 @@ export default function Home() {
               <span className="text-white">That Grows Your Fandom</span>
             </h1>
             <p className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Create AI-powered loyalty programs that reward your fans for engagement. Perfect for Olympic athletes, college football players, and all creators to monetize their personal brand through smart Web3 rewards and NIL-compliant fan experiences.
+              Create AI-powered loyalty programs for athletes and creators, with built-in fan engagement, monetization tools, and optional Web3 rewards.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
