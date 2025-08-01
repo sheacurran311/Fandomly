@@ -346,6 +346,21 @@ export const insertRewardRedemptionSchema = createInsertSchema(rewardRedemptions
   redeemedAt: true,
 });
 
+export const insertUserSocialProfileSchema = createInsertSchema(userSocialProfiles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFanQuestSchema = createInsertSchema(fanQuests).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertQuestParticipationSchema = createInsertSchema(questParticipations).omit({
+  id: true,
+  startedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -367,3 +382,12 @@ export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema
 
 export type RewardRedemption = typeof rewardRedemptions.$inferSelect;
 export type InsertRewardRedemption = z.infer<typeof insertRewardRedemptionSchema>;
+
+export type UserSocialProfile = typeof userSocialProfiles.$inferSelect;
+export type InsertUserSocialProfile = z.infer<typeof insertUserSocialProfileSchema>;
+
+export type FanQuest = typeof fanQuests.$inferSelect;
+export type InsertFanQuest = z.infer<typeof insertFanQuestSchema>;
+
+export type QuestParticipation = typeof questParticipations.$inferSelect;
+export type InsertQuestParticipation = z.infer<typeof insertQuestParticipationSchema>;
