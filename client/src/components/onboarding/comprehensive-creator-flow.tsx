@@ -130,6 +130,10 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
     { name: "Gold VIP", minPoints: 5000, benefits: ["VIP events", "Personal interactions", "Limited NFTs"], color: "#FFD700" }
   ]);
 
+  // Ideal Users selection state
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSubcategories, setSelectedSubcategories] = useState<Record<string, string[]>>({});
+
   // Forms for each step
   const categoryForm = useForm<CategoryData>({
     resolver: zodResolver(categorySchema),
@@ -1085,9 +1089,6 @@ export default function ComprehensiveCreatorFlow({ onComplete }: ComprehensiveCr
         ]
       }
     ];
-
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-    const [selectedSubcategories, setSelectedSubcategories] = useState<Record<string, string[]>>({});
 
     const handleCategoryToggle = (categoryId: string) => {
       setSelectedCategories(prev => 
