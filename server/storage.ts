@@ -1,15 +1,11 @@
 import { 
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
-  pointTransactions, rewardRedemptions, userSocialProfiles,
-  fanQuests, questParticipations,
+  pointTransactions, rewardRedemptions,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
   type PointTransaction, type InsertPointTransaction,
-  type RewardRedemption, type InsertRewardRedemption,
-  type UserSocialProfile, type InsertUserSocialProfile,
-  type FanQuest, type InsertFanQuest,
-  type QuestParticipation, type InsertQuestParticipation
+  type RewardRedemption, type InsertRewardRedemption
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -57,24 +53,7 @@ export interface IStorage {
   getRewardRedemptionsByUser(fanId: string): Promise<RewardRedemption[]>;
   updateRewardRedemption(id: string, updates: Partial<InsertRewardRedemption>): Promise<RewardRedemption>;
 
-  // User social profile operations
-  createUserSocialProfile(profile: InsertUserSocialProfile): Promise<UserSocialProfile>;
-  getUserSocialProfiles(userId: string): Promise<UserSocialProfile[]>;
-  deleteUserSocialProfile(id: string): Promise<void>;
 
-  // Fan quest operations
-  createFanQuest(quest: InsertFanQuest): Promise<FanQuest>;
-  getFanQuests(): Promise<FanQuest[]>;
-  getFanQuestById(id: string): Promise<FanQuest | undefined>;
-  getFanQuestsByCreator(creatorId: string): Promise<FanQuest[]>;
-  updateFanQuest(id: string, updates: Partial<FanQuest>): Promise<FanQuest | undefined>;
-
-  // Quest participation operations
-  createQuestParticipation(participation: InsertQuestParticipation): Promise<QuestParticipation>;
-  getQuestParticipationsByUser(userId: string): Promise<QuestParticipation[]>;
-  getQuestParticipationsByQuest(questId: string): Promise<QuestParticipation[]>;
-  updateQuestParticipation(id: string, updates: Partial<QuestParticipation>): Promise<QuestParticipation | undefined>;
-  getUserQuestParticipation(userId: string, questId: string): Promise<QuestParticipation | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -224,89 +203,7 @@ export class DatabaseStorage implements IStorage {
     return redemption;
   }
 
-  // User social profile operations
-  async createUserSocialProfile(insertProfile: InsertUserSocialProfile): Promise<UserSocialProfile> {
-    const [profile] = await db.insert(userSocialProfiles).values(insertProfile).returning();
-    return profile;
-  }
 
-  async getUserSocialProfiles(userId: string): Promise<UserSocialProfile[]> {
-    return await db.select().from(userSocialProfiles)
-      .where(eq(userSocialProfiles.userId, userId))
-      .orderBy(userSocialProfiles.platform);
-  }
-
-  async deleteUserSocialProfile(id: string): Promise<void> {
-    await db.delete(userSocialProfiles).where(eq(userSocialProfiles.id, id));
-  }
-
-  // Fan quest operations
-  async createFanQuest(insertQuest: InsertFanQuest): Promise<FanQuest> {
-    const [quest] = await db.insert(fanQuests).values(insertQuest).returning();
-    return quest;
-  }
-
-  async getFanQuests(): Promise<FanQuest[]> {
-    return await db.select().from(fanQuests)
-      .where(eq(fanQuests.isActive, true))
-      .orderBy(desc(fanQuests.createdAt));
-  }
-
-  async getFanQuestById(id: string): Promise<FanQuest | undefined> {
-    const [quest] = await db.select().from(fanQuests).where(eq(fanQuests.id, id));
-    return quest || undefined;
-  }
-
-  async getFanQuestsByCreator(creatorId: string): Promise<FanQuest[]> {
-    return await db.select().from(fanQuests)
-      .where(eq(fanQuests.creatorId, creatorId))
-      .orderBy(desc(fanQuests.createdAt));
-  }
-
-  async updateFanQuest(id: string, updates: Partial<FanQuest>): Promise<FanQuest | undefined> {
-    const [quest] = await db.update(fanQuests).set(updates)
-      .where(eq(fanQuests.id, id)).returning();
-    return quest || undefined;
-  }
-
-  // Quest participation operations
-  async createQuestParticipation(insertParticipation: InsertQuestParticipation): Promise<QuestParticipation> {
-    const [participation] = await db.insert(questParticipations).values(insertParticipation).returning();
-    
-    // Update quest participant count (simplified approach)
-    const participantCount = await db.select().from(questParticipations)
-      .where(eq(questParticipations.questId, insertParticipation.questId));
-    
-    await db.update(fanQuests)
-      .set({ currentParticipants: participantCount.length })
-      .where(eq(fanQuests.id, insertParticipation.questId));
-    
-    return participation;
-  }
-
-  async getQuestParticipationsByUser(userId: string): Promise<QuestParticipation[]> {
-    return await db.select().from(questParticipations)
-      .where(eq(questParticipations.userId, userId))
-      .orderBy(desc(questParticipations.startedAt));
-  }
-
-  async getQuestParticipationsByQuest(questId: string): Promise<QuestParticipation[]> {
-    return await db.select().from(questParticipations)
-      .where(eq(questParticipations.questId, questId))
-      .orderBy(desc(questParticipations.startedAt));
-  }
-
-  async updateQuestParticipation(id: string, updates: Partial<QuestParticipation>): Promise<QuestParticipation | undefined> {
-    const [participation] = await db.update(questParticipations).set(updates)
-      .where(eq(questParticipations.id, id)).returning();
-    return participation || undefined;
-  }
-
-  async getUserQuestParticipation(userId: string, questId: string): Promise<QuestParticipation | undefined> {
-    const [participation] = await db.select().from(questParticipations)
-      .where(and(eq(questParticipations.userId, userId), eq(questParticipations.questId, questId)));
-    return participation || undefined;
-  }
 }
 
 export const storage = new DatabaseStorage();

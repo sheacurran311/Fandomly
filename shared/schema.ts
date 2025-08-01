@@ -154,70 +154,7 @@ export const rewardRedemptions = pgTable("reward_redemptions", {
   redeemedAt: timestamp("redeemed_at").defaultNow(),
 });
 
-// User social profiles (just for display/quest targeting, Dynamic handles verification)
-export const userSocialProfiles = pgTable("user_social_profiles", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  platform: text("platform").notNull(), // instagram, twitter, tiktok, youtube, linkedin
-  username: text("username").notNull(),
-  profileUrl: text("profile_url"),
-  isVisible: boolean("is_visible").default(true), // user can choose to show/hide
-  createdAt: timestamp("created_at").defaultNow(),
-});
 
-// Fan quests/challenges system
-export const fanQuests = pgTable("fan_quests", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  creatorId: varchar("creator_id").references(() => creators.id, { onDelete: "cascade" }).notNull(),
-  title: text("title").notNull(),
-  description: text("description").notNull(),
-  questType: text("quest_type").notNull(), // social_follow, social_share, social_post, engagement, custom
-  requirements: jsonb("requirements").$type<{
-    platforms?: string[];
-    actions?: string[];
-    minimumFollowers?: number;
-    hashtags?: string[];
-    mentions?: string[];
-    customInstructions?: string;
-    duration?: number; // days
-  }>(),
-  rewards: jsonb("rewards").$type<{
-    points: number;
-    tier?: string;
-    exclusiveContent?: string;
-    nft?: string;
-    physicalReward?: string;
-    badgeId?: string;
-  }>(),
-  isActive: boolean("is_active").notNull().default(true),
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
-  maxParticipants: integer("max_participants"),
-  currentParticipants: integer("current_participants").default(0),
-  difficultyLevel: text("difficulty_level").default("easy"), // easy, medium, hard
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Track quest participation and completion
-export const questParticipations = pgTable("quest_participations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  questId: varchar("quest_id").references(() => fanQuests.id, { onDelete: "cascade" }).notNull(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  status: text("status").notNull().default("started"), // started, submitted, verified, completed, rewarded
-  submissionData: jsonb("submission_data").$type<{
-    socialPosts?: string[];
-    screenshots?: string[];
-    verificationLinks?: string[];
-    notes?: string;
-    completionProof?: string;
-  }>(),
-  pointsEarned: integer("points_earned").default(0),
-  startedAt: timestamp("started_at").defaultNow(),
-  submittedAt: timestamp("submitted_at"),
-  verifiedAt: timestamp("verified_at"),
-  completedAt: timestamp("completed_at"),
-  rewardedAt: timestamp("rewarded_at"),
-});
 
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -284,31 +221,7 @@ export const rewardRedemptionsRelations = relations(rewardRedemptions, ({ one })
   }),
 }));
 
-export const userSocialProfilesRelations = relations(userSocialProfiles, ({ one }) => ({
-  user: one(users, {
-    fields: [userSocialProfiles.userId],
-    references: [users.id],
-  }),
-}));
 
-export const fanQuestsRelations = relations(fanQuests, ({ one, many }) => ({
-  creator: one(creators, {
-    fields: [fanQuests.creatorId],
-    references: [creators.id],
-  }),
-  participations: many(questParticipations),
-}));
-
-export const questParticipationsRelations = relations(questParticipations, ({ one }) => ({
-  quest: one(fanQuests, {
-    fields: [questParticipations.questId],
-    references: [fanQuests.id],
-  }),
-  user: one(users, {
-    fields: [questParticipations.userId],
-    references: [users.id],
-  }),
-}));
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -346,20 +259,7 @@ export const insertRewardRedemptionSchema = createInsertSchema(rewardRedemptions
   redeemedAt: true,
 });
 
-export const insertUserSocialProfileSchema = createInsertSchema(userSocialProfiles).omit({
-  id: true,
-  createdAt: true,
-});
 
-export const insertFanQuestSchema = createInsertSchema(fanQuests).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertQuestParticipationSchema = createInsertSchema(questParticipations).omit({
-  id: true,
-  startedAt: true,
-});
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -383,11 +283,4 @@ export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema
 export type RewardRedemption = typeof rewardRedemptions.$inferSelect;
 export type InsertRewardRedemption = z.infer<typeof insertRewardRedemptionSchema>;
 
-export type UserSocialProfile = typeof userSocialProfiles.$inferSelect;
-export type InsertUserSocialProfile = z.infer<typeof insertUserSocialProfileSchema>;
 
-export type FanQuest = typeof fanQuests.$inferSelect;
-export type InsertFanQuest = z.infer<typeof insertFanQuestSchema>;
-
-export type QuestParticipation = typeof questParticipations.$inferSelect;
-export type InsertQuestParticipation = z.infer<typeof insertQuestParticipationSchema>;
