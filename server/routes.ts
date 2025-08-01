@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { registerSocialRoutes } from "./social-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema
@@ -16,7 +17,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user already exists by dynamic user ID
       if (userData.dynamicUserId) {
-        const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId);
+        const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId as string);
         if (existingUser) {
           return res.json(existingUser);
         }
@@ -226,6 +227,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+
+  // Register social media routes
+  registerSocialRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

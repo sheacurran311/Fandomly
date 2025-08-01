@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import MockSocialConnect from "@/components/social/mock-social-connect";
 
 type OnboardingStep = "theme" | "profile" | "social" | "complete";
 type CreatorTheme = "athlete" | "musician" | "creator";
@@ -452,7 +453,49 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         <div className="max-w-6xl mx-auto">
           {currentStep === "theme" && renderThemeSelection()}
           {currentStep === "profile" && renderProfileSetup()}
-          {currentStep === "social" && renderSocialConnections()}
+          {currentStep === "social" && (
+            <div className="space-y-6 max-w-6xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold gradient-text mb-4">
+                  Connect Your Social Media
+                </h2>
+                <p className="text-gray-300 text-lg">
+                  Link your accounts to track engagement and grow your fanbase
+                </p>
+              </div>
+
+              <MockSocialConnect 
+                onAccountsChange={(accounts) => {
+                  const connections = accounts.reduce((acc, account) => ({
+                    ...acc,
+                    [account.platform]: `@${account.username}`
+                  }), {} as typeof socialConnections);
+                  setSocialConnections(prev => ({ ...prev, ...connections }));
+                }}
+                requiredPlatforms={['instagram', 'tiktok', 'twitter']}
+                showMetrics={true}
+              />
+
+              <div className="flex justify-between">
+                <Button
+                  onClick={() => setCurrentStep("profile")}
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  size="lg"
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={() => setCurrentStep("complete")}
+                  className="bg-brand-primary hover:bg-brand-primary/80"
+                  size="lg"
+                >
+                  Continue
+                  <ArrowRight className="h-5 w-5 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
           {currentStep === "complete" && renderComplete()}
         </div>
       </div>
