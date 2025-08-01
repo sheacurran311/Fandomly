@@ -26,7 +26,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import MockSocialConnect from "@/components/social/mock-social-connect";
 
-type OnboardingStep = "theme" | "profile" | "social" | "complete";
+type OnboardingStep = "theme" | "profile" | "complete";
 type CreatorTheme = "athlete" | "musician" | "creator";
 
 interface CreatorOnboardingFlowProps {
@@ -110,9 +110,8 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
 
   const getProgressPercentage = () => {
     switch (currentStep) {
-      case "theme": return 25;
-      case "profile": return 50;
-      case "social": return 75;
+      case "theme": return 33;
+      case "profile": return 66;
       case "complete": return 100;
       default: return 0;
     }
@@ -271,7 +270,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
           Back
         </Button>
         <Button
-          onClick={() => setCurrentStep("social")}
+          onClick={() => setCurrentStep("complete")}
           disabled={!profileData.displayName.trim()}
           className="bg-brand-primary hover:bg-brand-primary/80"
           size="lg"
@@ -443,7 +442,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         {/* Progress Bar */}
         <div className="max-w-4xl mx-auto mb-12">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-gray-400">Step {currentStep === "theme" ? 1 : currentStep === "profile" ? 2 : currentStep === "social" ? 3 : 4} of 4</span>
+            <span className="text-sm text-gray-400">Step {currentStep === "theme" ? 1 : currentStep === "profile" ? 2 : 3} of 3</span>
             <span className="text-sm text-gray-400">{getProgressPercentage()}% Complete</span>
           </div>
           <Progress value={getProgressPercentage()} className="h-2" />
@@ -453,49 +452,6 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         <div className="max-w-6xl mx-auto">
           {currentStep === "theme" && renderThemeSelection()}
           {currentStep === "profile" && renderProfileSetup()}
-          {currentStep === "social" && (
-            <div className="space-y-6 max-w-6xl mx-auto">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold gradient-text mb-4">
-                  Connect Your Social Media
-                </h2>
-                <p className="text-gray-300 text-lg">
-                  Link your accounts to track engagement and grow your fanbase
-                </p>
-              </div>
-
-              <MockSocialConnect 
-                onAccountsChange={(accounts) => {
-                  const connections = accounts.reduce((acc, account) => ({
-                    ...acc,
-                    [account.platform]: `@${account.username}`
-                  }), {} as typeof socialConnections);
-                  setSocialConnections(prev => ({ ...prev, ...connections }));
-                }}
-                requiredPlatforms={['instagram', 'tiktok', 'twitter']}
-                showMetrics={true}
-              />
-
-              <div className="flex justify-between">
-                <Button
-                  onClick={() => setCurrentStep("profile")}
-                  variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
-                  size="lg"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={() => setCurrentStep("complete")}
-                  className="bg-brand-primary hover:bg-brand-primary/80"
-                  size="lg"
-                >
-                  Continue
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </Button>
-              </div>
-            </div>
-          )}
           {currentStep === "complete" && renderComplete()}
         </div>
       </div>

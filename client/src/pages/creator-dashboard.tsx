@@ -32,8 +32,8 @@ export default function CreatorDashboard() {
 
   // Get user data
   const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user", user?.id],
-    enabled: !!user?.id,
+    queryKey: ["/api/auth/user", user?.userId],
+    enabled: !!user?.userId,
   });
 
   // Get creator profile
