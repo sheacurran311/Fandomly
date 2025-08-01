@@ -62,7 +62,7 @@ export default function Home() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="border-2 border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-200"
+                  className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-200"
                 >
                   Explore Programs
                   <Coins className="ml-2 h-5 w-5" />
@@ -118,10 +118,10 @@ export default function Home() {
               </CardContent>
             </Card>
             
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-secondary/50 transition-all duration-300 hover:scale-105">
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-primary/50 transition-all duration-300 hover:scale-105">
               <CardContent className="p-8">
-                <div className="w-16 h-16 bg-brand-secondary rounded-2xl flex items-center justify-center mb-6">
-                  <Share2 className="h-8 w-8 text-brand-dark-bg" />
+                <div className="w-16 h-16 bg-gradient-to-br from-brand-primary to-purple-600 rounded-2xl flex items-center justify-center mb-6">
+                  <Share2 className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold mb-4 text-white">Social Integration</h3>
                 <p className="text-gray-300 leading-relaxed">
