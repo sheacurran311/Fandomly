@@ -43,7 +43,7 @@ export default function Home() {
               <span className="text-white">That Grows Your Fandom</span>
             </h1>
             <p className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Create AI-powered loyalty programs that reward your fans for engagement. Integrate social media, offer exclusive perks, and build lasting relationships with smart Web3 rewards.
+              Create AI-powered loyalty programs that reward your fans for engagement. Perfect for NIL athletes, content creators, and musicians to monetize their personal brand through smart Web3 rewards and exclusive fan experiences.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
@@ -99,7 +99,7 @@ export default function Home() {
               Everything You Need to Engage Your Fans
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Built for athletes, creators, and musicians who want to build lasting relationships with their audience through innovative loyalty programs.
+              Built for NIL athletes, content creators, and musicians who want to build lasting relationships with their audience and monetize their personal brand through innovative loyalty programs.
             </p>
           </div>
           
@@ -188,7 +188,7 @@ export default function Home() {
               <span className="text-brand-primary">Amazing Creators</span>
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Join loyalty programs from your favorite athletes, musicians, and creators. Earn exclusive rewards and get closer to the action.
+              Join loyalty programs from your favorite NIL athletes, musicians, and creators. Earn exclusive rewards, NFTs, and get closer to the action.
             </p>
           </div>
           
@@ -221,7 +221,7 @@ export default function Home() {
               Who Fandomly Is For
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Built specifically for athletes, content creators, and musicians who want to build lasting relationships with their fans through innovative loyalty programs.
+              Built specifically for NIL athletes, content creators, and musicians who want to monetize their personal brand and build lasting relationships with their fans through innovative Web3 loyalty programs.
             </p>
           </div>
           
@@ -235,7 +235,7 @@ export default function Home() {
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-4">Athletes</h3>
                   <p className="text-gray-300 mb-6">
-                    From professional leagues to high school sports, connect with your fans and build your personal brand.
+                    Monetize your Name, Image, and Likeness with loyal fan programs. Perfect for NIL opportunities and building your personal sports brand.
                   </p>
                 </div>
                 
@@ -254,7 +254,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center text-gray-300">
                     <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
-                    <span className="text-sm">NIL Opportunities</span>
+                    <span className="text-sm font-semibold">NIL Monetization Opportunities</span>
                   </div>
                 </div>
                 
@@ -360,9 +360,8 @@ export default function Home() {
                 <div className="text-left">
                   <h4 className="font-semibold text-brand-accent mb-2">No matter your level or niche</h4>
                   <p className="text-gray-300">
-                    Whether you're just starting out or already have millions of fans, Fandomly scales with you. 
-                    Our platform works for everyone from local performers to global superstars, providing the tools 
-                    you need to build meaningful relationships with your audience.
+                    Whether you're a college athlete exploring NIL opportunities, an indie creator, or a global superstar, Fandomly scales with you. 
+                    Our platform provides the tools you need to monetize your personal brand and build meaningful relationships with your audience through Web3 rewards.
                   </p>
                 </div>
               </div>

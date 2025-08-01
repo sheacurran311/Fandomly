@@ -5,6 +5,7 @@ Fandomly is a Web3-powered loyalty platform that enables creators to build lasti
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+Marketing Focus: Emphasize NIL (Name, Image, Likeness) opportunities for college athletes as a major market opportunity. NIL allows student-athletes to monetize their personal brand through endorsements, sponsorships, and fan engagement - a perfect fit for Fandomly's loyalty platform.
 
 # System Architecture
 
