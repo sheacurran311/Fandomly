@@ -73,6 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Creator routes (public creation for onboarding)
   app.post("/api/creators", async (req, res) => {
     try {
+      console.log("Creating creator with data:", req.body);
       const creatorData = insertCreatorSchema.parse(req.body);
       const creator = await storage.createCreator(creatorData);
       res.json(creator);

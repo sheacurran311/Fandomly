@@ -154,6 +154,127 @@ export const rewardRedemptions = pgTable("reward_redemptions", {
   redeemedAt: timestamp("redeemed_at").defaultNow(),
 });
 
+// OpenLoyalty-style Campaign System
+export const campaignTypeEnum = pgEnum('campaign_type', ['automation', 'direct', 'referral']);
+export const campaignTriggerEnum = pgEnum('campaign_trigger', [
+  'schedule_daily', 'schedule_weekly', 'schedule_monthly', 'birthday', 'anniversary',
+  'purchase_transaction', 'return_transaction', 'internal_event', 'custom_event', 
+  'achievement_earned', 'redemption_code'
+]);
+export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive', 'draft', 'archived']);
+
+export const campaigns = pgTable("campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => creators.id).notNull(),
+  
+  // Basic Info
+  name: text("name").notNull(),
+  description: text("description"),
+  displayOrder: integer("display_order"),
+  
+  // Campaign Type & Trigger
+  campaignType: campaignTypeEnum("campaign_type").notNull(),
+  trigger: campaignTriggerEnum("trigger").notNull(),
+  
+  // Schedule & Status
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  status: campaignStatusEnum("status").notNull().default('draft'),
+  
+  // Visibility & Targeting
+  visibility: text("visibility").notNull().default('everyone'), // 'everyone' | 'segments' | 'tiers' | 'hidden'
+  visibilityRules: jsonb("visibility_rules").$type<{
+    segments?: string[];
+    tiers?: string[];
+    customAttributes?: Record<string, any>;
+  }>(),
+  
+  // Custom Attributes for API filtering
+  customAttributes: jsonb("custom_attributes").$type<Record<string, any>>(),
+  
+  // Transaction Filters (for purchase/return triggers)
+  transactionFilters: jsonb("transaction_filters").$type<{
+    productCategories?: string[];
+    brands?: string[];
+    priceRange?: { min: number; max: number; };
+    quantity?: { min: number; max: number; };
+    customFilters?: Array<{
+      field: string;
+      operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains';
+      value: any;
+    }>;
+  }>(),
+  
+  // Budget & Limits
+  globalBudget: integer("global_budget"), // Total units that can be issued
+  perMemberLimit: jsonb("per_member_limit").$type<{
+    type: 'per_hour' | 'per_day' | 'per_week' | 'per_month' | 'per_year' | 'total';
+    value: number;
+  }>(),
+  
+  // Usage tracking
+  totalIssued: integer("total_issued").default(0),
+  totalParticipants: integer("total_participants").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Campaign Rules (Conditions + Effects)
+export const campaignRules = pgTable("campaign_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  ruleOrder: integer("rule_order").notNull().default(1),
+  
+  // Conditions (ALL must be met within this rule)
+  conditions: jsonb("conditions").$type<Array<{
+    type: 'member_tier' | 'purchase_amount' | 'product_category' | 'custom_attribute' | 
+          'previous_purchase' | 'member_segment' | 'transaction_count' | 'date_range';
+    field?: string;
+    operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'in' | 'not_in';
+    value: any;
+    logicalOperator?: 'AND' | 'OR'; // For combining with next condition
+  }>>().notNull(),
+  
+  // Effects (What happens when conditions are met)
+  effects: jsonb("effects").$type<Array<{
+    type: 'add_units' | 'deduct_units' | 'give_reward' | 'set_custom_attribute' | 
+          'remove_custom_attribute' | 'upgrade_tier' | 'send_notification';
+    value?: any;
+    formula?: string; // For calculations like "transaction_amount * 0.1"
+    rewardId?: string;
+    attributeName?: string;
+    attributeValue?: any;
+    notificationTemplate?: string;
+  }>>().notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Campaign Participation Tracking
+export const campaignParticipations = pgTable("campaign_participations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  memberId: varchar("member_id").references(() => users.id).notNull(),
+  
+  // Tracking
+  participationCount: integer("participation_count").default(1),
+  lastParticipation: timestamp("last_participation").defaultNow(),
+  totalUnitsEarned: integer("total_units_earned").default(0),
+  
+  // Metadata
+  participationData: jsonb("participation_data").$type<{
+    triggerDetails?: any;
+    rewardsEarned?: Array<{
+      type: string;
+      value: any;
+      timestamp: string;
+    }>;
+  }>(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 
 // Relations
@@ -172,6 +293,7 @@ export const creatorsRelations = relations(creators, ({ one, many }) => ({
     references: [users.id],
   }),
   loyaltyPrograms: many(loyaltyPrograms),
+  campaigns: many(campaigns),
 }));
 
 export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many }) => ({
@@ -221,6 +343,34 @@ export const rewardRedemptionsRelations = relations(rewardRedemptions, ({ one })
   }),
 }));
 
+// Campaign Relations
+export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
+  creator: one(creators, {
+    fields: [campaigns.creatorId],
+    references: [creators.id],
+  }),
+  rules: many(campaignRules),
+  participations: many(campaignParticipations),
+}));
+
+export const campaignRulesRelations = relations(campaignRules, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignRules.campaignId],
+    references: [campaigns.id],
+  }),
+}));
+
+export const campaignParticipationsRelations = relations(campaignParticipations, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignParticipations.campaignId],
+    references: [campaigns.id],
+  }),
+  member: one(users, {
+    fields: [campaignParticipations.memberId],
+    references: [users.id],
+  }),
+}));
+
 
 
 // Insert schemas
@@ -261,6 +411,25 @@ export const insertRewardRedemptionSchema = createInsertSchema(rewardRedemptions
 
 
 
+// Campaign Schemas
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({
+  id: true,
+  totalIssued: true,
+  totalParticipants: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCampaignRuleSchema = createInsertSchema(campaignRules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCampaignParticipationSchema = createInsertSchema(campaignParticipations).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -282,5 +451,13 @@ export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema
 
 export type RewardRedemption = typeof rewardRedemptions.$inferSelect;
 export type InsertRewardRedemption = z.infer<typeof insertRewardRedemptionSchema>;
+
+// Campaign Types
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
+export type CampaignRule = typeof campaignRules.$inferSelect;
+export type InsertCampaignRule = z.infer<typeof insertCampaignRuleSchema>;
+export type CampaignParticipation = typeof campaignParticipations.$inferSelect;
+export type InsertCampaignParticipation = z.infer<typeof insertCampaignParticipationSchema>;
 
 
