@@ -45,19 +45,20 @@ export default function Home() {
               <span className="text-white">That Grows Your Fandom</span>
             </h1>
             <p className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Create AI-powered loyalty programs that reward your fans for engagement. Perfect for NIL athletes, content creators, and musicians to monetize their personal brand through smart Web3 rewards and exclusive fan experiences.
+              Create AI-powered loyalty programs that reward your fans for engagement. Perfect for Olympic athletes, college football players, and all creators to monetize their personal brand through smart Web3 rewards and NIL-compliant fan experiences.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
-              <Button 
-                onClick={handleStartCreatorSignup}
-                size="lg"
-                className="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-110 shadow-2xl hover:shadow-brand-primary/25 relative overflow-hidden group"
-              >
-                <span className="relative z-10">🚀 Build Your Loyalty Empire</span>
-                <ArrowRight className="ml-3 h-6 w-6 relative z-10 transition-transform group-hover:translate-x-1" />
-                <div className="absolute inset-0 bg-gradient-to-r from-brand-secondary/20 to-brand-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </Button>
+              <Link href="/family-athlete-onboarding">
+                <Button 
+                  size="lg"
+                  className="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-110 shadow-2xl hover:shadow-brand-primary/25 relative overflow-hidden group"
+                >
+                  <span className="relative z-10">🏆 Start Your Athletic Empire</span>
+                  <ArrowRight className="ml-3 h-6 w-6 relative z-10 transition-transform group-hover:translate-x-1" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </Button>
+              </Link>
               <Link href="/marketplace">
                 <Button
                   variant="outline"

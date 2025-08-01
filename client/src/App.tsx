@@ -9,6 +9,7 @@ import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
 import Marketplace from "@/pages/marketplace";
 import CreatorOnboarding from "@/pages/creator-onboarding";
+import FamilyAthleteOnboarding from "@/pages/family-athlete-onboarding";
 import CreatorDashboard from "@/pages/creator-dashboard";
 import FanDashboard from "@/pages/fan-dashboard";
 import NILDashboard from "@/pages/nil-dashboard";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
+      <Route path="/family-athlete-onboarding" component={FamilyAthleteOnboarding} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/nil-dashboard" component={NILDashboard} />

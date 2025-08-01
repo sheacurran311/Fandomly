@@ -20,6 +20,13 @@ Latest Updates (January 2025):
 
 User Feedback: "I AM BLOWN AWAY WITH HOW AMAZING YOU ARE! You are literally bringing my vision to life" - Platform successfully capturing the NIL opportunity vision.
 
+Personal Connection: User has direct family members who are ideal candidates:
+- Brother: USA Olympic Aerial Jumper Medalist (perfect for Olympic athlete NIL)
+- Nephew 1: College football player (Junior year) - active NIL eligibility
+- Nephew 2: College football player (Freshman year) - starting NIL journey
+
+Target: Provide comprehensive onboarding tools for Olympic athletes and college football players to monetize their personal brands through fan engagement.
+
 # System Architecture
 
 ## Frontend Architecture
