@@ -59,7 +59,15 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
 
   const createCreatorMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !selectedTheme) throw new Error("Missing required data");
+      if (!user || !selectedTheme) {
+        console.error("Missing required data:", { user: !!user, selectedTheme });
+        throw new Error("Missing required data");
+      }
+      
+      console.log("Starting creator creation flow...");
+      console.log("User data:", user);
+      console.log("Profile data:", profileData);
+      console.log("Tenant data:", tenantData);
       
       // First ensure we have a user record in our database
       const userData = {
@@ -71,6 +79,8 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         walletChain: user.verifiedCredentials?.[0]?.chain || "",
         userType: "creator" as const,
       };
+      
+      console.log("Prepared user data:", userData);
 
       // Create or get user
       const userRecord = await apiRequest("POST", "/api/auth/register", userData) as any;
@@ -123,7 +133,8 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         isVerified: false,
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Creator creation successful:", data);
       toast({
         title: "Welcome to Fandomly!",
         description: "Your store has been created successfully.",
@@ -132,6 +143,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
       setCurrentStep("complete");
     },
     onError: (error) => {
+      console.error("Creator creation failed:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create profile",
