@@ -37,7 +37,15 @@ export function registerTenantRoutes(app: Express) {
   // Create tenant
   app.post("/api/tenants", async (req, res) => {
     try {
+      console.log("Creating tenant with data:", req.body);
       const tenantData = createTenantSchema.parse(req.body);
+      console.log("Parsed tenant data:", tenantData);
+      
+      // Verify the owner exists
+      const owner = await storage.getUser(tenantData.ownerId);
+      if (!owner) {
+        return res.status(400).json({ error: "Owner user not found" });
+      }
       
       // Check if slug is already taken
       const existingTenant = await storage.getTenantBySlug(tenantData.slug);
@@ -49,26 +57,10 @@ export function registerTenantRoutes(app: Express) {
         ...tenantData,
         status: 'trial',
         subscriptionTier: 'starter',
-        subscriptionStatus: 'trial',
-        limits: {
-          maxMembers: 100,
-          maxCampaigns: 5,
-          maxRewards: 10,
-          maxApiCalls: 1000,
-          storageLimit: 100,
-          customDomain: false,
-          advancedAnalytics: false,
-          whiteLabel: false,
-        },
-        usage: {
-          currentMembers: 0,
-          currentCampaigns: 0,
-          currentRewards: 0,
-          apiCallsThisMonth: 0,
-          storageUsed: 0,
-        }
+        subscriptionStatus: 'trial'
       });
       
+      console.log("Created tenant:", tenant.id);
       res.json(tenant);
     } catch (error) {
       console.error("Error creating tenant:", error);

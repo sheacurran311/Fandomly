@@ -15,17 +15,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
+      console.log("Registering user with data:", userData);
       
       // Check if user already exists by dynamic user ID
       if (userData.dynamicUserId) {
         const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId as string);
         if (existingUser) {
+          console.log("Returning existing user:", existingUser.id);
           return res.json(existingUser);
         }
       }
 
       // Create new user
       const user = await storage.createUser(userData);
+      console.log("Created new user:", user.id);
       res.json(user);
     } catch (error) {
       console.error("User creation error:", error);

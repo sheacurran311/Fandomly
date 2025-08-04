@@ -73,7 +73,12 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
       };
 
       // Create or get user
-      const userRecord = await apiRequest("POST", "/api/auth/register", userData);
+      const userRecord = await apiRequest("POST", "/api/auth/register", userData) as any;
+      console.log("User record:", userRecord);
+      
+      if (!userRecord?.id) {
+        throw new Error("Failed to create user record");
+      }
       
       // Create tenant for the creator
       const tenantResponse = await apiRequest("POST", "/api/tenants", {
@@ -105,7 +110,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
           requireEmailVerification: false,
           enableSocialLogin: true,
         }
-      });
+      }) as any;
 
       return apiRequest("POST", "/api/creators", {
         userId: userRecord.id,
