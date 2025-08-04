@@ -117,16 +117,19 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
         }
       }) as any;
 
-      return apiRequest("POST", "/api/creators", {
+      console.log("Creating creator with tenantId:", tenantResponse.id);
+      const creatorData = {
         userId: userRecord.id,
         tenantId: tenantResponse.id,
         displayName: profileData.displayName,
         bio: profileData.bio,
         category: selectedTheme,
-        website: profileData.website,
         followerCount: 0,
         isVerified: false,
-      });
+      };
+      
+      console.log("Creator data:", creatorData);
+      return apiRequest("POST", "/api/creators", creatorData);
     },
     onSuccess: (data) => {
       console.log("Creator creation successful:", data);
