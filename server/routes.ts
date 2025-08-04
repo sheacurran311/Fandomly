@@ -11,22 +11,67 @@ import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermiss
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Dynamic auth middleware to verify JWT and extract user info
+  const verifyDynamicAuth = async (req: any, res: any, next: any) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // For now, we'll skip JWT verification and trust the client
+      // In production, you'd verify the JWT token here  
+      req.dynamicUser = req.body.dynamicUser || req.headers['x-dynamic-user'];
+      next();
+    } catch (error) {
+      res.status(401).json({ error: "Invalid authentication token" });
+    }
+  };
+
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const userData = insertUserSchema.parse(req.body);
-      console.log("Registering user with data:", userData);
+      const { dynamicUser, userType } = req.body;
       
-      // Check if user already exists by dynamic user ID
-      if (userData.dynamicUserId) {
-        const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId as string);
-        if (existingUser) {
-          console.log("Returning existing user:", existingUser.id);
-          return res.json(existingUser);
+      if (!dynamicUser) {
+        // Fallback to old format for existing calls
+        const userData = insertUserSchema.parse(req.body);
+        console.log("Registering user with data (legacy):", userData);
+        
+        if (userData.dynamicUserId) {
+          const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId as string);
+          if (existingUser) {
+            console.log("Returning existing user:", existingUser.id);
+            return res.json(existingUser);
+          }
         }
+
+        const user = await storage.createUser(userData);
+        console.log("Created new user:", user.id);
+        return res.json(user);
       }
 
-      // Create new user
+      // New Dynamic-based registration
+      console.log("Registering user with Dynamic auth:", dynamicUser);
+      
+      const userData = {
+        dynamicUserId: dynamicUser.userId || dynamicUser.id,
+        email: dynamicUser.email,
+        username: dynamicUser.alias || dynamicUser.firstName || "User",
+        avatar: dynamicUser.avatar || null,
+        walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || "",
+        walletChain: dynamicUser.verifiedCredentials?.[0]?.chain || "",
+        userType: userType === "creator" ? "creator" : "fan",
+        role: userType === "creator" ? "customer_admin" : "customer_end_user", // Creators get admin role
+      };
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId);
+      if (existingUser) {
+        console.log("Returning existing user:", existingUser.id);
+        return res.json(existingUser);
+      }
+
       const user = await storage.createUser(userData);
       console.log("Created new user:", user.id);
       res.json(user);

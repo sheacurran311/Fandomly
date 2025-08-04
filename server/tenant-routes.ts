@@ -41,10 +41,18 @@ export function registerTenantRoutes(app: Express) {
       const tenantData = createTenantSchema.parse(req.body);
       console.log("Parsed tenant data:", tenantData);
       
-      // Verify the owner exists
+      // Verify the owner exists and has proper permissions
       const owner = await storage.getUser(tenantData.ownerId);
       if (!owner) {
         return res.status(400).json({ error: "Owner user not found" });
+      }
+      
+      if (owner.userType !== 'creator') {
+        return res.status(403).json({ error: "Only creators can create tenants. Please ensure you're registered as a creator." });
+      }
+      
+      if (owner.role !== 'customer_admin' && owner.role !== 'fandomly_admin') {
+        return res.status(403).json({ error: "Insufficient permissions to create tenant" });
       }
       
       // Check if slug is already taken

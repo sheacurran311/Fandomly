@@ -69,21 +69,16 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
       console.log("Profile data:", profileData);
       console.log("Tenant data:", tenantData);
       
-      // First ensure we have a user record in our database
-      const userData = {
-        dynamicUserId: user.userId || "",
-        email: user.email || "",
-        username: user.alias || user.firstName || profileData.displayName || "Creator",
-        avatar: "",
-        walletAddress: user.verifiedCredentials?.[0]?.address || "",
-        walletChain: user.verifiedCredentials?.[0]?.chain || "",
-        userType: "creator" as const,
+      // Create user through Dynamic auth with proper role assignment
+      const registrationData = {
+        dynamicUser: user,
+        userType: "creator"  // This will assign customer_admin role
       };
       
-      console.log("Prepared user data:", userData);
+      console.log("Prepared registration data:", registrationData);
 
-      // Create or get user
-      const userRecord = await apiRequest("POST", "/api/auth/register", userData) as any;
+      // Create or get user with proper Dynamic integration
+      const userRecord = await apiRequest("POST", "/api/auth/register", registrationData) as any;
       console.log("User record:", userRecord);
       
       if (!userRecord?.id) {
