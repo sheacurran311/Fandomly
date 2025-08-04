@@ -55,7 +55,8 @@ export default function Footer() {
             © 2024 Fandomly. All rights reserved.
           </div>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Privacy Policy</a>
+            <Link href="/privacy-policy" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Privacy Policy</Link>
+            <Link href="/data-deletion" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Data Deletion</Link>
             <a href="#" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Terms of Service</a>
             <a href="#" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Cookie Policy</a>
           </div>
