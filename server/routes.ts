@@ -87,8 +87,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      res.json(user);
+      
+      // Check if creator has tenant
+      let creator = null;
+      let tenant = null;
+      if (user.userType === 'creator') {
+        creator = await storage.getCreatorByUserId(user.id);
+        if (creator) {
+          tenant = await storage.getTenant(creator.tenantId);
+        }
+      }
+      
+      res.json({
+        ...user,
+        creator,
+        tenant,
+        hasCompletedOnboarding: user.userType === 'fan' || (user.userType === 'creator' && !!creator && !!tenant)
+      });
     } catch (error) {
+      console.error("Error fetching user profile:", error);
       res.status(500).json({ error: "Failed to fetch user" });
     }
   });
