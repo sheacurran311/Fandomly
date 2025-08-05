@@ -15,7 +15,7 @@ export default function Auth() {
   // Create user in our database with selected type
   const createUserMutation = useMutation({
     mutationFn: async (userType: "fan" | "creator") => {
-      if (!user) throw new Error("No user data available");
+      if (!user?.userId) throw new Error("No user data available");
       
       return apiRequest("POST", "/api/auth/user", {
         dynamicUserId: user.userId,
@@ -40,23 +40,35 @@ export default function Auth() {
 
   // Check if user needs to be registered in our database
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user?.userId) {
       // Check if user exists in our database
       const checkUser = async () => {
         try {
-          await apiRequest("GET", `/api/auth/user/${user.userId}`);
-          // User exists, redirect to appropriate dashboard
-          setLocation("/");
-        } catch (error: any) {
-          if (error.message.includes("404")) {
+          const response = await fetch(`/api/auth/user/${user.userId}`);
+          if (response.ok) {
+            const userData = await response.json();
+            console.log("Found existing user:", userData);
+            
+            // User exists, redirect based on their type and onboarding status
+            if (userData.userType === "creator" && !userData.hasCompletedOnboarding) {
+              setLocation("/creator-onboarding");
+            } else if (userData.userType === "creator") {
+              setLocation("/creator-dashboard");
+            } else {
+              setLocation("/fan-dashboard");
+            }
+          } else if (response.status === 404) {
             // User doesn't exist, show user type selection
             setShowUserTypeSelection(true);
           }
+        } catch (error: any) {
+          console.error("Error checking user:", error);
+          setShowUserTypeSelection(true);
         }
       };
       checkUser();
     }
-  }, [isAuthenticated, user, setLocation]);
+  }, [isAuthenticated, user?.userId, setLocation]);
 
   const handleUserTypeSelection = (userType: "fan" | "creator") => {
     createUserMutation.mutate(userType);
@@ -74,7 +86,7 @@ export default function Auth() {
   }
 
   // User is authenticated but needs to select user type
-  if (isAuthenticated && user && showUserTypeSelection) {
+  if (isAuthenticated && user?.userId && showUserTypeSelection) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
         <Card className="max-w-2xl w-full bg-brand-dark-purple/90 backdrop-blur-lg border-brand-primary/20">

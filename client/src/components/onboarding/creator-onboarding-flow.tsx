@@ -78,7 +78,7 @@ export default function CreatorOnboardingFlow({ onComplete }: CreatorOnboardingF
       console.log("Prepared registration data:", registrationData);
 
       // Create or get user with proper Dynamic integration
-      const userRecord = await apiRequest("POST", "/api/auth/register", registrationData) as any;
+      const userRecord = await apiRequest("POST", "/api/auth/user", registrationData) as any;
       console.log("User record:", userRecord);
       
       if (!userRecord?.id) {

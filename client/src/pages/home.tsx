@@ -50,28 +50,16 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
               <DynamicWidget 
-                buttonClassName="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-110 shadow-2xl hover:shadow-brand-primary/25"
+                buttonClassName="bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25"
               />
               <Button 
-                onClick={handleStartCreatorSignup}
+                onClick={() => window.location.href = "/marketplace"}
                 size="lg"
                 variant="outline"
-                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300"
+                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20 hover:text-brand-secondary px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300"
               >
-                <span className="relative z-10">🚀 Build Your Loyalty Empire</span>
-                <ArrowRight className="ml-3 h-6 w-6 relative z-10 transition-transform group-hover:translate-x-1" />
-                <div className="absolute inset-0 bg-gradient-to-r from-brand-secondary/20 to-brand-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                Explore Programs
               </Button>
-              <Link href="/marketplace">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-200"
-                >
-                  Explore Programs
-                  <Coins className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
             </div>
             
             {/* Trust Indicators */}
