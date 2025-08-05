@@ -137,6 +137,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Switch user type endpoint
+  app.patch("/api/auth/user/:userId/switch-type", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { newUserType } = req.body;
+      
+      if (!["fan", "creator"].includes(newUserType)) {
+        return res.status(400).json({ error: "Invalid user type" });
+      }
+
+      const newRole = newUserType === "creator" ? "customer_admin" : "customer_end_user";
+      
+      // Update user type and role
+      const updatedUser = await storage.updateUser(userId, {
+        userType: newUserType,
+        role: newRole,
+        hasCompletedOnboarding: false // Reset onboarding when switching
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Failed to switch user type:", error);
+      res.status(500).json({ error: "Failed to switch user type" });
+    }
+  });
+
   // Creator routes (public creation for onboarding)
   app.post("/api/creators", async (req, res) => {
     try {

@@ -19,6 +19,7 @@ import {
   Facebook,
   Music
 } from "lucide-react";
+import UserTypeSwitch from "@/components/auth/user-type-switch";
 import StatsGrid from "@/components/dashboard/stats-grid";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -395,6 +396,49 @@ export default function CreatorDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="settings" className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Account Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <UserTypeSwitch 
+                    currentUserType="creator"
+                    userId={userData?.id || ""}
+                    onSwitchSuccess={() => {
+                      window.location.reload();
+                    }}
+                  />
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Profile Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <Button 
+                      variant="outline"
+                      className="w-full border-brand-primary text-brand-primary hover:bg-brand-primary/10"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="w-full border-brand-secondary text-brand-secondary hover:bg-brand-secondary/10"
+                    >
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      Analytics Settings
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

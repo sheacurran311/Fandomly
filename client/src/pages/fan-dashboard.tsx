@@ -12,8 +12,10 @@ import {
   Star,
   ExternalLink,
   Coins,
-  Award
+  Award,
+  Settings
 } from "lucide-react";
+import UserTypeSwitch from "@/components/auth/user-type-switch";
 import { type FanProgram, type User } from "@shared/schema";
 
 export default function FanDashboard() {
@@ -291,6 +293,25 @@ export default function FanDashboard() {
             </TabsContent>
           </Tabs>
         )}
+        
+        {/* Account Settings Section */}
+        <div id="account-settings" className="mt-16 border-t border-brand-primary/20 pt-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-white mb-2">Account Settings</h2>
+            <p className="text-gray-300">Manage your account preferences and switch account types</p>
+          </div>
+          
+          <div className="max-w-2xl mx-auto">
+            <UserTypeSwitch 
+              currentUserType="fan"
+              userId={userData?.id || ""}
+              onSwitchSuccess={() => {
+                // Refresh the page after successful switch
+                window.location.reload();
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
