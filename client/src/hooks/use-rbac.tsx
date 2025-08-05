@@ -30,10 +30,10 @@ export interface UserRole {
 export function useRBAC() {
   const { user, isAuthenticated } = useDynamicContext();
 
-  // Get user data from our database instead of role endpoint
+  // Get user data from our backend using our user management system
   const { data: userData, isLoading } = useQuery({
-    queryKey: ['/api/auth/user', user?.userId],
-    enabled: !!user?.userId && isAuthenticated,
+    queryKey: ['/api/auth/user'],
+    enabled: isAuthenticated,
     retry: false,
   });
 

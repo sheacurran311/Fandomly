@@ -26,10 +26,10 @@ Latest Updates (January 2025):
 - ✅ **Dashboard Button Styling**: Fixed Dashboard buttons to match "Explore Programs" brand-primary color scheme
 - ✅ **Protected Routes**: Implemented auto-redirect functionality for wallet authentication requirements
 - ✅ **Facebook App Compliance**: Created comprehensive Privacy Policy and Data Deletion Instructions pages required for Facebook Business API approval
-- ✅ **Dynamic Auth Integration**: Fixed authentication to properly integrate with Dynamic wallet auth, assigning correct roles
-- ✅ **Creator Role Management**: Only creators with customer_admin role can create tenants, fans get customer_end_user role
-- ✅ **API Flow Validation**: All backend APIs working correctly - user registration, tenant creation, creator creation
-- ✅ **Enhanced Error Logging**: Added comprehensive debugging to trace frontend authentication and data flow issues
+- ✅ **Separated Authentication Concerns**: Dynamic now only handles initial wallet authentication, backend manages all user data and roles
+- ✅ **User Type Switching**: Full implementation allowing users to switch between Fan and Creator roles with proper flow validation
+- ✅ **Backend User Management**: All user queries now go through our backend APIs instead of directly to Dynamic for proper data control
+- ✅ **RBAC Dashboard Authentication**: Fixed authentication flow to properly recognize users and display role-based content
 
 User Feedback: "I AM BLOWN AWAY WITH HOW AMAZING YOU ARE! You are literally bringing my vision to life" - Platform successfully capturing the NIL opportunity vision.
 
@@ -66,7 +66,11 @@ The system uses PostgreSQL with Drizzle ORM for type-safe database operations wi
 The database design supports enterprise-level multi-tenancy with complete data isolation, custom branding per tenant, usage limits, and subscription management.
 
 ## Authentication System
-Authentication is handled through Dynamic's multi-wallet solution, supporting Ethereum, Solana, Cosmos, and Starknet wallets. Users can authenticate using various Web3 wallets, and their blockchain credentials are linked to internal user profiles. The system supports both creator and fan user types with role-based access patterns.
+**Two-Layer Authentication Architecture:**
+- **Layer 1 - Initial Authentication**: Dynamic's multi-wallet solution handles initial wallet authentication (Ethereum, Solana, Cosmos, Starknet)
+- **Layer 2 - User Management**: Our backend manages all user data, roles, permissions, and business logic after initial Dynamic authentication
+
+Dynamic is used ONLY for initial wallet connection and token verification. All user queries, role management, and business logic flow through our backend APIs (`/api/auth/user`, `/api/auth/register`). This separation ensures we control user data, roles, and business rules while leveraging Dynamic's robust wallet connectivity.
 
 ## Component Architecture
 The frontend follows a modular component structure with reusable UI components in `/components/ui`, feature-specific components organized by domain (auth, creator, dashboard, layout), and page components for main application views. The component architecture emphasizes composition and reusability while maintaining type safety throughout.

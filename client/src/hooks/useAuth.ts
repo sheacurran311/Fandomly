@@ -20,23 +20,23 @@ export function useAuth() {
 
   // Fetch user profile from our database when Dynamic user is authenticated
   const { data: userProfile, isLoading, error } = useQuery({
-    queryKey: ["/api/auth/profile", dynamicUser?.userId],
+    queryKey: ["/api/auth/user"],
     queryFn: async () => {
-      if (!dynamicUser?.userId) return null;
+      if (!isAuthenticated || !dynamicUser) return null;
       
       try {
-        // First check if user exists in our database
-        const response = await apiRequest("GET", `/api/auth/user/${dynamicUser.userId}`);
+        // Get user from our backend, which handles Dynamic token verification internally
+        const response = await apiRequest("GET", "/api/auth/user");
         return response;
       } catch (error: any) {
-        if (error.message.includes("404")) {
-          // User doesn't exist in our database yet
+        if (error.message.includes("404") || error.message.includes("401")) {
+          // User doesn't exist in our database yet or token invalid
           return null;
         }
         throw error;
       }
     },
-    enabled: !!dynamicUser?.userId && isAuthenticated,
+    enabled: isAuthenticated && !!dynamicUser,
     retry: false,
   });
 

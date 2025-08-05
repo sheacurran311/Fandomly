@@ -21,10 +21,10 @@ import { type FanProgram, type User } from "@shared/schema";
 export default function FanDashboard() {
   const { user } = useDynamicContext();
 
-  // Get user data
+  // Get user data from our backend (not directly from Dynamic)
   const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user", user?.id],
-    enabled: !!user?.id,
+    queryKey: ["/api/auth/user"],
+    enabled: !!user,
   });
 
   // Get fan programs

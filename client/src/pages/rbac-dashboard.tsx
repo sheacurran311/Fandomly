@@ -471,6 +471,29 @@ function CustomerEndUserDashboard() {
 export default function RBACDashboard() {
   const { userRole, isLoading, isFandomlyAdmin, isCustomerAdmin, isCustomerEndUser } = useRBAC();
 
+  // Show authentication required if user data not loaded
+  if (!userRole && !isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4 bg-brand-dark-purple/90 backdrop-blur-lg border-brand-primary/20">
+          <CardContent className="pt-6 text-center">
+            <Shield className="h-16 w-16 text-brand-primary mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-4">Authentication Required</h2>
+            <p className="text-gray-300 mb-6">
+              Please connect your wallet to access the RBAC dashboard.
+            </p>
+            <Button 
+              onClick={() => window.location.href = "/"}
+              className="bg-brand-primary hover:bg-brand-primary/80"
+            >
+              Go to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">

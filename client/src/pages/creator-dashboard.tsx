@@ -31,10 +31,10 @@ export default function CreatorDashboard() {
   const queryClient = useQueryClient();
   const [isCreatingProgram, setIsCreatingProgram] = useState(false);
 
-  // Get user data
+  // Get user data from our backend (not directly from Dynamic)
   const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user", user?.userId],
-    enabled: !!user?.userId,
+    queryKey: ["/api/auth/user"],
+    enabled: !!user,
   });
 
   // Get creator profile
