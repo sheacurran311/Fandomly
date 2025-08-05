@@ -62,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || "",
         walletChain: dynamicUser.verifiedCredentials?.[0]?.chain || "",
         userType: userType === "creator" ? "creator" : "fan",
-        role: userType === "creator" ? "customer_admin" : "customer_end_user", // Creators get admin role
+        role: (userType === "creator" ? "customer_admin" : "customer_end_user") as "customer_admin" | "customer_end_user",
       };
 
       // Check if user already exists
