@@ -28,18 +28,41 @@ export interface UserRole {
 }
 
 export function useRBAC() {
-  const { user } = useDynamicContext();
+  const { user, isAuthenticated } = useDynamicContext();
 
-  const { data: userRole, isLoading } = useQuery<UserRole | null>({
-    queryKey: ['/api/auth/role'],
-    enabled: !!user,
+  // Get user data from our database instead of role endpoint
+  const { data: userData, isLoading } = useQuery({
+    queryKey: ['/api/auth/user', user?.userId],
+    enabled: !!user?.userId && isAuthenticated,
     retry: false,
   });
+
+  // Transform user data into UserRole format
+  const userRole: UserRole | null = userData ? {
+    id: userData.id,
+    role: userData.role || 'customer_end_user',
+    customerTier: userData.customerTier || 'basic',
+    adminPermissions: userData.role === 'fandomly_admin' ? {
+      canManageAllCreators: true,
+      canManageUsers: true,
+      canAccessAnalytics: true,
+      canManagePlatformSettings: true,
+      canManagePayments: true,
+    } : undefined,
+    customerAdminData: userData.userType === 'creator' ? {
+      organizationName: userData.username,
+      businessType: 'creator',
+      subscriptionStatus: 'active',
+      subscriptionTier: 'professional',
+    } : undefined,
+  } : null;
 
   const hasRole = (allowedRoles: Array<'fandomly_admin' | 'customer_admin' | 'customer_end_user'>): boolean => {
     if (!userRole) return false;
     return allowedRoles.includes(userRole.role);
   };
+
+
 
   const hasCustomerTier = (minTier: 'basic' | 'premium' | 'vip'): boolean => {
     if (!userRole || userRole.role !== 'customer_end_user') return true; // Non-customers bypass tier restrictions
@@ -74,7 +97,6 @@ export function useRBAC() {
       
       case 'api_access':
         return userRole.role === 'fandomly_admin' || 
-               (userRole.role === 'customer_admin') ||
                (userRole.role === 'customer_end_user' && userRole.customerTier === 'vip');
       
       default:

@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Shield, 
