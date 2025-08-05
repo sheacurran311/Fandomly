@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -8,9 +8,9 @@ import { useLocation } from "wouter";
 import { User, Users } from "lucide-react";
 
 export default function Auth() {
-  const { user, setShowAuthFlow, isAuthenticated } = useDynamicContext();
+  const { user, isAuthenticated } = useDynamicContext();
   const [, setLocation] = useLocation();
-  const [selectedUserType, setSelectedUserType] = useState<"fan" | "creator" | null>(null);
+  const [showUserTypeSelection, setShowUserTypeSelection] = useState(false);
 
   // Create user in our database with selected type
   const createUserMutation = useMutation({
@@ -38,12 +38,27 @@ export default function Auth() {
     },
   });
 
-  const handleConnect = () => {
-    setShowAuthFlow(true);
-  };
+  // Check if user needs to be registered in our database
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Check if user exists in our database
+      const checkUser = async () => {
+        try {
+          await apiRequest("GET", `/api/auth/user/${user.userId}`);
+          // User exists, redirect to appropriate dashboard
+          setLocation("/");
+        } catch (error: any) {
+          if (error.message.includes("404")) {
+            // User doesn't exist, show user type selection
+            setShowUserTypeSelection(true);
+          }
+        }
+      };
+      checkUser();
+    }
+  }, [isAuthenticated, user, setLocation]);
 
   const handleUserTypeSelection = (userType: "fan" | "creator") => {
-    setSelectedUserType(userType);
     createUserMutation.mutate(userType);
   };
 
@@ -58,8 +73,8 @@ export default function Auth() {
     );
   }
 
-  // User is authenticated - show user type selection
-  if (isAuthenticated && user) {
+  // User is authenticated but needs to select user type
+  if (isAuthenticated && user && showUserTypeSelection) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
         <Card className="max-w-2xl w-full bg-brand-dark-purple/90 backdrop-blur-lg border-brand-primary/20">
@@ -123,34 +138,13 @@ export default function Auth() {
     );
   }
 
-  // User is not authenticated - show wallet connection
+  // Show loading state while checking authentication
   return (
     <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-      <Card className="max-w-md w-full mx-4 bg-brand-dark-purple/90 backdrop-blur-lg border-brand-primary/20">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center gradient-text">
-            Connect Your Wallet
-          </CardTitle>
-          <p className="text-gray-300 text-center">
-            Get started with Fandomly by connecting your Web3 wallet
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="text-center">
-            <Button
-              onClick={handleConnect}
-              size="lg"
-              className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-semibold"
-            >
-              Connect Wallet
-            </Button>
-          </div>
-          
-          <div className="text-center text-sm text-gray-400">
-            <p>Supports MetaMask, Phantom, WalletConnect and more</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+        <p className="text-gray-300">Loading...</p>
+      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import CreatorCard from "@/components/creator/creator-card";
 import NILAthleteSpotlight from "@/components/nil/nil-athlete-spotlight";
 import NILValueCalculator from "@/components/nil/nil-value-calculator";
 import { type Creator } from "@shared/schema";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useDynamicContext, DynamicWidget } from "@dynamic-labs/sdk-react-core";
 
 export default function Home() {
   const { user, setShowAuthFlow } = useDynamicContext();
@@ -49,10 +49,14 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
+              <DynamicWidget 
+                buttonClassName="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-110 shadow-2xl hover:shadow-brand-primary/25"
+              />
               <Button 
                 onClick={handleStartCreatorSignup}
                 size="lg"
-                className="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-110 shadow-2xl hover:shadow-brand-primary/25 relative overflow-hidden group"
+                variant="outline"
+                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300"
               >
                 <span className="relative z-10">🚀 Build Your Loyalty Empire</span>
                 <ArrowRight className="ml-3 h-6 w-6 relative z-10 transition-transform group-hover:translate-x-1" />

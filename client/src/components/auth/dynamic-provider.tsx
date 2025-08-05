@@ -35,28 +35,34 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
           StarknetWalletConnectors,
         ],
         appName: "Fandomly",
-        // Disable email requirements - wallet-only authentication
-        bridgeChains: [],
+        appLogoUrl: "https://fandomly.ai/logo.png",
+        privacyPolicyUrl: "/privacy-policy",
+        termsOfServiceUrl: "/terms-of-service",
+        // Use default settings to show all auth methods configured in Dynamic dashboard
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;
           }
-          .dynamic-widget-inline-controls {
-            background: hsl(280, 20%, 15%);
-            border: 1px solid hsl(280, 30%, 25%);
-            border-radius: 0.75rem;
+          .dynamic-shadow-dom .connect-wallet-content {
+            background: #0a0214 !important;
+            border: 1px solid #dd20be40 !important;
           }
-          .dynamic-widget-inline-controls button {
-            background: hsl(315, 76%, 49%);
-            color: white;
-            border-radius: 0.75rem;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            transition: all 0.2s;
+          .dynamic-shadow-dom .connect-wallet-title {
+            color: #dd20be !important;
           }
-          .dynamic-widget-inline-controls button:hover {
-            background: hsl(315, 76%, 44%);
-            transform: scale(1.02);
+          .dynamic-shadow-dom .wallet-list-item {
+            background: #1a0f2e !important;
+            border: 1px solid #dd20be20 !important;
+          }
+          .dynamic-shadow-dom .wallet-list-item:hover {
+            border-color: #dd20be !important;
+          }
+          .dynamic-shadow-dom .wallet-icon {
+            border-radius: 8px !important;
+          }
+          .dynamic-shadow-dom .primary-button {
+            background: linear-gradient(135deg, #dd20be 0%, #a4fc07 50%, #03a0fd 100%) !important;
+            border: none !important;
           }
         `,
       }}
