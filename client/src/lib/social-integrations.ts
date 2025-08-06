@@ -1,7 +1,8 @@
 // Social Media Integration APIs
+import FacebookSDK, { type FacebookUser, type FacebookPage } from './facebook';
 
 export interface SocialMediaAccount {
-  platform: 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify';
+  platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify';
   username: string;
   displayName: string;
   profileUrl: string;
@@ -22,6 +23,65 @@ export interface SocialMediaMetrics {
   averageLikes: number;
   averageComments: number;
   recentGrowth: number;
+}
+
+// Facebook Graph API
+export class FacebookAPI {
+  async connectAccount(): Promise<SocialMediaAccount | null> {
+    try {
+      const loginResult = await FacebookSDK.login('email,public_profile,pages_show_list,pages_read_engagement');
+      
+      if (!loginResult.success || !loginResult.accessToken) {
+        return null;
+      }
+
+      const userInfo = await FacebookSDK.getUserInfo(loginResult.accessToken);
+      if (!userInfo) {
+        return null;
+      }
+
+      // Get pages to determine follower count
+      const pages = await FacebookSDK.getUserPages(loginResult.accessToken);
+      let totalFollowers = 0;
+      
+      // Sum followers from all connected pages
+      for (const page of pages) {
+        const followers = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
+        totalFollowers += followers;
+      }
+
+      return {
+        platform: 'facebook',
+        username: userInfo.name,
+        displayName: userInfo.name,
+        profileUrl: `https://facebook.com/${userInfo.id}`,
+        followers: totalFollowers,
+        verified: false,
+        profileImage: userInfo.picture?.data.url || '',
+        accessToken: loginResult.accessToken,
+        connectedAt: new Date()
+      };
+    } catch (error) {
+      console.error('Facebook connection error:', error);
+      return null;
+    }
+  }
+
+  async getPages(accessToken: string): Promise<FacebookPage[]> {
+    return await FacebookSDK.getUserPages(accessToken);
+  }
+
+  async refreshFollowerCount(accessToken: string): Promise<number> {
+    const pages = await FacebookSDK.getUserPages(accessToken);
+    let totalFollowers = 0;
+    
+    for (const page of pages) {
+      const followers = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
+      totalFollowers += followers;
+    }
+    
+    return totalFollowers;
+  }
 }
 
 // Instagram Basic Display API
@@ -295,6 +355,7 @@ export class SpotifyAPI {
 
 // Social Integration Manager
 export class SocialIntegrationManager {
+  private facebook: FacebookAPI;
   private instagram: InstagramAPI;
   private tiktok: TikTokAPI;
   private twitter: TwitterAPI;
@@ -302,6 +363,7 @@ export class SocialIntegrationManager {
   private spotify: SpotifyAPI;
 
   constructor() {
+    this.facebook = new FacebookAPI();
     this.instagram = new InstagramAPI();
     this.tiktok = new TikTokAPI();
     this.twitter = new TwitterAPI();
@@ -311,6 +373,7 @@ export class SocialIntegrationManager {
 
   getAuthUrl(platform: string): string {
     switch (platform) {
+      case 'facebook': return '#'; // Facebook uses SDK login, not URL redirect
       case 'instagram': return this.instagram.getAuthUrl();
       case 'tiktok': return this.tiktok.getAuthUrl();
       case 'twitter': return this.twitter.getAuthUrl();
@@ -320,23 +383,30 @@ export class SocialIntegrationManager {
     }
   }
 
-  async connectAccount(platform: string, code: string): Promise<SocialMediaAccount> {
+  async connectAccount(platform: string, code?: string): Promise<SocialMediaAccount | null> {
     let accessToken: string;
     
     switch (platform) {
+      case 'facebook':
+        return await this.facebook.connectAccount(); // Facebook uses SDK, no code needed
       case 'instagram':
+        if (!code) throw new Error('Code required for Instagram');
         accessToken = await this.instagram.exchangeCodeForToken(code);
         return this.instagram.getUserProfile(accessToken);
       case 'tiktok':
+        if (!code) throw new Error('Code required for TikTok');
         accessToken = await this.tiktok.exchangeCodeForToken(code);
         return this.tiktok.getUserProfile(accessToken);
       case 'twitter':
+        if (!code) throw new Error('Code required for Twitter');
         accessToken = await this.twitter.exchangeCodeForToken(code);
         return this.twitter.getUserProfile(accessToken);
       case 'youtube':
+        if (!code) throw new Error('Code required for YouTube');
         accessToken = await this.youtube.exchangeCodeForToken(code);
         return this.youtube.getUserProfile(accessToken);
       case 'spotify':
+        if (!code) throw new Error('Code required for Spotify');
         accessToken = await this.spotify.exchangeCodeForToken(code);
         return this.spotify.getUserProfile(accessToken);
       default:
@@ -376,6 +446,10 @@ export class SocialIntegrationManager {
     if (!account.accessToken) throw new Error('No access token available');
     
     switch (account.platform) {
+      case 'facebook': 
+        // Refresh Facebook follower count
+        const updatedFollowers = await this.facebook.refreshFollowerCount(account.accessToken);
+        return { ...account, followers: updatedFollowers };
       case 'instagram': return this.instagram.getUserProfile(account.accessToken);
       case 'tiktok': return this.tiktok.getUserProfile(account.accessToken);
       case 'twitter': return this.twitter.getUserProfile(account.accessToken);
