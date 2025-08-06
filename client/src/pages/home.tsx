@@ -9,22 +9,21 @@ import NILAthleteSpotlight from "@/components/nil/nil-athlete-spotlight";
 import NILValueCalculator from "@/components/nil/nil-value-calculator";
 import { type Creator } from "@shared/schema";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 
 export default function Home() {
-  const { user, setShowAuthFlow } = useDynamicContext();
+  const { user } = useDynamicContext();
 
   const { data: creators = [] } = useQuery<Creator[]>({
     queryKey: ["/api/creators"],
     enabled: true,
   });
 
-  const handleConnectWallet = () => {
-    setShowAuthFlow(true);
-  };
+
 
   const handleStartCreatorSignup = () => {
     if (!user) {
-      setShowAuthFlow(true);
+      // User needs to connect wallet first
       return;
     }
     // Navigate to enhanced creator onboarding
@@ -49,8 +48,7 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
-              <Button 
-                onClick={handleConnectWallet}
+              <ConnectWalletButton 
                 size="lg"
                 className="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 relative overflow-hidden group"
               >
@@ -59,7 +57,7 @@ export default function Home() {
                   Build Your Loyalty Empire
                   <ArrowRight className="w-6 h-6" />
                 </span>
-              </Button>
+              </ConnectWalletButton>
               <Button 
                 onClick={() => window.location.href = "/marketplace"}
                 size="lg"

@@ -1,0 +1,98 @@
+# useDynamicEvents
+
+### Summary
+
+The useDynamicEvents hook can be used to subscribe to events emitted by Dynamic.
+
+### Usage
+
+Available function and states
+
+**Auth related events**
+
+| Event             | Arguments                                        | Description                                                                                            |
+| ----------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| authFailure       | `reason: 'user-cancelled' \| { error: unknown }` | Triggered whenever the auth process fails                                                              |
+| authFlowCancelled | `none`                                           | Triggered when auth is attempted but fails like when user rejects connection or the network call fails |
+| authFlowClose     | `none`                                           | Triggered when the modal is closed during an authentication process, regardless of failure or success  |
+| authFlowOpen      | `none`                                           | Triggered when the modal is opened during an authentication process, regardless of failure or success  |
+| authInit          | `method: string`                                 | Informs an auth attempt initialized, and provides insight into which auth option it is                 |
+| logout            | `none`                                           | Triggered when the user logs out                                                                       |
+
+**Wallet related events**
+
+| Event                       | Arguments                                                                                               | Description                                                                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| walletAdded                 | `newWallet: Wallet`                                                                                     | Triggered whenever a wallet is added to the user profile                                                                                                                                     |
+| walletRemoved               | `removedWallet: Wallet`                                                                                 | Triggered whenever a wallet is removed from the user profile                                                                                                                                 |
+| embeddedWalletCreated       | `wallet: Wallet, verifiedCredential: JwtVerifiedCredential \ undefined, user: UserProfile \| undefined` | Triggered when an embedded wallet is created                                                                                                                                                 |
+| primaryWalletChanged        | `newPrimaryWallet: Wallet`                                                                              | Triggered whenever the primary wallet changes                                                                                                                                                |
+| primaryWalletNetworkChanged | `newNetwork: number \| string`                                                                          | Triggered whenever the primary wallet network changes                                                                                                                                        |
+| userWalletsChanged          | `params: UserWalletsChangedParams`                                                                      | Triggered whenever a wallet is added or removed from the user profile, the primary wallet changes to another one, the primary wallet network changes or a non-primary wallet network changes |
+
+**OTP related events**
+
+| Event                   | Arguments                       | Description                                                  |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------ |
+| emailVerificationResult | `param: boolean, email: string` | Triggered when the email verification result is received     |
+| smsVerificationResult   | `param: boolean, phone: string` | Triggered when the sms verification result is received       |
+| mfaCompletionFailure    | `args: { error: unknown }`      | Emitted when there is an error verifiyng the MFA challenge   |
+| mfaCompletionSuccess    | `args: { mfaToken?: string }`   | Emitted when the user succesfully completes an MFA challenge |
+
+### Type Definitions
+
+```tsx
+import { type UserWalletsChangedParams } from "@dynamic-labs/sdk-react-core";
+
+
+type UserWalletsUpdateType =
+  | {
+      updateType: 'walletAdded';
+      addedWallet: Wallet;
+    }
+  | {
+      updateType: 'walletRemoved';
+      removedWallet: Wallet;
+    }
+  | {
+      updateType: 'primaryWalletChanged';
+    }
+  | {
+      updateType: 'primaryWalletNetworkChanged';
+      newNetwork: string | number;
+    }
+  | {
+      updateType: 'nonPrimaryWalletNetworkChanged';
+      newNetwork: string | number;
+      affectedWallets: Wallet[];
+    };
+
+type UserWalletsChangedParams = {
+  userWallets: Wallet[];
+  primaryWallet: Wallet | undefined;
+} & UserWalletsUpdateType;
+```
+
+### Example
+
+```tsx
+import { useDynamicEvents } from "@dynamic-labs/sdk-react-core";
+
+const useDynamicEventsExample = () => {
+  useDynamicEvents("userWalletsChanged", async (params) => {
+    console.log(params);
+  });
+
+  useDynamicEvents("primaryWalletChanged", async (newPrimaryWallet) => {
+    console.log(newPrimaryWallet);
+  });
+
+  useDynamicEvents("primaryWalletNetworkChanged", async (newNetwork) => {
+    console.log(newNetwork);
+  });
+
+  useDynamicEvents("walletAdded", async (newWallet) => {
+    console.log(newWallet);
+  });
+};
+```

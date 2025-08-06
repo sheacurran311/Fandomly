@@ -1,0 +1,232 @@
+# useDynamicContext
+
+> Dynamic's React Context which is set via DynamicContextProvider
+
+## accountSwitchState
+
+Type: `AccountSwitchState`
+
+This enum type specifies the current state of switching or linking wallets in a multi-wallet enabled environment. This can be idle, linking\_new\_wallet, switching\_primary, primary\_not\_connected
+
+## authMode
+
+Type: `AuthModeType`
+
+This enum type specifies whether the SDK's users will need to sign to authenticate and prove ownership of their account, or just connect is enough. This can be connect-only or connect-and-sign
+
+## awaitingSignatureState
+
+Type: `AwaitingSignatureState`
+
+This enum type specifies the current state while waiting for a signature of a new wallet to link in a multi-wallet enabled environment. This can be idle, linking\_new\_wallet, transferring\_wallet
+
+## handleLogOut
+
+Type: `() => Promise`
+
+A helper-method to log-out the currently authenticated user account.
+
+## handleUnlinkWallet
+
+Type: `(walletId: string) => Promise`
+
+Helper function to unlink a wallet given a wallet ID from the user account.
+
+## isVerificationInProgress
+
+Type: `boolean`
+
+Whether any verifications are in progress for the current user (ex. connect, sign and email login verifications).
+
+## loadingNetwork
+
+Type: `boolean`
+
+Returns true when the SDK is looking for the network of the primary wallet's wallet connector.
+
+## multiWalletWidgetState
+
+Type: `MultiWalletWidgetState`
+
+This enum type specifies the current state of the widget in a multi-wallet enabled environment. This can be idle, awaiting\_account\_switch, awaiting\_connection, awaiting\_signature, detected\_known\_secondary\_wallet, detected\_new\_wallet
+
+## network
+
+Type: `number | undefined`
+
+This represents the current network selected for the primary wallet
+
+## networkConfigurations
+
+Type: `NetworkConfigurationMap | undefined`
+
+This contains the current network configurations for various EVM and Solana chains. These information includes chain ID, RPC URLs, and other important information.
+
+## primaryWallet
+
+Type: `Wallet | null`
+
+An instance of a Wallet that represents the most recent connected Wallet.
+
+## qrcodeUri
+
+Type: `string`
+
+URI for the QR code to scan in the current modal.
+
+## redirectUrl
+
+Type: `string | undefined`
+
+URL used for redirecting back after connecting with farcaster
+
+## sdkHasLoaded
+
+Type: `boolean`
+
+Whether the sdk's data is done loading — useful for avoiding stale data flashes by not rendering until the sdk is done loading.
+
+## selectedTabIndex
+
+Type: `number`
+
+The selected tab index when using the [wallet list view tabs](/design-customizations/tutorials/wallet-list-views-guide) feature
+
+## setAuthMode
+
+Type: `Dispatch<SetStateAction<AuthModeType>>`
+
+Sets the current authentication mode of branded wallets ("connect-and-sign" or "connect-only"). Note: does nothing if the user is already logged in. You might also want to toggle the [initialAuthenticationMode](/react-sdk/providers/dynamiccontextprovider) prop.
+
+## setMultiWalletWidgetState
+
+Type: `MultiWalletWidgetStateSetter`
+
+It controls the intended state for a multi-wallet enabled environment.
+
+## setSelectedTabIndex
+
+Type: `Dispatch<SetStateAction<number>>`
+
+Sets the selected tab index when using the [wallet list view tabs](/design-customizations/tutorials/wallet-list-views-guide) feature
+
+## setShowAuthFlow
+
+Type: `Dispatch<SetStateAction>`
+
+It controls whether or not to display the DynamicAuthFlow SDK component.
+
+## setShowQrcodeModal
+
+Type: `Dispatch<SetStateAction>`
+
+It controls whether or not to display a QR code modal.
+
+## showAuthFlow
+
+Type: `boolean`
+
+The value set by setShowAuthFlow, it controls whether or not to display the DynamicAuthFlow SDK component.
+
+## showQrcodeModal
+
+Type: `boolean`
+
+Value set by setShowQrcodeModal, it controls whether or not to display a QR code modal.
+
+## user
+
+Type: `UserProfile | null`
+
+The user object of the currently authenticated user.
+
+## userWithMissingInfo
+
+Type: `UserProfile | undefined`
+
+Present if the user is authenticated but hasn't finished onboarding (i.e. mandatory info capture/MFA), undefined if the user hasn't started the login/signup process or has already fully completed it.
+
+<Tip>
+  If you're looking to access the current user or session's wallets, like you
+  would with `linkedWallets`, `secondaryWallets` and `connectedWallets` in
+  previous versions, check out the new
+  [useUserWallets](/react-sdk/hooks/wallets/useuserwallets) hook.
+</Tip>
+
+### Examples
+
+#### `setShowAuthFlow` - use it to start signature request from user
+
+```TypeScript
+const ConnectButton = () => {
+  const { setShowAuthFlow } = useDynamicContext();
+  return (
+    <button
+      onClick={() => setShowAuthFlow(true)}
+    >
+      Connect your wallet
+    </button>
+  );
+};
+```
+
+#### `primaryWallet` - use it to make operations on the currently active wallet
+
+* method to simply fetch balance of users wallet:
+
+```TypeScript
+const getBalance = async () => {
+  const balance = await primaryWallet.getBalance();
+  return balance;
+};
+```
+
+* get users primary wallet
+
+```TypeScript
+const getAddress = () => {
+  const address = primaryWallet.address;
+  return address;
+};
+```
+
+* get all connected wallets by primary wallet connector
+
+```TypeScript
+const getConnectedAccounts = async () => {
+  const connectedAccounts = await primaryWallet?.connector.getConnectedAccounts();
+  return connectedAccounts;
+};
+```
+
+#### `handleLogOut` - use it to log out currently logged in user
+
+```TypeScript
+const LogoutButton = () => {
+  const { handleLogOut } = useDynamicContext();
+  return (
+    <button
+      onClick={() => handleLogOut()}
+    >
+      Log out
+    </button>
+  );
+};
+```
+
+#### `isVerificationInProgress` - use it along with [**onAuthFlowClose**](/react-sdk/events/onauthflowclose) to tell whether it was manually closed or closed due to a verification process
+
+```TypeScript
+<DynamicContextProvider
+  settings={{
+    events: {
+      onAuthFlowClose: () => {
+        if (isVerificationInProgress) console.log('Closed due to verification process');
+        else console.log('Manually closed by client');
+      }
+    }
+  }}
+>
+ {/* ... rest of your app ... */}
+</DynamicContextProvider>
+```

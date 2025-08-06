@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Menu, X, User, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
 import AuthModal from "@/components/auth/auth-modal";
 
@@ -11,16 +12,10 @@ export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const { user, setShowAuthFlow, handleLogOut } = useDynamicContext();
+  const { user, handleLogOut } = useDynamicContext();
   const { isFandomlyAdmin, isCustomerAdmin } = useRBAC();
 
-  const handleConnectWallet = () => {
-    if (user) {
-      // User is already connected, maybe show user menu
-      return;
-    }
-    setShowAuthFlow(true);
-  };
+
 
   const handleDisconnect = async () => {
     try {
@@ -118,12 +113,11 @@ export default function Navigation() {
                   </DropdownMenu>
                 </div>
               ) : (
-                <Button 
-                  onClick={handleConnectWallet}
+                <ConnectWalletButton 
                   className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium transition-all duration-200 hover:scale-105"
                 >
                   Connect Wallet
-                </Button>
+                </ConnectWalletButton>
               )}
             </div>
             
