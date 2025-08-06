@@ -38,6 +38,13 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
         appLogoUrl: "https://fandomly.ai/logo.png",
         privacyPolicyUrl: "/privacy-policy",
         termsOfServiceUrl: "/terms-of-service",
+        // Prevent auto-opening of wallet modal - manual trigger only
+        initialAuthenticationMode: "connect-only",
+        shadowDOMEnabled: false, // Disable shadow DOM to prevent conflicts
+        accessDeniedMessagePrimary: "Wallet access required",
+        accessDeniedMessageSecondary: "Please connect your wallet to continue",
+        displaySiweStatement: false, // Don't auto-show SIWE message
+        enableVisitTrackingOnConnectOnly: true, // Only track visits after manual connection
         // Disable all secondary authentication requirements
         eventsCallbacks: {
           onAuthSuccess: (args: any) => {
@@ -48,6 +55,12 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
             localStorage.removeItem('userType');
             localStorage.removeItem('onboardingCompleted');
           },
+          onAuthFlowClose: (args: any) => {
+            console.log('Dynamic Auth Flow Closed:', args);
+          },
+          onAuthFlowOpen: (args: any) => {
+            console.log('Dynamic Auth Flow Opened:', args);
+          }
         },
         cssOverrides: `
           .dynamic-modal {
