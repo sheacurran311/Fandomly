@@ -49,20 +49,16 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
               <ConnectWalletButton 
-                size="lg"
-                className="gradient-primary text-white px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 relative overflow-hidden group"
+                className="gradient-primary text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 flex items-center justify-center gap-3"
               >
-                <span className="absolute inset-0 bg-gradient-to-r from-brand-secondary/20 to-brand-accent/20 rounded-2xl group-hover:scale-110 transition-transform duration-300"></span>
-                <span className="relative flex items-center justify-center gap-3">
-                  Build Your Loyalty Empire
-                  <ArrowRight className="w-6 h-6" />
-                </span>
+                Build Your Loyalty Empire
+                <ArrowRight className="w-6 h-6" />
               </ConnectWalletButton>
               <Button 
                 onClick={() => window.location.href = "/marketplace"}
                 size="lg"
                 variant="outline"
-                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20 hover:text-brand-secondary px-12 py-6 rounded-2xl font-bold text-xl transition-all duration-300"
+                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20 hover:text-brand-secondary px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300"
               >
                 Explore Programs
               </Button>
