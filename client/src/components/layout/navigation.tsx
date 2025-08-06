@@ -6,12 +6,12 @@ import { Menu, X, User, Settings, LogOut, ChevronDown, Shield } from "lucide-rea
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
-import AuthModal from "@/components/auth/auth-modal";
+
 
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   const { user, handleLogOut } = useDynamicContext();
   const { isFandomlyAdmin, isCustomerAdmin } = useRBAC();
 
@@ -149,12 +149,11 @@ export default function Navigation() {
                     </Button>
                   </Link>
                 ) : (
-                  <Button 
-                    onClick={handleConnectWallet}
+                  <ConnectWalletButton 
                     className="w-full bg-brand-primary hover:bg-brand-primary/80"
                   >
                     Connect Wallet
-                  </Button>
+                  </ConnectWalletButton>
                 )}
               </div>
             </div>
@@ -162,7 +161,7 @@ export default function Navigation() {
         </div>
       </nav>
 
-      <AuthModal open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen} />
+
     </>
   );
 }

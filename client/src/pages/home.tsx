@@ -258,12 +258,20 @@ export default function Home() {
                   </div>
                 </div>
                 
-                <Button
-                  onClick={handleStartCreatorSignup}
-                  className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
-                >
-                  Start as Athlete
-                </Button>
+                {user ? (
+                  <Button
+                    onClick={handleStartCreatorSignup}
+                    className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  >
+                    Start as Athlete
+                  </Button>
+                ) : (
+                  <ConnectWalletButton
+                    className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  >
+                    Connect Wallet to Start
+                  </ConnectWalletButton>
+                )}
               </CardContent>
             </Card>
             
@@ -302,12 +310,20 @@ export default function Home() {
                   </div>
                 </div>
                 
-                <Button
-                  onClick={handleStartCreatorSignup}
-                  className="w-full bg-gradient-to-r from-blue-400 to-cyan-500 hover:from-blue-500 hover:to-cyan-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
-                >
-                  Start as Creator
-                </Button>
+                {user ? (
+                  <Button
+                    onClick={handleStartCreatorSignup}
+                    className="w-full bg-gradient-to-r from-blue-400 to-cyan-500 hover:from-blue-500 hover:to-cyan-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  >
+                    Start as Creator
+                  </Button>
+                ) : (
+                  <ConnectWalletButton
+                    className="w-full bg-gradient-to-r from-blue-400 to-cyan-500 hover:from-blue-500 hover:to-cyan-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  >
+                    Connect Wallet to Start
+                  </ConnectWalletButton>
+                )}
               </CardContent>
             </Card>
             
@@ -343,12 +359,20 @@ export default function Home() {
                   </div>
                 </div>
                 
-                <Button
-                  onClick={handleStartCreatorSignup}
-                  className="w-full bg-gradient-to-r from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
-                >
-                  Start as Musician
-                </Button>
+                {user ? (
+                  <Button
+                    onClick={handleStartCreatorSignup}
+                    className="w-full bg-gradient-to-r from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  >
+                    Start as Musician
+                  </Button>
+                ) : (
+                  <ConnectWalletButton
+                    className="w-full bg-gradient-to-r from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white py-3 rounded-2xl font-semibold transition-all duration-200"
+                  >
+                    Connect Wallet to Start
+                  </ConnectWalletButton>
+                )}
               </CardContent>
             </Card>
           </div>
