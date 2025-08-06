@@ -8,6 +8,7 @@ import WalletAuthRouter from "@/components/auth/wallet-auth-router";
 import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
+import HomeRouter from "@/components/auth/home-router";
 import Marketplace from "@/pages/marketplace";
 import CreatorOnboarding from "@/pages/creator-onboarding";
 import CampaignBuilder from "@/pages/campaign-builder";
@@ -26,7 +27,7 @@ import DashboardRouter from "@/components/auth/dashboard-router";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={HomeRouter} />
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/campaign-builder" component={CampaignBuilder} />

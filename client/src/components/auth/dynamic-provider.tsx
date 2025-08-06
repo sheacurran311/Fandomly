@@ -40,11 +40,6 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
         termsOfServiceUrl: "/terms-of-service",
         // Prevent auto-opening of wallet modal - manual trigger only
         initialAuthenticationMode: "connect-only",
-        shadowDOMEnabled: false, // Disable shadow DOM to prevent conflicts
-        accessDeniedMessagePrimary: "Wallet access required",
-        accessDeniedMessageSecondary: "Please connect your wallet to continue",
-        displaySiweStatement: false, // Don't auto-show SIWE message
-        enableVisitTrackingOnConnectOnly: true, // Only track visits after manual connection
         // Disable all secondary authentication requirements
         eventsCallbacks: {
           onAuthSuccess: (args: any) => {
