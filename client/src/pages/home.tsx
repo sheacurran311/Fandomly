@@ -8,7 +8,7 @@ import CreatorCard from "@/components/creator/creator-card";
 import NILAthleteSpotlight from "@/components/nil/nil-athlete-spotlight";
 import NILValueCalculator from "@/components/nil/nil-value-calculator";
 import { type Creator } from "@shared/schema";
-import { useDynamicContext, DynamicWidget } from "@dynamic-labs/sdk-react-core";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 
 export default function Home() {
   const { user, setShowAuthFlow } = useDynamicContext();
