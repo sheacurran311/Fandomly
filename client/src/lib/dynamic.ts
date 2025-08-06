@@ -9,12 +9,21 @@ export const dynamicConfig = {
   walletConnectors: [],
   multiWallet: true,
   enableVisitTrackingOnConnectOnly: true,
-  // Disable 2FA and email requirements
+  // Disable all secondary authentication requirements
   privacyPolicy: undefined,
   termsOfService: undefined,
   socialProvidersFilter: undefined,
+  // Disable email verification and other secondary auth steps
+  emailVerification: false,
+  twoFactorAuth: false,
+  requireEmailVerification: false,
+  skipEmailVerification: true,
   overrides: {
     evmNetworks: [],
+    views: [{
+      type: "login",
+      mode: "simple"  // Use simple login mode without secondary verification
+    }]
   },
   appMetadata: {
     name: "Fandomly",

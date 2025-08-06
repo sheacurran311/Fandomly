@@ -38,7 +38,17 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
         appLogoUrl: "https://fandomly.ai/logo.png",
         privacyPolicyUrl: "/privacy-policy",
         termsOfServiceUrl: "/terms-of-service",
-        // Use default settings to show all auth methods configured in Dynamic dashboard
+        // Disable all secondary authentication requirements
+        eventsCallbacks: {
+          onAuthSuccess: (args: any) => {
+            console.log('Dynamic Auth Success:', args);
+          },
+          onLogout: (args: any) => {
+            console.log('Dynamic Logout:', args);
+            localStorage.removeItem('userType');
+            localStorage.removeItem('onboardingCompleted');
+          },
+        },
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;
