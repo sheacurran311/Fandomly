@@ -1,4 +1,4 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useDynamicContext, useAuthenticateConnectedUser } from "@dynamic-labs/sdk-react-core";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -15,14 +15,21 @@ export default function ConnectWalletButton({
   variant = "default",
   size = "default"
 }: ConnectWalletButtonProps) {
-  const { setShowAuthFlow, user } = useDynamicContext();
+  const { user, isAuthenticated } = useDynamicContext();
+  const { authenticateConnectedUser } = useAuthenticateConnectedUser();
 
-  const handleConnect = () => {
-    if (user) {
-      // User is already connected
+  const handleConnect = async () => {
+    if (isAuthenticated && user) {
+      // User is already connected and authenticated
       return;
     }
-    setShowAuthFlow(true);
+    
+    try {
+      // Use the proper Dynamic authentication method
+      await authenticateConnectedUser();
+    } catch (error) {
+      console.error('Authentication error:', error);
+    }
   };
 
   const defaultClassName = "bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-3 rounded-xl transition-all duration-200 hover:scale-105";
