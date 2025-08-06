@@ -40,23 +40,6 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
         termsOfServiceUrl: "/terms-of-service",
         // Prevent auto-opening of wallet modal - manual trigger only
         initialAuthenticationMode: "connect-only",
-        // Disable all secondary authentication requirements
-        eventsCallbacks: {
-          onAuthSuccess: (args: any) => {
-            console.log('Dynamic Auth Success:', args);
-          },
-          onLogout: (args: any) => {
-            console.log('Dynamic Logout:', args);
-            localStorage.removeItem('userType');
-            localStorage.removeItem('onboardingCompleted');
-          },
-          onAuthFlowClose: (args: any) => {
-            console.log('Dynamic Auth Flow Closed:', args);
-          },
-          onAuthFlowOpen: (args: any) => {
-            console.log('Dynamic Auth Flow Opened:', args);
-          }
-        },
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;
