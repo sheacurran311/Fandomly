@@ -40,8 +40,6 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
         termsOfServiceUrl: "/terms-of-service",
         // Prevent auto-opening of wallet modal - manual trigger only
         initialAuthenticationMode: "connect-only",
-        // Show auth flow when clicking connect button
-        showAuthFlow: false,
         cssOverrides: `
           .dynamic-modal {
             z-index: 9999;
