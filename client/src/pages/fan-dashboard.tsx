@@ -15,7 +15,7 @@ import {
   Award,
   Settings
 } from "lucide-react";
-import UserTypeSwitch from "@/components/auth/user-type-switch";
+
 import { type FanProgram, type User } from "@shared/schema";
 
 export default function FanDashboard() {
@@ -298,18 +298,25 @@ export default function FanDashboard() {
         <div id="account-settings" className="mt-16 border-t border-brand-primary/20 pt-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">Account Settings</h2>
-            <p className="text-gray-300">Manage your account preferences and switch account types</p>
+            <p className="text-gray-300">Manage your account preferences</p>
           </div>
           
           <div className="max-w-2xl mx-auto">
-            <UserTypeSwitch 
-              currentUserType="fan"
-              userId={userData?.id || ""}
-              onSwitchSuccess={() => {
-                // Refresh the page after successful switch
-                window.location.reload();
-              }}
-            />
+            <Card className="bg-white/5 border-white/10">
+              <CardContent className="p-6 text-center">
+                <Settings className="h-12 w-12 text-brand-primary mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">Account Type: Fan</h3>
+                <p className="text-gray-300 mb-4">
+                  Want to become a creator? Visit the marketplace to set up your own loyalty program.
+                </p>
+                <Button
+                  onClick={() => window.location.href = "/creator-onboarding"}
+                  className="bg-brand-primary hover:bg-brand-primary/80"
+                >
+                  Become a Creator
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

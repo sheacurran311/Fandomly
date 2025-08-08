@@ -19,7 +19,7 @@ import {
   Facebook,
   Music
 } from "lucide-react";
-import UserTypeSwitch from "@/components/auth/user-type-switch";
+
 import StatsGrid from "@/components/dashboard/stats-grid";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -405,13 +405,23 @@ export default function CreatorDashboard() {
                   <CardTitle className="text-white">Account Settings</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <UserTypeSwitch 
-                    currentUserType="creator"
-                    userId={userData?.id || ""}
-                    onSwitchSuccess={() => {
-                      window.location.reload();
-                    }}
-                  />
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/40">
+                        Creator Account
+                      </Badge>
+                      <p className="text-gray-300 mt-2">
+                        You're set up as a creator with your own loyalty program.
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline"
+                      className="w-full border-brand-accent text-brand-accent hover:bg-brand-accent/10"
+                      onClick={() => window.location.href = "/fan-dashboard"}
+                    >
+                      View Fan Dashboard
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
               

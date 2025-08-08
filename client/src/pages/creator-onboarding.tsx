@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useLocation } from "wouter";
 import CreatorOnboardingFlow from "@/components/onboarding/creator-onboarding-flow";
-import ProtectedRoute from "@/components/auth/protected-route";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -19,9 +18,25 @@ export default function CreatorOnboardingPage() {
     setLocation("/");
   };
 
+  // Simple auth check using Dynamic's native system
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
+          <CardContent className="text-center p-6">
+            <h2 className="text-xl font-bold text-white mb-4">Authentication Required</h2>
+            <p className="text-gray-300 mb-4">Please connect your wallet to access creator onboarding.</p>
+            <Button onClick={() => setLocation("/")} className="bg-brand-primary hover:bg-brand-primary/80">
+              Go Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-brand-dark-bg">
+    <div className="min-h-screen bg-brand-dark-bg">
         {/* Header */}
         <div className="border-b border-white/10 bg-brand-dark-bg/80 backdrop-blur-sm sticky top-0 z-50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,6 +63,5 @@ export default function CreatorOnboardingPage() {
         {/* Onboarding Flow */}
         <CreatorOnboardingFlow onComplete={handleOnboardingComplete} />
       </div>
-    </ProtectedRoute>
   );
 }

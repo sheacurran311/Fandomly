@@ -1,8 +1,12 @@
 import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
-import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-import { SolanaWalletConnectors } from "@dynamic-labs/solana";
+import { AlgorandWalletConnectors } from "@dynamic-labs/algorand";
+import { BitcoinWalletConnectors } from "@dynamic-labs/bitcoin";
 import { CosmosWalletConnectors } from "@dynamic-labs/cosmos";
+import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
+import { FlowWalletConnectors } from "@dynamic-labs/flow";
+import { SolanaWalletConnectors } from "@dynamic-labs/solana";
 import { StarknetWalletConnectors } from "@dynamic-labs/starknet";
+import { SuiWalletConnectors } from "@dynamic-labs/sui";
 import { dynamicEnvironmentId } from "@/lib/dynamic";
 import { ReactNode } from "react";
 
@@ -29,16 +33,19 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
       settings={{
         environmentId: dynamicEnvironmentId,
         walletConnectors: [
-          EthereumWalletConnectors,
-          SolanaWalletConnectors,
+          AlgorandWalletConnectors,
+          BitcoinWalletConnectors,
           CosmosWalletConnectors,
+          EthereumWalletConnectors,
+          FlowWalletConnectors,
+          SolanaWalletConnectors,
           StarknetWalletConnectors,
+          SuiWalletConnectors,
         ],
         appName: "Fandomly",
         appLogoUrl: "https://fandomly.ai/logo.png",
         privacyPolicyUrl: "/privacy-policy",
         termsOfServiceUrl: "/terms-of-service",
-        // Prevent auto-opening of wallet modal - manual trigger only
         initialAuthenticationMode: "connect-only",
         cssOverrides: `
           .dynamic-modal {

@@ -4,11 +4,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DynamicProvider from "@/components/auth/dynamic-provider";
-import WalletAuthRouter from "@/components/auth/wallet-auth-router";
 import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
-
 import Marketplace from "@/pages/marketplace";
 import CreatorOnboarding from "@/pages/creator-onboarding";
 import CampaignBuilder from "@/pages/campaign-builder";
@@ -22,7 +20,6 @@ import Auth from "@/pages/auth";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
 import NotFound from "@/pages/not-found";
-import DashboardRouter from "@/components/auth/dashboard-router";
 
 function Router() {
   return (
@@ -37,7 +34,6 @@ function Router() {
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/nil-dashboard" component={NILDashboard} />
       <Route path="/rbac-dashboard" component={RBACDashboard} />
-      <Route path="/dashboard" component={DashboardRouter} />
       <Route path="/auth" component={Auth} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
@@ -51,16 +47,14 @@ function App() {
     <DynamicProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <WalletAuthRouter>
-            <div className="min-h-screen bg-brand-dark-bg">
+          <div className="min-h-screen bg-brand-dark-bg">
               <Navigation />
               <main>
                 <Router />
               </main>
               <Footer />
-            </div>
-            <Toaster />
-          </WalletAuthRouter>
+          </div>
+          <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
     </DynamicProvider>
