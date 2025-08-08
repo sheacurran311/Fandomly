@@ -34,6 +34,7 @@ function Router() {
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/nil-dashboard" component={NILDashboard} />
       <Route path="/rbac-dashboard" component={RBACDashboard} />
+      <Route path="/dashboard" component={RBACDashboard} />
 
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
