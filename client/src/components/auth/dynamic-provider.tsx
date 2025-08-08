@@ -30,9 +30,6 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
         environmentId: dynamicEnvironmentId,
         walletConnectors: [
           EthereumWalletConnectors,
-          SolanaWalletConnectors,
-          CosmosWalletConnectors,
-          StarknetWalletConnectors,
         ],
         appName: "Fandomly",
         appLogoUrl: "https://fandomly.ai/logo.png",

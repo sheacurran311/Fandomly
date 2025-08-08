@@ -58,7 +58,7 @@ export default function Home() {
                 onClick={() => window.location.href = "/marketplace"}
                 size="lg"
                 variant="outline"
-                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20 hover:text-brand-secondary px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300"
+                className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20 hover:text-brand-secondary px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300 h-auto"
               >
                 Explore Programs
               </Button>
