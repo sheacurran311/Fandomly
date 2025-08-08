@@ -5,7 +5,6 @@ interface WalletAuthRouterProps {
 }
 
 export default function WalletAuthRouter({ children }: WalletAuthRouterProps) {
-  // Simplified - let Dynamic handle the authentication flow
-  // and let individual pages handle their own routing logic
+  // Let Dynamic handle all authentication - no custom routing logic
   return <>{children}</>;
 }
