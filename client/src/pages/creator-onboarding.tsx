@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useLocation } from "wouter";
-import CreatorOnboardingFlow from "@/components/onboarding/creator-onboarding-flow";
+import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -60,8 +60,23 @@ export default function CreatorOnboardingPage() {
           </div>
         </div>
 
-        {/* Onboarding Flow */}
-        <CreatorOnboardingFlow onComplete={handleOnboardingComplete} />
+        {/* Simplified Onboarding - Dynamic handles everything */}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="max-w-2xl mx-auto text-center">
+            <h1 className="text-4xl font-bold text-white mb-4">
+              Welcome to Fandomly!
+            </h1>
+            <p className="text-xl text-gray-300 mb-8">
+              Your wallet is connected. You're all set to start building your fan community.
+            </p>
+            <Button 
+              onClick={handleOnboardingComplete}
+              className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-8 py-3 rounded-xl"
+            >
+              Go to Creator Dashboard
+            </Button>
+          </div>
+        </div>
       </div>
   );
 }

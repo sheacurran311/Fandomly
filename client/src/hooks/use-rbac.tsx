@@ -28,33 +28,13 @@ export interface UserRole {
 }
 
 export function useRBAC() {
-  const { user, isAuthenticated } = useDynamicContext();
+  const { user } = useDynamicContext();
 
-  // Get user data from our backend using our user management system
-  const { data: userData, isLoading } = useQuery({
-    queryKey: ['/api/auth/user'],
-    enabled: isAuthenticated,
-    retry: false,
-  });
-
-  // Transform user data into UserRole format
-  const userRole: UserRole | null = userData ? {
-    id: userData.id,
-    role: userData.role || 'customer_end_user',
-    customerTier: userData.customerTier || 'basic',
-    adminPermissions: userData.role === 'fandomly_admin' ? {
-      canManageAllCreators: true,
-      canManageUsers: true,
-      canAccessAnalytics: true,
-      canManagePlatformSettings: true,
-      canManagePayments: true,
-    } : undefined,
-    customerAdminData: userData.userType === 'creator' ? {
-      organizationName: userData.username,
-      businessType: 'creator',
-      subscriptionStatus: 'active',
-      subscriptionTier: 'professional',
-    } : undefined,
+  // Simplified RBAC using only Dynamic's native user properties
+  const userRole: UserRole | null = user ? {
+    id: user.userId || '',
+    role: 'customer_end_user', // Default role, can be configured in Dynamic admin
+    customerTier: 'basic',
   } : null;
 
   const hasRole = (allowedRoles: Array<'fandomly_admin' | 'customer_admin' | 'customer_end_user'>): boolean => {
@@ -113,7 +93,7 @@ export function useRBAC() {
 
   return {
     userRole,
-    isLoading,
+    isLoading: false, // No backend loading since we use Dynamic directly
     hasRole,
     hasCustomerTier,
     hasAdminPermission,

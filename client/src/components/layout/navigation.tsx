@@ -6,15 +6,11 @@ import { Menu, X, User, Settings, LogOut, ChevronDown, Shield } from "lucide-rea
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
-import { useAuth } from "@/hooks/useAuth";
-
-
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { user: dynamicUser, handleLogOut } = useDynamicContext();
-  const { user, isAuthenticated } = useAuth();
   const { isFandomlyAdmin, isCustomerAdmin } = useRBAC();
 
 
@@ -53,7 +49,7 @@ export default function Navigation() {
               <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
                 Who It's For
               </Link>
-              {isAuthenticated && user ? (
+              {dynamicUser ? (
                 <div className="flex items-center space-x-4">
                   <Link href="/dashboard">
                     <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
@@ -66,7 +62,7 @@ export default function Navigation() {
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="flex items-center space-x-2 text-white hover:text-brand-secondary">
                         <div className="w-8 h-8 bg-brand-primary rounded-full flex items-center justify-center">
-                          {user.username?.[0] || user.email?.[0] || "U"}
+                          {dynamicUser?.email?.[0] || "U"}
                         </div>
                         <ChevronDown className="h-4 w-4" />
                       </Button>
@@ -74,7 +70,7 @@ export default function Navigation() {
                     <DropdownMenuContent className="w-56 bg-brand-dark-purple border-brand-primary/20">
                       <div className="px-2 py-1.5 text-sm text-gray-300">
                         <div className="font-medium text-white">
-                          {user.username || user.email || "User"}
+                          {dynamicUser?.email || "User"}
                         </div>
                         <div className="text-xs text-gray-400">
                           {dynamicUser?.verifiedCredentials?.[0]?.address?.slice(0, 8)}...{dynamicUser?.verifiedCredentials?.[0]?.address?.slice(-6)}
@@ -144,7 +140,7 @@ export default function Navigation() {
                 <Link href="/#pricing" className="text-gray-300 hover:text-brand-secondary transition-colors">
                   Pricing
                 </Link>
-                {isAuthenticated && user ? (
+                {dynamicUser ? (
                   <Link href="/dashboard">
                     <Button className="w-full bg-brand-primary hover:bg-brand-primary/80">
                       Dashboard

@@ -21,7 +21,7 @@ export default function CreatorCard({ creator, showJoinButton = true }: CreatorC
       if (!user) throw new Error("Must be authenticated to join program");
       
       return apiRequest("POST", "/api/fan-programs", {
-        fanId: user.id,
+        fanId: user.userId,
         programId: programId,
       });
     },

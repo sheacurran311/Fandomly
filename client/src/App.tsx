@@ -16,7 +16,7 @@ import CreatorDashboard from "@/pages/creator-dashboard";
 import FanDashboard from "@/pages/fan-dashboard";
 import NILDashboard from "@/pages/nil-dashboard";
 import RBACDashboard from "@/pages/rbac-dashboard";
-import Auth from "@/pages/auth";
+
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
 import NotFound from "@/pages/not-found";
@@ -34,7 +34,7 @@ function Router() {
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/nil-dashboard" component={NILDashboard} />
       <Route path="/rbac-dashboard" component={RBACDashboard} />
-      <Route path="/auth" component={Auth} />
+
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route component={NotFound} />

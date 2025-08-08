@@ -12,13 +12,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Get Dynamic user if available for auth headers
-  const dynamicUser = (window as any).Dynamic?.getUser?.();
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
-  
-  if (dynamicUser?.userId) {
-    headers['x-dynamic-user-id'] = dynamicUser.userId;
-  }
 
   const res = await fetch(url, {
     method,
@@ -37,16 +31,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Get Dynamic user if available for auth headers
-    const dynamicUser = (window as any).Dynamic?.getUser?.();
-    const headers: Record<string, string> = {};
-    
-    if (dynamicUser?.userId) {
-      headers['x-dynamic-user-id'] = dynamicUser.userId;
-    }
-
     const res = await fetch(queryKey.join("/") as string, {
-      headers,
       credentials: "include",
     });
 
