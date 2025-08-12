@@ -139,6 +139,21 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default('customer_end_user'),
   customerTier: customerTierEnum("customer_tier").default('basic'), // Only applies to customer_end_user role
   
+  // Onboarding State Tracking
+  onboardingState: jsonb("onboarding_state").$type<{
+    currentStep: number; // 0 = not started, 1+ = step numbers
+    totalSteps: number;
+    completedSteps: string[]; // Array of completed step IDs
+    isCompleted: boolean;
+    lastOnboardingRoute?: string; // Save where user left off
+    skipReason?: string; // If user skipped onboarding
+  }>().default({
+    currentStep: 0,
+    totalSteps: 5,
+    completedSteps: [],
+    isCompleted: false
+  }),
+  
   // Admin permissions for fandomly_admin role
   adminPermissions: jsonb("admin_permissions").$type<{
     canManageAllCreators?: boolean;

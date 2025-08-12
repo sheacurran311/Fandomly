@@ -98,15 +98,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const onboardingState = user.onboardingState || {
+        currentStep: 0,
+        totalSteps: user.userType === 'creator' ? 5 : 3,
+        completedSteps: [],
+        isCompleted: false
+      };
+      
       res.json({
         ...user,
         creator,
         tenant,
-        hasCompletedOnboarding: user.userType === 'fan' || (user.userType === 'creator' && !!creator && !!tenant)
+        onboardingState,
+        hasCompletedOnboarding: onboardingState.isCompleted || (user.userType === 'creator' && !!creator && !!tenant)
       });
     } catch (error) {
       console.error("Error fetching user profile:", error);
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // User type switching route
+  app.post("/api/auth/switch-user-type", async (req, res) => {
+    try {
+      const { userId, userType } = req.body;
+      
+      if (!userId || !userType || !['fan', 'creator'].includes(userType)) {
+        return res.status(400).json({ error: "Invalid user type or user ID" });
+      }
+      
+      const updatedUser = await storage.updateUserType(userId, userType);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({
+        ...updatedUser,
+        message: `Successfully switched to ${userType} account`
+      });
+    } catch (error) {
+      console.error("Error switching user type:", error);
+      res.status(500).json({ error: "Failed to switch user type" });
+    }
+  });
+
+  // Onboarding state management
+  app.post("/api/auth/update-onboarding", async (req, res) => {
+    try {
+      const { userId, onboardingState } = req.body;
+      
+      if (!userId || !onboardingState) {
+        return res.status(400).json({ error: "User ID and onboarding state required" });
+      }
+      
+      const updatedUser = await storage.updateOnboardingState(userId, onboardingState);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating onboarding state:", error);
+      res.status(500).json({ error: "Failed to update onboarding state" });
     }
   });
 

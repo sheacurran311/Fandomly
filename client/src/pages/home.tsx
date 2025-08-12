@@ -52,7 +52,6 @@ export default function Home() {
                 className="gradient-primary text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25"
               >
                 Build Your Loyalty Empire
-                <ArrowRight className="w-6 h-6 ml-3" />
               </ConnectWalletButton>
               <Button 
                 onClick={() => window.location.href = "/marketplace"}

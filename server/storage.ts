@@ -18,6 +18,8 @@ export interface IStorage {
   getUserByDynamicId(dynamicUserId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
+  updateUserType(userId: string, userType: "fan" | "creator"): Promise<User | undefined>;
+  updateOnboardingState(userId: string, onboardingState: any): Promise<User | undefined>;
 
   // Creator operations
   getCreator(id: string): Promise<Creator | undefined>;
@@ -82,6 +84,45 @@ export class DatabaseStorage implements IStorage {
   async getUserByDynamicId(dynamicUserId: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.dynamicUserId, dynamicUserId));
     return user || undefined;
+  }
+
+  async updateUserType(userId: string, userType: "fan" | "creator"): Promise<User | undefined> {
+    try {
+      const role = userType === "creator" ? "customer_admin" : "customer_end_user";
+      const [updatedUser] = await db
+        .update(users)
+        .set({ 
+          userType, 
+          role,
+          // Reset onboarding when switching types
+          onboardingState: {
+            currentStep: 0,
+            totalSteps: userType === "creator" ? 5 : 3,
+            completedSteps: [],
+            isCompleted: false
+          }
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      return updatedUser;
+    } catch (error) {
+      console.error("Error updating user type:", error);
+      return undefined;
+    }
+  }
+
+  async updateOnboardingState(userId: string, onboardingState: any): Promise<User | undefined> {
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({ onboardingState })
+        .where(eq(users.id, userId))
+        .returning();
+      return updatedUser;
+    } catch (error) {
+      console.error("Error updating onboarding state:", error);
+      return undefined;
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

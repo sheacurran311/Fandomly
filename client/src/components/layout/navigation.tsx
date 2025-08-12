@@ -5,12 +5,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Menu, X, User, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
+import UserTypeSwitcher from "@/components/auth/user-type-switcher";
+import { useAuth } from "@/hooks/use-auth";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { user: dynamicUser, handleLogOut } = useDynamicContext();
+  const { user: userData, isAuthenticated, isLoading } = useAuth();
   const { isFandomlyAdmin, isCustomerAdmin } = useRBAC();
 
 
@@ -99,6 +102,15 @@ export default function Navigation() {
                         <Settings className="mr-2 h-4 w-4" />
                         Settings
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator className="bg-brand-primary/20" />
+                      {userData && (
+                        <div className="px-2 py-1">
+                          <UserTypeSwitcher 
+                            userId={userData.id}
+                            currentUserType={userData.userType}
+                          />
+                        </div>
+                      )}
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
                       <DropdownMenuItem 
                         onClick={handleDisconnect}
