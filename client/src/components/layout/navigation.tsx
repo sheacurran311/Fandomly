@@ -113,9 +113,8 @@ export default function Navigation() {
               ) : (
                 <ConnectWalletButton 
                   className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105"
-                >
-                  Start Here
-                </ConnectWalletButton>
+                  text="Start Here"
+                />
               )}
             </div>
             
@@ -149,9 +148,8 @@ export default function Navigation() {
                 ) : (
                   <ConnectWalletButton 
                     className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
-                  >
-                    Start Here
-                  </ConnectWalletButton>
+                    text="Start Here"
+                  />
                 )}
               </div>
             </div>

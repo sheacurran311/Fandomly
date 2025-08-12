@@ -49,12 +49,10 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
               <ConnectWalletButton 
-                className="gradient-primary text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 flex items-center"
+                className="gradient-primary text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25"
               >
-                <span className="flex items-center text-white">
-                  Build Your Loyalty Empire
-                  <ArrowRight className="w-6 h-6 ml-3" />
-                </span>
+                Build Your Loyalty Empire
+                <ArrowRight className="w-6 h-6 ml-3" />
               </ConnectWalletButton>
               <Button 
                 onClick={() => window.location.href = "/marketplace"}
