@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,9 +29,12 @@ import {
   Zap
 } from "lucide-react";
 import { Link } from "wouter";
+import UserRoleManager from "@/components/admin/user-role-manager";
 
 // Admin Dashboard Component
 function FandomlyAdminDashboard() {
+  const [adminTab, setAdminTab] = useState("overview");
+  
   const platformStats = {
     totalUsers: 15420,
     totalCreators: 1240,
@@ -114,59 +117,109 @@ function FandomlyAdminDashboard() {
         </Card>
       </div>
 
-      {/* Admin Actions */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-primary/50 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-brand-primary/20 rounded-lg flex items-center justify-center">
-                <Users className="h-6 w-6 text-brand-primary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-white">User Management</h3>
+      {/* Admin Management Tabs */}
+      <Tabs value={adminTab} onValueChange={setAdminTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 bg-white/5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          {/* Admin Actions */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Button 
+              onClick={() => setAdminTab("users")}
+              className="h-auto p-6 bg-white/5 hover:bg-brand-primary/20 border border-white/10 hover:border-brand-primary/50"
+              variant="ghost"
+            >
+              <div className="text-center w-full">
+                <Users className="h-12 w-12 text-brand-primary mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">User Management</h3>
                 <p className="text-sm text-gray-400">Manage all platform users and roles</p>
               </div>
-            </div>
-            <Button className="w-full mt-4 bg-brand-primary hover:bg-brand-primary/80">
-              Manage Users
             </Button>
-          </CardContent>
-        </Card>
 
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-secondary/50 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-brand-secondary/20 rounded-lg flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-brand-secondary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-white">Analytics</h3>
+            <Button 
+              onClick={() => setAdminTab("analytics")}
+              className="h-auto p-6 bg-white/5 hover:bg-brand-secondary/20 border border-white/10 hover:border-brand-secondary/50"
+              variant="ghost"
+            >
+              <div className="text-center w-full">
+                <BarChart3 className="h-12 w-12 text-brand-secondary mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Analytics</h3>
                 <p className="text-sm text-gray-400">View platform-wide analytics</p>
               </div>
-            </div>
-            <Button className="w-full mt-4 bg-brand-secondary hover:bg-brand-secondary/80">
-              View Analytics
             </Button>
-          </CardContent>
-        </Card>
 
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-purple-500/50 transition-colors">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <Settings className="h-6 w-6 text-purple-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-white">Platform Settings</h3>
+            <Button 
+              onClick={() => setAdminTab("settings")}
+              className="h-auto p-6 bg-white/5 hover:bg-purple-500/20 border border-white/10 hover:border-purple-500/50"
+              variant="ghost"
+            >
+              <div className="text-center w-full">
+                <Settings className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Platform Settings</h3>
                 <p className="text-sm text-gray-400">Configure global settings</p>
               </div>
-            </div>
-            <Button className="w-full mt-4 bg-purple-500 hover:bg-purple-500/80">
-              Settings
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <UserRoleManager />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <h3 className="text-xl font-semibold text-white">Platform Analytics</h3>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Growth Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <TrendingUp className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                  <p className="text-gray-400">Growth analytics will appear here</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Revenue Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <DollarSign className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                  <p className="text-gray-400">Revenue data will appear here</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <h3 className="text-xl font-semibold text-white">Platform Settings</h3>
+          
+          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Platform Configuration</CardTitle>
+              <CardDescription className="text-gray-400">
+                Configure platform-wide settings and features
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Settings className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-400">Platform settings interface will appear here</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -174,14 +227,21 @@ function FandomlyAdminDashboard() {
 // Customer Admin Dashboard Component
 function CustomerAdminDashboard() {
   const { userRole, isNILAthlete } = useRBAC();
+  const [selectedTab, setSelectedTab] = useState("overview");
   
-  const creatorStats = {
-    totalFans: 8750,
+  // Mock data - in production, this would come from API calls
+  const tenantStats = {
+    totalFans: 2850,
     activePrograms: 3,
     monthlyRevenue: 12400,
     engagementRate: 4.2,
-    complianceScore: 98
+    complianceScore: 98,
+    tenantName: userRole?.customerAdminData?.organizationName || "My Store",
+    subscriptionTier: userRole?.customerAdminData?.subscriptionTier || "starter"
   };
+
+  // Alias for UI consistency (legacy references)
+  const creatorStats = tenantStats;
 
   return (
     <div className="space-y-8">
@@ -275,44 +335,193 @@ function CustomerAdminDashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link href="/creator-dashboard">
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-primary/50 transition-colors cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <Award className="h-12 w-12 text-brand-primary mx-auto mb-4" />
-              <h3 className="font-semibold text-white mb-2">Loyalty Programs</h3>
-              <p className="text-sm text-gray-400">Manage your programs</p>
+      {/* Tenant Management Tabs */}
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-5 bg-white/5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="programs">Programs</TabsTrigger>
+          <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          {/* Quick Actions */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Button 
+              onClick={() => setSelectedTab("programs")}
+              className="h-auto p-6 bg-white/5 hover:bg-brand-primary/20 border border-white/10 hover:border-brand-primary/50"
+              variant="ghost"
+            >
+              <div className="text-center w-full">
+                <Award className="h-12 w-12 text-brand-primary mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Loyalty Programs</h3>
+                <p className="text-sm text-gray-400">Manage your programs</p>
+              </div>
+            </Button>
+
+            <Button 
+              onClick={() => setSelectedTab("campaigns")}
+              className="h-auto p-6 bg-white/5 hover:bg-brand-secondary/20 border border-white/10 hover:border-brand-secondary/50"
+              variant="ghost"
+            >
+              <div className="text-center w-full">
+                <Zap className="h-12 w-12 text-brand-secondary mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Campaigns</h3>
+                <p className="text-sm text-gray-400">Create & manage campaigns</p>
+              </div>
+            </Button>
+
+            <Link href="/nil-dashboard">
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-secondary/50 transition-colors cursor-pointer">
+                <CardContent className="p-6 text-center">
+                  <Shield className="h-12 w-12 text-brand-secondary mx-auto mb-4" />
+                  <h3 className="font-semibold text-white mb-2">NIL Dashboard</h3>
+                  <p className="text-sm text-gray-400">Compliance & earnings</p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Button 
+              onClick={() => setSelectedTab("analytics")}
+              className="h-auto p-6 bg-white/5 hover:bg-green-500/20 border border-white/10 hover:border-green-500/50"
+              variant="ghost"
+            >
+              <div className="text-center w-full">
+                <BarChart3 className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">Analytics</h3>
+                <p className="text-sm text-gray-400">Performance insights</p>
+              </div>
+            </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="programs" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-semibold text-white">Loyalty Programs</h3>
+            <Button className="bg-brand-primary hover:bg-brand-primary/80">
+              Create New Program
+            </Button>
+          </div>
+          
+          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            <CardContent className="p-6">
+              <div className="text-center py-12">
+                <Award className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">No Programs Yet</h3>
+                <p className="text-gray-400 mb-4">Create your first loyalty program to start engaging with fans</p>
+                <Button className="bg-brand-primary hover:bg-brand-primary/80">
+                  Create Program
+                </Button>
+              </div>
             </CardContent>
           </Card>
-        </Link>
+        </TabsContent>
 
-        <Link href="/nil-dashboard">
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-secondary/50 transition-colors cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <Shield className="h-12 w-12 text-brand-secondary mx-auto mb-4" />
-              <h3 className="font-semibold text-white mb-2">NIL Dashboard</h3>
-              <p className="text-sm text-gray-400">Compliance & earnings</p>
+        <TabsContent value="campaigns" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-semibold text-white">Campaigns</h3>
+            <Button className="bg-brand-secondary hover:bg-brand-secondary/80">
+              Create Campaign
+            </Button>
+          </div>
+          
+          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            <CardContent className="p-6">
+              <div className="text-center py-12">
+                <Zap className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">No Campaigns Running</h3>
+                <p className="text-gray-400 mb-4">Create your first campaign to start rewarding your fans</p>
+                <Button className="bg-brand-secondary hover:bg-brand-secondary/80">
+                  Create Campaign
+                </Button>
+              </div>
             </CardContent>
           </Card>
-        </Link>
+        </TabsContent>
 
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-green-500/50 transition-colors cursor-pointer">
-          <CardContent className="p-6 text-center">
-            <BarChart3 className="h-12 w-12 text-green-400 mx-auto mb-4" />
-            <h3 className="font-semibold text-white mb-2">Analytics</h3>
-            <p className="text-sm text-gray-400">Performance insights</p>
-          </CardContent>
-        </Card>
+        <TabsContent value="analytics" className="space-y-6">
+          <h3 className="text-xl font-semibold text-white">Analytics Dashboard</h3>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Fan Engagement</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <BarChart3 className="h-12 w-12 text-brand-primary mx-auto mb-4" />
+                  <p className="text-gray-400">Analytics data will appear here</p>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-purple-500/50 transition-colors cursor-pointer">
-          <CardContent className="p-6 text-center">
-            <CreditCard className="h-12 w-12 text-purple-400 mx-auto mb-4" />
-            <h3 className="font-semibold text-white mb-2">Payouts</h3>
-            <p className="text-sm text-gray-400">Manage earnings</p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Revenue Trends</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <TrendingUp className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                  <p className="text-gray-400">Revenue data will appear here</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <h3 className="text-xl font-semibold text-white">Tenant Settings</h3>
+          
+          <div className="grid gap-6">
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Store Information</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Manage your store details and branding
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm text-gray-400">Store Name</label>
+                  <p className="text-white font-medium">{tenantStats.tenantName}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Subscription Tier</label>
+                  <Badge className="bg-brand-primary/20 text-brand-primary capitalize">
+                    {tenantStats.subscriptionTier}
+                  </Badge>
+                </div>
+                <Button variant="outline" className="border-white/20 text-white">
+                  Edit Store Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Subscription & Billing</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Manage your subscription and payment details
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Current Plan</span>
+                    <Badge className="bg-brand-primary/20 text-brand-primary capitalize">
+                      {tenantStats.subscriptionTier}
+                    </Badge>
+                  </div>
+                  <Button variant="outline" className="border-white/20 text-white w-full">
+                    Upgrade Plan
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

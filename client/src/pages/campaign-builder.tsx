@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { apiRequest } from "@/lib/queryClient";
+import { type User, type Creator } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +119,52 @@ const categoryColors = {
 
 export default function CampaignBuilder() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const { user: dynamicUser } = useDynamicContext();
+  const { data: userData } = useQuery<User>({ queryKey: ["/api/auth/user", dynamicUser?.userId], enabled: !!dynamicUser?.userId });
+  const { data: creator } = useQuery<Creator>({ queryKey: ["/api/creators/user", userData?.id], enabled: !!userData?.id });
+
+  const [followX, setFollowX] = useState(false);
+  const [followInstagram, setFollowInstagram] = useState(false);
+  const [followFacebook, setFollowFacebook] = useState(false);
+  const [likePost, setLikePost] = useState(false);
+  const [retweet, setRetweet] = useState(false);
+  const [points, setPoints] = useState(50);
+
+  const createCampaign = useMutation({
+    mutationFn: async () => {
+      if (!creator) throw new Error("Creator profile not found");
+      const now = new Date().toISOString();
+      const newCampaignRes = await apiRequest("POST", "/api/campaigns", {
+        tenantId: creator.tenantId,
+        creatorId: creator.id,
+        name: "Social Engagement",
+        description: "Earn points for social actions",
+        campaignType: "direct",
+        trigger: "custom_event",
+        startDate: now,
+        status: "active",
+      });
+      const campaign = await newCampaignRes.json();
+
+      const effects: any[] = [];
+      const add = (type: string) => effects.push({ type: 'add_units', value: points, notificationTemplate: type });
+      if (followX) add('follow_x');
+      if (followInstagram) add('follow_instagram');
+      if (followFacebook) add('follow_facebook');
+      if (likePost) add('like_post');
+      if (retweet) add('retweet');
+
+      if (effects.length > 0) {
+        await apiRequest("POST", "/api/campaign-rules", {
+          campaignId: campaign.id,
+          ruleOrder: 1,
+          conditions: [],
+          effects,
+        });
+      }
+      return campaign;
+    },
+  });
 
   return (
     <div className="min-h-screen bg-brand-dark-bg p-6">
@@ -176,6 +226,41 @@ export default function CampaignBuilder() {
                   <p className="text-2xl font-bold text-white">0%</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Social Campaign */}
+        <div className="mb-10">
+          <Card className="bg-white/10 border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">Quick Social Campaign</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Button variant={followX ? 'default' : 'outline'} onClick={() => setFollowX(v => !v)} className={followX ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                  Follow on X
+                </Button>
+                <Button variant={followInstagram ? 'default' : 'outline'} onClick={() => setFollowInstagram(v => !v)} className={followInstagram ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                  Follow on Instagram
+                </Button>
+                <Button variant={followFacebook ? 'default' : 'outline'} onClick={() => setFollowFacebook(v => !v)} className={followFacebook ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                  Follow on Facebook
+                </Button>
+                <Button variant={likePost ? 'default' : 'outline'} onClick={() => setLikePost(v => !v)} className={likePost ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                  Like Post
+                </Button>
+                <Button variant={retweet ? 'default' : 'outline'} onClick={() => setRetweet(v => !v)} className={retweet ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                  Retweet
+                </Button>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-gray-300">Points per action</span>
+                <input type="number" className="w-24 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white" value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} />
+                <Button className="ml-auto bg-brand-primary" disabled={createCampaign.isPending} onClick={() => createCampaign.mutate()}>
+                  {createCampaign.isPending ? 'Creating...' : 'Create Campaign'}
+                </Button>
               </div>
             </CardContent>
           </Card>

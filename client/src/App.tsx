@@ -9,14 +9,20 @@ import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
 import Marketplace from "@/pages/marketplace";
+import UserTypeSelection from "@/pages/user-type-selection";
 import CreatorOnboarding from "@/pages/creator-onboarding";
 import CampaignBuilder from "@/pages/campaign-builder";
 import TenantSetup from "@/pages/tenant-setup";
 import BrandingStudio from "@/pages/branding-studio";
 import CreatorDashboard from "@/pages/creator-dashboard";
+import CreatorDashboardNew from "@/pages/creator-dashboard-new";
 import FanDashboard from "@/pages/fan-dashboard";
+import FanDashboardNew from "@/pages/fan-dashboard-new";
+import FanCampaigns from "@/pages/fan-dashboard/campaigns";
 import NILDashboard from "@/pages/nil-dashboard";
 import RBACDashboard from "@/pages/rbac-dashboard";
+import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
+import FanChooseCreators from "@/pages/fan-choose-creators";
 
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
@@ -27,12 +33,18 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/user-type-selection" component={UserTypeSelection} />
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />
       <Route path="/branding-studio" component={BrandingStudio} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
+      <Route path="/creator-dashboard-new" component={CreatorDashboardNew} />
       <Route path="/fan-dashboard" component={FanDashboard} />
+      <Route path="/fan-dashboard-new" component={FanDashboardNew} />
+      <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
+      <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
+      <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/nil-dashboard" component={NILDashboard} />
       <Route path="/rbac-dashboard" component={RBACDashboard} />
       <Route path="/dashboard" component={RBACDashboard} />

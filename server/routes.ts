@@ -5,7 +5,8 @@ import { registerSocialRoutes } from "./social-routes";
 import { registerTenantRoutes } from "./tenant-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
-  insertRewardSchema, insertFanProgramSchema
+  insertRewardSchema, insertFanProgramSchema,
+  insertCampaignSchema, insertCampaignRuleSchema
 } from "@shared/schema";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
 import { z } from "zod";
@@ -56,7 +57,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userData = {
         dynamicUserId: dynamicUser.userId || dynamicUser.id,
-        email: dynamicUser.email,
         username: dynamicUser.alias || dynamicUser.firstName || "User",
         avatar: dynamicUser.avatar || null,
         walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || "",
@@ -74,6 +74,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.createUser(userData);
       console.log("Created new user:", user.id);
+
+      // If user is a creator, auto-create their tenant
+      if (userType === "creator") {
+        try {
+          const username = userData.username || "creator";
+          const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${user.id.slice(-6)}`;
+          
+          const tenant = await storage.createTenant({
+            slug: tenantSlug,
+            name: `${username}'s Store`,
+            ownerId: user.id,
+            status: 'trial',
+            subscriptionTier: 'starter',
+            branding: {
+              primaryColor: '#8B5CF6',
+              secondaryColor: '#06B6D4', 
+              accentColor: '#10B981'
+            },
+            businessInfo: {
+              businessType: 'individual' as const
+            },
+            limits: {
+              maxMembers: 100,
+              maxCampaigns: 3,
+              maxRewards: 10,
+              maxApiCalls: 1000,
+              storageLimit: 100,
+              customDomain: false,
+              advancedAnalytics: false,
+              whiteLabel: false
+            },
+            settings: {
+              timezone: 'UTC',
+              currency: 'USD',
+              language: 'en',
+              nilCompliance: false,
+              publicProfile: true,
+              allowRegistration: true,
+              requireEmailVerification: false,
+              enableSocialLogin: true
+            }
+          });
+
+          // Create initial tenant membership for the creator
+          await storage.createTenantMembership({
+            tenantId: tenant.id,
+            userId: user.id,
+            role: 'owner'
+          });
+
+          // Update user's current tenant
+          await storage.updateUser(user.id, { currentTenantId: tenant.id });
+
+          console.log("Created tenant for new creator:", tenant.id);
+        } catch (error) {
+          console.error("Failed to create tenant for creator:", error);
+          // Continue even if tenant creation fails
+        }
+      }
+
       res.json(user);
     } catch (error) {
       console.error("User creation error:", error);
@@ -83,10 +143,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/user/:dynamicUserId", async (req, res) => {
     try {
+      console.log("Fetching user by Dynamic ID:", req.params.dynamicUserId);
       const user = await storage.getUserByDynamicId(req.params.dynamicUserId);
       if (!user) {
+        console.log("User not found for Dynamic ID:", req.params.dynamicUserId);
         return res.status(404).json({ error: "User not found" });
       }
+      console.log("Found user:", user.id, "type:", user.userType);
       
       // Check if creator has tenant
       let creator = null;
@@ -130,6 +193,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUserType(userId, userType);
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      // If switching to creator, create a tenant if they don't have one
+      if (userType === "creator" && !updatedUser.currentTenantId) {
+        try {
+          const username = updatedUser.username || "creator";
+          const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${updatedUser.id.slice(-6)}`;
+          
+          const tenant = await storage.createTenant({
+            slug: tenantSlug,
+            name: `${username}'s Store`,
+            ownerId: updatedUser.id,
+            status: 'trial',
+            subscriptionTier: 'starter',
+            branding: {
+              primaryColor: '#8B5CF6',
+              secondaryColor: '#06B6D4', 
+              accentColor: '#10B981'
+            },
+            businessInfo: {
+              businessType: 'individual' as const
+            },
+            limits: {
+              maxMembers: 100,
+              maxCampaigns: 3,
+              maxRewards: 10,
+              maxApiCalls: 1000,
+              storageLimit: 100,
+              customDomain: false,
+              advancedAnalytics: false,
+              whiteLabel: false
+            },
+            settings: {
+              timezone: 'UTC',
+              currency: 'USD',
+              language: 'en',
+              nilCompliance: false,
+              publicProfile: true,
+              allowRegistration: true,
+              requireEmailVerification: false,
+              enableSocialLogin: true
+            }
+          });
+
+          // Create initial tenant membership for the creator
+          await storage.createTenantMembership({
+            tenantId: tenant.id,
+            userId: updatedUser.id,
+            role: 'owner'
+          });
+
+          // Update user's current tenant
+          await storage.updateUser(updatedUser.id, { currentTenantId: tenant.id });
+
+          console.log("Created tenant for user switching to creator:", tenant.id);
+        } catch (error) {
+          console.error("Failed to create tenant for user switching to creator:", error);
+          // Continue even if tenant creation fails
+        }
       }
       
       res.json({
@@ -206,7 +328,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUser(userId, {
         userType: newUserType,
         role: newRole,
-        hasCompletedOnboarding: false // Reset onboarding when switching
       });
 
       if (!updatedUser) {
@@ -236,7 +357,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/creators", async (req, res) => {
     try {
       const creators = await storage.getAllCreators();
-      res.json(creators);
+      // Optionally enrich with active campaign info
+      const enriched = await Promise.all(creators.map(async (c) => {
+        const activeCampaigns = await storage.getActiveCampaignsByCreator(c.id);
+        return { ...c, hasActiveCampaign: activeCampaigns.length > 0 };
+      }));
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch creators" });
     }
@@ -309,6 +435,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Campaign routes
+  app.get("/api/campaigns/creator/:creatorId", async (req, res) => {
+    try {
+      const data = await storage.getCampaignsByCreator(req.params.creatorId);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch campaigns" });
+    }
+  });
+
+  app.post("/api/campaigns", async (req, res) => {
+    try {
+      const payload = insertCampaignSchema.parse(req.body);
+      const created = await storage.createCampaign(payload);
+      res.json(created);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid campaign data" });
+    }
+  });
+
+  app.get("/api/campaign-rules/:campaignId", async (req, res) => {
+    try {
+      const data = await storage.getCampaignRules(req.params.campaignId);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch campaign rules" });
+    }
+  });
+
+  app.post("/api/campaign-rules", async (req, res) => {
+    try {
+      const payload = insertCampaignRuleSchema.parse(req.body);
+      const created = await storage.createCampaignRule(payload);
+      res.json(created);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid campaign rule data" });
+    }
+  });
+
+  // Follow tenant (create membership) for a fan
+  app.post("/api/tenants/:tenantId/follow", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const { tenantId } = req.params;
+      if (!userId) return res.status(400).json({ error: "userId required" });
+      const membership = await storage.createTenantMembership({ tenantId, userId, role: 'member' });
+      res.json(membership);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to follow tenant" });
+    }
+  });
+
+  // Update user profile data (fan onboarding info)
+  app.post("/api/auth/profile", async (req, res) => {
+    try {
+      const { userId, profileData } = req.body;
+      if (!userId) return res.status(400).json({ error: "userId required" });
+      const updated = await storage.updateUser(userId, { profileData });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update profile" });
+    }
+  });
+
   app.post("/api/rewards", async (req, res) => {
     try {
       const rewardData = insertRewardSchema.parse(req.body);
@@ -375,7 +565,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes for user management
+  app.get("/api/admin/users", authenticateUser, requireRole(['fandomly_admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      // In production, implement pagination and filtering
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
 
+  app.put("/api/admin/users/:userId/role", authenticateUser, requireRole(['fandomly_admin']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { userId } = req.params;
+      const { role, customerTier } = req.body;
+
+      if (!['fandomly_admin', 'customer_admin', 'customer_end_user'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+
+      const updateData: any = { role };
+      if (role === 'customer_end_user' && customerTier) {
+        updateData.customerTier = customerTier;
+      }
+
+      const updatedUser = await storage.updateUser(userId, updateData);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
 
   // Register social media routes
   registerSocialRoutes(app);

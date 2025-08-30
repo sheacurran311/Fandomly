@@ -1,5 +1,6 @@
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 
 export interface UserRole {
   id: string;
@@ -28,13 +29,15 @@ export interface UserRole {
 }
 
 export function useRBAC() {
-  const { user } = useDynamicContext();
+  const { user: userData, isLoading } = useAuth();
 
-  // Simplified RBAC using only Dynamic's native user properties
-  const userRole: UserRole | null = user ? {
-    id: user.userId || '',
-    role: 'customer_end_user', // Default role, can be configured in Dynamic admin
-    customerTier: 'basic',
+  // Use actual user data from our backend
+  const userRole: UserRole | null = userData ? {
+    id: userData.id,
+    role: userData.role as 'fandomly_admin' | 'customer_admin' | 'customer_end_user',
+    customerTier: (userData as any).customerTier || 'basic',
+    adminPermissions: (userData as any).adminPermissions,
+    customerAdminData: (userData as any).customerAdminData,
   } : null;
 
   const hasRole = (allowedRoles: Array<'fandomly_admin' | 'customer_admin' | 'customer_end_user'>): boolean => {
@@ -93,7 +96,7 @@ export function useRBAC() {
 
   return {
     userRole,
-    isLoading: false, // No backend loading since we use Dynamic directly
+    isLoading,
     hasRole,
     hasCustomerTier,
     hasAdminPermission,
@@ -124,7 +127,7 @@ export function RoleGuard({
   const { hasRole, hasCustomerTier, hasAdminPermission, hasFeatureAccess, isLoading } = useRBAC();
 
   if (isLoading) {
-    return <div className="animate-pulse bg-gray-300 h-4 w-24 rounded"></div>;
+    return <div className="animate-pulse bg-gray-800 h-4 w-24 rounded"></div>;
   }
 
   // Check role access

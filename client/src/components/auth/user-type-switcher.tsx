@@ -22,6 +22,8 @@ export default function UserTypeSwitcher({ userId, currentUserType, onTypeSwitch
   const [open, setOpen] = useState(false);
   const switchUserType = useUserTypeSwitch();
 
+  console.log("UserTypeSwitcher - Current user type:", currentUserType);
+
   const handleSwitch = (newType: "fan" | "creator") => {
     switchUserType.mutate(
       { userId, userType: newType },

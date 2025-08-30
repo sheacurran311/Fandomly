@@ -132,6 +132,13 @@ export const users = pgTable("users", {
   walletChain: text("wallet_chain"),
   userType: text("user_type").notNull().default("fan"), // "creator" | "fan" - legacy field
   
+  // Optional profile data collected during onboarding (fan/creator)
+  profileData: jsonb("profile_data").$type<{
+    name?: string;
+    age?: number;
+    interests?: Array<"musicians" | "athletes" | "content_creators">;
+  }>(),
+  
   // Multi-Tenant Support
   currentTenantId: varchar("current_tenant_id"), // Current active tenant
   
@@ -217,6 +224,7 @@ export const creators = pgTable("creators", {
   displayName: text("display_name").notNull(),
   bio: text("bio"),
   category: text("category").notNull(), // "athlete" | "musician" | "creator"
+  imageUrl: text("image_url"),
   followerCount: integer("follower_count").default(0),
   brandColors: jsonb("brand_colors").$type<{
     primary: string;

@@ -7,6 +7,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Traditional apiRequest function (method first)
 export async function apiRequest(
   method: string,
   url: string,
@@ -23,6 +24,29 @@ export async function apiRequest(
 
   await throwIfResNotOk(res);
   return res;
+}
+
+// Fetch wrapper for URL-first pattern with options (returns JSON)
+export async function fetchApi(
+  url: string,
+  options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }
+): Promise<any> {
+  const method = options?.method || "GET";
+  const headers = { "Content-Type": "application/json", ...options?.headers };
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: options?.body,
+    credentials: "include",
+  });
+
+  await throwIfResNotOk(res);
+  return await res.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

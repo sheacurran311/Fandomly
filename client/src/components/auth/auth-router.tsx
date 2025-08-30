@@ -1,74 +1,85 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useQuery } from "@tanstack/react-query";
-import { useOnboardingState } from "@/hooks/use-onboarding-state";
+import { useAuth } from "@/hooks/use-auth";
 
 interface AuthRouterProps {
   children: React.ReactNode;
 }
 
 export default function AuthRouter({ children }: AuthRouterProps) {
-  const { user } = useDynamicContext();
+  const { user: dynamicUser } = useDynamicContext();
   const [, setLocation] = useLocation();
-  const { getOnboardingRoute } = useOnboardingState();
-
-  // Fetch user data from our backend when Dynamic user is available
-  const { data: userData, isLoading } = useQuery({
-    queryKey: ["/api/auth/user", user?.userId],
-    enabled: !!user?.userId,
-    retry: false,
-  });
+  const { user: userData, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!user) {
+    console.log("AuthRouter - Dynamic user:", !!dynamicUser, "User data:", !!userData, "Loading:", isLoading);
+    
+    if (!dynamicUser) {
       // User not connected to Dynamic - stay on current page
+      console.log("AuthRouter - No Dynamic user, staying on current page");
       return;
     }
 
     if (isLoading) {
       // Still loading user data
+      console.log("AuthRouter - Loading user data...");
       return;
     }
 
     if (!userData) {
       // User connected to Dynamic but not registered in our system
-      // This should trigger registration automatically via the useAuth hook
+      // Redirect to user type selection instead of auto-registration
+      const currentPath = window.location.pathname;
+      console.log("AuthRouter - User not registered, current path:", currentPath);
+      if (currentPath !== '/user-type-selection') {
+        console.log('AuthRouter - Redirecting to user type selection');
+        setLocation('/user-type-selection');
+      }
       return;
     }
 
-    // User is authenticated and we have their data
-    const { userType, onboardingState } = userData;
-
-    // Determine where user should be redirected based on their onboarding state
-    const targetRoute = getOnboardingRoute(userType, onboardingState);
-    
-    // Get current path
+    // User is authenticated and registered
     const currentPath = window.location.pathname;
     
-    // Define protected routes that require completion
-    const protectedRoutes = ['/creator-dashboard', '/fan-dashboard', '/rbac-dashboard'];
-    const onboardingRoutes = ['/creator-onboarding', '/fan-onboarding'];
+    // Define routes behavior
+    const protectedRoutes = ['/creator-dashboard', '/fan-dashboard'];
+    const legacyOnboardingRoutes = ['/creator-onboarding'];
+    const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
+    const publicRoutes = ['/privacy-policy', '/data-deletion'];
     
-    // If user is on a protected route but hasn't completed onboarding, redirect
-    if (protectedRoutes.includes(currentPath) && !onboardingState.isCompleted) {
-      console.log(`Redirecting from protected route ${currentPath} to onboarding ${targetRoute}`);
-      setLocation(targetRoute);
+    // Redirect legacy creator routes and old dashboards to RBAC dashboard
+    if (protectedRoutes.includes(currentPath) || legacyOnboardingRoutes.includes(currentPath)) {
+      console.log(`Redirecting from ${currentPath} to RBAC dashboard`);
+      setLocation('/rbac-dashboard');
       return;
     }
     
-    // If user has completed onboarding but is on an onboarding route, redirect to dashboard
-    if (onboardingRoutes.includes(currentPath) && onboardingState.isCompleted) {
-      const dashboardRoute = userType === "creator" ? "/creator-dashboard" : "/fan-dashboard";
-      console.log(`Redirecting from onboarding route ${currentPath} to dashboard ${dashboardRoute}`);
-      setLocation(dashboardRoute);
+    // If fan and hasn't completed onboarding, allow fan onboarding routes
+    if (userData?.userType === 'fan' && !userData?.onboardingState?.isCompleted) {
+      if (!fanOnboardingRoutes.includes(currentPath)) {
+        setLocation('/fan-onboarding/profile');
+      }
+      return;
+    }
+
+    // If user is on user type selection but already registered, redirect to dashboard
+    if (currentPath === '/user-type-selection') {
+      console.log('User already registered, redirecting to RBAC dashboard');
+      setLocation('/rbac-dashboard');
       return;
     }
     
-    // If user is on home page and hasn't started onboarding, they can stay
-    // If user is on home page and has completed onboarding, they can stay (they might want to browse)
+    // Redirect authenticated users away from homepage to their dashboard
+    if (currentPath === '/') {
+      console.log('Authenticated user on homepage, redirecting to RBAC dashboard');
+      setLocation('/rbac-dashboard');
+      return;
+    }
     
-  }, [user, userData, isLoading, setLocation, getOnboardingRoute]);
+    // Allow access to public routes like privacy policy
+    
+  }, [dynamicUser, userData, isLoading, setLocation]);
 
   return <>{children}</>;
 }

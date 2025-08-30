@@ -49,11 +49,15 @@ export default function CreatorDashboard() {
       displayName: string;
       bio: string;
       category: string;
+      followerCount: number;
+      imageUrl?: string;
     }) => {
       if (!userData) throw new Error("User data not available");
+      if (!userData.currentTenantId) throw new Error("No tenant found for creator");
       
       return apiRequest("POST", "/api/creators", {
         userId: userData.id,
+        tenantId: userData.currentTenantId,
         ...creatorData,
         brandColors: {
           primary: "#dd20be",
@@ -61,7 +65,6 @@ export default function CreatorDashboard() {
           accent: "#03a0fd",
         },
         socialLinks: {},
-        followerCount: 0,
         isVerified: false,
       });
     },
@@ -135,6 +138,8 @@ export default function CreatorDashboard() {
                       displayName: formData.get("displayName") as string,
                       bio: formData.get("bio") as string,
                       category: formData.get("category") as string,
+                      followerCount: Number(formData.get("followerCount") || 0),
+                      imageUrl: (formData.get("imageUrl") as string) || undefined,
                     });
                   }}
                 >
@@ -153,10 +158,11 @@ export default function CreatorDashboard() {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Bio
+                        Bio *
                       </label>
                       <Textarea
                         name="bio"
+                        required
                         placeholder="Tell your fans about yourself..."
                         className="bg-white/10 border-white/20 text-white"
                         rows={3}
@@ -177,6 +183,31 @@ export default function CreatorDashboard() {
                         <option value="musician">musician</option>
                         <option value="creator">Creator</option>
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Follower Count (across socials) *
+                      </label>
+                      <Input
+                        name="followerCount"
+                        type="number"
+                        required
+                        min={0}
+                        placeholder="e.g. 10000"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Photo / Logo URL (optional)
+                      </label>
+                      <Input
+                        name="imageUrl"
+                        placeholder="https://..."
+                        className="bg-white/10 border-white/20 text-white"
+                      />
                     </div>
                   </div>
                   

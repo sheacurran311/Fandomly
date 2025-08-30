@@ -15,6 +15,7 @@ import {
   Award,
   Settings
 } from "lucide-react";
+import SocialConnections from "@/components/social/social-connections";
 
 import { type FanProgram, type User } from "@shared/schema";
 
@@ -317,6 +318,10 @@ export default function FanDashboard() {
                 </Button>
               </CardContent>
             </Card>
+
+            <div className="mt-6">
+              <SocialConnections />
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { fetchApi } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface SwitchUserTypeRequest {
@@ -13,23 +13,31 @@ export function useUserTypeSwitch() {
 
   return useMutation({
     mutationFn: async ({ userId, userType }: SwitchUserTypeRequest) => {
-      return await apiRequest("/api/auth/switch-user-type", {
+      console.log("Switching user type:", { userId, userType });
+      const response = await fetchApi("/api/auth/switch-user-type", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ userId, userType }),
       });
+      console.log("User type switch response:", response);
+      return response;
     },
     onSuccess: (data) => {
-      // Invalidate user-related queries to refetch updated data
+      console.log("User type switch successful:", data);
+      
+      // Invalidate all user-related queries to refetch updated data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/role"] });
       
       toast({
         title: "Account Type Changed",
         description: data.message || `Successfully switched to ${data.userType} account`,
         variant: "default",
       });
+      
+      // Reload the page to ensure user sees the updated dashboard
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     },
     onError: (error) => {
       toast({

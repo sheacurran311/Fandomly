@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { apiRequest } from "@/lib/queryClient";
+import { fetchApi } from "@/lib/queryClient";
 
 interface UserData {
   id: string;
@@ -24,7 +24,8 @@ interface UserData {
 }
 
 export function useAuth() {
-  const { user, isAuthenticated } = useDynamicContext();
+  const { user } = useDynamicContext();
+  const isAuthenticated = !!user;
   const queryClient = useQueryClient();
 
   // Fetch user data from backend when Dynamic user is available
@@ -32,7 +33,8 @@ export function useAuth() {
     queryKey: ["/api/auth/user", user?.userId],
     queryFn: async () => {
       if (!user?.userId) throw new Error("No user ID");
-      return await apiRequest(`/api/auth/user/${user.userId}`);
+      console.log("Fetching user data for Dynamic user ID:", user.userId);
+      return await fetchApi(`/api/auth/user/${user.userId}`);
     },
     enabled: !!user?.userId,
     retry: false,
@@ -41,37 +43,41 @@ export function useAuth() {
   // Register user in our backend when they first connect via Dynamic
   const registerUser = useMutation({
     mutationFn: async (userType: "fan" | "creator" = "fan") => {
-      if (!user) throw new Error("No Dynamic user");
+      if (!user) {
+        throw new Error("No Dynamic user - please connect your wallet first");
+      }
       
-      return await apiRequest("/api/auth/register", {
+      console.log("Registering user with Dynamic user:", user.userId, "Type:", userType);
+      
+      const response = await fetchApi("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           dynamicUser: {
             userId: user.userId,
             id: user.userId,
-            email: user.email,
             firstName: user.firstName,
             alias: user.alias,
-            avatar: user.avatar,
             verifiedCredentials: user.verifiedCredentials,
           },
           userType,
         }),
       });
+      
+      console.log("Registration API response:", response);
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Registration successful, invalidating queries...");
       // Invalidate user query to refetch updated data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user", user?.userId] });
     },
+    onError: (error) => {
+      console.error("Registration mutation failed:", error);
+    },
   });
 
-  // Auto-register user if they're authenticated via Dynamic but not in our system
-  if (isAuthenticated && user && !userData && !isLoading && !registerUser.isPending) {
-    registerUser.mutate();
-  }
+  // Manual registration only - no auto-registration
+  // Users must explicitly choose their type via the user-type-selection page
 
   return {
     // Dynamic auth state
