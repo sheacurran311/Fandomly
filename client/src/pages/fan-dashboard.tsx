@@ -1,326 +1,256 @@
-import { useQuery } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
+import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardCard from "@/components/dashboard/dashboard-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { 
+  CreditCard, 
+  Heart, 
   Trophy, 
-  Gift, 
-  History, 
-  Star,
-  ExternalLink,
-  Coins,
-  Award,
-  Settings
+  Star, 
+  Bell, 
+  TrendingUp,
+  Gift,
+  Users,
+  Plus,
+  ExternalLink
 } from "lucide-react";
-import SocialConnections from "@/components/social/social-connections";
-
-import { type FanProgram, type User } from "@shared/schema";
 
 export default function FanDashboard() {
-  const { user } = useDynamicContext();
-
-  // Get user data from our backend (not directly from Dynamic)
-  const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    enabled: !!user,
-  });
-
-  // Get fan programs
-  const { data: fanPrograms = [], isLoading } = useQuery<FanProgram[]>({
-    queryKey: ["/api/fan-programs/user", userData?.id],
-    enabled: !!userData?.id,
-  });
-
-  // If user is not authenticated
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="pt-6 text-center">
-            <div className="text-6xl mb-4">🔒</div>
-            <h2 className="text-2xl font-bold text-white mb-4">Authentication Required</h2>
-            <p className="text-gray-300 mb-6">
-              Please connect your wallet to access your fan dashboard.
-            </p>
-            <Button 
-              onClick={() => window.location.href = "/"}
-              className="bg-brand-primary hover:bg-brand-primary/80"
-            >
-              Go to Home
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading your dashboard...</p>
-        </div>
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="text-white">Please connect your wallet to access the dashboard.</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Your Fan Dashboard
-          </h1>
-          <p className="text-gray-300">
-            Track your loyalty points, rewards, and favorite creators.
-          </p>
-        </div>
-
-        {fanPrograms.length === 0 ? (
-          // Empty state
-          <div className="text-center py-16">
-            <Card className="max-w-2xl mx-auto bg-white/5 border-white/10">
-              <CardContent className="pt-16 pb-16">
-                <div className="text-6xl mb-6">🎯</div>
-                <h2 className="text-3xl font-bold text-white mb-4">
-                  Start Your Fan Journey
-                </h2>
-                <p className="text-xl text-gray-300 mb-8 max-w-md mx-auto">
-                  Join loyalty programs from your favorite creators to earn exclusive rewards and get closer to the action.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button
-                    onClick={() => window.location.href = "/marketplace"}
-                    size="lg"
-                    className="bg-brand-primary hover:bg-brand-primary/80"
-                  >
-                    <Trophy className="h-5 w-5 mr-2" />
-                    Explore Creators
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg"
-                  >
-                    <Star className="h-5 w-5 mr-2" />
-                    How It Works
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+    <div className="min-h-screen bg-brand-dark-bg flex">
+      <SidebarNavigation userType="fan" />
+      
+      <div className="flex-1 overflow-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Welcome back, {user.username || "Fan"}!
+            </h1>
+            <p className="text-gray-400">
+              Discover new campaigns and earn amazing rewards from your favorite creators.
+            </p>
           </div>
-        ) : (
-          // Dashboard with programs
-          <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="bg-white/10 border-white/20">
-              <TabsTrigger value="overview" className="data-[state=active]:bg-brand-primary">
-                <Trophy className="h-4 w-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="programs" className="data-[state=active]:bg-brand-primary">
-                <Star className="h-4 w-4 mr-2" />
-                My Programs
-              </TabsTrigger>
-              <TabsTrigger value="rewards" className="data-[state=active]:bg-brand-primary">
-                <Gift className="h-4 w-4 mr-2" />
-                Rewards
-              </TabsTrigger>
-              <TabsTrigger value="history" className="data-[state=active]:bg-brand-primary">
-                <History className="h-4 w-4 mr-2" />
-                History
-              </TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="overview" className="space-y-6">
-              {/* Stats Overview */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-4 text-center">
-                    <Trophy className="h-8 w-8 text-brand-secondary mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-white">{fanPrograms.length}</div>
-                    <div className="text-sm text-gray-400">Programs Joined</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-4 text-center">
-                    <Coins className="h-8 w-8 text-brand-primary mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-white">
-                      {fanPrograms.reduce((total, program) => total + (program.currentPoints || 0), 0)}
-                    </div>
-                    <div className="text-sm text-gray-400">Total Points</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-4 text-center">
-                    <Gift className="h-8 w-8 text-brand-accent mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-white">0</div>
-                    <div className="text-sm text-gray-400">Rewards Claimed</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-4 text-center">
-                    <Award className="h-8 w-8 text-brand-secondary mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-white">0</div>
-                    <div className="text-sm text-gray-400">NFTs Owned</div>
-                  </CardContent>
-                </Card>
-              </div>
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <DashboardCard
+              title="Total Points"
+              value="12,450"
+              change={{ value: 8.5, type: "increase", period: "this week" }}
+              icon={<CreditCard className="h-5 w-5" />}
+              gradient
+            />
+            <DashboardCard
+              title="Following"
+              value="18"
+              description="Active creators"
+              icon={<Heart className="h-5 w-5" />}
+            />
+            <DashboardCard
+              title="Active Campaigns"
+              value="7"
+              change={{ value: 2, type: "increase", period: "new today" }}
+              icon={<Trophy className="h-5 w-5" />}
+            />
+            <DashboardCard
+              title="Rewards Earned"
+              value="42"
+              description="Total claimed"
+              icon={<Star className="h-5 w-5" />}
+            />
+          </div>
 
-              {/* Active Programs */}
-              <Card className="bg-white/5 border-white/10">
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Active Campaigns */}
+            <div className="lg:col-span-2">
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white">Your Active Programs</CardTitle>
+                  <CardTitle className="text-white flex items-center justify-between">
+                    <span>Active Campaigns</span>
+                    <Button variant="outline" size="sm" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                      View All
+                    </Button>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {fanPrograms.map((program) => (
-                      <div key={program.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-brand-primary rounded-full flex items-center justify-center text-white font-bold">
-                            C
-                          </div>
+                    {[
+                      { 
+                        creator: "Aerial Ace Athletics", 
+                        campaign: "Follow for Points", 
+                        points: 500, 
+                        progress: 75, 
+                        category: "Social",
+                        timeLeft: "3 days left"
+                      },
+                      { 
+                        creator: "Luna Music", 
+                        campaign: "Stream & Earn", 
+                        points: 1000, 
+                        progress: 45, 
+                        category: "Music",
+                        timeLeft: "1 week left"
+                      },
+                      { 
+                        creator: "Tech Creator Hub", 
+                        campaign: "Referral Bonus", 
+                        points: 2000, 
+                        progress: 20, 
+                        category: "Referral",
+                        timeLeft: "2 weeks left"
+                      },
+                    ].map((campaign, index) => (
+                      <div key={index} className="p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10">
+                        <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h3 className="font-semibold text-white">Creator Program</h3>
-                            <p className="text-sm text-gray-400">
-                              {program.currentPoints || 0} points • {program.currentTier || "Bronze"} tier
-                            </p>
+                            <h4 className="text-white font-medium">{campaign.campaign}</h4>
+                            <p className="text-sm text-gray-400">by {campaign.creator}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-brand-secondary">{campaign.points} pts</div>
+                            <Badge variant="outline" className="text-xs border-brand-primary/30 text-brand-primary">
+                              {campaign.category}
+                            </Badge>
                           </div>
                         </div>
-                        <Button 
-                          size="sm"
-                          variant="outline"
-                          className="border-brand-accent text-brand-accent hover:bg-brand-accent hover:text-white"
-                        >
-                          View Details
-                          <ExternalLink className="h-4 w-4 ml-2" />
-                        </Button>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Progress</span>
+                            <span className="text-white">{campaign.progress}%</span>
+                          </div>
+                          <Progress value={campaign.progress} className="h-2" />
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500">{campaign.timeLeft}</span>
+                            <Button size="sm" className="bg-brand-primary hover:bg-brand-primary/80">
+                              Continue
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
 
-            <TabsContent value="programs" className="space-y-6">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {fanPrograms.map((program) => (
-                  <Card key={program.id} className="bg-white/5 border-white/10">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <Badge className="bg-brand-secondary text-brand-dark-bg">
-                          {program.currentTier || "Bronze"}
-                        </Badge>
-                        <div className="text-sm text-gray-400">
-                          Joined {new Date(program.joinedAt || Date.now()).toLocaleDateString()}
+            {/* Sidebar Cards */}
+            <div className="space-y-6">
+              {/* Quick Actions */}
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white text-sm">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="w-full bg-brand-secondary hover:bg-brand-secondary/80 justify-start">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Join New Campaign
+                  </Button>
+                  <Button variant="outline" className="w-full border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 justify-start">
+                    <Gift className="h-4 w-4 mr-2" />
+                    Browse Rewards
+                  </Button>
+                  <Button variant="outline" className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start">
+                    <Users className="h-4 w-4 mr-2" />
+                    Discover Creators
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Recent Rewards */}
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white text-sm">Recent Rewards</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[
+                      { name: "VIP Discord Access", creator: "Aerial Ace", type: "Access", claimed: true },
+                      { name: "Exclusive NFT", creator: "Luna Music", type: "NFT", claimed: true },
+                      { name: "10% Merch Discount", creator: "Tech Hub", type: "Discount", claimed: false },
+                    ].map((reward, index) => (
+                      <div key={index} className="flex items-center space-x-3 p-2 rounded-lg bg-white/5">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          reward.type === 'Access' ? 'bg-green-400/20 text-green-400' :
+                          reward.type === 'NFT' ? 'bg-purple-400/20 text-purple-400' :
+                          'bg-yellow-400/20 text-yellow-400'
+                        }`}>
+                          {reward.type === 'Access' && <Bell className="h-4 w-4" />}
+                          {reward.type === 'NFT' && <Star className="h-4 w-4" />}
+                          {reward.type === 'Discount' && <Gift className="h-4 w-4" />}
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm text-gray-400">Current Points</span>
-                            <span className="text-lg font-bold text-brand-primary">
-                              {program.currentPoints || 0}
-                            </span>
-                          </div>
-                          <Progress 
-                            value={((program.currentPoints || 0) % 1000) / 10} 
-                            className="h-2"
-                          />
-                          <div className="text-xs text-gray-400 mt-1">
-                            {1000 - ((program.currentPoints || 0) % 1000)} points to next tier
-                          </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white">{reward.name}</p>
+                          <p className="text-xs text-gray-400">{reward.creator}</p>
                         </div>
-                        
-                        <div className="pt-4 border-t border-white/10">
-                          <Button 
-                            className="w-full bg-brand-primary hover:bg-brand-primary/80"
-                            size="sm"
-                          >
-                            View Program
+                        {reward.claimed ? (
+                          <Badge variant="outline" className="text-xs border-green-400/30 text-green-400">
+                            Claimed
+                          </Badge>
+                        ) : (
+                          <Button size="sm" variant="outline" className="text-xs border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                            Claim
                           </Button>
-                        </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="rewards" className="space-y-6">
-              <Card className="bg-white/5 border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-white">Available Rewards</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12">
-                    <Gift className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-300 mb-2">No Rewards Available</h3>
-                    <p className="text-gray-400 mb-6">
-                      Keep earning points to unlock exclusive rewards from your creators.
-                    </p>
-                    <Button
-                      onClick={() => window.location.href = "/marketplace"}
-                      className="bg-brand-secondary hover:bg-brand-secondary/80 text-brand-dark-bg"
-                    >
-                      Explore More Programs
-                    </Button>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="history" className="space-y-6">
-              <Card className="bg-white/5 border-white/10">
+              {/* Points Breakdown */}
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white">Activity History</CardTitle>
+                  <CardTitle className="text-white text-sm">Points by Creator</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-12">
-                    <History className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-300 mb-2">No Activity Yet</h3>
-                    <p className="text-gray-400">
-                      Your point earning and reward redemption history will appear here.
-                    </p>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-gray-300">Aerial Ace Athletics</span>
+                        <span className="text-sm font-medium text-white">4,250 pts</span>
+                      </div>
+                      <Progress value={85} className="h-2" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-gray-300">Luna Music</span>
+                        <span className="text-sm font-medium text-white">3,100 pts</span>
+                      </div>
+                      <Progress value={62} className="h-2" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-gray-300">Tech Creator Hub</span>
+                        <span className="text-sm font-medium text-white">5,100 pts</span>
+                      </div>
+                      <Progress value={95} className="h-2" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
-        )}
-        
-        {/* Account Settings Section */}
-        <div id="account-settings" className="mt-16 border-t border-brand-primary/20 pt-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Account Settings</h2>
-            <p className="text-gray-300">Manage your account preferences</p>
-          </div>
-          
-          <div className="max-w-2xl mx-auto">
-            <Card className="bg-white/5 border-white/10">
-              <CardContent className="p-6 text-center">
-                <Settings className="h-12 w-12 text-brand-primary mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">Account Type: Fan</h3>
-                <p className="text-gray-300 mb-4">
-                  Want to become a creator? Visit the marketplace to set up your own loyalty program.
-                </p>
-                <Button
-                  onClick={() => window.location.href = "/creator-onboarding"}
-                  className="bg-brand-primary hover:bg-brand-primary/80"
-                >
-                  Become a Creator
-                </Button>
-              </CardContent>
-            </Card>
-
-            <div className="mt-6">
-              <SocialConnections />
             </div>
           </div>
         </div>

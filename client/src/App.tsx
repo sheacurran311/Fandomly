@@ -15,10 +15,11 @@ import CampaignBuilder from "@/pages/campaign-builder";
 import TenantSetup from "@/pages/tenant-setup";
 import BrandingStudio from "@/pages/branding-studio";
 import CreatorDashboard from "@/pages/creator-dashboard";
-import CreatorDashboardNew from "@/pages/creator-dashboard-new";
+import CreatorAnalytics from "@/pages/creator-dashboard/analytics";
+import CreatorSocial from "@/pages/creator-dashboard/social";
 import FanDashboard from "@/pages/fan-dashboard";
-import FanDashboardNew from "@/pages/fan-dashboard-new";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
+import FanFollowing from "@/pages/fan-dashboard/following";
 import NILDashboard from "@/pages/nil-dashboard";
 import RBACDashboard from "@/pages/rbac-dashboard";
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
@@ -39,10 +40,11 @@ function Router() {
       <Route path="/tenant-setup" component={TenantSetup} />
       <Route path="/branding-studio" component={BrandingStudio} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
-      <Route path="/creator-dashboard-new" component={CreatorDashboardNew} />
+      <Route path="/creator-dashboard/analytics" component={CreatorAnalytics} />
+      <Route path="/creator-dashboard/social" component={CreatorSocial} />
       <Route path="/fan-dashboard" component={FanDashboard} />
-      <Route path="/fan-dashboard-new" component={FanDashboardNew} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
+      <Route path="/fan-dashboard/following" component={FanFollowing} />
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/nil-dashboard" component={NILDashboard} />
