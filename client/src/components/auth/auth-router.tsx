@@ -52,8 +52,8 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (currentPath === '/rbac-dashboard' || currentPath === '/dashboard') {
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Creator needs onboarding, redirecting from RBAC to creator onboarding');
-          setLocation('/creator-onboarding');
+          console.log('Creator needs onboarding, redirecting from RBAC to creator type selection');
+          setLocation('/creator-type-selection');
         } else {
           console.log('Redirecting from RBAC to creator dashboard');
           setLocation('/creator-dashboard');
@@ -82,8 +82,8 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (currentPath === '/user-type-selection') {
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Creator needs onboarding, redirecting to creator onboarding');
-          setLocation('/creator-onboarding');
+          console.log('Creator needs onboarding, redirecting to creator type selection');
+          setLocation('/creator-type-selection');
         } else {
           console.log('Creator already onboarded, redirecting to creator dashboard');
           setLocation('/creator-dashboard');
@@ -100,11 +100,12 @@ export default function AuthRouter({ children }: AuthRouterProps) {
       return;
     }
     
-    // If creator hasn't completed onboarding, allow creator onboarding route
+    // If creator hasn't completed onboarding, allow creator type selection and onboarding routes
     if (userData?.userType === 'creator' && !userData?.onboardingState?.isCompleted) {
-      if (currentPath !== '/creator-onboarding') {
-        console.log('Creator needs onboarding, redirecting to creator onboarding');
-        setLocation('/creator-onboarding');
+      const allowedCreatorOnboardingRoutes = ['/creator-type-selection', '/creator-onboarding'];
+      if (!allowedCreatorOnboardingRoutes.includes(currentPath)) {
+        console.log('Creator needs onboarding, redirecting to creator type selection');
+        setLocation('/creator-type-selection');
       }
       return;
     }
@@ -113,8 +114,8 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (currentPath === '/') {
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Creator needs onboarding, redirecting to creator onboarding');
-          setLocation('/creator-onboarding');
+          console.log('Creator needs onboarding, redirecting to creator type selection');
+          setLocation('/creator-type-selection');
         } else {
           console.log('Authenticated creator on homepage, redirecting to creator dashboard');
           setLocation('/creator-dashboard');
