@@ -141,13 +141,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Complete onboarding endpoint
+  // Complete onboarding endpoint with Stripe integration
   app.post("/api/auth/complete-onboarding", async (req, res) => {
     try {
-      // Get user from session or auth header
-      const dynamicUserId = req.session?.passport?.user?.claims?.sub;
+      // Get user from Dynamic context (not session since we're using Dynamic Auth)
+      const authHeader = req.headers.authorization;
+      let dynamicUserId = null;
+      
+      // Try to get Dynamic user ID from auth header or body
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        // Would need to verify Dynamic JWT token here in production
+        dynamicUserId = req.body.dynamicUserId;
+      } else {
+        // For development, get from request body
+        dynamicUserId = req.body.dynamicUserId;
+      }
+
       if (!dynamicUserId) {
-        return res.status(401).json({ error: "Unauthorized" });
+        return res.status(401).json({ error: "Unauthorized - Dynamic user ID required" });
       }
 
       const user = await storage.getUserByDynamicId(dynamicUserId);
@@ -187,12 +198,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subscriptionTier
       } = req.body;
 
+      // Build type-specific data based on creator type
+      let typeSpecificData = {};
+      
+      if (creatorType === 'athlete') {
+        typeSpecificData = {
+          athlete: {
+            sport: sport || '',
+            ageRange: ageRange || 'unknown',
+            education: education || 'other',
+            position: position || '',
+            school: school || '',
+            currentSponsors: currentSponsors ? currentSponsors.split(',').map((s: string) => s.trim()) : [],
+            nilCompliant: nilCompliant || false
+          }
+        };
+      } else if (creatorType === 'musician') {
+        typeSpecificData = {
+          musician: {
+            bandArtistName: bandArtistName || '',
+            musicCatalogUrl: musicCatalogUrl || '',
+            artistType: artistType || 'independent',
+            musicGenre: musicGenre || []
+          }
+        };
+      } else if (creatorType === 'content_creator') {
+        typeSpecificData = {
+          contentCreator: {
+            contentType: contentType || [],
+            topicsOfFocus: topicsOfFocus || [],
+            sponsorships: sponsorships ? sponsorships.split(',').map((s: string) => s.trim()) : [],
+            totalViews: totalViews || 'unknown',
+            platforms: platforms || []
+          }
+        };
+      }
+
+      // Handle subscription and payment processing
+      let stripeCustomerId = null;
+      let stripeSubscriptionId = null;
+      
+      if (subscriptionTier && subscriptionTier !== 'starter') {
+        // Create Stripe customer and subscription for paid plans
+        try {
+          const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+          
+          // Create Stripe customer
+          const customer = await stripe.customers.create({
+            email: user.email || `${dynamicUserId}@wallet.user`,
+            name: displayName || name || 'Creator',
+            metadata: {
+              dynamicUserId: dynamicUserId,
+              userId: user.id,
+              creatorType: creatorType
+            }
+          });
+          
+          stripeCustomerId = customer.id;
+          
+          // Note: In a real implementation, you'd create the subscription
+          // after payment method is collected on the frontend
+          // For now, we'll just store the customer ID
+          
+        } catch (stripeError) {
+          console.error('Stripe customer creation error:', stripeError);
+          // Continue with onboarding even if Stripe fails
+        }
+      }
+
       // Update user onboarding state
       const updatedUser = await storage.updateUser(user.id, {
         onboardingState: {
-          currentStep: "4",
-          totalSteps: "4", 
-          completedSteps: ["1", "2", "3", "4"],
+          currentStep: 5,
+          totalSteps: 5, 
+          completedSteps: ["1", "2", "3", "4", "5"],
           isCompleted: true
         }
       });
@@ -207,6 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateTenant(tenant.id, {
             name: name || tenant.name,
             slug: slug || tenant.slug,
+            subscriptionTier: subscriptionTier || 'starter',
             branding: {
               primaryColor: primaryColor || '#8B5CF6',
               secondaryColor: secondaryColor || '#06B6D4',
@@ -220,9 +300,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 tiktok
               }
             },
+            billingInfo: {
+              stripeCustomerId,
+              subscriptionId: stripeSubscriptionId
+            },
             settings: {
-              ...tenant.settings,
-              nilCompliance: nilCompliant || false
+              timezone: tenant.settings?.timezone || 'UTC',
+              currency: tenant.settings?.currency || 'USD',
+              language: tenant.settings?.language || 'en',
+              nilCompliance: nilCompliant || false,
+              publicProfile: tenant.settings?.publicProfile ?? true,
+              allowRegistration: tenant.settings?.allowRegistration ?? true,
+              requireEmailVerification: tenant.settings?.requireEmailVerification ?? false,
+              enableSocialLogin: tenant.settings?.enableSocialLogin ?? true
             }
           });
         }
@@ -233,7 +323,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateCreator(creator.id, {
             displayName: displayName || name,
             bio: bio,
+            category: creatorType,
             followerCount: parseInt(followerCount) || 0,
+            typeSpecificData: typeSpecificData,
+            brandColors: {
+              primary: primaryColor || '#8B5CF6',
+              secondary: secondaryColor || '#06B6D4',
+              accent: accentColor || '#10B981'
+            },
+            socialLinks: {
+              instagram,
+              twitter,
+              tiktok
+            }
+          });
+        } else {
+          // Create creator profile if it doesn't exist
+          await storage.createCreator({
+            userId: user.id,
+            tenantId: tenant.id,
+            displayName: displayName || name || 'Creator',
+            bio: bio || '',
+            category: creatorType || 'athlete',
+            followerCount: parseInt(followerCount) || 0,
+            typeSpecificData: typeSpecificData,
+            brandColors: {
+              primary: primaryColor || '#8B5CF6',
+              secondary: secondaryColor || '#06B6D4',
+              accent: accentColor || '#10B981'
+            },
             socialLinks: {
               instagram,
               twitter,

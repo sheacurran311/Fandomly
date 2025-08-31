@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,6 +124,7 @@ const subscriptionTiers = [
 export default function CreatorOnboardingPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { user: dynamicUser } = useDynamicContext();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [selectedTier, setSelectedTier] = useState('professional');
@@ -218,9 +220,22 @@ export default function CreatorOnboardingPage() {
   };
 
   const handleComplete = () => {
+    // Get Dynamic user ID for authentication
+    const dynamicUserId = dynamicUser?.userId;
+    if (!dynamicUserId) {
+      toast({
+        title: "Authentication Error",
+        description: "Please ensure your wallet is connected",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const onboardingData = {
       ...formData,
-      subscriptionTier: selectedTier
+      subscriptionTier: selectedTier,
+      creatorType: creatorType,
+      dynamicUserId: dynamicUserId
     };
     completeOnboardingMutation.mutate(onboardingData);
   };

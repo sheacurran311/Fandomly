@@ -223,9 +223,41 @@ export const creators = pgTable("creators", {
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Each creator belongs to a tenant
   displayName: text("display_name").notNull(),
   bio: text("bio"),
-  category: text("category").notNull(), // "athlete" | "musician" | "creator"
+  category: text("category").notNull(), // "athlete" | "musician" | "content_creator"
   imageUrl: text("image_url"),
   followerCount: integer("follower_count").default(0),
+  
+  // Creator Type-Specific Data
+  typeSpecificData: jsonb("type_specific_data").$type<{
+    // Athlete-specific data
+    athlete?: {
+      sport: string;
+      ageRange: string; // "under_18" | "18_22" | "23_30" | "over_30"
+      education: string; // "middle_school" | "high_school" | "college" | "professional" | "other"
+      position: string;
+      school?: string;
+      currentSponsors?: string[];
+      nilCompliant: boolean;
+    };
+    
+    // Musician-specific data
+    musician?: {
+      bandArtistName: string;
+      musicCatalogUrl: string;
+      artistType: string; // "independent" | "signed" | "hobby"
+      musicGenre: string[];
+    };
+    
+    // Content Creator-specific data
+    contentCreator?: {
+      contentType: string[]; // ["video", "podcast", "gaming", "lifestyle", etc.]
+      topicsOfFocus: string[];
+      sponsorships?: string[];
+      totalViews?: string; // "under_1k" | "1k_10k" | "10k_100k" | "100k_1m" | "over_1m"
+      platforms: string[]; // ["instagram", "tiktok", "youtube", "twitch", etc.]
+    };
+  }>(),
+  
   brandColors: jsonb("brand_colors").$type<{
     primary: string;
     secondary: string;
