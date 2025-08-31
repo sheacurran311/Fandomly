@@ -727,4 +727,75 @@ export type InsertCampaignRule = z.infer<typeof insertCampaignRuleSchema>;
 export type CampaignParticipation = typeof campaignParticipations.$inferSelect;
 export type InsertCampaignParticipation = z.infer<typeof insertCampaignParticipationSchema>;
 
+// Achievement System Tables
+export const achievements = pgTable("achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  name: varchar("name").notNull(),
+  description: varchar("description").notNull(),
+  icon: varchar("icon").notNull(), // Icon name from Lucide
+  category: varchar("category").notNull(), // "social", "engagement", "milestones", "special"
+  type: varchar("type").notNull(), // "bronze", "silver", "gold", "platinum", "diamond"
+  pointsRequired: integer("points_required").default(0),
+  actionRequired: varchar("action_required"), // "follow", "campaign_complete", "points_earned", etc.
+  actionCount: integer("action_count").default(1), // How many times action must be performed
+  rewardPoints: integer("reward_points").default(0),
+  rewardType: varchar("reward_type"), // "points", "badge", "nft", "discount", "access"
+  rewardValue: varchar("reward_value"), // JSON string for reward details
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  achievementId: varchar("achievement_id").references(() => achievements.id),
+  progress: integer("progress").default(0), // Current progress towards achievement
+  completed: boolean("completed").default(false),
+  completedAt: timestamp("completed_at"),
+  claimed: boolean("claimed").default(false),
+  claimedAt: timestamp("claimed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userLevels = pgTable("user_levels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  currentLevel: integer("current_level").default(1),
+  totalPoints: integer("total_points").default(0),
+  levelPoints: integer("level_points").default(0), // Points in current level
+  nextLevelThreshold: integer("next_level_threshold").default(1000),
+  achievementsUnlocked: integer("achievements_unlocked").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Achievement Schemas
+export const insertAchievementSchema = createInsertSchema(achievements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserLevelSchema = createInsertSchema(userLevels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Achievement Types
+export type Achievement = typeof achievements.$inferSelect;
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type UserLevel = typeof userLevels.$inferSelect;
+export type InsertUserLevel = z.infer<typeof insertUserLevelSchema>;
+
 

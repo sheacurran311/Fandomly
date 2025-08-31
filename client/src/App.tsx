@@ -20,6 +20,7 @@ import CreatorSocial from "@/pages/creator-dashboard/social";
 import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
 import FanFollowing from "@/pages/fan-dashboard/following";
+import FanAchievements from "@/pages/fan-dashboard/achievements";
 import NILDashboard from "@/pages/nil-dashboard";
 import RBACDashboard from "@/pages/rbac-dashboard";
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
       <Route path="/fan-dashboard/following" component={FanFollowing} />
+      <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/nil-dashboard" component={NILDashboard} />
