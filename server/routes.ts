@@ -241,7 +241,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (subscriptionTier && subscriptionTier !== 'starter') {
         // Create Stripe customer and subscription for paid plans
         try {
-          const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+          const Stripe = (await import('stripe')).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+            apiVersion: "2023-10-16",
+          });
           
           // Create Stripe customer
           const customer = await stripe.customers.create({
@@ -283,9 +286,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tenant = userTenants[0];
         
         if (tenant) {
-          await storage.updateTenant(tenant.id, {
+          // Only update slug if it's different from current one to avoid unique constraint violation
+          const updateData: any = {
             name: name || tenant.name,
-            slug: slug || tenant.slug,
             subscriptionTier: subscriptionTier || 'starter',
             branding: {
               primaryColor: primaryColor || '#8B5CF6',
@@ -314,7 +317,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               requireEmailVerification: tenant.settings?.requireEmailVerification ?? false,
               enableSocialLogin: tenant.settings?.enableSocialLogin ?? true
             }
-          });
+          };
+          
+          // Only add slug if it's different to avoid unique constraint violation
+          if (slug && slug !== tenant.slug) {
+            updateData.slug = slug;
+          }
+          
+          await storage.updateTenant(tenant.id, updateData);
         }
 
         // Update or create creator profile
