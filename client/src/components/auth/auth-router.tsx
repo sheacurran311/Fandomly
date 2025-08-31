@@ -48,10 +48,15 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
     const publicRoutes = ['/privacy-policy', '/data-deletion'];
     
-    // Redirect legacy creator routes and old dashboards to RBAC dashboard
+    // Redirect legacy creator routes and old dashboards to appropriate dashboard
     if (protectedRoutes.includes(currentPath) || legacyOnboardingRoutes.includes(currentPath)) {
-      console.log(`Redirecting from ${currentPath} to RBAC dashboard`);
-      setLocation('/rbac-dashboard');
+      if (userData?.userType === 'creator') {
+        console.log(`Redirecting ${userData.userType} from ${currentPath} to creator dashboard`);
+        setLocation('/creator-dashboard');
+      } else {
+        console.log(`Redirecting ${userData.userType} from ${currentPath} to fan dashboard`);
+        setLocation('/fan-dashboard');
+      }
       return;
     }
     
@@ -63,17 +68,27 @@ export default function AuthRouter({ children }: AuthRouterProps) {
       return;
     }
 
-    // If user is on user type selection but already registered, redirect to dashboard
+    // If user is on user type selection but already registered, redirect to appropriate dashboard
     if (currentPath === '/user-type-selection') {
-      console.log('User already registered, redirecting to RBAC dashboard');
-      setLocation('/rbac-dashboard');
+      if (userData?.userType === 'creator') {
+        console.log('Creator already registered, redirecting to creator dashboard');
+        setLocation('/creator-dashboard');
+      } else {
+        console.log('Fan already registered, redirecting to fan dashboard');
+        setLocation('/fan-dashboard');
+      }
       return;
     }
     
-    // Redirect authenticated users away from homepage to their dashboard
+    // Redirect authenticated users away from homepage to their appropriate dashboard
     if (currentPath === '/') {
-      console.log('Authenticated user on homepage, redirecting to RBAC dashboard');
-      setLocation('/rbac-dashboard');
+      if (userData?.userType === 'creator') {
+        console.log('Authenticated creator on homepage, redirecting to creator dashboard');
+        setLocation('/creator-dashboard');
+      } else {
+        console.log('Authenticated fan on homepage, redirecting to fan dashboard');
+        setLocation('/fan-dashboard');
+      }
       return;
     }
     
