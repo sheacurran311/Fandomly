@@ -42,6 +42,8 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
           StarknetWalletConnectors,
           SuiWalletConnectors,
         ],
+        // Ensure Dynamic uses only wallet authentication
+        // All other customizations should be done in Dynamic admin dashboard
       }}
     >
       {children}
