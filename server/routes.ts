@@ -141,6 +141,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete onboarding endpoint
+  app.post("/api/auth/complete-onboarding", async (req, res) => {
+    try {
+      // Get user from session or auth header
+      const dynamicUserId = req.session?.passport?.user?.claims?.sub;
+      if (!dynamicUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const user = await storage.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const {
+        name,
+        slug,
+        businessType,
+        description,
+        sport,
+        position,
+        school,
+        division,
+        year,
+        nilCompliant,
+        primaryColor,
+        secondaryColor,
+        accentColor,
+        instagram,
+        twitter,
+        tiktok,
+        subscriptionTier
+      } = req.body;
+
+      // Update user onboarding state
+      const updatedUser = await storage.updateUser(user.id, {
+        onboardingState: {
+          currentStep: "4",
+          totalSteps: "4", 
+          completedSteps: ["1", "2", "3", "4"],
+          isCompleted: true
+        }
+      });
+
+      // Update creator and tenant if user is a creator
+      if (user.userType === 'creator') {
+        // Get user's tenant
+        const userTenants = await storage.getUserTenants(user.id);
+        const tenant = userTenants[0];
+        
+        if (tenant) {
+          await storage.updateTenant(tenant.id, {
+            name: name || tenant.name,
+            slug: slug || tenant.slug,
+            branding: {
+              primaryColor: primaryColor || '#8B5CF6',
+              secondaryColor: secondaryColor || '#06B6D4',
+              accentColor: accentColor || '#10B981'
+            },
+            businessInfo: {
+              businessType: businessType || 'individual',
+              socialLinks: {
+                instagram,
+                twitter,
+                tiktok
+              }
+            },
+            settings: {
+              ...tenant.settings,
+              nilCompliance: nilCompliant || false
+            }
+          });
+        }
+
+        // Update or create creator profile
+        let creator = await storage.getCreatorByUserId(user.id);
+        if (creator) {
+          await storage.updateCreator(creator.id, {
+            displayName: name,
+            bio: description,
+            socialLinks: {
+              instagram,
+              twitter,
+              tiktok
+            }
+          });
+        }
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Onboarding completion error:", error);
+      res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
   app.get("/api/auth/user/:dynamicUserId", async (req, res) => {
     try {
       console.log("Fetching user by Dynamic ID:", req.params.dynamicUserId);

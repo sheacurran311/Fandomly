@@ -1,24 +1,178 @@
 import { useState } from "react";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useLocation } from "wouter";
-import ConnectWalletButton from "@/components/auth/connect-wallet-button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/hooks/use-toast";
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  Store, 
+  Trophy, 
+  Palette, 
+  Music, 
+  Crown, 
+  User,
+  Rocket,
+  Building,
+  Zap,
+  CheckCircle
+} from "lucide-react";
+
+const businessTypes = [
+  { id: 'athlete', name: 'Athlete', icon: Trophy },
+  { id: 'creator', name: 'Creator', icon: User },
+  { id: 'musician', name: 'Musician', icon: Music },
+];
+
+const sportCategories = [
+  "American Football", "Basketball", "Baseball", "Soccer", "Tennis", "Golf", 
+  "Swimming", "Track & Field", "Wrestling", "Gymnastics", "Volleyball", 
+  "Softball", "Hockey", "Lacrosse", "Cross Country", "Skiing", "Aerial Sports",
+  "Other"
+];
+
+const subscriptionTiers = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 'Free',
+    icon: Rocket,
+    color: 'from-blue-500 to-blue-600',
+    features: [
+      '1 Loyalty Program',
+      'Up to 100 members',
+      'Basic campaigns',
+      'Email support',
+      'Standard analytics'
+    ]
+  },
+  {
+    id: 'professional',
+    name: 'Professional',
+    price: '$29/month',
+    icon: Crown,
+    color: 'from-purple-500 to-purple-600',
+    popular: true,
+    features: [
+      '5 Loyalty Programs',
+      'Up to 1,000 members',
+      'Advanced campaigns',
+      'Priority support',
+      'Advanced analytics',
+      'Custom branding',
+      'API access'
+    ]
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: '$99/month',
+    icon: Building,
+    color: 'from-green-500 to-green-600',
+    features: [
+      'Unlimited programs',
+      'Unlimited members',
+      'Premium campaigns',
+      'Dedicated support',
+      'White-label solution',
+      'Custom integrations',
+      'Advanced compliance'
+    ]
+  }
+];
 
 export default function CreatorOnboardingPage() {
-  const { user } = useDynamicContext();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [step, setStep] = useState(1);
+  const [selectedTier, setSelectedTier] = useState('professional');
+  
+  const [formData, setFormData] = useState({
+    // Store Info
+    name: '',
+    slug: '',
+    businessType: '',
+    description: '',
+    
+    // Athlete Info
+    sport: '',
+    position: '',
+    school: '',
+    division: '',
+    year: '',
+    nilCompliant: false,
+    
+    // Branding
+    primaryColor: '#6366f1',
+    secondaryColor: '#10b981',
+    accentColor: '#f59e0b',
+    
+    // Social Links
+    instagram: '',
+    twitter: '',
+    tiktok: '',
+    
+    // Settings
+    subscriptionTier: 'professional'
+  });
 
-  const handleOnboardingComplete = () => {
-    setLocation("/creator-dashboard");
+  const completeOnboardingMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('/api/auth/complete-onboarding', 'POST', data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Onboarding Complete!",
+        description: "Your creator profile and store have been set up successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      setLocation('/creator-dashboard');
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete onboarding",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
   };
 
-  const handleBackToHome = () => {
-    setLocation("/");
+  const handleNameChange = (name: string) => {
+    setFormData(prev => ({
+      ...prev,
+      name,
+      slug: generateSlug(name)
+    }));
   };
 
-  // Simple auth check using Dynamic's native system
+  const handleComplete = () => {
+    const onboardingData = {
+      ...formData,
+      subscriptionTier: selectedTier
+    };
+    completeOnboardingMutation.mutate(onboardingData);
+  };
+
+  const selectedTierData = subscriptionTiers.find(tier => tier.id === selectedTier);
+
   if (!user) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
@@ -36,47 +190,438 @@ export default function CreatorOnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg">
+    <div className="min-h-screen bg-brand-dark-bg p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="border-b border-white/10 bg-brand-dark-bg/80 backdrop-blur-sm sticky top-0 z-50">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
-                <Button
-                  onClick={handleBackToHome}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-300 hover:text-white"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Home
-                </Button>
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold gradient-text mb-4">
+            Create Your Fandomly Store
+          </h1>
+          <p className="text-gray-300 text-lg max-w-3xl mx-auto">
+            Set up your personalized loyalty platform to engage fans and build your community. 
+            Each store is completely isolated with your own branding, campaigns, and member base.
+          </p>
+        </div>
+
+        {/* Progress Indicator */}
+        <div className="flex justify-center mb-8">
+          <div className="flex items-center space-x-4">
+            {[1, 2, 3, 4].map((stepNum) => (
+              <div key={stepNum} className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                  step >= stepNum 
+                    ? "bg-brand-primary text-white" 
+                    : "bg-gray-700 text-gray-400"
+                }`}>
+                  {stepNum}
+                </div>
+                {stepNum < 4 && (
+                  <div className={`w-12 h-1 mx-2 ${
+                    step > stepNum ? "bg-brand-primary" : "bg-gray-700"
+                  }`} />
+                )}
               </div>
-              <div className="flex items-center">
-                <img src="/fandomly-logo-with-text.png" alt="Fandomly" className="h-8 w-auto" />
-              </div>
-              <div className="w-24"></div> {/* Spacer for centering */}
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Simplified Onboarding - Dynamic handles everything */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="max-w-2xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-white mb-4">
-              Welcome to Fandomly!
-            </h1>
-            <p className="text-xl text-gray-300 mb-8">
-              Your wallet is connected. You're all set to start building your fan community.
-            </p>
-            <Button 
-              onClick={handleOnboardingComplete}
-              className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-8 py-3 rounded-xl"
-            >
-              Go to Creator Dashboard
-            </Button>
+        {/* Step 1: Store Information */}
+        {step === 1 && (
+          <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-white text-2xl flex items-center gap-3">
+                <Store className="h-8 w-8 text-brand-primary" />
+                Store Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="name" className="text-gray-300">Store Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="e.g., Aerial Ace Athletics, Luna Music, Thunder Squad"
+                  className="bg-white/10 border-white/20 text-white"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="slug" className="text-gray-300">Store URL *</Label>
+                <div className="flex items-center">
+                  <span className="text-gray-400 text-sm mr-2">fandomly.com/</span>
+                  <Input
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    placeholder="your-store-name"
+                    className="bg-white/10 border-white/20 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300">What describes you best? *</Label>
+                <div className="grid grid-cols-3 gap-4 mt-3">
+                  {businessTypes.map((type) => {
+                    const Icon = type.icon;
+                    return (
+                      <button
+                        key={type.id}
+                        onClick={() => setFormData(prev => ({ ...prev, businessType: type.id }))}
+                        className={`p-4 rounded-xl border transition-all ${
+                          formData.businessType === type.id
+                            ? "border-brand-primary bg-brand-primary/20"
+                            : "border-white/20 bg-white/5 hover:bg-white/10"
+                        }`}
+                      >
+                        <Icon className="h-8 w-8 mx-auto mb-2 text-brand-primary" />
+                        <p className="text-white text-sm font-medium">{type.name}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="description" className="text-gray-300">Description</Label>
+                <textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Tell your fans about yourself..."
+                  className="w-full p-3 bg-white/10 border border-white/20 text-white rounded-lg resize-none h-24"
+                />
+              </div>
+
+              <Button 
+                onClick={() => setStep(2)}
+                disabled={!formData.name || !formData.slug || !formData.businessType}
+                className="w-full gradient-primary text-white"
+              >
+                Continue to Profile Details
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: Profile Information */}
+        {step === 2 && (
+          <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-white text-2xl flex items-center gap-3">
+                <Trophy className="h-8 w-8 text-brand-primary" />
+                {formData.businessType === 'athlete' ? 'Athlete Information' : 'Profile Information'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {formData.businessType === 'athlete' && (
+                <>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-300">Sport *</Label>
+                      <Select value={formData.sport} onValueChange={(value) => setFormData(prev => ({ ...prev, sport: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select your sport" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sportCategories.map((sport) => (
+                            <SelectItem key={sport} value={sport}>{sport}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="position" className="text-gray-300">Position</Label>
+                      <Input
+                        id="position"
+                        value={formData.position}
+                        onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
+                        placeholder="e.g., Quarterback, Point Guard"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="school" className="text-gray-300">School/University</Label>
+                      <Input
+                        id="school"
+                        value={formData.school}
+                        onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
+                        placeholder="e.g., University of Florida"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-300">Year</Label>
+                      <Select value={formData.year} onValueChange={(value) => setFormData(prev => ({ ...prev, year: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="freshman">Freshman</SelectItem>
+                          <SelectItem value="sophomore">Sophomore</SelectItem>
+                          <SelectItem value="junior">Junior</SelectItem>
+                          <SelectItem value="senior">Senior</SelectItem>
+                          <SelectItem value="graduate">Graduate</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="nilCompliant"
+                      checked={formData.nilCompliant}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, nilCompliant: checked as boolean }))}
+                    />
+                    <Label htmlFor="nilCompliant" className="text-gray-300 text-sm">
+                      I understand NIL compliance requirements and agree to follow applicable regulations
+                    </Label>
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-4">
+                <Button 
+                  onClick={() => setStep(1)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button 
+                  onClick={() => setStep(3)}
+                  className="flex-1 gradient-primary text-white"
+                >
+                  Continue to Branding
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Store Branding */}
+        {step === 3 && (
+          <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-white text-2xl flex items-center gap-3">
+                <Palette className="h-8 w-8 text-brand-primary" />
+                Store Branding
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label className="text-gray-300 mb-4 block">Brand Colors</Label>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-gray-400 text-sm">Primary</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <input
+                        type="color"
+                        value={formData.primaryColor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                        className="w-12 h-10 rounded-lg border border-white/20"
+                      />
+                      <Input
+                        value={formData.primaryColor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                        className="bg-white/10 border-white/20 text-white text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">Secondary</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <input
+                        type="color"
+                        value={formData.secondaryColor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                        className="w-12 h-10 rounded-lg border border-white/20"
+                      />
+                      <Input
+                        value={formData.secondaryColor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                        className="bg-white/10 border-white/20 text-white text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400 text-sm">Accent</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <input
+                        type="color"
+                        value={formData.accentColor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, accentColor: e.target.value }))}
+                        className="w-12 h-10 rounded-lg border border-white/20"
+                      />
+                      <Input
+                        value={formData.accentColor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, accentColor: e.target.value }))}
+                        className="bg-white/10 border-white/20 text-white text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 mb-4 block">Social Media Links</Label>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="instagram" className="text-gray-400 text-sm">Instagram</Label>
+                    <Input
+                      id="instagram"
+                      value={formData.instagram}
+                      onChange={(e) => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
+                      placeholder="@your_instagram"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="twitter" className="text-gray-400 text-sm">Twitter/X</Label>
+                    <Input
+                      id="twitter"
+                      value={formData.twitter}
+                      onChange={(e) => setFormData(prev => ({ ...prev, twitter: e.target.value }))}
+                      placeholder="@your_twitter"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tiktok" className="text-gray-400 text-sm">TikTok</Label>
+                    <Input
+                      id="tiktok"
+                      value={formData.tiktok}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tiktok: e.target.value }))}
+                      placeholder="@your_tiktok"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Button 
+                  onClick={() => setStep(2)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button 
+                  onClick={() => setStep(4)}
+                  className="flex-1 gradient-primary text-white"
+                >
+                  Continue to Subscription
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 4: Subscription Plan */}
+        {step === 4 && (
+          <div className="space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white mb-4">Choose Your Plan</h2>
+              <p className="text-gray-300">Start with a 14-day free trial. Upgrade or downgrade anytime.</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {subscriptionTiers.map((tier) => {
+                const Icon = tier.icon;
+                return (
+                  <Card 
+                    key={tier.id}
+                    className={`cursor-pointer transition-all duration-300 ${
+                      selectedTier === tier.id 
+                        ? "bg-white/20 border-brand-primary shadow-xl scale-105" 
+                        : "bg-white/10 border-white/20 hover:border-brand-primary/50"
+                    }`}
+                    onClick={() => setSelectedTier(tier.id)}
+                  >
+                    <CardHeader className="text-center">
+                      {tier.popular && (
+                        <div className="mb-2">
+                          <Badge className="bg-brand-primary text-white">Most Popular</Badge>
+                        </div>
+                      )}
+                      <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${tier.color} flex items-center justify-center mx-auto mb-4`}>
+                        <Icon className="h-8 w-8 text-white" />
+                      </div>
+                      <CardTitle className="text-white text-2xl">{tier.name}</CardTitle>
+                      <div className="text-3xl font-bold text-brand-primary">{tier.price}</div>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-3">
+                        {tier.features.map((feature, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-300 text-sm">
+                            <div className="w-1.5 h-1.5 bg-brand-primary rounded-full mt-2 flex-shrink-0" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-white text-xl">Store Preview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-16 h-16 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: formData.primaryColor }}
+                  >
+                    <Store className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-lg">{formData.name || "Your Store"}</h3>
+                    <p className="text-gray-400">fandomly.com/{formData.slug || "your-store"}</p>
+                  </div>
+                </div>
+                <div className="text-gray-300 text-sm">
+                  {formData.description || "Your store description will appear here..."}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex gap-4 max-w-2xl mx-auto">
+              <Button 
+                onClick={() => setStep(3)}
+                variant="outline"
+                className="flex-1"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button 
+                onClick={handleComplete}
+                disabled={completeOnboardingMutation.isPending}
+                className="flex-1 gradient-primary text-white"
+              >
+                {completeOnboardingMutation.isPending ? "Setting up..." : "Complete Setup"}
+                <CheckCircle className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
+    </div>
   );
 }
