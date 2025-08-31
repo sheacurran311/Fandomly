@@ -43,22 +43,51 @@ export default function Navigation() {
             </div>
             
             <div className="hidden md:flex items-center space-x-8">
-              <Link href="/#features" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                Features
-              </Link>
-              <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                Marketplace
-              </Link>
-              <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                Who It's For
-              </Link>
+              {!dynamicUser ? (
+                // Non-authenticated users see marketing navigation
+                <>
+                  <Link href="/#features" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                    Features
+                  </Link>
+                  <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                    Marketplace
+                  </Link>
+                  <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                    Who It's For
+                  </Link>
+                </>
+              ) : (
+                // Authenticated users see simplified navigation
+                <>
+                  <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                    Marketplace
+                  </Link>
+                  {userData?.userType === 'creator' ? (
+                    <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Dashboard
+                    </Link>
+                  ) : (
+                    <Link href="/fan-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Dashboard
+                    </Link>
+                  )}
+                </>
+              )}
               {dynamicUser ? (
                 <div className="flex items-center space-x-4">
-                  <Link href="/dashboard">
-                    <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
-                      Dashboard
-                    </Button>
-                  </Link>
+                  {userData?.userType === 'creator' ? (
+                    <Link href="/creator-dashboard">
+                      <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
+                        Dashboard
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/fan-dashboard">
+                      <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
+                        Dashboard
+                      </Button>
+                    </Link>
+                  )}
                   
                   {/* User Menu */}
                   <DropdownMenu>
@@ -142,22 +171,37 @@ export default function Navigation() {
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-brand-primary/20">
               <div className="flex flex-col space-y-4">
-                <Link href="/#features" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                  Features
-                </Link>
-                <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                  Marketplace
-                </Link>
-                <Link href="/#pricing" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                  Pricing
-                </Link>
-                {dynamicUser ? (
-                  <Link href="/dashboard">
-                    <Button className="w-full bg-brand-primary hover:bg-brand-primary/80">
-                      Dashboard
-                    </Button>
-                  </Link>
+                {!dynamicUser ? (
+                  // Non-authenticated mobile navigation
+                  <>
+                    <Link href="/#features" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Features
+                    </Link>
+                    <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Marketplace
+                    </Link>
+                    <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Who It's For
+                    </Link>
+                  </>
                 ) : (
+                  // Authenticated mobile navigation
+                  <>
+                    <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Marketplace
+                    </Link>
+                    {userData?.userType === 'creator' ? (
+                      <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                        Dashboard
+                      </Link>
+                    ) : (
+                      <Link href="/fan-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                        Dashboard
+                      </Link>
+                    )}
+                  </>
+                )}
+                {!dynamicUser && (
                   <ConnectWalletButton 
                     className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
                     text="Start Here"
