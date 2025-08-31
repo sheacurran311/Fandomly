@@ -9,7 +9,7 @@ Marketing Focus: Emphasize NIL (Name, Image, Likeness) opportunities for college
 
 Recent Implementation: Added comprehensive NIL features including athlete spotlight showcase, interactive value calculator, social media tracking for NIL earnings, and automated compliance monitoring for NCAA, state, and institutional regulations.
 
-Latest Updates (January 2025):
+Latest Updates (August 2025):
 - ✅ **OpenLoyalty Campaign System**: Implemented comprehensive trigger-condition-effect campaign architecture with templates
 - ✅ **Multi-Tenant Architecture**: Built complete tenant system where each creator gets their own "store"
 - ✅ **Tenant Management**: Full tenant lifecycle with branding, limits, usage tracking, and subscription management
@@ -33,6 +33,10 @@ Latest Updates (January 2025):
 - ✅ **Facebook Business API Integration**: Added comprehensive Facebook SDK with App ID 4233782626946744 for follower tracking
 - ✅ **Clean Dynamic Integration**: Removed custom email verification code and hidden widget overlays - all Dynamic customizations now come from admin dashboard only
 - ✅ **Enhanced Landing Page**: Comprehensive mobile-first responsive design with improved UI practices and "Start Now" button consistency
+- ✅ **Fixed Creator Onboarding Flow**: New creators now properly route through onboarding (/creator-onboarding) before reaching dashboard
+- ✅ **Removed Obsolete RBAC Dashboard**: Eliminated /rbac-dashboard in favor of user-type-specific dashboards (/creator-dashboard, /fan-dashboard)
+- ✅ **Programmatic Wallet Connection**: Replaced Dynamic widget overlay with direct authentication flow to bypass admin dashboard email verification settings
+- ✅ **Dual Navigation Menus**: Authenticated users see simplified navigation (Marketplace, Dashboard) vs full marketing menu for non-authenticated users
 
 Personal Connection: User has direct family members who would benefit from the platform:
 - Brother: USA Olympic Aerial Jumper Medalist

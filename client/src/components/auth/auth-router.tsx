@@ -48,14 +48,24 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
     const publicRoutes = ['/privacy-policy', '/data-deletion'];
     
-    // Redirect legacy creator routes and old dashboards to appropriate dashboard
-    if (protectedRoutes.includes(currentPath) || legacyOnboardingRoutes.includes(currentPath)) {
+    // Redirect legacy RBAC dashboard routes to appropriate user dashboards
+    if (currentPath === '/rbac-dashboard' || currentPath === '/dashboard') {
       if (userData?.userType === 'creator') {
-        console.log(`Redirecting ${userData.userType} from ${currentPath} to creator dashboard`);
-        setLocation('/creator-dashboard');
+        if (!userData?.onboardingState?.isCompleted) {
+          console.log('Creator needs onboarding, redirecting from RBAC to creator onboarding');
+          setLocation('/creator-onboarding');
+        } else {
+          console.log('Redirecting from RBAC to creator dashboard');
+          setLocation('/creator-dashboard');
+        }
       } else {
-        console.log(`Redirecting ${userData.userType} from ${currentPath} to fan dashboard`);
-        setLocation('/fan-dashboard');
+        if (!userData?.onboardingState?.isCompleted) {
+          console.log('Fan needs onboarding, redirecting from RBAC to fan onboarding');
+          setLocation('/fan-onboarding/profile');
+        } else {
+          console.log('Redirecting from RBAC to fan dashboard');
+          setLocation('/fan-dashboard');
+        }
       }
       return;
     }
@@ -68,14 +78,33 @@ export default function AuthRouter({ children }: AuthRouterProps) {
       return;
     }
 
-    // If user is on user type selection but already registered, redirect to appropriate dashboard
+    // If user is on user type selection but already registered, redirect based on onboarding status
     if (currentPath === '/user-type-selection') {
       if (userData?.userType === 'creator') {
-        console.log('Creator already registered, redirecting to creator dashboard');
-        setLocation('/creator-dashboard');
+        if (!userData?.onboardingState?.isCompleted) {
+          console.log('Creator needs onboarding, redirecting to creator onboarding');
+          setLocation('/creator-onboarding');
+        } else {
+          console.log('Creator already onboarded, redirecting to creator dashboard');
+          setLocation('/creator-dashboard');
+        }
       } else {
-        console.log('Fan already registered, redirecting to fan dashboard');
-        setLocation('/fan-dashboard');
+        if (!userData?.onboardingState?.isCompleted) {
+          console.log('Fan needs onboarding, redirecting to fan onboarding');
+          setLocation('/fan-onboarding/profile');
+        } else {
+          console.log('Fan already onboarded, redirecting to fan dashboard');
+          setLocation('/fan-dashboard');
+        }
+      }
+      return;
+    }
+    
+    // If creator hasn't completed onboarding, allow creator onboarding route
+    if (userData?.userType === 'creator' && !userData?.onboardingState?.isCompleted) {
+      if (currentPath !== '/creator-onboarding') {
+        console.log('Creator needs onboarding, redirecting to creator onboarding');
+        setLocation('/creator-onboarding');
       }
       return;
     }
@@ -83,11 +112,21 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     // Redirect authenticated users away from homepage to their appropriate dashboard
     if (currentPath === '/') {
       if (userData?.userType === 'creator') {
-        console.log('Authenticated creator on homepage, redirecting to creator dashboard');
-        setLocation('/creator-dashboard');
+        if (!userData?.onboardingState?.isCompleted) {
+          console.log('Creator needs onboarding, redirecting to creator onboarding');
+          setLocation('/creator-onboarding');
+        } else {
+          console.log('Authenticated creator on homepage, redirecting to creator dashboard');
+          setLocation('/creator-dashboard');
+        }
       } else {
-        console.log('Authenticated fan on homepage, redirecting to fan dashboard');
-        setLocation('/fan-dashboard');
+        if (!userData?.onboardingState?.isCompleted) {
+          console.log('Fan needs onboarding, redirecting to fan onboarding');
+          setLocation('/fan-onboarding/profile');
+        } else {
+          console.log('Authenticated fan on homepage, redirecting to fan dashboard');
+          setLocation('/fan-dashboard');
+        }
       }
       return;
     }

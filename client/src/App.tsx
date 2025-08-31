@@ -22,7 +22,7 @@ import FanCampaigns from "@/pages/fan-dashboard/campaigns";
 import FanFollowing from "@/pages/fan-dashboard/following";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
 import NILDashboard from "@/pages/nil-dashboard";
-import RBACDashboard from "@/pages/rbac-dashboard";
+// RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
 import FanChooseCreators from "@/pages/fan-choose-creators";
 
@@ -50,9 +50,7 @@ function Router() {
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/nil-dashboard" component={NILDashboard} />
-      <Route path="/rbac-dashboard" component={RBACDashboard} />
-      <Route path="/dashboard" component={RBACDashboard} />
-
+      
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route component={NotFound} />

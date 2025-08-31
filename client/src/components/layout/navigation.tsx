@@ -109,12 +109,7 @@ export default function Navigation() {
                         </div>
                       </div>
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
-                      <Link href="/rbac-dashboard">
-                        <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
-                          <Shield className="mr-2 h-4 w-4" />
-                          Role Dashboard
-                        </DropdownMenuItem>
-                      </Link>
+                      {/* Role Dashboard removed - users use type-specific dashboards */}
                       <RoleGuard allowedRoles={['customer_admin']}>
                         <Link href="/nil-dashboard">
                           <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
