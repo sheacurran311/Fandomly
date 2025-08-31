@@ -45,7 +45,7 @@ export default function NILDashboard() {
             </Alert>
             <Link href="/auth">
               <Button className="w-full bg-brand-primary hover:bg-brand-primary/80">
-                Connect Wallet
+                Start Now
               </Button>
             </Link>
           </CardContent>

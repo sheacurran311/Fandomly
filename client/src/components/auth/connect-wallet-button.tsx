@@ -8,7 +8,7 @@ interface ConnectWalletButtonProps {
 }
 
 export default function ConnectWalletButton({ children, className, text }: ConnectWalletButtonProps) {
-  const buttonText = text || (typeof children === 'string' ? children : 'Connect Wallet');
+  const buttonText = text || (typeof children === 'string' ? children : 'Start Now');
   
   return (
     <div className="relative">
