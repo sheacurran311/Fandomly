@@ -55,7 +55,7 @@ export default function UserTypeSelection() {
       if (userType === "fan") {
         setLocation("/fan-onboarding/profile");
       } else {
-        setLocation("/rbac-dashboard");
+        setLocation("/creator-type-selection");
       }
     } catch (error) {
       console.error("Registration failed:", error);

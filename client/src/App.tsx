@@ -10,6 +10,7 @@ import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
 import Marketplace from "@/pages/marketplace";
 import UserTypeSelection from "@/pages/user-type-selection";
+import CreatorTypeSelection from "@/pages/creator-type-selection";
 import CreatorOnboarding from "@/pages/creator-onboarding";
 import CampaignBuilder from "@/pages/campaign-builder";
 import TenantSetup from "@/pages/tenant-setup";
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/user-type-selection" component={UserTypeSelection} />
+      <Route path="/creator-type-selection" component={CreatorTypeSelection} />
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />

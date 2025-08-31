@@ -26,17 +26,48 @@ import {
   CheckCircle
 } from "lucide-react";
 
-const businessTypes = [
-  { id: 'athlete', name: 'Athlete', icon: Trophy },
-  { id: 'creator', name: 'Creator', icon: User },
-  { id: 'musician', name: 'Musician', icon: Music },
-];
-
-const sportCategories = [
+const topSports = [
   "American Football", "Basketball", "Baseball", "Soccer", "Tennis", "Golf", 
   "Swimming", "Track & Field", "Wrestling", "Gymnastics", "Volleyball", 
-  "Softball", "Hockey", "Lacrosse", "Cross Country", "Skiing", "Aerial Sports",
-  "Other"
+  "Softball", "Hockey", "Lacrosse", "Cross Country", "Skiing", "Boxing",
+  "MMA", "Aerial Sports", "Snowboarding", "Skateboarding", "Surfing",
+  "Cycling", "Marathon", "Triathlon", "Weightlifting", "Cheerleading",
+  "Dance", "Equestrian", "Other"
+];
+
+const educationLevels = [
+  { value: "middle_school", label: "Middle School" },
+  { value: "high_school", label: "High School" },
+  { value: "junior_college", label: "Junior College" },
+  { value: "college_d1", label: "College - Division I" },
+  { value: "college_d2", label: "College - Division II" },
+  { value: "college_d3", label: "College - Division III" },
+  { value: "naia", label: "NAIA" },
+  { value: "not_enrolled", label: "Not Currently Enrolled" },
+  { value: "professional", label: "Professional Athlete" }
+];
+
+const musicGenres = [
+  "Pop", "Rock", "Hip-Hop", "R&B", "Country", "Electronic", "Jazz", "Classical",
+  "Alternative", "Indie", "Folk", "Blues", "Reggae", "Latin", "Metal", "Punk",
+  "Gospel", "Soul", "Funk", "Disco", "House", "Techno", "Dubstep", "Other"
+];
+
+const artistTypes = [
+  { value: "independent", label: "Independent Artist" },
+  { value: "signed", label: "Signed to Label" },
+  { value: "hobby", label: "Hobby/Amateur" }
+];
+
+const contentTypes = [
+  "Creative Video", "Podcast", "Influencer", "Gaming", "Educational", "Comedy",
+  "Lifestyle", "Fashion", "Beauty", "Fitness", "Food", "Travel", "Technology",
+  "Sports Commentary", "Music Reviews", "Art & Design", "DIY/Crafts", "Other"
+];
+
+const socialPlatforms = [
+  "Instagram", "TikTok", "YouTube", "Twitter/X", "Facebook", "Twitch", "Discord",
+  "Snapchat", "LinkedIn", "Pinterest", "Reddit", "Clubhouse", "OnlyFans", "Other"
 ];
 
 const subscriptionTiers = [
@@ -96,20 +127,43 @@ export default function CreatorOnboardingPage() {
   const [step, setStep] = useState(1);
   const [selectedTier, setSelectedTier] = useState('professional');
   
+  // Get creator type from URL params
+  const params = new URLSearchParams(window.location.search);
+  const creatorType = params.get('type') || 'athlete';
+  
   const [formData, setFormData] = useState({
+    // Common fields
+    creatorType,
+    displayName: '',
+    bio: '',
+    followerCount: '',
+    
     // Store Info
     name: '',
     slug: '',
-    businessType: '',
-    description: '',
     
-    // Athlete Info
+    // Athlete specific
     sport: '',
+    ageRange: '',
+    education: '',
     position: '',
     school: '',
-    division: '',
-    year: '',
+    currentSponsors: '',
     nilCompliant: false,
+    
+    // Musician specific
+    bandArtistName: '',
+    musicCatalogUrl: '',
+    totalFollowerCount: '',
+    artistType: '',
+    musicGenre: '',
+    
+    // Content Creator specific
+    contentType: '',
+    topicsOfFocus: '',
+    sponsorships: '',
+    totalViews: '',
+    platforms: [] as string[],
     
     // Branding
     primaryColor: '#6366f1',
@@ -225,98 +279,78 @@ export default function CreatorOnboardingPage() {
           </div>
         </div>
 
-        {/* Step 1: Store Information */}
+        {/* Step 1: Creator Profile Setup */}
         {step === 1 && (
           <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="text-white text-2xl flex items-center gap-3">
-                <Store className="h-8 w-8 text-brand-primary" />
-                Store Information
+                <User className="h-8 w-8 text-brand-primary" />
+                Build Your Creator Profile
               </CardTitle>
+              <p className="text-gray-300">Tell your fans who you are and what makes you unique</p>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <Label htmlFor="name" className="text-gray-300">Store Name *</Label>
+                <Label htmlFor="displayName" className="text-gray-300">Display Name *</Label>
                 <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g., Aerial Ace Athletics, Luna Music, Thunder Squad"
+                  id="displayName"
+                  value={formData.displayName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
+                  placeholder="Your name as fans will see it"
                   className="bg-white/10 border-white/20 text-white"
                 />
               </div>
 
               <div>
-                <Label htmlFor="slug" className="text-gray-300">Store URL *</Label>
-                <div className="flex items-center">
-                  <span className="text-gray-400 text-sm mr-2">fandomly.com/</span>
-                  <Input
-                    id="slug"
-                    value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    placeholder="your-store-name"
-                    className="bg-white/10 border-white/20 text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-gray-300">What describes you best? *</Label>
-                <div className="grid grid-cols-3 gap-4 mt-3">
-                  {businessTypes.map((type) => {
-                    const Icon = type.icon;
-                    return (
-                      <button
-                        key={type.id}
-                        onClick={() => setFormData(prev => ({ ...prev, businessType: type.id }))}
-                        className={`p-4 rounded-xl border transition-all ${
-                          formData.businessType === type.id
-                            ? "border-brand-primary bg-brand-primary/20"
-                            : "border-white/20 bg-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        <Icon className="h-8 w-8 mx-auto mb-2 text-brand-primary" />
-                        <p className="text-white text-sm font-medium">{type.name}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="description" className="text-gray-300">Description</Label>
+                <Label htmlFor="bio" className="text-gray-300">Bio</Label>
                 <textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Tell your fans about yourself..."
+                  id="bio"
+                  value={formData.bio}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+                  placeholder="Tell your fans about yourself, your achievements, and what they can expect from your community..."
                   className="w-full p-3 bg-white/10 border border-white/20 text-white rounded-lg resize-none h-24"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="followerCount" className="text-gray-300">Total Follower Count *</Label>
+                <Input
+                  id="followerCount"
+                  type="number"
+                  value={formData.followerCount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, followerCount: e.target.value }))}
+                  placeholder="Total followers across all platforms"
+                  className="bg-white/10 border-white/20 text-white"
                 />
               </div>
 
               <Button 
                 onClick={() => setStep(2)}
-                disabled={!formData.name || !formData.slug || !formData.businessType}
+                disabled={!formData.displayName || !formData.followerCount}
                 className="w-full gradient-primary text-white"
               >
-                Continue to Profile Details
+                Continue to {creatorType === 'athlete' ? 'Athletic' : creatorType === 'musician' ? 'Music' : 'Content'} Details
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 2: Profile Information */}
+        {/* Step 2: Creator Type Specific Information */}
         {step === 2 && (
           <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="text-white text-2xl flex items-center gap-3">
-                <Trophy className="h-8 w-8 text-brand-primary" />
-                {formData.businessType === 'athlete' ? 'Athlete Information' : 'Profile Information'}
+                {creatorType === 'athlete' && <Trophy className="h-8 w-8 text-brand-primary" />}
+                {creatorType === 'musician' && <Music className="h-8 w-8 text-brand-primary" />}
+                {creatorType === 'content_creator' && <User className="h-8 w-8 text-brand-primary" />}
+                {creatorType === 'athlete' ? 'Athletic Information' : 
+                 creatorType === 'musician' ? 'Music Information' : 'Content Creator Information'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {formData.businessType === 'athlete' && (
+              {/* Athlete Fields */}
+              {creatorType === 'athlete' && (
                 <>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
@@ -326,8 +360,41 @@ export default function CreatorOnboardingPage() {
                           <SelectValue placeholder="Select your sport" />
                         </SelectTrigger>
                         <SelectContent>
-                          {sportCategories.map((sport) => (
+                          {topSports.map((sport) => (
                             <SelectItem key={sport} value={sport}>{sport}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-300">Age Range *</Label>
+                      <Select value={formData.ageRange} onValueChange={(value) => setFormData(prev => ({ ...prev, ageRange: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select age range" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="13-15">13-15</SelectItem>
+                          <SelectItem value="16-18">16-18</SelectItem>
+                          <SelectItem value="19-22">19-22</SelectItem>
+                          <SelectItem value="23-26">23-26</SelectItem>
+                          <SelectItem value="27-30">27-30</SelectItem>
+                          <SelectItem value="31+">31+</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-300">Current Education *</Label>
+                      <Select value={formData.education} onValueChange={(value) => setFormData(prev => ({ ...prev, education: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select education level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {educationLevels.map((level) => (
+                            <SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -345,34 +412,26 @@ export default function CreatorOnboardingPage() {
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="school" className="text-gray-300">School/University</Label>
-                      <Input
-                        id="school"
-                        value={formData.school}
-                        onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
-                        placeholder="e.g., University of Florida"
-                        className="bg-white/10 border-white/20 text-white"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="school" className="text-gray-300">School/University</Label>
+                    <Input
+                      id="school"
+                      value={formData.school}
+                      onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
+                      placeholder="e.g., University of Florida"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
 
-                    <div>
-                      <Label className="text-gray-300">Year</Label>
-                      <Select value={formData.year} onValueChange={(value) => setFormData(prev => ({ ...prev, year: value }))}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                          <SelectValue placeholder="Select year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="freshman">Freshman</SelectItem>
-                          <SelectItem value="sophomore">Sophomore</SelectItem>
-                          <SelectItem value="junior">Junior</SelectItem>
-                          <SelectItem value="senior">Senior</SelectItem>
-                          <SelectItem value="graduate">Graduate</SelectItem>
-                          <SelectItem value="professional">Professional</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label htmlFor="currentSponsors" className="text-gray-300">Current Sponsors (if applicable)</Label>
+                    <Input
+                      id="currentSponsors"
+                      value={formData.currentSponsors}
+                      onChange={(e) => setFormData(prev => ({ ...prev, currentSponsors: e.target.value }))}
+                      placeholder="List any current sponsorships or endorsements"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -384,6 +443,138 @@ export default function CreatorOnboardingPage() {
                     <Label htmlFor="nilCompliant" className="text-gray-300 text-sm">
                       I understand NIL compliance requirements and agree to follow applicable regulations
                     </Label>
+                  </div>
+                </>
+              )}
+
+              {/* Musician Fields */}
+              {creatorType === 'musician' && (
+                <>
+                  <div>
+                    <Label htmlFor="bandArtistName" className="text-gray-300">Band/Artist Name *</Label>
+                    <Input
+                      id="bandArtistName"
+                      value={formData.bandArtistName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, bandArtistName: e.target.value }))}
+                      placeholder="Your stage name or band name"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="musicCatalogUrl" className="text-gray-300">Music Catalog URL</Label>
+                    <Input
+                      id="musicCatalogUrl"
+                      value={formData.musicCatalogUrl}
+                      onChange={(e) => setFormData(prev => ({ ...prev, musicCatalogUrl: e.target.value }))}
+                      placeholder="Spotify, Apple Music, or other streaming link"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-300">Type of Artist *</Label>
+                      <Select value={formData.artistType} onValueChange={(value) => setFormData(prev => ({ ...prev, artistType: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select artist type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {artistTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-300">Genre of Music *</Label>
+                      <Select value={formData.musicGenre} onValueChange={(value) => setFormData(prev => ({ ...prev, musicGenre: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select genre" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {musicGenres.map((genre) => (
+                            <SelectItem key={genre} value={genre}>{genre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Content Creator Fields */}
+              {creatorType === 'content_creator' && (
+                <>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-300">Type of Content *</Label>
+                      <Select value={formData.contentType} onValueChange={(value) => setFormData(prev => ({ ...prev, contentType: value }))}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select content type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contentTypes.map((type) => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="totalViews" className="text-gray-300">Total Views Across Platforms</Label>
+                      <Input
+                        id="totalViews"
+                        value={formData.totalViews}
+                        onChange={(e) => setFormData(prev => ({ ...prev, totalViews: e.target.value }))}
+                        placeholder="e.g., 1.5M total views"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="topicsOfFocus" className="text-gray-300">Topics of Focus</Label>
+                    <Input
+                      id="topicsOfFocus"
+                      value={formData.topicsOfFocus}
+                      onChange={(e) => setFormData(prev => ({ ...prev, topicsOfFocus: e.target.value }))}
+                      placeholder="What topics do you create content about?"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="sponsorships" className="text-gray-300">Current Sponsors</Label>
+                    <Input
+                      id="sponsorships"
+                      value={formData.sponsorships}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sponsorships: e.target.value }))}
+                      placeholder="List any current brand partnerships"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-gray-300">Platforms You Regularly Post On *</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {socialPlatforms.map((platform) => (
+                        <label key={platform} className="flex items-center space-x-2 text-gray-300">
+                          <Checkbox
+                            checked={formData.platforms.includes(platform)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData(prev => ({ ...prev, platforms: [...prev.platforms, platform] }));
+                              } else {
+                                setFormData(prev => ({ ...prev, platforms: prev.platforms.filter(p => p !== platform) }));
+                              }
+                            }}
+                          />
+                          <span className="text-sm">{platform}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
@@ -401,7 +592,7 @@ export default function CreatorOnboardingPage() {
                   onClick={() => setStep(3)}
                   className="flex-1 gradient-primary text-white"
                 >
-                  Continue to Branding
+                  Continue to Store Setup
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -409,16 +600,42 @@ export default function CreatorOnboardingPage() {
           </Card>
         )}
 
-        {/* Step 3: Store Branding */}
+        {/* Step 3: Store Setup */}
         {step === 3 && (
           <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="text-white text-2xl flex items-center gap-3">
-                <Palette className="h-8 w-8 text-brand-primary" />
-                Store Branding
+                <Store className="h-8 w-8 text-brand-primary" />
+                Store Setup
               </CardTitle>
+              <p className="text-gray-300">Set up your fan loyalty store and branding</p>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="storeName" className="text-gray-300">Store Name *</Label>
+                <Input
+                  id="storeName"
+                  value={formData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="e.g., Aerial Ace Athletics, Luna Music, Thunder Squad"
+                  className="bg-white/10 border-white/20 text-white"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="storeSlug" className="text-gray-300">Store URL *</Label>
+                <div className="flex items-center">
+                  <span className="text-gray-400 text-sm mr-2">fandomly.com/</span>
+                  <Input
+                    id="storeSlug"
+                    value={formData.slug}
+                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    placeholder="your-store-name"
+                    className="bg-white/10 border-white/20 text-white"
+                  />
+                </div>
+              </div>
+
               <div>
                 <Label className="text-gray-300 mb-4 block">Brand Colors</Label>
                 <div className="grid grid-cols-3 gap-4">
@@ -596,7 +813,7 @@ export default function CreatorOnboardingPage() {
                   </div>
                 </div>
                 <div className="text-gray-300 text-sm">
-                  {formData.description || "Your store description will appear here..."}
+                  {formData.bio || "Your store description will appear here..."}
                 </div>
               </CardContent>
             </Card>

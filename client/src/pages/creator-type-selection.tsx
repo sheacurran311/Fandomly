@@ -1,0 +1,190 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Trophy,
+  Music,
+  User,
+  ArrowRight,
+  Sparkles
+} from "lucide-react";
+
+const creatorTypes = [
+  {
+    id: 'athlete',
+    title: 'Athlete',
+    icon: Trophy,
+    description: 'Perfect for college athletes, Olympians, and professional sports figures',
+    examples: 'Football players, Basketball stars, Olympic medalists',
+    features: [
+      'NIL compliance monitoring',
+      'Sport-specific analytics',
+      'University integration',
+      'Performance tracking',
+      'Sponsor management'
+    ],
+    color: 'from-blue-500 to-blue-600',
+    popular: true
+  },
+  {
+    id: 'musician',
+    title: 'Musician',
+    icon: Music,
+    description: 'For independent artists, bands, and music creators building their fanbase',
+    examples: 'Solo artists, Bands, Music producers',
+    features: [
+      'Music catalog integration',
+      'Streaming platform sync',
+      'Fan engagement tools',
+      'Concert promotion',
+      'Merchandise campaigns'
+    ],
+    color: 'from-purple-500 to-purple-600',
+    popular: false
+  },
+  {
+    id: 'content_creator',
+    title: 'Content Creator',
+    icon: User,
+    description: 'For influencers, podcasters, and digital content creators',
+    examples: 'YouTubers, TikTokers, Podcasters, Influencers',
+    features: [
+      'Multi-platform tracking',
+      'Content performance analytics',
+      'Brand partnership tools',
+      'Audience segmentation',
+      'Creator monetization'
+    ],
+    color: 'from-green-500 to-green-600',
+    popular: false
+  }
+];
+
+export default function CreatorTypeSelection() {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
+          <CardContent className="text-center p-6">
+            <h2 className="text-xl font-bold text-white mb-4">Authentication Required</h2>
+            <p className="text-gray-300 mb-4">Please connect your wallet to continue.</p>
+            <Button onClick={() => setLocation("/")} className="bg-brand-primary hover:bg-brand-primary/80">
+              Go Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const handleTypeSelection = (creatorType: string) => {
+    setSelectedType(creatorType);
+    // Navigate to specific onboarding flow based on creator type
+    setLocation(`/creator-onboarding?type=${creatorType}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-dark-bg">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-brand-dark-purple/20 via-brand-dark-bg to-brand-dark-green/20" />
+      
+      <div className="relative z-10 container mx-auto px-4 py-12">
+        <div className="max-w-5xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-brand-primary/10 px-4 py-2 rounded-full border border-brand-primary/20 mb-6">
+              <Sparkles className="h-5 w-5 text-brand-primary" />
+              <span className="text-brand-primary font-medium">Creator Onboarding</span>
+            </div>
+            
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              What type of creator are you?
+            </h1>
+            
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+              Choose your category to unlock personalized features, reward templates, and fan engagement tools
+            </p>
+          </div>
+
+          {/* Creator Type Cards */}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {creatorTypes.map((type) => {
+              const Icon = type.icon;
+              return (
+                <Card 
+                  key={type.id}
+                  className={`bg-white/5 backdrop-blur-lg border-white/10 cursor-pointer transition-all duration-300 hover:bg-white/10 hover:border-brand-primary/50 hover:transform hover:scale-105 ${
+                    selectedType === type.id ? "border-brand-primary bg-brand-primary/10" : ""
+                  } relative`}
+                  onClick={() => handleTypeSelection(type.id)}
+                >
+                  {type.popular && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <Badge className="bg-brand-primary text-white px-3 py-1">
+                        Most Popular
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  <CardHeader className="text-center pb-4">
+                    <div className={`mx-auto w-16 h-16 bg-gradient-to-br ${type.color} rounded-xl flex items-center justify-center mb-4`}>
+                      <Icon className="h-8 w-8 text-white" />
+                    </div>
+                    <CardTitle className="text-2xl text-white">
+                      {type.title}
+                    </CardTitle>
+                    <CardDescription className="text-gray-300 text-sm">
+                      {type.description}
+                    </CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-4">
+                    <div className="text-center">
+                      <p className="text-brand-primary text-sm font-medium mb-3">
+                        Examples: {type.examples}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {type.features.map((feature, index) => (
+                        <div key={index} className="flex items-center gap-2 text-gray-300 text-sm">
+                          <div className="w-1.5 h-1.5 bg-brand-primary rounded-full flex-shrink-0" />
+                          {feature}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <Button 
+                      className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white mt-4"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTypeSelection(type.id);
+                      }}
+                    >
+                      Choose {type.title}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="text-center">
+            <p className="text-gray-400 text-sm">
+              Don't worry - you can always change your creator type later in your settings
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -156,16 +156,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const {
+        creatorType,
+        displayName,
+        bio,
+        followerCount,
         name,
         slug,
-        businessType,
-        description,
         sport,
+        ageRange,
+        education,
         position,
         school,
-        division,
-        year,
+        currentSponsors,
         nilCompliant,
+        bandArtistName,
+        musicCatalogUrl,
+        artistType,
+        musicGenre,
+        contentType,
+        topicsOfFocus,
+        sponsorships,
+        totalViews,
+        platforms,
         primaryColor,
         secondaryColor,
         accentColor,
@@ -201,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               accentColor: accentColor || '#10B981'
             },
             businessInfo: {
-              businessType: businessType || 'individual',
+              businessType: creatorType || 'athlete',
               socialLinks: {
                 instagram,
                 twitter,
@@ -219,8 +231,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let creator = await storage.getCreatorByUserId(user.id);
         if (creator) {
           await storage.updateCreator(creator.id, {
-            displayName: name,
-            bio: description,
+            displayName: displayName || name,
+            bio: bio,
+            followerCount: parseInt(followerCount) || 0,
             socialLinks: {
               instagram,
               twitter,
