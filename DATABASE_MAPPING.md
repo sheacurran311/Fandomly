@@ -107,6 +107,23 @@ Frontend Form Field → Database Table.Column
 (completed steps) → users.onboarding_state.completedSteps
 ```
 
+## Subscription Tiers Configuration
+
+### Three-Tier System
+```
+Tier ID → Features & Limits
+─────────────────────────
+starter (Free) → 1 program, 100 members, basic campaigns
+professional ($29/month) → 5 programs, 1,000 members, advanced features  
+enterprise ($99/month) → Unlimited programs/members, white-label
+```
+
+### Environment Variables
+```
+Frontend → VITE_STRIPE_PUBLIC_KEY (client-side payments)
+Backend → VITE_STRIPE_SECRET_KEY (server-side Stripe API)
+```
+
 ## Current Database Tables Structure
 
 ### users
