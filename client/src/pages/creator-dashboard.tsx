@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
+import FacebookConnect from "@/components/facebook-connect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -13,7 +14,8 @@ import {
   MessageSquare,
   Target,
   Plus,
-  BarChart3
+  BarChart3,
+  Facebook
 } from "lucide-react";
 
 export default function CreatorDashboard() {
@@ -121,6 +123,13 @@ export default function CreatorDashboard() {
 
             {/* Quick Actions & Stats */}
             <div className="space-y-6">
+              {/* Facebook Integration */}
+              <FacebookConnect 
+                onConnectionSuccess={(pageData) => {
+                  console.log('Facebook page connected:', pageData);
+                }}
+              />
+
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
@@ -132,12 +141,12 @@ export default function CreatorDashboard() {
                     Create Campaign
                   </Button>
                   <Button variant="outline" className="w-full border-brand-secondary/30 text-brand-secondary hover:bg-brand-secondary/10 justify-start">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Analytics
+                    <Facebook className="h-4 w-4 mr-2" />
+                    Facebook Campaign
                   </Button>
                   <Button variant="outline" className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Message Fans
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    View Analytics
                   </Button>
                 </CardContent>
               </Card>
