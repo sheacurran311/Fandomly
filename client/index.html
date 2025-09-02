@@ -11,7 +11,36 @@
   </head>
   <body>
     <div id="fb-root"></div>
-    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v23.0&appId=4233782626946744"></script>
+    <script>
+      window.fbAsyncInit = function() {
+        FB.init({
+          appId      : '4233782626946744',
+          cookie     : true,
+          xfbml      : true,
+          version    : 'v23.0'
+        });
+          
+        FB.AppEvents.logPageView();   
+          
+        // Global function for Facebook login button callback
+        window.checkLoginState = function() {
+          FB.getLoginStatus(function(response) {
+            console.log('Facebook login status:', response);
+            if (window.handleFacebookLoginStatus) {
+              window.handleFacebookLoginStatus(response);
+            }
+          });
+        }
+      };
+
+      (function(d, s, id){
+         var js, fjs = d.getElementsByTagName(s)[0];
+         if (d.getElementById(id)) {return;}
+         js = d.createElement(s); js.id = id;
+         js.src = "https://connect.facebook.net/en_US/sdk.js";
+         fjs.parentNode.insertBefore(js, fjs);
+       }(document, 'script', 'facebook-jssdk'));
+    </script>
     
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

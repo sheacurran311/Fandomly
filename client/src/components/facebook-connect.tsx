@@ -20,14 +20,8 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   const { toast } = useToast();
 
   useEffect(() => {
-    // Define global callback for Facebook login button
-    (window as any).checkLoginState = () => {
-      console.log('Facebook login button clicked');
-      window.FB.getLoginStatus((response: any) => {
-        console.log('Facebook login status from button:', response);
-        handleFacebookResponse(response);
-      });
-    };
+    // Set up global handler for Facebook login status (used by checkLoginState in HTML)
+    (window as any).handleFacebookLoginStatus = handleFacebookResponse;
     
     // Parse Facebook XFBML elements after component mounts
     const parseXFBML = () => {
@@ -55,6 +49,11 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       // Don't auto-set connected - let checkConnectionStatus handle it
       loadUserDataFromStoredToken(storedToken);
     }
+    
+    // Cleanup
+    return () => {
+      delete (window as any).handleFacebookLoginStatus;
+    };
   }, []);
 
   const checkConnectionStatus = async () => {
@@ -224,7 +223,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
               data-size="large"
               data-button-type="continue_with"
               data-layout="default"
-              data-auto-logout-link="true"
+              data-auto-logout-link="false"
               data-use-continue-as="true"
               data-scope="public_profile,email,pages_show_list,pages_read_engagement"
               data-onlogin="checkLoginState"
