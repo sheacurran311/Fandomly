@@ -9,7 +9,12 @@ Marketing Focus: Emphasize NIL (Name, Image, Likeness) opportunities for college
 
 Recent Implementation: Added comprehensive NIL features including athlete spotlight showcase, interactive value calculator, social media tracking for NIL earnings, and automated compliance monitoring for NCAA, state, and institutional regulations.
 
-Latest Updates (August 2025):
+Latest Updates (September 2025):
+- ✅ **Fixed API Parameter Order Issue**: Resolved "not a valid HTTP method" error in creator onboarding by correcting apiRequest parameter order
+- ✅ **Database Reset Capability**: Added ability to clean database for fresh testing of onboarding flows
+- ✅ **Robust Data Processing**: Fixed server-side array/string handling for all creator type-specific data fields
+
+Previous Updates (August 2025):
 - ✅ **Complete Database Field Mapping**: Comprehensive JSONB field mapping for all creator type-specific data (athlete, musician, content creator)
 - ✅ **Multi-Path Onboarding Database Integration**: All frontend form fields properly map to database with tenant isolation
 - ✅ **Stripe Payment Integration**: Full Stripe customer creation and subscription management with billing data storage
