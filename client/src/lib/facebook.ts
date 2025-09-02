@@ -138,7 +138,13 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
+      console.log('Initiating Facebook login with scope:', scope);
+      console.log('Facebook SDK status:', typeof window.FB, window.FB ? 'loaded' : 'not loaded');
+      
       window.FB.login((response) => {
+        console.log('Facebook login response:', response);
+        FacebookSDK.handleLoginStatusResponse(response);
+        
         if (response.status === 'connected' && response.authResponse) {
           resolve({
             success: true,
