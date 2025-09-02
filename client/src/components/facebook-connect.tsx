@@ -29,6 +29,20 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       });
     };
     
+    // Parse Facebook XFBML elements after component mounts
+    const parseXFBML = () => {
+      if (window.FB && (window.FB as any).XFBML) {
+        console.log('Parsing Facebook XFBML elements...');
+        (window.FB as any).XFBML.parse();
+      } else {
+        // Retry after a short delay if FB SDK isn't ready yet
+        setTimeout(parseXFBML, 1000);
+      }
+    };
+    
+    // Wait for Facebook SDK to load before parsing
+    setTimeout(parseXFBML, 500);
+    
     // Check connection status when component mounts
     checkConnectionStatus();
     
@@ -204,7 +218,6 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
             {/* Official Facebook Login Button */}
             <div 
               className="fb-login-button" 
-              data-width=""
               data-size="large"
               data-button-type="continue_with"
               data-layout="default"
@@ -213,20 +226,23 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
               data-scope="public_profile,email,pages_show_list,pages_read_engagement"
               data-onlogin="checkLoginState"
               data-testid="facebook-login-button"
+              style={{minHeight: '40px', display: 'block'}}
             ></div>
             
-            {/* Fallback Manual Connect Button */}
-            <div className="text-center text-gray-400 text-xs">or</div>
+            {/* Fallback if Facebook button doesn't render */}
             <Button
               onClick={handleConnect}
               disabled={isConnecting}
-              variant="outline"
-              className="w-full border-blue-600/30 text-blue-400 hover:bg-blue-600/10"
-              data-testid="button-facebook-connect-manual"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-facebook-connect-fallback"
             >
               <Facebook className="h-4 w-4 mr-2" />
-              {isConnecting ? "Connecting..." : "Manual Connect"}
+              {isConnecting ? "Connecting..." : "Connect Facebook"}
             </Button>
+            
+            <div className="text-xs text-gray-400 text-center">
+              Use either button above to connect your Facebook page
+            </div>
           </div>
           
           <div className="mt-4 text-xs text-gray-400 space-y-1">
