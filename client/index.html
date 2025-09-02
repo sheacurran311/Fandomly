@@ -8,18 +8,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
   </head>
   <body>
-    <!-- Facebook SDK for JavaScript -->
-    <script>
-      window.fbAsyncInit = function() {
-        FB.init({
-          appId            : '4233782626946744',
-          xfbml            : true,
-          version          : 'v23.0'
-        });
-        FB.AppEvents.logPageView();
-      };
-    </script>
-    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+    <div id="fb-root"></div>
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v23.0&appId=4233782626946744"></script>
     
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

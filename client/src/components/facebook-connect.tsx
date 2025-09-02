@@ -20,6 +20,15 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   const { toast } = useToast();
 
   useEffect(() => {
+    // Define global callback for Facebook login button
+    (window as any).checkLoginState = () => {
+      console.log('Facebook login button clicked');
+      window.FB.getLoginStatus((response: any) => {
+        console.log('Facebook login status from button:', response);
+        handleFacebookResponse(response);
+      });
+    };
+    
     // Check connection status when component mounts
     checkConnectionStatus();
     
@@ -135,15 +144,28 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
     }
   };
 
-  const handleFacebookLoginSuccess = async (response: any) => {
-    console.log('Facebook login successful:', response);
-    if (response.authResponse && response.authResponse.accessToken) {
+  const handleFacebookResponse = async (response: any) => {
+    console.log('Handling Facebook response:', response);
+    
+    if (response.status === 'connected' && response.authResponse) {
       setIsConnected(true);
       await loadUserDataFromStoredToken(response.authResponse.accessToken);
       
       toast({
         title: "Facebook Connected",
         description: `Connected successfully! Found ${pages.length} page(s).`,
+      });
+    } else if (response.status === 'not_authorized') {
+      toast({
+        title: "Authorization Required",
+        description: "Please authorize Fandomly to access your Facebook account",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Facebook Login Required",
+        description: "Please log into Facebook to continue",
+        variant: "destructive",
       });
     }
   };
@@ -178,15 +200,34 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
           </p>
         </CardHeader>
         <CardContent>
-          <Button
-            onClick={handleConnect}
-            disabled={isConnecting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            data-testid="button-facebook-connect"
-          >
-            <Facebook className="h-4 w-4 mr-2" />
-            {isConnecting ? "Connecting..." : "Connect Facebook"}
-          </Button>
+          <div className="space-y-4">
+            {/* Official Facebook Login Button */}
+            <div 
+              className="fb-login-button" 
+              data-width=""
+              data-size="large"
+              data-button-type="continue_with"
+              data-layout="default"
+              data-auto-logout-link="true"
+              data-use-continue-as="true"
+              data-scope="public_profile,email,pages_show_list,pages_read_engagement"
+              data-onlogin="checkLoginState"
+              data-testid="facebook-login-button"
+            ></div>
+            
+            {/* Fallback Manual Connect Button */}
+            <div className="text-center text-gray-400 text-xs">or</div>
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting}
+              variant="outline"
+              className="w-full border-blue-600/30 text-blue-400 hover:bg-blue-600/10"
+              data-testid="button-facebook-connect-manual"
+            >
+              <Facebook className="h-4 w-4 mr-2" />
+              {isConnecting ? "Connecting..." : "Manual Connect"}
+            </Button>
+          </div>
           
           <div className="mt-4 text-xs text-gray-400 space-y-1">
             <p>Required permissions:</p>
