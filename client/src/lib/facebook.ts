@@ -129,7 +129,7 @@ export class FacebookSDK {
     sessionStorage.removeItem('fb_expires_in');
   }
 
-  static async login(scope: string = 'email,public_profile'): Promise<{
+  static async login(scope: string = 'public_profile,email,pages_show_list,pages_read_engagement'): Promise<{
     success: boolean;
     accessToken?: string;
     userID?: string;
