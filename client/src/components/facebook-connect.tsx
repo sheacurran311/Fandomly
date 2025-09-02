@@ -225,7 +225,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
               data-layout="default"
               data-auto-logout-link="false"
               data-use-continue-as="true"
-              data-scope="public_profile,email,pages_show_list,pages_read_engagement"
+              data-scope="public_profile,email"
               data-onlogin="checkLoginState"
               data-testid="facebook-login-button"
               style={{minHeight: '40px', display: 'block'}}
