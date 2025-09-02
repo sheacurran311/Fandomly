@@ -52,28 +52,31 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
     
     if (storedToken && storedUserID && FacebookSDK.isTokenValid()) {
       console.log('Found valid stored Facebook token');
-      setIsConnected(true);
+      // Don't auto-set connected - let checkConnectionStatus handle it
       loadUserDataFromStoredToken(storedToken);
     }
   }, []);
 
   const checkConnectionStatus = async () => {
     try {
+      console.log('Checking Facebook connection status...');
       const status = await FacebookSDK.getLoginStatus();
       console.log('Facebook connection status:', status);
       
       if (status.isLoggedIn && status.accessToken) {
+        console.log('User is connected to Facebook');
         setIsConnected(true);
         await loadUserDataFromStoredToken(status.accessToken);
-      } else if (status.status === 'not_authorized') {
-        toast({
-          title: "Facebook Authorization Required",
-          description: "Please authorize Fandomly to access your Facebook account",
-          variant: "default",
-        });
+      } else {
+        console.log('User is not connected to Facebook, status:', status.status);
+        setIsConnected(false);
+        setUserInfo(null);
+        setPages([]);
+        setSelectedPage(null);
       }
     } catch (error) {
       console.error('Error checking Facebook connection status:', error);
+      setIsConnected(false);
     }
   };
 
