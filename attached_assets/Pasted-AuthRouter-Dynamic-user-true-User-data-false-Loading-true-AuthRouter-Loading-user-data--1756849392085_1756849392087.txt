@@ -1,0 +1,45 @@
+AuthRouter - Dynamic user: true User data: false Loading: true
+AuthRouter - Loading user data...
+[DynamicSDK] [ERROR]: TypeError: Failed to fetch
+    at window.fetch (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218642)
+    at Object.apply (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/injected.js:253:39)
+    at SDKApi.<anonymous> (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:780:66)
+    at Generator.next (<anonymous>)
+    at https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:763:67
+    at new Promise (<anonymous>)
+    at __awaiter2 (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:745:10)
+    at BaseAPI.fetchApi (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:773:36)
+    at SDKApi.<anonymous> (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:811:35)
+    at Generator.next (<anonymous>)
+Failed to fetch
+Failed to fetch
+[DynamicSDK] [ERROR]: TypeError: Failed to fetch
+    at window.fetch (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218642)
+    at Object.apply (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/injected.js:253:39)
+    at SDKApi.<anonymous> (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:780:66)
+    at Generator.next (<anonymous>)
+    at https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:763:67
+    at new Promise (<anonymous>)
+    at __awaiter2 (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:745:10)
+    at BaseAPI.fetchApi (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:773:36)
+    at SDKApi.<anonymous> (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:811:35)
+    at Generator.next (<anonymous>)
+at window.fetch (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218642)
+at Object.apply (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/injected.js:253:39)
+at SDKApi.&lt;anonymous&gt; (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:780:66)
+at Generator.next (&lt;anonymous&gt;)
+at https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:763:67
+at new Promise (&lt;anonymous&gt;)
+at __awaiter2 (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:745:10)
+at BaseAPI.fetchApi (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:773:36)
+at SDKApi.&lt;anonymous&gt; (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-TBEVARBR.js?v=b71bcee5:811:35)
+at Generator.next (&lt;anonymous&gt;)
+at t.value (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Failed to fetch
+Failed to fetch
+Checking Facebook connection status...
+AuthRouter - Dynamic user: true User data: true Loading: false
+Parsing Facebook XFBML elements...
