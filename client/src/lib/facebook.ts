@@ -76,6 +76,8 @@ export class FacebookSDK {
         window.fbAsyncInit = function() {
           originalInit();
           FacebookSDK.isInitialized = true;
+          // Check login status after SDK initialization
+          FacebookSDK.checkLoginStatusOnInit();
           resolve();
         };
       } else {
@@ -87,10 +89,44 @@ export class FacebookSDK {
           });
           window.FB.AppEvents.logPageView();
           FacebookSDK.isInitialized = true;
+          // Check login status after SDK initialization
+          FacebookSDK.checkLoginStatusOnInit();
           resolve();
         };
       }
     });
+  }
+
+  // Check login status when SDK initializes (as recommended by Facebook)
+  private static checkLoginStatusOnInit(): void {
+    window.FB.getLoginStatus((response) => {
+      console.log('Facebook login status on page load:', response);
+      FacebookSDK.handleLoginStatusResponse(response);
+    });
+  }
+
+  // Handle the login status response
+  private static handleLoginStatusResponse(response: any): void {
+    if (response.status === 'connected') {
+      console.log('User is connected to Facebook and logged into app');
+      // Store access token and user ID for the session
+      sessionStorage.setItem('fb_access_token', response.authResponse.accessToken);
+      sessionStorage.setItem('fb_user_id', response.authResponse.userID);
+      sessionStorage.setItem('fb_expires_in', response.authResponse.expiresIn.toString());
+    } else if (response.status === 'not_authorized') {
+      console.log('User is logged into Facebook but not authorized for the app');
+      FacebookSDK.clearStoredTokens();
+    } else {
+      console.log('User is not logged into Facebook');
+      FacebookSDK.clearStoredTokens();
+    }
+  }
+
+  // Clear stored authentication tokens
+  private static clearStoredTokens(): void {
+    sessionStorage.removeItem('fb_access_token');
+    sessionStorage.removeItem('fb_user_id');
+    sessionStorage.removeItem('fb_expires_in');
   }
 
   static async login(scope: string = 'email,public_profile,pages_show_list,pages_read_engagement'): Promise<{
@@ -180,6 +216,7 @@ export class FacebookSDK {
 
     return new Promise((resolve) => {
       window.FB.logout(() => {
+        FacebookSDK.clearStoredTokens();
         resolve();
       });
     });
@@ -189,24 +226,50 @@ export class FacebookSDK {
     isLoggedIn: boolean;
     accessToken?: string;
     userID?: string;
+    status?: string;
   }> {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
       window.FB.getLoginStatus((response) => {
+        FacebookSDK.handleLoginStatusResponse(response);
+        
         if (response.status === 'connected' && response.authResponse) {
           resolve({
             isLoggedIn: true,
             accessToken: response.authResponse.accessToken,
-            userID: response.authResponse.userID
+            userID: response.authResponse.userID,
+            status: response.status
           });
         } else {
           resolve({
-            isLoggedIn: false
+            isLoggedIn: false,
+            status: response.status
           });
         }
       });
     });
+  }
+
+  // Get stored access token from session storage
+  static getStoredAccessToken(): string | null {
+    return sessionStorage.getItem('fb_access_token');
+  }
+
+  // Get stored user ID from session storage
+  static getStoredUserID(): string | null {
+    return sessionStorage.getItem('fb_user_id');
+  }
+
+  // Check if stored token is still valid
+  static isTokenValid(): boolean {
+    const expiresIn = sessionStorage.getItem('fb_expires_in');
+    if (!expiresIn) return false;
+    
+    const expirationTime = parseInt(expiresIn) * 1000; // Convert to milliseconds
+    const currentTime = Date.now();
+    
+    return currentTime < expirationTime;
   }
 }
 

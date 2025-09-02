@@ -20,23 +20,53 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check connection status when component mounts
     checkConnectionStatus();
+    
+    // Also check for stored tokens from previous session
+    const storedToken = FacebookSDK.getStoredAccessToken();
+    const storedUserID = FacebookSDK.getStoredUserID();
+    
+    if (storedToken && storedUserID && FacebookSDK.isTokenValid()) {
+      console.log('Found valid stored Facebook token');
+      setIsConnected(true);
+      loadUserDataFromStoredToken(storedToken);
+    }
   }, []);
 
   const checkConnectionStatus = async () => {
     try {
       const status = await FacebookSDK.getLoginStatus();
+      console.log('Facebook connection status:', status);
+      
       if (status.isLoggedIn && status.accessToken) {
         setIsConnected(true);
-        const user = await FacebookSDK.getUserInfo(status.accessToken);
-        if (user) {
-          setUserInfo(user);
-          const userPages = await FacebookSDK.getUserPages(status.accessToken);
-          setPages(userPages);
-        }
+        await loadUserDataFromStoredToken(status.accessToken);
+      } else if (status.status === 'not_authorized') {
+        toast({
+          title: "Facebook Authorization Required",
+          description: "Please authorize Fandomly to access your Facebook account",
+          variant: "default",
+        });
       }
     } catch (error) {
       console.error('Error checking Facebook connection status:', error);
+    }
+  };
+
+  const loadUserDataFromStoredToken = async (accessToken: string) => {
+    try {
+      const user = await FacebookSDK.getUserInfo(accessToken);
+      if (user) {
+        setUserInfo(user);
+        const userPages = await FacebookSDK.getUserPages(accessToken);
+        setPages(userPages);
+        console.log(`Loaded ${userPages.length} Facebook pages for user ${user.name}`);
+      }
+    } catch (error) {
+      console.error('Error loading Facebook user data:', error);
+      // If there's an error, the token might be invalid
+      setIsConnected(false);
     }
   };
 
@@ -45,28 +75,27 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
     
     try {
       const loginResult = await FacebookSDK.login();
+      console.log('Facebook login result:', loginResult);
       
       if (loginResult.success && loginResult.accessToken) {
         setIsConnected(true);
-        
-        // Get user info
-        const user = await FacebookSDK.getUserInfo(loginResult.accessToken);
-        if (user) {
-          setUserInfo(user);
-        }
-        
-        // Get user's Facebook pages
-        const userPages = await FacebookSDK.getUserPages(loginResult.accessToken);
-        setPages(userPages);
+        await loadUserDataFromStoredToken(loginResult.accessToken);
         
         toast({
           title: "Facebook Connected",
-          description: `Connected successfully! Found ${userPages.length} page(s).`,
+          description: `Connected successfully! Found ${pages.length} page(s).`,
         });
       } else {
+        let errorMessage = "Failed to connect to Facebook";
+        if (loginResult.error === 'not_authorized') {
+          errorMessage = "Please authorize Fandomly to access your Facebook account";
+        } else if (loginResult.error === 'unknown') {
+          errorMessage = "Please log into Facebook first, then try connecting again";
+        }
+        
         toast({
           title: "Connection Failed",
-          description: loginResult.error || "Failed to connect to Facebook",
+          description: errorMessage,
           variant: "destructive",
         });
       }
