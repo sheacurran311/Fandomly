@@ -1,0 +1,190 @@
+# Balances
+
+> Get token balances for a given SVM address
+
+## OpenAPI
+
+````yaml svm/openapi/balances.json get /beta/svm/balances/{uri}
+paths:
+  path: /beta/svm/balances/{uri}
+  method: get
+  servers:
+    - url: https://api.sim.dune.com
+  request:
+    security: []
+    parameters:
+      path:
+        uri:
+          schema:
+            - type: string
+              required: true
+              description: SVM address
+              default: 86xCnPeV69n6t3DnyGvkKobf9FdN2H9oiVDdaMpo2MMY
+      query:
+        chains:
+          schema:
+            - type: string
+              required: false
+              description: Comma-separated list of chains to include
+        limit:
+          schema:
+            - type: integer
+              required: false
+              description: >-
+                Maximum number of results to return. Default is 1000 when not
+                provided. Values above 1000 are reduced to 1000.
+              maximum: 1000
+              minimum: 1
+              default: 1000
+        offset:
+          schema:
+            - type: string
+              required: false
+              description: Pagination offset from previous response
+      header:
+        X-Sim-Api-Key:
+          schema:
+            - type: string
+              required: true
+              description: API key to access the service
+      cookie: {}
+    body: {}
+  response:
+    '200':
+      application/json:
+        schemaArray:
+          - type: object
+            properties:
+              processing_time_ms:
+                allOf:
+                  - type: number
+                    description: Time taken to process the request in milliseconds
+              wallet_address:
+                allOf:
+                  - type: string
+                    description: The queried wallet address
+              next_offset:
+                allOf:
+                  - type: string
+                    description: Pagination token for the next page of results
+              balances_count:
+                allOf:
+                  - type: number
+                    description: Total number of balances returned
+              balances:
+                allOf:
+                  - type: array
+                    description: Array of token balance objects
+                    items:
+                      $ref: '#/components/schemas/SvmBalanceItem'
+            refIdentifier: '#/components/schemas/SvmBalancesResponse'
+            requiredProperties:
+              - wallet_address
+              - balances
+        examples:
+          example:
+            value:
+              processing_time_ms: 120
+              wallet_address: DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK
+              next_offset: eyJibG9ja190aW1lIjoxNjgwMDAwMDAwLCJpbmRleCI6MH0=
+              balances_count: 2
+              balances:
+                - chain: solana
+                  address: native
+                  amount: '1000000000'
+                  balance: '1.0'
+                  value_usd: 20.5
+                  program_id: null
+                  decimals: 9
+                  total_supply: '1000000000000000'
+                  name: Solana
+                  symbol: SOL
+                  uri: null
+                  price_usd: 20.5
+                  liquidity_usd: 500000000
+                  pool_type: null
+                  pool_address: null
+                  mint_authority: null
+        description: Successful response
+    '400':
+      _mintlify/placeholder:
+        schemaArray:
+          - type: any
+            description: Bad request
+        examples: {}
+        description: Bad request
+    '401':
+      _mintlify/placeholder:
+        schemaArray:
+          - type: any
+            description: Unauthorized
+        examples: {}
+        description: Unauthorized
+    '500':
+      _mintlify/placeholder:
+        schemaArray:
+          - type: any
+            description: Internal server error
+        examples: {}
+        description: Internal server error
+  deprecated: false
+  type: path
+components:
+  schemas:
+    SvmBalanceItem:
+      type: object
+      required:
+        - chain
+        - address
+        - amount
+      properties:
+        chain:
+          type: string
+          description: Name of blockchain of token
+        address:
+          type: string
+          description: Token contract address or blockchain name for native token
+        amount:
+          type: string
+          description: Amount of token owned in smallest unit
+        balance:
+          type: string
+          description: Formatted amount with decimals applied
+        value_usd:
+          type: number
+          description: Current value of token owned, if available
+        program_id:
+          type: string
+          description: Program ID of the token (for SPL tokens)
+        decimals:
+          type: number
+          description: Decimals of token
+        total_supply:
+          type: string
+          description: Total supply of the token
+        name:
+          type: string
+          description: Name of token
+        symbol:
+          type: string
+          description: Symbol of token
+        uri:
+          type: string
+          description: URI to token metadata
+        price_usd:
+          type: number
+          description: Current price of token, if available
+        liquidity_usd:
+          type: number
+          description: Liquidity in USD, if available
+        pool_type:
+          type: string
+          description: Type of liquidity pool, if available
+        pool_address:
+          type: string
+          description: Address of liquidity pool, if available
+        mint_authority:
+          type: string
+          description: Mint authority address, if available
+
+````
