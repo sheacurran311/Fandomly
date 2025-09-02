@@ -1,0 +1,19 @@
+[vite] connecting...
+[vite] connected.
+Module "buffer" has been externalized for browser compatibility. Cannot access "buffer.Buffer" in client code. See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+AuthRouter - Dynamic user: false User data: false Loading: false
+AuthRouter - No Dynamic user, staying on current page
+Fetching user data for Dynamic user ID: b68d32bb-7fb1-484e-80e6-47a769ab6aaf
+AuthRouter - Dynamic user: true User data: false Loading: true
+AuthRouter - Loading user data...
+AuthRouter - Dynamic user: true User data: true Loading: false
+Creator needs onboarding, redirecting to creator type selection
+Failed to execute 'fetch' on 'Window': '/api/auth/complete-onboarding' is not a valid HTTP method.
+at window.fetch (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218642)
+at Object.apply (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/__replco/static/devtools/injected.js:253:39)
+at apiRequest (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/src/lib/queryClient.ts:10:21)
+at Object.mutationFn (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/src/pages/creator-onboarding.tsx:255:20)
+at Object.fn (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b71bcee5:1189:29)
+at run (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b71bcee5:494:49)
+at Object.start (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b71bcee5:536:9)
+at _a6.execute (https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b71bcee5:1225:56)

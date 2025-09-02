@@ -225,11 +225,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (creatorType === 'content_creator') {
         typeSpecificData = {
           contentCreator: {
-            contentType: contentType || [],
-            topicsOfFocus: topicsOfFocus || [],
-            sponsorships: sponsorships ? sponsorships.split(',').map((s: string) => s.trim()) : [],
+            contentType: Array.isArray(contentType) ? contentType : (typeof contentType === 'string' ? contentType.split(',').map(s => s.trim()) : []),
+            topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : (typeof topicsOfFocus === 'string' ? topicsOfFocus.split(',').map(s => s.trim()) : []),
+            sponsorships: Array.isArray(sponsorships) ? sponsorships : (typeof sponsorships === 'string' ? sponsorships.split(',').map(s => s.trim()) : []),
             totalViews: totalViews || 'unknown',
-            platforms: platforms || []
+            platforms: Array.isArray(platforms) ? platforms : (typeof platforms === 'string' ? platforms.split(',').map(s => s.trim()) : [])
           }
         };
       }

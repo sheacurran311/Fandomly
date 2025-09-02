@@ -183,7 +183,7 @@ export default function CreatorOnboardingPage() {
 
   const completeOnboardingMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest('/api/auth/complete-onboarding', 'POST', data);
+      return await apiRequest('POST', '/api/auth/complete-onboarding', data);
     },
     onSuccess: () => {
       toast({
