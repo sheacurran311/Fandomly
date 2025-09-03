@@ -218,7 +218,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Official Facebook Login Button */}
+            {/* Official Facebook Login Button - Only basic permissions */}
             <div 
               className="fb-login-button" 
               data-size="large"
@@ -226,34 +226,18 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
               data-layout="default"
               data-auto-logout-link="false"
               data-use-continue-as="true"
-              data-scope="public_profile,email,pages_show_list,pages_read_engagement"
+              data-scope="public_profile,email"
               data-onlogin="checkLoginState"
               data-testid="facebook-login-button"
               style={{minHeight: '40px', display: 'block'}}
             ></div>
-            
-            {/* Fallback if Facebook button doesn't render */}
-            <Button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              data-testid="button-facebook-connect-fallback"
-            >
-              <Facebook className="h-4 w-4 mr-2" />
-              {isConnecting ? "Connecting..." : "Connect Facebook"}
-            </Button>
-            
-            <div className="text-xs text-gray-400 text-center">
-              Use either button above to connect your Facebook page
-            </div>
           </div>
           
           <div className="mt-4 text-xs text-gray-400 space-y-1">
-            <p>Required permissions:</p>
+            <p>Basic permissions:</p>
             <ul className="list-disc list-inside space-y-1 pl-2">
-              <li>Access to your Facebook pages</li>
-              <li>Read page engagement metrics</li>
-              <li>View follower counts</li>
+              <li>Access to your public profile</li>
+              <li>Your email address</li>
             </ul>
           </div>
         </CardContent>
