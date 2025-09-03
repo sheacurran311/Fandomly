@@ -291,17 +291,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
           <div className="text-gray-300 text-sm space-y-1">
             <p>Connected as {userInfo.name}</p>
             {userInfo.email && <p className="text-xs">Email: {userInfo.email}</p>}
-            {userInfo.sports && userInfo.sports.length > 0 && (
-              <p className="text-xs">Sports: {userInfo.sports.join(', ')}</p>
-            )}
-            {userInfo.favorite_teams && userInfo.favorite_teams.length > 0 && (
-              <p className="text-xs">Teams: {userInfo.favorite_teams.join(', ')}</p>
-            )}
-            {userInfo.businesses?.owned_instagram_accounts?.data && (
-              <p className="text-xs">
-                Instagram Accounts: {userInfo.businesses.owned_instagram_accounts.data.length}
-              </p>
-            )}
+            <p className="text-xs">ID: {userInfo.id}</p>
           </div>
         )}
       </CardHeader>

@@ -178,9 +178,9 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
+      // Using simplified API call for testing and permissions approval
       window.FB.api('/me', 'GET', {
-        fields: 'id,name,email,favorite_athletes,favorite_teams,profile_pic,sports,businesses{owned_instagram_accounts}',
-        access_token: accessToken
+        fields: 'id,name,email'
       }, (response) => {
         if (response && !response.error) {
           console.log('Facebook user data received:', response);
