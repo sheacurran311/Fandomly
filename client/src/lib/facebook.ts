@@ -45,6 +45,19 @@ export interface FacebookUser {
   id: string;
   name: string;
   email?: string;
+  profile_pic?: string;
+  favorite_athletes?: string[];
+  favorite_teams?: string[];
+  sports?: string[];
+  businesses?: {
+    owned_instagram_accounts?: {
+      data: Array<{
+        id: string;
+        name: string;
+        username: string;
+      }>;
+    };
+  };
   picture?: {
     data: {
       url: string;
@@ -166,10 +179,11 @@ export class FacebookSDK {
 
     return new Promise((resolve) => {
       window.FB.api('/me', 'GET', {
-        fields: 'id,name,email,picture',
+        fields: 'id,name,email,favorite_athletes,favorite_teams,profile_pic,sports,businesses{owned_instagram_accounts}',
         access_token: accessToken
       }, (response) => {
         if (response && !response.error) {
+          console.log('Facebook user data received:', response);
           resolve(response as FacebookUser);
         } else {
           console.error('Facebook API error:', response?.error);
@@ -183,14 +197,17 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
+      // Try to get pages/accounts that the user manages
       window.FB.api('/me/accounts', 'GET', {
-        fields: 'id,name,access_token,category,followers_count,fan_count',
+        fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account',
         access_token: accessToken
       }, (response) => {
         if (response && response.data && !response.error) {
+          console.log('Facebook pages received:', response.data);
           resolve(response.data as FacebookPage[]);
         } else {
-          console.error('Facebook Pages API error:', response?.error);
+          console.log('No pages found or permission denied:', response?.error);
+          // If pages permission is not available, return empty array
           resolve([]);
         }
       });
