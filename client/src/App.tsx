@@ -27,6 +27,7 @@ import NILDashboard from "@/pages/nil-dashboard";
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
 import FanChooseCreators from "@/pages/fan-choose-creators";
 import Profile from "@/pages/profile";
+import FacebookLikeCampaign from "@/pages/facebook-like-campaign";
 
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/nil-dashboard" component={NILDashboard} />
       <Route path="/profile" component={Profile} />
+      <Route path="/facebook-like-campaign" component={FacebookLikeCampaign} />
       
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
