@@ -70,7 +70,7 @@ export default function FanChooseCreators() {
       }
     });
     // Redirect to fan dashboard
-    setLocation("/rbac-dashboard");
+    setLocation("/fan-dashboard");
   };
 
   const toggle = (id: string) => setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
