@@ -42,13 +42,13 @@ const creatorItems: SidebarItem[] = [
   { label: "Revenue", href: "/creator-dashboard/revenue", icon: DollarSign, color: "text-yellow-400" },
   { label: "Campaigns", href: "/creator-dashboard/campaigns", icon: Megaphone, color: "text-orange-400" },
   { label: "Social Accounts", href: "/creator-dashboard/social", icon: Instagram, color: "text-pink-400" },
-  { label: "Profile", href: "/creator-dashboard/profile", icon: User },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/creator-dashboard/settings", icon: Settings },
 ];
 
 const fanItems: SidebarItem[] = [
   { label: "Overview", href: "/fan-dashboard", icon: Home },
-  { label: "Profile", href: "/fan-dashboard/profile", icon: User },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Following", href: "/fan-dashboard/following", icon: Heart, color: "text-red-400" },
   { label: "Campaigns", href: "/fan-dashboard/campaigns", icon: Trophy, color: "text-yellow-400" },
   { label: "Achievements", href: "/fan-dashboard/achievements", icon: Star, color: "text-purple-400" },

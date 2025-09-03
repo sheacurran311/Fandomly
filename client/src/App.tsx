@@ -26,6 +26,7 @@ import NILDashboard from "@/pages/nil-dashboard";
 // RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
 import FanChooseCreators from "@/pages/fan-choose-creators";
+import Profile from "@/pages/profile";
 
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/nil-dashboard" component={NILDashboard} />
+      <Route path="/profile" component={Profile} />
       
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
