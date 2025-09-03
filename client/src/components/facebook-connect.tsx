@@ -103,16 +103,9 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       await FacebookSDK.waitForSDK();
       console.log('Facebook SDK ready, starting login...');
       
-      // Try with full permissions first
-      let loginResult = await FacebookSDK.login('public_profile,email,pages_show_list,pages_read_engagement');
-      console.log('Facebook login result (full permissions):', loginResult);
-      
-      // If that fails due to invalid permissions, try with basic permissions only
-      if (!loginResult.success && loginResult.error) {
-        console.log('Full permissions failed, trying basic permissions...');
-        loginResult = await FacebookSDK.login('public_profile,email');
-        console.log('Facebook login result (basic permissions):', loginResult);
-      }
+      // Use only the basic permissions we have access to
+      const loginResult = await FacebookSDK.login('public_profile,email');
+      console.log('Facebook login result (basic permissions):', loginResult);
       
       if (loginResult.success && loginResult.accessToken) {
         setIsConnected(true);
