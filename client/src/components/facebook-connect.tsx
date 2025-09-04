@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Facebook, Users, TrendingUp, Check } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { apiRequest } from '@/lib/queryClient';
+import { Facebook, Users, TrendingUp, Check, Download } from 'lucide-react';
 import { FacebookSDK, type FacebookPage, type FacebookUser } from '@/lib/facebook';
 
 interface FacebookConnectProps {
@@ -17,7 +19,9 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   const [userInfo, setUserInfo] = useState<FacebookUser | null>(null);
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [selectedPage, setSelectedPage] = useState<FacebookPage | null>(null);
+  const [isImportingProfile, setIsImportingProfile] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     // Set up global handler for Facebook login status (used by checkLoginState in HTML)
@@ -81,17 +85,77 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
 
   const loadUserDataFromStoredToken = async (accessToken: string) => {
     try {
-      const user = await FacebookSDK.getUserInfo(accessToken);
-      if (user) {
-        setUserInfo(user);
+      const facebookUser = await FacebookSDK.getUserInfo(accessToken);
+      if (facebookUser) {
+        setUserInfo(facebookUser);
+        console.log('Facebook user data loaded:', facebookUser);
+        
+        // Automatically import profile data if user is authenticated
+        if (user && facebookUser.email) {
+          await importFacebookProfile(facebookUser);
+        }
+        
         const userPages = await FacebookSDK.getUserPages(accessToken);
         setPages(userPages);
-        console.log(`Loaded ${userPages.length} Facebook pages for user ${user.name}`);
+        console.log(`Loaded ${userPages.length} Facebook pages for user ${facebookUser.name}`);
       }
     } catch (error) {
       console.error('Error loading Facebook user data:', error);
       // If there's an error, the token might be invalid
       setIsConnected(false);
+    }
+  };
+
+  const importFacebookProfile = async (facebookData: FacebookUser) => {
+    if (!user) {
+      console.log('No authenticated user, skipping profile import');
+      return;
+    }
+
+    setIsImportingProfile(true);
+    
+    try {
+      console.log('Importing Facebook profile data:', facebookData);
+      
+      const response = await apiRequest('POST', '/api/auth/facebook-profile-import', {
+        userId: user.id,
+        facebookData: {
+          id: facebookData.id,
+          name: facebookData.name,
+          email: facebookData.email,
+          likes: facebookData.likes
+        }
+      });
+      
+      console.log('Facebook profile import response:', response);
+      
+      if (response.success) {
+        const imported = response.imported;
+        let importMessage = 'Facebook profile imported successfully!';
+        const importedItems = [];
+        
+        if (imported.email) importedItems.push('email');
+        if (imported.name) importedItems.push('name');
+        if (imported.likes) importedItems.push(`${facebookData.likes?.data?.length || 0} likes`);
+        
+        if (importedItems.length > 0) {
+          importMessage += ` Imported: ${importedItems.join(', ')}.`;
+        }
+        
+        toast({
+          title: "Profile Updated",
+          description: importMessage,
+        });
+      }
+    } catch (error) {
+      console.error('Error importing Facebook profile:', error);
+      toast({
+        title: "Import Failed",
+        description: "Could not import your Facebook profile data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImportingProfile(false);
     }
   };
 
@@ -265,10 +329,29 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
           </Button>
         </CardTitle>
         {userInfo && (
-          <div className="text-gray-300 text-sm space-y-1">
+          <div className="text-gray-300 text-sm space-y-2">
             <p>Connected as {userInfo.name}</p>
             {userInfo.email && <p className="text-xs">Email: {userInfo.email}</p>}
             <p className="text-xs">ID: {userInfo.id}</p>
+            {userInfo.likes && (
+              <p className="text-xs">Likes: {userInfo.likes.data?.length || 0} pages/interests</p>
+            )}
+            
+            {user && (
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => importFacebookProfile(userInfo)}
+                  disabled={isImportingProfile}
+                  className="text-blue-400 border-blue-600 hover:bg-blue-500/10"
+                  data-testid="button-import-facebook-profile"
+                >
+                  <Download className="mr-2 h-3 w-3" />
+                  {isImportingProfile ? 'Importing...' : 'Import Profile Data'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardHeader>

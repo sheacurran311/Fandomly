@@ -736,6 +736,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import Facebook profile data to user account
+  app.post("/api/auth/facebook-profile-import", async (req, res) => {
+    try {
+      const { userId, facebookData } = req.body;
+      if (!userId) return res.status(400).json({ error: "userId required" });
+      if (!facebookData) return res.status(400).json({ error: "Facebook data required" });
+      
+      // Prepare user updates
+      const userUpdates: any = {};
+      
+      // Update email if provided and not already set
+      if (facebookData.email) {
+        userUpdates.email = facebookData.email;
+      }
+      
+      // Update profile data with Facebook information
+      const currentUser = await storage.getUser(userId);
+      if (!currentUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const updatedProfileData = {
+        ...currentUser.profileData,
+        name: facebookData.name || currentUser.profileData?.name,
+        facebookData: {
+          id: facebookData.id,
+          name: facebookData.name,
+          email: facebookData.email,
+          likes: facebookData.likes,
+          importedAt: new Date().toISOString()
+        }
+      };
+      
+      userUpdates.profileData = updatedProfileData;
+      
+      // Update the user
+      const updated = await storage.updateUser(userId, userUpdates);
+      res.json({
+        success: true,
+        user: updated,
+        imported: {
+          email: !!facebookData.email,
+          name: !!facebookData.name,
+          likes: !!facebookData.likes?.data
+        }
+      });
+    } catch (error) {
+      console.error("Error importing Facebook profile:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import Facebook profile" });
+    }
+  });
+
   app.post("/api/rewards", async (req, res) => {
     try {
       const rewardData = insertRewardSchema.parse(req.body);
