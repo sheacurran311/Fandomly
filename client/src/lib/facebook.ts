@@ -52,6 +52,29 @@ export interface FacebookUser {
       category?: string;
     }>;
   };
+  photos?: {
+    data: Array<{
+      id: string;
+      name?: string;
+      picture?: string;
+      created_time?: string;
+    }>;
+  };
+  posts?: {
+    data: Array<{
+      id: string;
+      message?: string;
+      story?: string;
+      created_time?: string;
+      type?: string;
+    }>;
+  };
+  friends?: {
+    data: Array<{
+      id: string;
+      name: string;
+    }>;
+  };
   profile_pic?: string;
   favorite_athletes?: string[];
   favorite_teams?: string[];
@@ -185,9 +208,9 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      // Updated API call to include likes field as requested
+      // Updated API call to include additional fields: photos, posts, friends
       window.FB.api('/me', 'GET', {
-        fields: 'id,name,email,likes'
+        fields: 'id,name,email,likes,photos,posts,friends'
       }, (response) => {
         if (response && !response.error) {
           console.log('Facebook user data received:', response);
