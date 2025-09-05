@@ -198,7 +198,7 @@ export default function UserTypeSelection() {
                 </div>
                 
                 <Button 
-                  className="w-full bg-brand-secondary hover:bg-brand-secondary/80 text-white"
+                  className="w-full bg-brand-secondary hover:bg-brand-secondary/80 text-[#101636] font-bold"
                   disabled={isRegistering}
                   onClick={(e) => {
                     e.stopPropagation();

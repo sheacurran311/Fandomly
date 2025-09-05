@@ -326,7 +326,7 @@ export default function CampaignBuilder() {
                     </div>
                     
                     <Button 
-                      className="w-full gradient-primary text-white"
+                      className="w-full gradient-primary text-[#101636] font-bold"
                       onClick={(e) => {
                         e.stopPropagation();
                         // Navigate to campaign setup with this template

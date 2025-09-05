@@ -342,7 +342,7 @@ export default function CreatorOnboardingPage() {
               <Button 
                 onClick={() => setStep(2)}
                 disabled={!formData.displayName || !formData.followerCount}
-                className="w-full gradient-primary text-white"
+                className="w-full gradient-primary text-[#101636] font-bold"
               >
                 Continue to {creatorType === 'athlete' ? 'Athletic' : creatorType === 'musician' ? 'Music' : 'Content'} Details
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -605,7 +605,7 @@ export default function CreatorOnboardingPage() {
                 </Button>
                 <Button 
                   onClick={() => setStep(3)}
-                  className="flex-1 gradient-primary text-white"
+                  className="flex-1 gradient-primary text-[#101636] font-bold"
                 >
                   Continue to Store Setup
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -752,7 +752,7 @@ export default function CreatorOnboardingPage() {
                 </Button>
                 <Button 
                   onClick={() => setStep(4)}
-                  className="flex-1 gradient-primary text-white"
+                  className="flex-1 gradient-primary text-[#101636] font-bold"
                 >
                   Continue to Subscription
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -845,7 +845,7 @@ export default function CreatorOnboardingPage() {
               <Button 
                 onClick={handleComplete}
                 disabled={completeOnboardingMutation.isPending}
-                className="flex-1 gradient-primary text-white"
+                className="flex-1 gradient-primary text-[#101636] font-bold"
               >
                 {completeOnboardingMutation.isPending ? "Setting up..." : "Complete Setup"}
                 <CheckCircle className="ml-2 h-4 w-4" />

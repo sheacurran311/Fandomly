@@ -61,7 +61,7 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-stretch sm:items-center mb-12 sm:mb-16 px-4">
               <ConnectWalletButton 
-                className="w-full sm:w-auto gradient-primary text-white px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 min-h-[48px] sm:min-h-[56px]"
+                className="w-full sm:w-auto gradient-primary text-[#101636] px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 min-h-[48px] sm:min-h-[56px]"
               >
                 Start Now
               </ConnectWalletButton>

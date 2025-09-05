@@ -141,7 +141,7 @@ export default function BrandingStudio() {
               setSelectedTenant('demo-tenant');
               setCurrentView('customizer');
             }}
-            className="gradient-primary text-white"
+            className="gradient-primary text-[#101636] font-bold"
           >
             <Wand2 className="h-4 w-4 mr-2" />
             Start Customizing

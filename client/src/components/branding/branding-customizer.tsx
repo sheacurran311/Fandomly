@@ -142,7 +142,7 @@ export default function BrandingCustomizer({ tenantId, onSave }: BrandingCustomi
           </div>
           
           <div className="flex gap-2">
-            <Button onClick={handleSave} className="flex-1 gradient-primary text-white">
+            <Button onClick={handleSave} className="flex-1 gradient-primary text-[#101636] font-bold">
               <Save className="h-4 w-4 mr-2" />
               Save
             </Button>

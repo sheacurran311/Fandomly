@@ -261,7 +261,7 @@ export default function TenantSetup() {
               <Button 
                 onClick={() => setStep(2)}
                 disabled={!formData.name || !formData.slug || !formData.businessType}
-                className="w-full gradient-primary text-white"
+                className="w-full gradient-primary text-[#101636] font-bold"
               >
                 Continue to Athlete Details
               </Button>
@@ -366,7 +366,7 @@ export default function TenantSetup() {
                 </Button>
                 <Button 
                   onClick={() => setStep(3)}
-                  className="flex-1 gradient-primary text-white"
+                  className="flex-1 gradient-primary text-[#101636] font-bold"
                 >
                   Continue to Branding
                 </Button>
@@ -481,7 +481,7 @@ export default function TenantSetup() {
                 </Button>
                 <Button 
                   onClick={() => setStep(4)}
-                  className="flex-1 gradient-primary text-white"
+                  className="flex-1 gradient-primary text-[#101636] font-bold"
                 >
                   Continue to Subscription
                 </Button>
@@ -586,7 +586,7 @@ export default function TenantSetup() {
                 Back
               </Button>
               <Button 
-                className="flex-1 gradient-primary text-white"
+                className="flex-1 gradient-primary text-[#101636] font-bold"
                 onClick={() => {
                   // TODO: Submit tenant creation
                   console.log('Creating tenant:', { ...formData, subscriptionTier: selectedTier });
