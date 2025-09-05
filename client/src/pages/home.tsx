@@ -69,7 +69,7 @@ export default function Home() {
                 onClick={() => window.location.href = "/marketplace"}
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto border-2 border-[#101636] text-[#101636] hover:bg-[#101636]/20 hover:text-[#101636] px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
+                className="w-full sm:w-auto border-2 border-[#101636] text-[#101636] hover:scale-105 px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
               >
                 Explore Programs
               </Button>
