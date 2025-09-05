@@ -140,7 +140,7 @@ export default function CreatorDashboard() {
                     <Plus className="h-4 w-4 mr-2" />
                     Create Campaign
                   </Button>
-                  <Button variant="outline" className="w-full border-brand-secondary/30 text-brand-secondary hover:bg-brand-secondary/10 justify-start">
+                  <Button variant="outline" className="w-full border-[#101636]/30 text-[#101636] hover:bg-[#101636]/10 justify-start">
                     <Facebook className="h-4 w-4 mr-2" />
                     Facebook Campaign
                   </Button>

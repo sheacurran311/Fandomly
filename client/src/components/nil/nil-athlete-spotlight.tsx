@@ -196,7 +196,7 @@ export default function NILAthleteSpotlight() {
           <Button 
             variant="outline" 
             size="lg"
-            className="border-2 border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-brand-dark-bg"
+            className="border-2 border-[#101636] text-[#101636] hover:bg-[#101636] hover:text-white"
           >
             See All NIL Success Stories
           </Button>

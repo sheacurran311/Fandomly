@@ -42,7 +42,7 @@ export default function UserTypeSwitcher({ userId, currentUserType, onTypeSwitch
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-brand-secondary border-brand-secondary/30 hover:bg-brand-secondary/10">
+        <Button variant="outline" size="sm" className="text-[#101636] border-[#101636]/30 hover:bg-[#101636]/10">
           Switch to {targetType === "creator" ? "Creator" : "Fan"}
         </Button>
       </DialogTrigger>
