@@ -112,17 +112,17 @@ export default function Navigation() {
                       {/* Role Dashboard removed - users use type-specific dashboards */}
                       <RoleGuard allowedRoles={['customer_admin']}>
                         <Link href="/nil-dashboard">
-                          <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
+                          <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
                             <Shield className="mr-2 h-4 w-4" />
                             NIL Dashboard
                           </DropdownMenuItem>
                         </Link>
                       </RoleGuard>
-                      <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
+                      <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
                         <User className="mr-2 h-4 w-4" />
                         Profile
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/20">
+                      <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
                         <Settings className="mr-2 h-4 w-4" />
                         Settings
                       </DropdownMenuItem>
