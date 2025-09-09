@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
+import FacebookProfileImport from "@/components/fan/facebook-profile-import";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -80,6 +81,11 @@ export default function FanDashboard() {
               description="Total claimed"
               icon={<Star className="h-5 w-5" />}
             />
+          </div>
+
+          {/* Facebook Profile Import */}
+          <div className="mb-8">
+            <FacebookProfileImport />
           </div>
 
           {/* Main Content Grid */}

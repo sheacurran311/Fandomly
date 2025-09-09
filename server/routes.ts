@@ -760,10 +760,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedProfileData = {
         ...currentUser.profileData,
         name: facebookData.name || currentUser.profileData?.name,
+        avatar: facebookData.picture || currentUser.profileData?.avatar,
         facebookData: {
           id: facebookData.id,
           name: facebookData.name,
           email: facebookData.email,
+          picture: facebookData.picture,
           likes: facebookData.likes,
           importedAt: new Date().toISOString()
         }
@@ -779,6 +781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imported: {
           email: !!facebookData.email,
           name: !!facebookData.name,
+          picture: !!facebookData.picture,
           likes: !!facebookData.likes?.data
         }
       });
