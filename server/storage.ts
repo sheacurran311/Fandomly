@@ -108,14 +108,8 @@ export class DatabaseStorage implements IStorage {
         .update(users)
         .set({ 
           userType, 
-          role,
-          // Reset onboarding when switching types
-          onboardingState: {
-            currentStep: 0,
-            totalSteps: userType === "creator" ? 5 : 3,
-            completedSteps: [],
-            isCompleted: false
-          }
+          role
+          // Preserve existing onboarding state and profile data when switching types
         })
         .where(eq(users.id, userId))
         .returning();
