@@ -137,6 +137,33 @@ export const users = pgTable("users", {
     name?: string;
     age?: number;
     interests?: Array<"musicians" | "athletes" | "content_creators">;
+    bio?: string;
+    location?: string;
+    avatar?: string;
+    phoneNumber?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    favoriteCreators?: string[];
+    socialLinks?: {
+      twitter?: string;
+      instagram?: string;
+      tiktok?: string;
+      youtube?: string;
+    };
+    facebookData?: {
+      id: string;
+      name: string;
+      email?: string;
+      picture?: string;
+      likes?: any;
+      importedAt: string;
+    };
+    preferences?: {
+      emailNotifications?: boolean;
+      pushNotifications?: boolean;
+      marketingEmails?: boolean;
+      smsNotifications?: boolean;
+    };
   }>(),
   
   // Multi-Tenant Support
