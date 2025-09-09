@@ -1,23 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { fetchApi } from "@/lib/queryClient";
+import { type User } from "@shared/schema";
 
-interface UserData {
-  id: string;
-  dynamicUserId: string;
-  email?: string;
-  username?: string;
-  avatar?: string;
-  walletAddress?: string;
-  userType: "fan" | "creator";
-  role: string;
-  onboardingState: {
-    currentStep: number;
-    totalSteps: number;
-    completedSteps: string[];
-    isCompleted: boolean;
-    lastOnboardingRoute?: string;
-  };
+interface UserData extends User {
   hasCompletedOnboarding: boolean;
   creator?: any;
   tenant?: any;

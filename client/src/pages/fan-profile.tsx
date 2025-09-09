@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { type User } from "@shared/schema";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import FanProfileEditModal from "@/components/fan/fan-profile-edit-modal";
+import FacebookProfileImport from "@/components/fan/facebook-profile-import";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +23,7 @@ import {
 
 export default function FanProfile() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -82,15 +86,7 @@ export default function FanProfile() {
                       </div>
                     </div>
                     
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-4 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white"
-                      data-testid="button-import-facebook-photo"
-                    >
-                      <Facebook className="mr-2 h-4 w-4" />
-                      Import from Facebook
-                    </Button>
+                    <FacebookProfileImport />
                   </div>
                   
                   <CardTitle className="text-white text-xl">
@@ -148,6 +144,7 @@ export default function FanProfile() {
                   <Button 
                     className="w-full bg-brand-primary hover:bg-brand-primary/80" 
                     data-testid="button-edit-fan-profile"
+                    onClick={() => setIsEditModalOpen(true)}
                   >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Profile
@@ -208,6 +205,7 @@ export default function FanProfile() {
                       variant="outline" 
                       className="border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white"
                       data-testid="button-edit-personal-info"
+                      onClick={() => setIsEditModalOpen(true)}
                     >
                       <Edit className="mr-2 h-4 w-4" />
                       Update Information
@@ -321,6 +319,12 @@ export default function FanProfile() {
           </div>
         </div>
       </div>
+      
+      {/* Profile Edit Modal */}
+      <FanProfileEditModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+      />
     </div>
   );
 }
