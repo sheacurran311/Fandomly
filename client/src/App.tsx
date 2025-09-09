@@ -29,6 +29,7 @@ import FanChooseCreators from "@/pages/fan-choose-creators";
 import Profile from "@/pages/profile";
 import FanProfile from "@/pages/fan-profile";
 import FacebookLikeCampaign from "@/pages/facebook-like-campaign";
+import CreatorShowcase from "@/pages/creator-showcase";
 
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/fan-profile" component={FanProfile} />
       <Route path="/facebook-like-campaign" component={FacebookLikeCampaign} />
+      <Route path="/creator-showcase" component={CreatorShowcase} />
       
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
