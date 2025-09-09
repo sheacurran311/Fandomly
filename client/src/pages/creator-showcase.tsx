@@ -49,6 +49,18 @@ const mockCreator = {
 // Mock campaign data
 const mockCampaigns = [
   {
+    id: "facebook-page-like-1",
+    type: "facebook_page_like",
+    title: "Like My Facebook Page",
+    description: "Follow my official page for updates and earn bonus points!",
+    pointReward: 100,
+    platform: "facebook",
+    icon: Facebook,
+    color: "text-blue-500",
+    bgColor: "bg-blue-500/10",
+    completed: false
+  },
+  {
     id: "facebook-engagement-1",
     type: "facebook_like",
     title: "Like My Training Updates",
@@ -128,6 +140,7 @@ export default function CreatorShowcase() {
   const queryClient = useQueryClient();
   const [userPoints, setUserPoints] = useState(750); // Mock user points
   const [completedActions, setCompletedActions] = useState<Set<string>>(new Set());
+  const [hasLikedPage, setHasLikedPage] = useState(false);
 
   // Mock mutation for campaign participation
   const participateInCampaign = useMutation({
@@ -164,6 +177,16 @@ export default function CreatorShowcase() {
   const handleCampaignAction = (campaignId: string) => {
     if (!completedActions.has(campaignId)) {
       participateInCampaign.mutate({ campaignId, actionType: 'campaign_action' });
+    }
+  };
+
+  const handleLikePage = () => {
+    if (!hasLikedPage) {
+      participateInCampaign.mutate({ 
+        campaignId: 'like-facebook-page', 
+        actionType: 'facebook_page_like' 
+      });
+      setHasLikedPage(true);
     }
   };
 
@@ -224,6 +247,49 @@ export default function CreatorShowcase() {
                     <div className="text-2xl font-bold text-brand-accent">{mockCreator.followers.toLocaleString()}</div>
                     <div className="text-sm text-gray-300">Total Followers</div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Facebook Page */}
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center space-x-2">
+                  <Facebook className="h-5 w-5 text-blue-500" />
+                  <span>Facebook Page</span>
+                  <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">Connected</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-4 p-4 bg-white/5 rounded-lg border border-blue-500/20">
+                  <Avatar className="w-16 h-16">
+                    <AvatarImage src={mockCreator.profileImage} />
+                    <AvatarFallback>SC</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <h3 className="text-lg font-semibold text-white">{mockCreator.name}</h3>
+                      <CheckCircle className="h-5 w-5 text-blue-400 fill-current" />
+                    </div>
+                    <p className="text-gray-300 text-sm mb-2">{mockCreator.sport} • {mockCreator.school}</p>
+                    <p className="text-gray-400 text-xs">{mockCreator.socialStats.facebook.followers.toLocaleString()} followers</p>
+                  </div>
+                  <Button
+                    onClick={handleLikePage}
+                    disabled={hasLikedPage || participateInCampaign.isPending}
+                    className={`px-6 py-2 ${
+                      hasLikedPage
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-white/10 hover:bg-blue-500/20 text-white border border-blue-500/30'
+                    }`}
+                    data-testid="button-like-facebook-page"
+                  >
+                    <ThumbsUp className={`h-4 w-4 mr-2 ${hasLikedPage ? 'fill-current' : ''}`} />
+                    {hasLikedPage ? 'Liked' : 'Like Page'}
+                    {!hasLikedPage && (
+                      <span className="ml-2 text-brand-secondary font-semibold">+100 pts</span>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
