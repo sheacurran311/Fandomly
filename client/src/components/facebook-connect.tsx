@@ -95,14 +95,20 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
           await importFacebookProfile(facebookUser);
         }
         
+        console.log('Fetching Facebook pages with access token...');
         const userPages = await FacebookSDK.getUserPages(accessToken);
         setPages(userPages);
-        console.log(`Loaded ${userPages.length} Facebook pages for user ${facebookUser.name}`);
+        console.log(`Loaded ${userPages.length} Facebook pages for user ${facebookUser.name}:`, userPages);
+        
+        // Return the page count for the caller
+        return userPages.length;
       }
+      return 0;
     } catch (error) {
       console.error('Error loading Facebook user data:', error);
       // If there's an error, the token might be invalid
       setIsConnected(false);
+      return 0;
     }
   };
 
@@ -168,17 +174,17 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       await FacebookSDK.waitForSDK();
       console.log('Facebook SDK ready, starting login...');
       
-      // Use only the basic permissions we have access to
-      const loginResult = await FacebookSDK.login('public_profile,email');
+      // Request permissions needed for creator pages access
+      const loginResult = await FacebookSDK.login('public_profile,email,pages_show_list');
       console.log('Facebook login result (basic permissions):', loginResult);
       
       if (loginResult.success && loginResult.accessToken) {
         setIsConnected(true);
-        await loadUserDataFromStoredToken(loginResult.accessToken);
+        const pageCount = await loadUserDataFromStoredToken(loginResult.accessToken);
         
         toast({
           title: "Facebook Connected",
-          description: `Connected successfully! Found ${pages.length} page(s).`,
+          description: `Connected successfully! Found ${pageCount} page(s).`,
         });
       } else {
         let errorMessage = "Failed to connect to Facebook";
@@ -231,11 +237,11 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
     
     if (response.status === 'connected' && response.authResponse) {
       setIsConnected(true);
-      await loadUserDataFromStoredToken(response.authResponse.accessToken);
+      const pageCount = await loadUserDataFromStoredToken(response.authResponse.accessToken);
       
       toast({
         title: "Facebook Connected",
-        description: `Connected successfully! Found ${pages.length} page(s).`,
+        description: `Connected successfully! Found ${pageCount} page(s).`,
       });
     } else if (response.status === 'not_authorized') {
       toast({

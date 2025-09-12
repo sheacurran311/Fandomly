@@ -319,17 +319,34 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      // Try to get pages/accounts that the user manages
+      console.log('Fetching Facebook pages with access token:', accessToken);
+      
+      // Try to get pages/accounts that the user manages  
       window.FB.api('/me/accounts', 'GET', {
         fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account',
         access_token: accessToken
-      }, (response) => {
+      }, (response: any) => {
+        console.log('Raw Facebook pages API response:', response);
+        
         if (response && response.data && !response.error) {
-          console.log('Facebook pages received:', response.data);
+          console.log(`Facebook pages successfully received: ${response.data.length} pages found`);
+          console.log('Page details:', response.data);
           resolve(response.data as FacebookPage[]);
         } else {
-          console.log('No pages found or permission denied:', response?.error);
-          // If pages permission is not available, return empty array
+          console.error('Facebook Pages API Error Details:', {
+            error: response?.error,
+            errorCode: response?.error?.code,
+            errorMessage: response?.error?.message,
+            errorType: response?.error?.type
+          });
+          
+          // If pages permission is not available, try alternative approach
+          if (response?.error?.code === 200 || response?.error?.message?.includes('permission')) {
+            console.log('Permission issue detected, trying basic user info...');
+            // Fallback: just return empty array for now, but log the issue
+            console.warn('Facebook Pages access requires pages_show_list permission. User may need to grant additional permissions.');
+          }
+          
           resolve([]);
         }
       });
