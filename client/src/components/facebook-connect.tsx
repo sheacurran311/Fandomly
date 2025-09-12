@@ -174,8 +174,8 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       await FacebookSDK.waitForSDK();
       console.log('Facebook SDK ready, starting login...');
       
-      // Request permissions needed for creator pages access
-      const loginResult = await FacebookSDK.login('public_profile,email,pages_show_list');
+      // Request all creator permissions you've added to the Facebook app
+      const loginResult = await FacebookSDK.login('public_profile,email,pages_show_list,business_management,instagram_basic,pages_read_engagement');
       console.log('Facebook login result (basic permissions):', loginResult);
       
       if (loginResult.success && loginResult.accessToken) {
@@ -215,19 +215,30 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   const handlePageSelect = async (page: FacebookPage) => {
     setSelectedPage(page);
     
-    // Get follower count for the selected page
+    // Get enhanced page data using your new permissions
     try {
       const followerCount = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
-      const pageWithFollowers = { ...page, followers_count: followerCount };
+      const engagementData = await FacebookSDK.getPageEngagementData(page.id, page.access_token);
       
-      onConnectionSuccess?.(pageWithFollowers);
+      const enhancedPage = { 
+        ...page, 
+        followers_count: followerCount,
+        engagement_data: engagementData
+      };
+      
+      onConnectionSuccess?.(enhancedPage);
+      
+      let description = `Connected to ${page.name} with ${followerCount.toLocaleString()} followers`;
+      if (engagementData) {
+        description += ` • Enhanced analytics available`;
+      }
       
       toast({
-        title: "Page Selected",
-        description: `Connected to ${page.name} with ${followerCount.toLocaleString()} followers`,
+        title: "Page Connected with Analytics",
+        description,
       });
     } catch (error) {
-      console.error('Error getting page follower count:', error);
+      console.error('Error getting enhanced page data:', error);
       onConnectionSuccess?.(page);
     }
   };

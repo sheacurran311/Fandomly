@@ -172,7 +172,7 @@ export class FacebookSDK {
     sessionStorage.removeItem('fb_expires_in');
   }
 
-  static async login(scope: string = 'public_profile,email'): Promise<{
+  static async login(scope: string = 'public_profile,email,pages_show_list,business_management,instagram_basic,pages_read_engagement'): Promise<{
     success: boolean;
     accessToken?: string;
     userID?: string;
@@ -321,9 +321,9 @@ export class FacebookSDK {
     return new Promise((resolve) => {
       console.log('Fetching Facebook pages with access token:', accessToken);
       
-      // Try to get pages/accounts that the user manages  
+      // Get pages/accounts with enhanced fields using your new permissions
       window.FB.api('/me/accounts', 'GET', {
-        fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account',
+        fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account,engagement,website,about,picture',
         access_token: accessToken
       }, (response: any) => {
         console.log('Raw Facebook pages API response:', response);
@@ -348,6 +348,32 @@ export class FacebookSDK {
           }
           
           resolve([]);
+        }
+      });
+    });
+  }
+
+  // Enhanced method to get page engagement data using pages_read_engagement permission
+  static async getPageEngagementData(pageId: string, pageAccessToken: string): Promise<any> {
+    await this.waitForSDK();
+
+    return new Promise((resolve) => {
+      console.log(`Fetching engagement data for page ${pageId}...`);
+      
+      // Use your pages_read_engagement permission to get detailed engagement metrics
+      window.FB.api(`/${pageId}/insights`, 'GET', {
+        metric: 'page_engaged_users,page_post_engagements,page_fans,page_impressions',
+        period: 'day',
+        since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 7 days
+        until: new Date().toISOString().split('T')[0],
+        access_token: pageAccessToken
+      }, (response: any) => {
+        if (response && response.data && !response.error) {
+          console.log('Facebook page engagement data received:', response.data);
+          resolve(response.data);
+        } else {
+          console.error('Facebook Page engagement API error:', response?.error);
+          resolve(null);
         }
       });
     });
