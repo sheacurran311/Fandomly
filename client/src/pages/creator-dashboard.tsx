@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import FacebookConnect from "@/components/facebook-connect";
+import { FacebookSDK } from "@/lib/facebook";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -140,7 +141,22 @@ export default function CreatorDashboard() {
                     <Plus className="h-4 w-4 mr-2" />
                     Create Campaign
                   </Button>
-                  <Button variant="outline" className="w-full border-[#101636]/30 text-[#101636] hover:bg-[#101636]/10 justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-[#101636]/30 text-[#101636] hover:bg-[#101636]/10 justify-start"
+                    onClick={async () => {
+                      try {
+                        const creatorData = await FacebookSDK.getCreatorData();
+                        if (creatorData) {
+                          console.log('Creator Facebook campaign data:', creatorData);
+                          // Navigate to Facebook campaign builder or show campaign options
+                        }
+                      } catch (error) {
+                        console.error('Error accessing Facebook for campaign:', error);
+                      }
+                    }}
+                    data-testid="button-facebook-campaign"
+                  >
                     <Facebook className="h-4 w-4 mr-2" />
                     Facebook Campaign
                   </Button>

@@ -129,8 +129,9 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       
       console.log('Facebook profile import response:', response);
       
-      if (response.success) {
-        const imported = response.imported;
+      const responseData = await response.json();
+      if (responseData.success) {
+        const imported = responseData.imported;
         let importMessage = 'Facebook profile imported successfully!';
         const importedItems = [];
         

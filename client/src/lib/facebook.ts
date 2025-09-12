@@ -208,18 +208,110 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      // Updated API call to include additional fields: photos, posts, friends
-      window.FB.api('/me', 'GET', {
-        fields: 'id,name,email,likes,photos,posts,friends'
-      }, (response) => {
-        if (response && !response.error) {
-          console.log('Facebook user data received:', response);
-          resolve(response as FacebookUser);
-        } else {
-          console.error('Facebook API error:', response?.error);
-          resolve(null);
+      // Using updated Facebook JavaScript SDK API call format for creators
+      window.FB.api(
+        '/me',
+        'GET',
+        {"fields":"id,name,posts,photos,likes"},
+        function(response) {
+          if (response && !response.error) {
+            console.log('Facebook creator data received:', response);
+            
+            // Process the response for creator-specific functionality
+            const creatorData: FacebookUser = {
+              id: response.id,
+              name: response.name,
+              posts: response.posts,
+              photos: response.photos,
+              likes: response.likes,
+              // Extract creator-relevant insights from likes data
+              favorite_athletes: response.likes?.data?.filter((like: any) => 
+                like.category?.toLowerCase().includes('athlete') || 
+                like.category?.toLowerCase().includes('sports')
+              ).map((like: any) => like.name) || [],
+              favorite_teams: response.likes?.data?.filter((like: any) => 
+                like.category?.toLowerCase().includes('team') || 
+                like.category?.toLowerCase().includes('sports team')
+              ).map((like: any) => like.name) || [],
+              sports: response.likes?.data?.filter((like: any) => 
+                like.category?.toLowerCase().includes('sport')
+              ).map((like: any) => like.name) || []
+            };
+            
+            resolve(creatorData);
+          } else {
+            console.error('Facebook API error for creator:', response?.error);
+            
+            // Fallback to basic fields if enhanced fields fail due to permissions
+            window.FB.api(
+              '/me',
+              'GET',
+              {"fields":"id,name"},
+              function(fallbackResponse) {
+                if (fallbackResponse && !fallbackResponse.error) {
+                  console.log('Facebook fallback data for creator:', fallbackResponse);
+                  resolve(fallbackResponse as FacebookUser);
+                } else {
+                  resolve(null);
+                }
+              }
+            );
+          }
         }
-      });
+      );
+    });
+  }
+
+  // Specific method for creator Facebook connection using your updated SDK format
+  static async getCreatorData(accessToken?: string): Promise<FacebookUser | null> {
+    await this.waitForSDK();
+
+    return new Promise((resolve) => {
+      console.log('Fetching creator-specific Facebook data...');
+      
+      // Your updated Facebook JavaScript SDK API call format for creators
+      window.FB.api(
+        '/me',
+        'GET',
+        {"fields":"id,name,posts,photos,likes"},
+        function(response: any) {
+          if (response && !response.error) {
+            console.log('Creator Facebook data successfully retrieved:', response);
+            
+            // Enhanced processing for creator-specific insights
+            const creatorProfile: FacebookUser = {
+              id: response.id,
+              name: response.name,
+              posts: response.posts,
+              photos: response.photos,
+              likes: response.likes,
+              
+              // Creator-specific data extraction for NIL and sports content
+              favorite_athletes: response.likes?.data?.filter((like: any) => 
+                like.category?.toLowerCase().includes('athlete') || 
+                like.category?.toLowerCase().includes('sports') ||
+                like.category?.toLowerCase().includes('football') ||
+                like.category?.toLowerCase().includes('basketball')
+              ).map((like: any) => like.name) || [],
+              
+              favorite_teams: response.likes?.data?.filter((like: any) => 
+                like.category?.toLowerCase().includes('team') || 
+                like.category?.toLowerCase().includes('sports team') ||
+                like.category?.toLowerCase().includes('professional sports team')
+              ).map((like: any) => like.name) || [],
+              
+              sports: response.likes?.data?.filter((like: any) => 
+                like.category?.toLowerCase().includes('sport')
+              ).map((like: any) => like.name) || []
+            };
+            
+            resolve(creatorProfile);
+          } else {
+            console.error('Facebook API error for creator data:', response?.error);
+            resolve(null);
+          }
+        }
+      );
     });
   }
 
