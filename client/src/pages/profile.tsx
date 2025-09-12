@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useFacebookConnection } from "@/hooks/use-facebook-connection";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +16,24 @@ import {
   Edit,
   Camera,
   Facebook,
-  Instagram
+  Instagram,
+  CheckCircle,
+  AlertCircle,
+  Unlink,
+  Plus
 } from "lucide-react";
 
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { 
+    isConnected: facebookConnected, 
+    isConnecting: facebookConnecting,
+    userInfo: facebookUser,
+    connectedPages: facebookPages,
+    selectedPage: facebookPage,
+    connectFacebook,
+    disconnectFacebook
+  } = useFacebookConnection();
 
   if (isLoading) {
     return (
@@ -240,12 +254,49 @@ export default function Profile() {
                       <Facebook className="h-5 w-5 text-blue-400" />
                       <div>
                         <div className="text-white font-medium">Facebook</div>
-                        <div className="text-xs text-gray-400">Connect your Facebook account</div>
+                        <div className="text-xs text-gray-400">
+                          {facebookConnected ? 
+                            `Connected: ${facebookPage?.name || 'Facebook Page'}` : 
+                            'Connect your Facebook page'
+                          }
+                        </div>
+                        {facebookConnected && facebookPage && (
+                          <div className="text-xs text-blue-400">
+                            {facebookPage.followers_count ? 
+                              `${facebookPage.followers_count.toLocaleString()} followers` : 
+                              'Page connected'
+                            }
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" data-testid="button-connect-facebook">
-                      Connect
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {facebookConnected ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={disconnectFacebook}
+                            data-testid="button-disconnect-facebook-profile"
+                          >
+                            <Unlink className="h-3 w-3 mr-1" />
+                            Disconnect
+                          </Button>
+                        </>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={connectFacebook}
+                          disabled={facebookConnecting}
+                          data-testid="button-connect-facebook-profile"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          {facebookConnecting ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">

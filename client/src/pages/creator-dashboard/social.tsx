@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useFacebookConnection } from "@/hooks/use-facebook-connection";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,22 @@ import {
   ExternalLink,
   CheckCircle,
   AlertCircle,
-  Zap
+  Zap,
+  Unlink
 } from "lucide-react";
 
 export default function CreatorSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { 
+    isConnected: facebookConnected, 
+    isConnecting: facebookConnecting,
+    userInfo: facebookUser,
+    connectedPages: facebookPages,
+    selectedPage: facebookPage,
+    connectFacebook,
+    disconnectFacebook,
+    selectPage
+  } = useFacebookConnection();
 
   if (isLoading) {
     return (
@@ -42,6 +54,7 @@ export default function CreatorSocial() {
     );
   }
 
+  // Get real Facebook data and static data for other platforms
   const socialAccounts = [
     {
       platform: "Instagram",
@@ -83,15 +96,21 @@ export default function CreatorSocial() {
       color: "text-red-400",
       bgColor: "bg-red-400/20"
     },
+    // Real Facebook data from your connected page
     {
       platform: "Facebook",
       icon: Facebook,
-      handle: "Aerial Ace Athletics",
-      followers: "3.2K",
-      engagement: "4.1%",
-      connected: false,
+      handle: facebookPage?.name || "Connect Facebook Page",
+      followers: facebookPage?.followers_count ? 
+        (facebookPage.followers_count >= 1000 ? 
+          `${(facebookPage.followers_count / 1000).toFixed(1)}K` : 
+          facebookPage.followers_count.toString()) : 
+        "0",
+      engagement: (facebookPage as any)?.engagement_data ? "Analytics Available" : "N/A",
+      connected: facebookConnected,
       color: "text-blue-500",
-      bgColor: "bg-blue-500/20"
+      bgColor: "bg-blue-500/20",
+      realData: true // Flag to identify real Facebook data
     }
   ];
 
@@ -210,20 +229,54 @@ export default function CreatorSocial() {
                         <p className="text-sm text-gray-400">{account.engagement} engagement</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        {account.connected ? (
-                          <>
-                            <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
-                              <Settings className="h-4 w-4 mr-1" />
-                              Settings
+                        {account.platform === "Facebook" ? (
+                          // Facebook-specific buttons using unified state
+                          account.connected ? (
+                            <>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="border-white/20 text-gray-300 hover:bg-white/10"
+                                onClick={disconnectFacebook}
+                                data-testid="button-disconnect-facebook-social"
+                              >
+                                <Unlink className="h-4 w-4 mr-1" />
+                                Disconnect
+                              </Button>
+                              {facebookPages.length > 1 && (
+                                <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
+                                  <Settings className="h-4 w-4 mr-1" />
+                                  Switch Page
+                                </Button>
+                              )}
+                            </>
+                          ) : (
+                            <Button 
+                              className="bg-brand-primary hover:bg-brand-primary/80"
+                              onClick={connectFacebook}
+                              disabled={facebookConnecting}
+                              data-testid="button-connect-facebook-social"
+                            >
+                              {facebookConnecting ? 'Connecting...' : 'Connect'}
                             </Button>
-                            <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          </>
+                          )
                         ) : (
-                          <Button className="bg-brand-primary hover:bg-brand-primary/80">
-                            Connect
-                          </Button>
+                          // Other platform buttons (static for now)
+                          account.connected ? (
+                            <>
+                              <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
+                                <Settings className="h-4 w-4 mr-1" />
+                                Settings
+                              </Button>
+                              <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button className="bg-brand-primary hover:bg-brand-primary/80">
+                              Connect
+                            </Button>
+                          )
                         )}
                       </div>
                     </div>
