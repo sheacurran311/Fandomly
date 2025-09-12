@@ -102,6 +102,12 @@ export interface FacebookPage {
   category: string;
   followers_count?: number;
   fan_count?: number;
+  engagement_data?: {
+    engagement_rate?: number;
+    total_engagements?: number;
+    reach?: number;
+    impressions?: number;
+  };
 }
 
 export class FacebookSDK {

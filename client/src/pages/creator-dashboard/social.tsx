@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useFacebookConnection } from "@/hooks/use-facebook-connection";
+import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,7 +106,7 @@ export default function CreatorSocial() {
           `${(facebookPage.followers_count / 1000).toFixed(1)}K` : 
           facebookPage.followers_count.toString()) : 
         "0",
-      engagement: (facebookPage as any)?.engagement_data ? "Analytics Available" : "N/A",
+      engagement: facebookPage?.engagement_data ? "Analytics Available" : "N/A",
       connected: facebookConnected,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",

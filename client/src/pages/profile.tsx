@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useFacebookConnection } from "@/hooks/use-facebook-connection";
+import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
