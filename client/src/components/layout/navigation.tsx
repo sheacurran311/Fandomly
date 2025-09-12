@@ -77,13 +77,13 @@ export default function Navigation() {
                 <div className="flex items-center space-x-4">
                   {userData?.userType === 'creator' ? (
                     <Link href="/creator-dashboard">
-                      <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
+                      <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
                         Dashboard
                       </Button>
                     </Link>
                   ) : (
                     <Link href="/fan-dashboard">
-                      <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
+                      <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
                         Dashboard
                       </Button>
                     </Link>

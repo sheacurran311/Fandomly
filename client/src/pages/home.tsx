@@ -56,7 +56,7 @@ export default function Home() {
             </h1>
             
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-10 sm:mb-12 max-w-4xl mx-auto leading-relaxed font-light px-4">
-              Create AI-powered loyalty programs for athletes and creators, with built-in fan engagement, monetization tools, and optional Web3 rewards designed for the NIL era.
+              Create AI-powered loyalty programs for athletes, musicians, and content creators, with built-in fan engagement, monetization tools, and optional Web3 rewards designed for the NIL era.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-stretch sm:items-center mb-12 sm:mb-16 px-4">
@@ -68,10 +68,9 @@ export default function Home() {
               <Button 
                 onClick={() => window.location.href = "/marketplace"}
                 size="lg"
-                variant="outline"
-                className="w-full sm:w-auto border-2 border-[#101636] text-[#101636] hover:scale-105 px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
+                className="w-full sm:w-auto bg-brand-primary hover:bg-brand-primary/80 text-white hover:scale-105 px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
               >
-                Explore Programs
+                Explore Creators
               </Button>
             </div>
             

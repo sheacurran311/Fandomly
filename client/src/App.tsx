@@ -18,10 +18,15 @@ import BrandingStudio from "@/pages/branding-studio";
 import CreatorDashboard from "@/pages/creator-dashboard";
 import CreatorAnalytics from "@/pages/creator-dashboard/analytics";
 import CreatorSocial from "@/pages/creator-dashboard/social";
+import CreatorFans from "@/pages/creator-dashboard/fans";
+import CreatorGrowth from "@/pages/creator-dashboard/growth";
+import CreatorRevenue from "@/pages/creator-dashboard/revenue";
+import CreatorNIL from "@/pages/creator-dashboard/nil";
 import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
 import FanFollowing from "@/pages/fan-dashboard/following";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
+import FanPoints from "@/pages/fan-dashboard/points";
 import NILDashboard from "@/pages/nil-dashboard";
 // RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
@@ -49,13 +54,17 @@ function Router() {
       <Route path="/creator-dashboard" component={CreatorDashboard} />
       <Route path="/creator-dashboard/analytics" component={CreatorAnalytics} />
       <Route path="/creator-dashboard/social" component={CreatorSocial} />
+      <Route path="/creator-dashboard/fans" component={CreatorFans} />
+      <Route path="/creator-dashboard/growth" component={CreatorGrowth} />
+      <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
+      <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
       <Route path="/fan-dashboard/following" component={FanFollowing} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
+      <Route path="/fan-dashboard/points" component={FanPoints} />
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
-      <Route path="/nil-dashboard" component={NILDashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/fan-profile" component={FanProfile} />
       <Route path="/facebook-like-campaign" component={FacebookLikeCampaign} />

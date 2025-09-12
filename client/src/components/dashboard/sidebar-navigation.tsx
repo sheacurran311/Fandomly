@@ -18,7 +18,8 @@ import {
   Bell,
   CreditCard,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from "lucide-react";
 
 interface SidebarItem {
@@ -32,6 +33,7 @@ interface SidebarItem {
 interface SidebarNavigationProps {
   userType: "creator" | "fan";
   className?: string;
+  isNILAthlete?: boolean;
 }
 
 const creatorItems: SidebarItem[] = [
@@ -57,11 +59,16 @@ const fanItems: SidebarItem[] = [
   { label: "Settings", href: "/fan-dashboard/settings", icon: Settings },
 ];
 
-export default function SidebarNavigation({ userType, className }: SidebarNavigationProps) {
+export default function SidebarNavigation({ userType, className, isNILAthlete = false }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  const items = userType === "creator" ? creatorItems : fanItems;
+  // Add NIL dashboard for athletes
+  const creatorItemsWithNIL = isNILAthlete 
+    ? [...creatorItems.slice(0, -2), { label: "NIL Dashboard", href: "/creator-dashboard/nil", icon: Shield, color: "text-purple-400" }, ...creatorItems.slice(-2)]
+    : creatorItems;
+  
+  const items = userType === "creator" ? creatorItemsWithNIL : fanItems;
 
   return (
     <div className={cn(

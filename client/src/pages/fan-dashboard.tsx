@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useFanStats, useActiveCampaigns, useRecommendations } from "@/hooks/use-fan-dashboard";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import FacebookProfileImport from "@/components/fan/facebook-profile-import";
@@ -16,16 +17,23 @@ import {
   Gift,
   Users,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 
 export default function FanDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { data: fanStats, isLoading: statsLoading, error: statsError } = useFanStats();
+  const { data: activeCampaigns, isLoading: campaignsLoading } = useActiveCampaigns();
+  const { data: recommendations, isLoading: recommendationsLoading } = useRecommendations();
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+        <div className="flex items-center space-x-2 text-white">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </div>
     );
   }
@@ -56,31 +64,51 @@ export default function FanDashboard() {
 
           {/* Key Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <DashboardCard
-              title="Total Points"
-              value="12,450"
-              change={{ value: 8.5, type: "increase", period: "this week" }}
-              icon={<CreditCard className="h-5 w-5" />}
-              gradient
-            />
-            <DashboardCard
-              title="Following"
-              value="18"
-              description="Active creators"
-              icon={<Heart className="h-5 w-5" />}
-            />
-            <DashboardCard
-              title="Active Campaigns"
-              value="7"
-              change={{ value: 2, type: "increase", period: "new today" }}
-              icon={<Trophy className="h-5 w-5" />}
-            />
-            <DashboardCard
-              title="Rewards Earned"
-              value="42"
-              description="Total claimed"
-              icon={<Star className="h-5 w-5" />}
-            />
+            {statsLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="bg-white/5 backdrop-blur-lg border border-white/10">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-center h-16">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : statsError ? (
+              <Card className="col-span-4 bg-red-500/10 backdrop-blur-lg border border-red-500/20">
+                <CardContent className="p-6 text-center">
+                  <p className="text-red-400">Failed to load stats. Using offline mode.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <DashboardCard
+                  title="Total Points"
+                  value={fanStats?.totalPoints?.toLocaleString() || "0"}
+                  change={fanStats?.pointsChange}
+                  icon={<CreditCard className="h-5 w-5" />}
+                  gradient
+                />
+                <DashboardCard
+                  title="Following"
+                  value={fanStats?.followingCount?.toString() || "0"}
+                  description="Active creators"
+                  icon={<Heart className="h-5 w-5" />}
+                />
+                <DashboardCard
+                  title="Active Campaigns"
+                  value={fanStats?.activeCampaignsCount?.toString() || "0"}
+                  change={{ value: 2, type: "increase", period: "new today" }}
+                  icon={<Trophy className="h-5 w-5" />}
+                />
+                <DashboardCard
+                  title="Rewards Earned"
+                  value={fanStats?.rewardsEarned?.toString() || "0"}
+                  description="Total claimed"
+                  icon={<Star className="h-5 w-5" />}
+                />
+              </>
+            )}
           </div>
 
           {/* Facebook Profile Import */}
@@ -103,33 +131,26 @@ export default function FanDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {[
-                      { 
-                        creator: "Aerial Ace Athletics", 
-                        campaign: "Follow for Points", 
-                        points: 500, 
-                        progress: 75, 
-                        category: "Social",
-                        timeLeft: "3 days left"
-                      },
-                      { 
-                        creator: "Luna Music", 
-                        campaign: "Stream & Earn", 
-                        points: 1000, 
-                        progress: 45, 
-                        category: "Music",
-                        timeLeft: "1 week left"
-                      },
-                      { 
-                        creator: "Tech Creator Hub", 
-                        campaign: "Referral Bonus", 
-                        points: 2000, 
-                        progress: 20, 
-                        category: "Referral",
-                        timeLeft: "2 weeks left"
-                      },
-                    ].map((campaign, index) => (
-                      <div key={index} className="p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10">
+                    {campaignsLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex items-center space-x-3">
+                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                            <span className="text-gray-400">Loading campaigns...</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : !activeCampaigns || activeCampaigns.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-400 mb-4">No active campaigns yet</p>
+                        <Button variant="outline" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                          Discover Creators
+                        </Button>
+                      </div>
+                    ) : (
+                      activeCampaigns.map((campaign, index) => (
+                        <div key={campaign.id} className="p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10">
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <h4 className="text-white font-medium">{campaign.campaign}</h4>
@@ -156,7 +177,8 @@ export default function FanDashboard() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>

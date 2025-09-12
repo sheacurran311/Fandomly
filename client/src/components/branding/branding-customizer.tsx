@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { 
   Palette, Upload, Code, Eye, RotateCcw, Save,
-  Image, Type, Sparkles, Monitor, Smartphone, Tablet
+  Image, Type, Sparkles, Monitor, Smartphone, Tablet, Loader2
 } from "lucide-react";
 import { useTenantTheme } from "./tenant-theme-provider";
 import DynamicThemeInjector from "./dynamic-theme-injector";
+import { useBrandingUpload } from "@/hooks/use-file-upload";
 
 const fontOptions = [
   { value: "Inter, system-ui, sans-serif", name: "Inter (Default)" },
@@ -67,6 +68,15 @@ export default function BrandingCustomizer({ tenantId, onSave }: BrandingCustomi
     backgroundImage: currentBranding?.backgroundImage || "",
     customCSS: currentBranding?.customCSS || ""
   });
+
+  // File upload hooks and refs
+  const logoFileRef = useRef<HTMLInputElement>(null);
+  const faviconFileRef = useRef<HTMLInputElement>(null);
+  const backgroundFileRef = useRef<HTMLInputElement>(null);
+
+  const logoUpload = useBrandingUpload((url) => handleBrandingChange('logo', url));
+  const faviconUpload = useBrandingUpload((url) => handleBrandingChange('favicon', url));
+  const backgroundUpload = useBrandingUpload((url) => handleBrandingChange('backgroundImage', url));
 
   const handleBrandingChange = useCallback((field: string, value: any) => {
     const newBranding = { ...brandingData, [field]: value };
@@ -275,9 +285,25 @@ export default function BrandingCustomizer({ tenantId, onSave }: BrandingCustomi
                   placeholder="https://example.com/logo.png"
                   className="bg-white/10 border-white/20 text-white"
                 />
-                <Button size="sm" variant="outline" className="border-white/20 text-white">
-                  <Upload className="h-4 w-4" />
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="border-white/20 text-white"
+                  onClick={() => logoFileRef.current?.click()}
+                  disabled={logoUpload.isUploading}
+                >
+                  {logoUpload.isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 </Button>
+                <input
+                  ref={logoFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) logoUpload.handleFileSelect(file);
+                  }}
+                />
               </div>
             </div>
 
@@ -290,9 +316,25 @@ export default function BrandingCustomizer({ tenantId, onSave }: BrandingCustomi
                   placeholder="https://example.com/favicon.ico"
                   className="bg-white/10 border-white/20 text-white"
                 />
-                <Button size="sm" variant="outline" className="border-white/20 text-white">
-                  <Upload className="h-4 w-4" />
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="border-white/20 text-white"
+                  onClick={() => faviconFileRef.current?.click()}
+                  disabled={faviconUpload.isUploading}
+                >
+                  {faviconUpload.isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 </Button>
+                <input
+                  ref={faviconFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) faviconUpload.handleFileSelect(file);
+                  }}
+                />
               </div>
             </div>
 
@@ -305,9 +347,25 @@ export default function BrandingCustomizer({ tenantId, onSave }: BrandingCustomi
                   placeholder="https://example.com/background.jpg"
                   className="bg-white/10 border-white/20 text-white"
                 />
-                <Button size="sm" variant="outline" className="border-white/20 text-white">
-                  <Upload className="h-4 w-4" />
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="border-white/20 text-white"
+                  onClick={() => backgroundFileRef.current?.click()}
+                  disabled={backgroundUpload.isUploading}
+                >
+                  {backgroundUpload.isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 </Button>
+                <input
+                  ref={backgroundFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) backgroundUpload.handleFileSelect(file);
+                  }}
+                />
               </div>
             </div>
           </TabsContent>
