@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
+import { URLSearchParams } from "url";
 
 // Instagram Basic Display API token exchange
 async function exchangeInstagramToken(code: string, redirectUri: string) {
@@ -116,6 +117,150 @@ async function getTwitterUser(accessToken: string) {
 }
 
 export function registerSocialRoutes(app: Express) {
+  // ===== Facebook Graph API helpers and debug proxy =====
+  const FB_API_VERSION = process.env.FACEBOOK_API_VERSION || 'v23.0';
+  const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
+
+  async function callFacebookGraph(
+    path: string,
+    method: 'GET' | 'POST' | 'DELETE' | 'PUT',
+    params: Record<string, any>,
+    accessToken: string
+  ) {
+    const url = new URL(`${FB_BASE_URL}${path}`);
+    const searchParams = new URLSearchParams();
+    // Ensure access token is always included
+    searchParams.set('access_token', accessToken);
+
+    if (method === 'GET' || method === 'DELETE') {
+      Object.entries(params || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        searchParams.set(key, String(value));
+      });
+      url.search = searchParams.toString();
+      const res = await fetch(url.toString(), { method });
+      return res.json();
+    }
+
+    // POST/PUT
+    const bodyParams = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      bodyParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+    });
+    bodyParams.set('access_token', accessToken);
+    const res = await fetch(url.toString(), {
+      method,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: bodyParams.toString()
+    });
+    return res.json();
+  }
+
+  // Generic Graph passthrough for manual testing
+  app.post('/api/facebook/graph', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { path, method = 'GET', params = {}, accessToken } = req.body || {};
+      if (!accessToken) return res.status(400).json({ error: 'accessToken required' });
+      if (!path || typeof path !== 'string' || !path.startsWith('/')) {
+        return res.status(400).json({ error: 'path must start with /' });
+      }
+      const data = await callFacebookGraph(path, method, params, accessToken);
+      res.json(data);
+    } catch (error) {
+      console.error('Facebook graph passthrough error:', error);
+      res.status(500).json({ error: 'Graph request failed' });
+    }
+  });
+
+  // Inspect a token via /debug_token (requires app credentials)
+  app.get('/api/facebook/debug-token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const inputToken = (req.query.token as string) || req.headers['x-fb-token'] as string;
+      const appId = process.env.FACEBOOK_APP_ID;
+      const appSecret = process.env.FACEBOOK_APP_SECRET;
+      if (!inputToken) return res.status(400).json({ error: 'token query param or x-fb-token header required' });
+      if (!appId || !appSecret) return res.status(400).json({ error: 'Server missing FACEBOOK_APP_ID/SECRET' });
+      const appAccessToken = `${appId}|${appSecret}`;
+      const url = new URL(`https://graph.facebook.com/${FB_API_VERSION}/debug_token`);
+      url.search = new URLSearchParams({
+        input_token: inputToken,
+        access_token: appAccessToken
+      }).toString();
+      const resp = await fetch(url.toString());
+      const json = await resp.json();
+      res.json(json);
+    } catch (error) {
+      console.error('Facebook debug-token error:', error);
+      res.status(500).json({ error: 'Failed to debug token' });
+    }
+  });
+
+  // GET /me with optional fields using provided Bearer token
+  app.get('/api/facebook/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const bearer = req.headers.authorization || '';
+      const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+      if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
+      const fields = (req.query.fields as string) || 'id,name,fan_count,followers_count';
+      const data = await callFacebookGraph('/me', 'GET', { fields }, token);
+      res.json(data);
+    } catch (error) {
+      console.error('Facebook /me error:', error);
+      res.status(500).json({ error: 'Failed to fetch /me' });
+    }
+  });
+
+  // GET /me/accounts to list pages
+  app.get('/api/facebook/accounts', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const bearer = req.headers.authorization || '';
+      const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+      if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
+      const fields = (req.query.fields as string) || 'id,name,access_token,category,followers_count,fan_count,instagram_business_account';
+      const data = await callFacebookGraph('/me/accounts', 'GET', { fields, limit: '100' }, token);
+      res.json(data);
+    } catch (error) {
+      console.error('Facebook /me/accounts error:', error);
+      res.status(500).json({ error: 'Failed to fetch accounts' });
+    }
+  });
+
+  // GET page details
+  app.get('/api/facebook/pages/:pageId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const bearer = req.headers.authorization || '';
+      const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+      if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
+      const { pageId } = req.params;
+      const fields = (req.query.fields as string) || 'id,name,followers_count,fan_count,link,username,instagram_business_account';
+      const data = await callFacebookGraph(`/${pageId}`, 'GET', { fields }, token);
+      res.json(data);
+    } catch (error) {
+      console.error('Facebook page details error:', error);
+      res.status(500).json({ error: 'Failed to fetch page details' });
+    }
+  });
+
+  // GET page insights
+  app.get('/api/facebook/pages/:pageId/insights', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const bearer = req.headers.authorization || '';
+      const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+      if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
+      const { pageId } = req.params;
+      const metric = (req.query.metric as string) || 'page_engaged_users,page_post_engagements,page_fans,page_impressions';
+      const period = (req.query.period as string) || 'day';
+      const since = (req.query.since as string) || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const until = (req.query.until as string) || new Date().toISOString().split('T')[0];
+      const data = await callFacebookGraph(`/${pageId}/insights`, 'GET', { metric, period, since, until }, token);
+      res.json(data);
+    } catch (error) {
+      console.error('Facebook page insights error:', error);
+      res.status(500).json({ error: 'Failed to fetch page insights' });
+    }
+  });
+
   // Instagram token exchange
   app.post('/api/social/instagram/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

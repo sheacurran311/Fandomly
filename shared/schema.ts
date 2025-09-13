@@ -301,6 +301,22 @@ export const creators = pgTable("creators", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Creator Facebook Pages (stores page tokens and metrics per creator)
+export const creatorFacebookPages = pgTable("creator_facebook_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => creators.id).notNull(),
+  pageId: varchar("page_id").notNull(),
+  name: text("name").notNull(),
+  accessToken: text("access_token").notNull(),
+  followersCount: integer("followers_count").default(0),
+  fanCount: integer("fan_count").default(0),
+  instagramBusinessAccountId: varchar("instagram_business_account_id"),
+  connectedInstagramAccountId: varchar("connected_instagram_account_id"),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const loyaltyPrograms = pgTable("loyalty_programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant

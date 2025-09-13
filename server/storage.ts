@@ -8,7 +8,8 @@ import {
   type PointTransaction, type InsertPointTransaction,
   type RewardRedemption, type InsertRewardRedemption,
   type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership,
-  type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule
+  type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
+  creatorFacebookPages
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -78,6 +79,18 @@ export interface IStorage {
   updateCampaign(id: string, data: any): Promise<Campaign>;
   getCampaignRules(campaignId: string): Promise<CampaignRule[]>;
   createCampaignRule(data: any): Promise<CampaignRule>;
+
+  // Creator Facebook Pages
+  upsertCreatorFacebookPages(creatorId: string, pages: Array<{
+    pageId: string;
+    name: string;
+    accessToken: string;
+    followersCount?: number;
+    fanCount?: number;
+    instagramBusinessAccountId?: string;
+    connectedInstagramAccountId?: string;
+  }>): Promise<number>;
+  getCreatorFacebookPages(creatorId: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -343,6 +356,53 @@ export class DatabaseStorage implements IStorage {
   async createCampaignRule(data: InsertCampaignRule): Promise<CampaignRule> {
     const [row] = await db.insert(campaignRules).values(data as any).returning();
     return row;
+  }
+
+  // Creator Facebook Pages
+  async upsertCreatorFacebookPages(creatorId: string, pages: Array<{
+    pageId: string;
+    name: string;
+    accessToken: string;
+    followersCount?: number;
+    fanCount?: number;
+    instagramBusinessAccountId?: string;
+    connectedInstagramAccountId?: string;
+  }>): Promise<number> {
+    let count = 0;
+    for (const p of pages) {
+      const existing = await db.select().from(creatorFacebookPages)
+        .where(and(eq(creatorFacebookPages.creatorId, creatorId), eq(creatorFacebookPages.pageId, p.pageId)));
+      if (existing && existing.length > 0) {
+        await db.update(creatorFacebookPages).set({
+          name: p.name,
+          accessToken: p.accessToken,
+          followersCount: p.followersCount || 0,
+          fanCount: p.fanCount || 0,
+          instagramBusinessAccountId: p.instagramBusinessAccountId,
+          connectedInstagramAccountId: p.connectedInstagramAccountId,
+          updatedAt: new Date()
+        } as any).where(and(eq(creatorFacebookPages.creatorId, creatorId), eq(creatorFacebookPages.pageId, p.pageId)));
+      } else {
+        await db.insert(creatorFacebookPages).values({
+          creatorId,
+          pageId: p.pageId,
+          name: p.name,
+          accessToken: p.accessToken,
+          followersCount: p.followersCount || 0,
+          fanCount: p.fanCount || 0,
+          instagramBusinessAccountId: p.instagramBusinessAccountId,
+          connectedInstagramAccountId: p.connectedInstagramAccountId,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        } as any);
+      }
+      count++;
+    }
+    return count;
+  }
+
+  async getCreatorFacebookPages(creatorId: string): Promise<any[]> {
+    return await db.select().from(creatorFacebookPages).where(eq(creatorFacebookPages.creatorId, creatorId));
   }
 }
 

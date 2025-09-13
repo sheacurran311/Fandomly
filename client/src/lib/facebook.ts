@@ -52,42 +52,14 @@ export interface FacebookUser {
       category?: string;
     }>;
   };
-  photos?: {
-    data: Array<{
-      id: string;
-      name?: string;
-      picture?: string;
-      created_time?: string;
-    }>;
-  };
-  posts?: {
-    data: Array<{
-      id: string;
-      message?: string;
-      story?: string;
-      created_time?: string;
-      type?: string;
-    }>;
-  };
-  friends?: {
-    data: Array<{
-      id: string;
-      name: string;
-    }>;
-  };
+  photos?: any;
+  posts?: any;
+  friends?: any;
   profile_pic?: string;
   favorite_athletes?: string[];
   favorite_teams?: string[];
   sports?: string[];
-  businesses?: {
-    owned_instagram_accounts?: {
-      data: Array<{
-        id: string;
-        name: string;
-        username: string;
-      }>;
-    };
-  };
+  businesses?: any;
   picture?: {
     data: {
       url: string;
@@ -102,12 +74,7 @@ export interface FacebookPage {
   category: string;
   followers_count?: number;
   fan_count?: number;
-  engagement_data?: {
-    engagement_rate?: number;
-    total_engagements?: number;
-    reach?: number;
-    impressions?: number;
-  };
+  engagement_data?: any;
 }
 
 export class FacebookSDK {
@@ -125,20 +92,18 @@ export class FacebookSDK {
         window.fbAsyncInit = function() {
           originalInit();
           FacebookSDK.isInitialized = true;
-          // Check login status after SDK initialization
           FacebookSDK.checkLoginStatusOnInit();
           resolve();
         };
       } else {
         window.fbAsyncInit = function() {
           window.FB.init({
-            appId: '4233782626946744',
+            appId: (import.meta as any)?.env?.VITE_FACEBOOK_APP_ID || '4233782626946744',
             xfbml: true,
-            version: 'v23.0'
+            version: (import.meta as any)?.env?.VITE_FACEBOOK_API_VERSION || 'v23.0'
           });
           window.FB.AppEvents.logPageView();
           FacebookSDK.isInitialized = true;
-          // Check login status after SDK initialization
           FacebookSDK.checkLoginStatusOnInit();
           resolve();
         };
@@ -146,7 +111,6 @@ export class FacebookSDK {
     });
   }
 
-  // Check login status when SDK initializes (as recommended by Facebook)
   private static checkLoginStatusOnInit(): void {
     window.FB.getLoginStatus((response) => {
       console.log('Facebook login status on page load:', response);
@@ -154,31 +118,28 @@ export class FacebookSDK {
     });
   }
 
-  // Handle the login status response
   private static handleLoginStatusResponse(response: any): void {
     if (response.status === 'connected') {
-      console.log('User is connected to Facebook and logged into app');
-      // Store access token and user ID for the session
       sessionStorage.setItem('fb_access_token', response.authResponse.accessToken);
       sessionStorage.setItem('fb_user_id', response.authResponse.userID);
       sessionStorage.setItem('fb_expires_in', response.authResponse.expiresIn.toString());
-    } else if (response.status === 'not_authorized') {
-      console.log('User is logged into Facebook but not authorized for the app');
-      FacebookSDK.clearStoredTokens();
+      const expiresAtMs = Date.now() + (Number(response.authResponse.expiresIn) * 1000);
+      sessionStorage.setItem('fb_expires_at', String(expiresAtMs));
+      sessionStorage.setItem('fb_captured_at', String(Date.now()));
     } else {
-      console.log('User is not logged into Facebook');
       FacebookSDK.clearStoredTokens();
     }
   }
 
-  // Clear stored authentication tokens
   private static clearStoredTokens(): void {
     sessionStorage.removeItem('fb_access_token');
     sessionStorage.removeItem('fb_user_id');
     sessionStorage.removeItem('fb_expires_in');
+    sessionStorage.removeItem('fb_expires_at');
+    sessionStorage.removeItem('fb_captured_at');
   }
 
-  static async login(scope: string = 'public_profile,email,pages_show_list,business_management,instagram_basic,pages_read_engagement'): Promise<{
+  static async login(scope: string = 'public_profile,email'): Promise<{
     success: boolean;
     accessToken?: string;
     userID?: string;
@@ -187,24 +148,12 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      console.log('Initiating Facebook login with scope:', scope);
-      console.log('Facebook SDK status:', typeof window.FB, window.FB ? 'loaded' : 'not loaded');
-      
       window.FB.login((response) => {
-        console.log('Facebook login response:', response);
         FacebookSDK.handleLoginStatusResponse(response);
-        
         if (response.status === 'connected' && response.authResponse) {
-          resolve({
-            success: true,
-            accessToken: response.authResponse.accessToken,
-            userID: response.authResponse.userID
-          });
+          resolve({ success: true, accessToken: response.authResponse.accessToken, userID: response.authResponse.userID });
         } else {
-          resolve({
-            success: false,
-            error: response.status
-          });
+          resolve({ success: false, error: response.status });
         }
       }, { scope });
     });
@@ -214,50 +163,24 @@ export class FacebookSDK {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      // Using updated Facebook JavaScript SDK API call format for creators
       window.FB.api(
         '/me',
         'GET',
-        {"fields":"id,name,posts,photos,likes"},
+        { fields: 'id,name,email,picture.width(200).height(200)' },
         function(response) {
           if (response && !response.error) {
-            console.log('Facebook creator data received:', response);
-            
-            // Process the response for creator-specific functionality
-            const creatorData: FacebookUser = {
-              id: response.id,
-              name: response.name,
-              posts: response.posts,
-              photos: response.photos,
-              likes: response.likes,
-              // Extract creator-relevant insights from likes data
-              favorite_athletes: response.likes?.data?.filter((like: any) => 
-                like.category?.toLowerCase().includes('athlete') || 
-                like.category?.toLowerCase().includes('sports')
-              ).map((like: any) => like.name) || [],
-              favorite_teams: response.likes?.data?.filter((like: any) => 
-                like.category?.toLowerCase().includes('team') || 
-                like.category?.toLowerCase().includes('sports team')
-              ).map((like: any) => like.name) || [],
-              sports: response.likes?.data?.filter((like: any) => 
-                like.category?.toLowerCase().includes('sport')
-              ).map((like: any) => like.name) || []
-            };
-            
-            resolve(creatorData);
+            resolve(response as FacebookUser);
           } else {
-            console.error('Facebook API error for creator:', response?.error);
-            
-            // Fallback to basic fields if enhanced fields fail due to permissions
+            console.error('[FB] /me error:', response?.error || response);
             window.FB.api(
               '/me',
               'GET',
-              {"fields":"id,name"},
+              { fields: 'id,name' },
               function(fallbackResponse) {
                 if (fallbackResponse && !fallbackResponse.error) {
-                  console.log('Facebook fallback data for creator:', fallbackResponse);
                   resolve(fallbackResponse as FacebookUser);
                 } else {
+                  console.error('[FB] /me fallback error:', fallbackResponse?.error || fallbackResponse);
                   resolve(null);
                 }
               }
@@ -268,117 +191,38 @@ export class FacebookSDK {
     });
   }
 
-  // Specific method for creator Facebook connection using your updated SDK format
-  static async getCreatorData(accessToken?: string): Promise<FacebookUser | null> {
-    await this.waitForSDK();
-
-    return new Promise((resolve) => {
-      console.log('Fetching creator-specific Facebook data...');
-      
-      // Your updated Facebook JavaScript SDK API call format for creators
-      window.FB.api(
-        '/me',
-        'GET',
-        {"fields":"id,name,posts,photos,likes"},
-        function(response: any) {
-          if (response && !response.error) {
-            console.log('Creator Facebook data successfully retrieved:', response);
-            
-            // Enhanced processing for creator-specific insights
-            const creatorProfile: FacebookUser = {
-              id: response.id,
-              name: response.name,
-              posts: response.posts,
-              photos: response.photos,
-              likes: response.likes,
-              
-              // Creator-specific data extraction for NIL and sports content
-              favorite_athletes: response.likes?.data?.filter((like: any) => 
-                like.category?.toLowerCase().includes('athlete') || 
-                like.category?.toLowerCase().includes('sports') ||
-                like.category?.toLowerCase().includes('football') ||
-                like.category?.toLowerCase().includes('basketball')
-              ).map((like: any) => like.name) || [],
-              
-              favorite_teams: response.likes?.data?.filter((like: any) => 
-                like.category?.toLowerCase().includes('team') || 
-                like.category?.toLowerCase().includes('sports team') ||
-                like.category?.toLowerCase().includes('professional sports team')
-              ).map((like: any) => like.name) || [],
-              
-              sports: response.likes?.data?.filter((like: any) => 
-                like.category?.toLowerCase().includes('sport')
-              ).map((like: any) => like.name) || []
-            };
-            
-            resolve(creatorProfile);
-          } else {
-            console.error('Facebook API error for creator data:', response?.error);
-            resolve(null);
-          }
-        }
-      );
-    });
-  }
-
   static async getUserPages(accessToken: string): Promise<FacebookPage[]> {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      console.log('Fetching Facebook pages with access token:', accessToken);
-      
-      // Get pages/accounts with enhanced fields using your new permissions
       window.FB.api('/me/accounts', 'GET', {
-        fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account,engagement,website,about,picture',
-        access_token: accessToken
+        fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account'
       }, (response: any) => {
-        console.log('Raw Facebook pages API response:', response);
-        
         if (response && response.data && !response.error) {
-          console.log(`Facebook pages successfully received: ${response.data.length} pages found`);
-          console.log('Page details:', response.data);
           resolve(response.data as FacebookPage[]);
         } else {
-          console.error('Facebook Pages API Error Details:', {
-            error: response?.error,
-            errorCode: response?.error?.code,
-            errorMessage: response?.error?.message,
-            errorType: response?.error?.type
-          });
-          
-          // If pages permission is not available, try alternative approach
-          if (response?.error?.code === 200 || response?.error?.message?.includes('permission')) {
-            console.log('Permission issue detected, trying basic user info...');
-            // Fallback: just return empty array for now, but log the issue
-            console.warn('Facebook Pages access requires pages_show_list permission. User may need to grant additional permissions.');
-          }
-          
+          console.error('[FB] /me/accounts error:', response?.error || response);
           resolve([]);
         }
       });
     });
   }
 
-  // Enhanced method to get page engagement data using pages_read_engagement permission
   static async getPageEngagementData(pageId: string, pageAccessToken: string): Promise<any> {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
-      console.log(`Fetching engagement data for page ${pageId}...`);
-      
-      // Use your pages_read_engagement permission to get detailed engagement metrics
       window.FB.api(`/${pageId}/insights`, 'GET', {
         metric: 'page_engaged_users,page_post_engagements,page_fans,page_impressions',
         period: 'day',
-        since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 7 days
+        since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         until: new Date().toISOString().split('T')[0],
         access_token: pageAccessToken
       }, (response: any) => {
         if (response && response.data && !response.error) {
-          console.log('Facebook page engagement data received:', response.data);
           resolve(response.data);
         } else {
-          console.error('Facebook Page engagement API error:', response?.error);
+          console.error('[FB] /:pageId/insights error:', response?.error || response);
           resolve(null);
         }
       });
@@ -393,12 +237,11 @@ export class FacebookSDK {
         fields: 'followers_count,fan_count',
         access_token: pageAccessToken
       }, (response) => {
-        if (response && !response.error) {
-          // Use followers_count if available, fallback to fan_count
-          const count = response.followers_count || response.fan_count || 0;
+        if (response && !(response as any).error) {
+          const count = (response as any).followers_count || (response as any).fan_count || 0;
           resolve(count);
         } else {
-          console.error('Facebook Page metrics API error:', response?.error);
+          console.error('[FB] /:pageId error:', (response as any)?.error || response);
           resolve(0);
         }
       });
@@ -407,70 +250,50 @@ export class FacebookSDK {
 
   static async logout(): Promise<void> {
     await this.waitForSDK();
-
     return new Promise((resolve) => {
-      window.FB.logout(() => {
-        FacebookSDK.clearStoredTokens();
-        resolve();
-      });
+      window.FB.logout(() => { FacebookSDK.clearStoredTokens(); resolve(); });
     });
   }
 
-  static async getLoginStatus(): Promise<{
-    isLoggedIn: boolean;
-    accessToken?: string;
-    userID?: string;
-    status?: string;
-  }> {
+  static async getLoginStatus(): Promise<{ isLoggedIn: boolean; accessToken?: string; userID?: string; status?: string; }> {
     await this.waitForSDK();
 
     return new Promise((resolve) => {
       window.FB.getLoginStatus((response) => {
         FacebookSDK.handleLoginStatusResponse(response);
-        
         if (response.status === 'connected' && response.authResponse) {
-          resolve({
-            isLoggedIn: true,
-            accessToken: response.authResponse.accessToken,
-            userID: response.authResponse.userID,
-            status: response.status
-          });
+          resolve({ isLoggedIn: true, accessToken: response.authResponse.accessToken, userID: response.authResponse.userID, status: response.status });
         } else {
-          resolve({
-            isLoggedIn: false,
-            status: response.status
-          });
+          resolve({ isLoggedIn: false, status: response.status });
         }
       });
     });
   }
 
-  // Get stored access token from session storage
   static getStoredAccessToken(): string | null {
     return sessionStorage.getItem('fb_access_token');
   }
 
-  // Get stored user ID from session storage
   static getStoredUserID(): string | null {
     return sessionStorage.getItem('fb_user_id');
   }
 
-  // Check if stored token is still valid
   static isTokenValid(): boolean {
-    const expiresIn = sessionStorage.getItem('fb_expires_in');
-    if (!expiresIn) return false;
-    
-    const expirationTime = parseInt(expiresIn) * 1000; // Convert to milliseconds
-    const currentTime = Date.now();
-    
-    return currentTime < expirationTime;
+    const expiresAt = sessionStorage.getItem('fb_expires_at');
+    if (expiresAt) {
+      return Date.now() < Number(expiresAt);
+    }
+    const capturedAt = Number(sessionStorage.getItem('fb_captured_at') || '0');
+    const expiresIn = Number(sessionStorage.getItem('fb_expires_in') || '0');
+    if (capturedAt && expiresIn) {
+      return Date.now() < (capturedAt + expiresIn * 1000);
+    }
+    return false;
   }
 }
 
-// Utility function to check if Facebook SDK is available
 export const isFacebookSDKAvailable = (): boolean => {
   return typeof window !== 'undefined' && !!window.FB;
 };
 
-// Export default instance
 export default FacebookSDK;

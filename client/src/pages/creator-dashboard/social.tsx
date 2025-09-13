@@ -38,6 +38,11 @@ export default function CreatorSocial() {
     selectPage
   } = useFacebookConnection();
 
+  // Load saved creator pages from backend
+  // Note: In real app, use creatorId from user.creator.id
+  // For brevity, fetch on mount and ignore errors
+  // and show count in UI next to Facebook platform
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">

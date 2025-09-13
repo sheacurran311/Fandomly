@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Fandomly - AI-Powered Loyalty Platform for Creators</title>
     <meta name="description" content="Build AI-powered loyalty programs that reward your fans for engagement. Integrate social media, offer exclusive perks, and grow your fandom with smart Web3 rewards." />
+    <meta property="og:title" content="Fandomly - AI-Powered Loyalty Platform for Creators" />
+    <meta property="og:description" content="Reward fans for real engagement. Cross-platform loyalty for creators." />
+    <meta property="og:image" content="/fandomly-logo-with-text.png" />
+    <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <!-- Allow Facebook SDK and Dynamic SDK -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; frame-src 'self' https:; img-src 'self' data: https: blob:; connect-src 'self' https: wss: data:;">
@@ -12,26 +16,49 @@
   <body>
     <div id="fb-root"></div>
     <script>
-      window.fbAsyncInit = function() {
-        FB.init({
-          appId      : '4233782626946744',
-          cookie     : true,
-          xfbml      : true,
-          version    : 'v23.0'
-        });
-          
-        FB.AppEvents.logPageView();   
-          
-        // Global function for Facebook login button callback
-        window.checkLoginState = function() {
-          FB.getLoginStatus(function(response) {
-            console.log('Facebook login status:', response);
-            if (window.handleFacebookLoginStatus) {
-              window.handleFacebookLoginStatus(response);
-            }
+      // Optional globals can be set before this script:
+      // window.FACEBOOK_FAN_APP_ID, window.FACEBOOK_CREATOR_APP_ID, window.FACEBOOK_APP_ID, window.FACEBOOK_API_VERSION
+      (function(){
+        var FAN_APP_ID = window.FACEBOOK_FAN_APP_ID || '4233782626946744';
+        var CREATOR_APP_ID = window.FACEBOOK_CREATOR_APP_ID || '1665384740795979';
+        var API_VERSION = window.FACEBOOK_API_VERSION || 'v23.0';
+        var INITIAL_APP_ID = window.FACEBOOK_APP_ID || FAN_APP_ID;
+        window.__FB_DEFAULTS__ = { FAN_APP_ID: FAN_APP_ID, CREATOR_APP_ID: CREATOR_APP_ID, API_VERSION: API_VERSION };
+
+        window.fbAsyncInit = function() {
+          FB.init({
+            appId      : INITIAL_APP_ID,
+            cookie     : true,
+            xfbml      : true,
+            version    : API_VERSION
           });
-        }
-      };
+          window.__FB_CURRENT_APP_ID__ = INITIAL_APP_ID;
+          FB.AppEvents.logPageView();
+
+          // Expose a helper to reinitialize with a different appId at runtime
+          window.reinitializeFacebookApp = function(appId) {
+            try {
+              if (!appId) appId = INITIAL_APP_ID;
+              FB.init({ appId: appId, cookie: true, xfbml: true, version: API_VERSION });
+              window.__FB_CURRENT_APP_ID__ = appId;
+              return true;
+            } catch (e) {
+              console.error('FB reinit failed', e);
+              return false;
+            }
+          };
+
+          // Global function for Facebook login button callback
+          window.checkLoginState = function() {
+            FB.getLoginStatus(function(response) {
+              console.log('Facebook login status:', response);
+              if (window.handleFacebookLoginStatus) {
+                window.handleFacebookLoginStatus(response);
+              }
+            });
+          }
+        };
+      })();
 
       (function(d, s, id){
          var js, fjs = d.getElementsByTagName(s)[0];

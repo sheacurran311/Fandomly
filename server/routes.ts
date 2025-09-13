@@ -746,6 +746,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Creator Facebook Pages: import and fetch
+  app.post("/api/creators/:creatorId/facebook-pages", async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+      const pages = req.body?.pages || [];
+      if (!Array.isArray(pages)) return res.status(400).json({ error: 'pages array required' });
+      const saved = await storage.upsertCreatorFacebookPages(creatorId, pages.map((p: any) => ({
+        pageId: p.pageId || p.id,
+        name: p.name,
+        accessToken: p.accessToken || p.access_token,
+        followersCount: p.followersCount ?? p.followers_count,
+        fanCount: p.fanCount ?? p.fan_count,
+        instagramBusinessAccountId: p.instagramBusinessAccountId || p.instagram_business_account?.id,
+        connectedInstagramAccountId: p.connectedInstagramAccountId || p.connected_instagram_account?.id,
+      })));
+      res.json({ success: true, saved });
+    } catch (error) {
+      console.error('Import creator FB pages error:', error);
+      res.status(500).json({ error: 'Failed to import creator Facebook pages' });
+    }
+  });
+
+  app.get("/api/creators/:creatorId/facebook-pages", async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+      const rows = await storage.getCreatorFacebookPages(creatorId);
+      res.json(rows);
+    } catch (error) {
+      console.error('Fetch creator FB pages error:', error);
+      res.status(500).json({ error: 'Failed to fetch creator Facebook pages' });
+    }
+  });
+
+  // Fan Facebook profile quick fetch (returns saved profileData.facebookData)
+  app.get("/api/fans/:userId/facebook-profile", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json(user.profileData?.facebookData || null);
+    } catch (error) {
+      console.error('Fetch fan FB profile error:', error);
+      res.status(500).json({ error: 'Failed to fetch fan Facebook profile' });
+    }
+  });
+
   // Follow tenant (create membership) for a fan
   app.post("/api/tenants/:tenantId/follow", async (req, res) => {
     try {

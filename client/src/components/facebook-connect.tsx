@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { apiRequest } from '@/lib/queryClient';
 import { Facebook, Users, TrendingUp, Check, Download } from 'lucide-react';
-import { FacebookSDK, type FacebookPage, type FacebookUser } from '@/lib/facebook';
+import { type FacebookPage, type FacebookUser } from '@/lib/facebook';
+import { useFacebookConnection } from '@/contexts/facebook-connection-context';
 
 interface FacebookConnectProps {
   onConnectionSuccess?: (pageData: FacebookPage) => void;
@@ -14,103 +14,25 @@ interface FacebookConnectProps {
 }
 
 export function FacebookConnect({ onConnectionSuccess, className }: FacebookConnectProps) {
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [userInfo, setUserInfo] = useState<FacebookUser | null>(null);
-  const [pages, setPages] = useState<FacebookPage[]>([]);
-  const [selectedPage, setSelectedPage] = useState<FacebookPage | null>(null);
-  const [isImportingProfile, setIsImportingProfile] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const {
+    isConnected,
+    isConnecting,
+    userInfo,
+    connectedPages,
+    selectedPage,
+    connectFacebook,
+    disconnectFacebook,
+    selectPage,
+    refreshConnection,
+  } = useFacebookConnection();
+  const [isImportingProfile, setIsImportingProfile] = useState(false);
 
   useEffect(() => {
-    // Set up global handler for Facebook login status (used by checkLoginState in HTML)
-    (window as any).handleFacebookLoginStatus = handleFacebookResponse;
-    
-    // Parse Facebook XFBML elements after component mounts
-    const parseXFBML = () => {
-      if (window.FB && (window.FB as any).XFBML) {
-        console.log('Parsing Facebook XFBML elements...');
-        (window.FB as any).XFBML.parse();
-      } else {
-        // Retry after a short delay if FB SDK isn't ready yet
-        setTimeout(parseXFBML, 1000);
-      }
-    };
-    
-    // Wait for Facebook SDK to load before parsing
-    setTimeout(parseXFBML, 500);
-    
-    // Check connection status when component mounts
-    checkConnectionStatus();
-    
-    // Also check for stored tokens from previous session
-    const storedToken = FacebookSDK.getStoredAccessToken();
-    const storedUserID = FacebookSDK.getStoredUserID();
-    
-    if (storedToken && storedUserID && FacebookSDK.isTokenValid()) {
-      console.log('Found valid stored Facebook token');
-      // Don't auto-set connected - let checkConnectionStatus handle it
-      loadUserDataFromStoredToken(storedToken);
-    }
-    
-    // Cleanup
-    return () => {
-      delete (window as any).handleFacebookLoginStatus;
-    };
-  }, []);
-
-  const checkConnectionStatus = async () => {
-    try {
-      console.log('Checking Facebook connection status...');
-      const status = await FacebookSDK.getLoginStatus();
-      console.log('Facebook connection status:', status);
-      
-      if (status.isLoggedIn && status.accessToken) {
-        console.log('User is connected to Facebook');
-        setIsConnected(true);
-        await loadUserDataFromStoredToken(status.accessToken);
-      } else {
-        console.log('User is not connected to Facebook, status:', status.status);
-        setIsConnected(false);
-        setUserInfo(null);
-        setPages([]);
-        setSelectedPage(null);
-      }
-    } catch (error) {
-      console.error('Error checking Facebook connection status:', error);
-      setIsConnected(false);
-    }
-  };
-
-  const loadUserDataFromStoredToken = async (accessToken: string) => {
-    try {
-      const facebookUser = await FacebookSDK.getUserInfo(accessToken);
-      if (facebookUser) {
-        setUserInfo(facebookUser);
-        console.log('Facebook user data loaded:', facebookUser);
-        
-        // Automatically import profile data if user is authenticated
-        if (user && facebookUser.email) {
-          await importFacebookProfile(facebookUser);
-        }
-        
-        console.log('Fetching Facebook pages with access token...');
-        const userPages = await FacebookSDK.getUserPages(accessToken);
-        setPages(userPages);
-        console.log(`Loaded ${userPages.length} Facebook pages for user ${facebookUser.name}:`, userPages);
-        
-        // Return the page count for the caller
-        return userPages.length;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error loading Facebook user data:', error);
-      // If there's an error, the token might be invalid
-      setIsConnected(false);
-      return 0;
-    }
-  };
+    // On mount, refresh connection status via context (which re-inits proper App ID)
+    refreshConnection();
+  }, [refreshConnection]);
 
   const importFacebookProfile = async (facebookData: FacebookUser) => {
     if (!user) {
@@ -119,170 +41,46 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
     }
 
     setIsImportingProfile(true);
-    
     try {
-      console.log('Importing Facebook profile data:', facebookData);
-      
-      const response = await apiRequest('POST', '/api/auth/facebook-profile-import', {
-        userId: user.id,
-        facebookData: {
-          id: facebookData.id,
-          name: facebookData.name,
-          email: facebookData.email,
-          likes: facebookData.likes
-        }
+      const res = await fetch('/api/auth/facebook-profile-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: user.id,
+          facebookData: {
+            id: facebookData.id,
+            name: facebookData.name,
+            email: (facebookData as any).email,
+            likes: (facebookData as any).likes,
+          },
+        }),
       });
-      
-      console.log('Facebook profile import response:', response);
-      
-      const responseData = await response.json();
-      if (responseData.success) {
-        const imported = responseData.imported;
-        let importMessage = 'Facebook profile imported successfully!';
-        const importedItems = [];
-        
-        if (imported.email) importedItems.push('email');
-        if (imported.name) importedItems.push('name');
-        if (imported.likes) importedItems.push(`${facebookData.likes?.data?.length || 0} likes`);
-        
-        if (importedItems.length > 0) {
-          importMessage += ` Imported: ${importedItems.join(', ')}.`;
-        }
-        
-        toast({
-          title: "Profile Updated",
-          description: importMessage,
-        });
+      const data = await res.json();
+      if (data?.success) {
+        toast({ title: 'Profile Updated', description: 'Facebook profile imported.' });
       }
     } catch (error) {
-      console.error('Error importing Facebook profile:', error);
-      toast({
-        title: "Import Failed",
-        description: "Could not import your Facebook profile data.",
-        variant: "destructive",
-      });
+      toast({ title: 'Import Failed', description: 'Could not import your Facebook profile data.', variant: 'destructive' });
     } finally {
       setIsImportingProfile(false);
     }
   };
 
   const handleConnect = async () => {
-    setIsConnecting(true);
-    
     try {
-      // First check if Facebook SDK is ready
-      await FacebookSDK.waitForSDK();
-      console.log('Facebook SDK ready, starting login...');
-      
-      // Request all creator permissions you've added to the Facebook app
-      const loginResult = await FacebookSDK.login('public_profile,email,pages_show_list,business_management,instagram_basic,pages_read_engagement');
-      console.log('Facebook login result (basic permissions):', loginResult);
-      
-      if (loginResult.success && loginResult.accessToken) {
-        setIsConnected(true);
-        const pageCount = await loadUserDataFromStoredToken(loginResult.accessToken);
-        
-        toast({
-          title: "Facebook Connected",
-          description: `Connected successfully! Found ${pageCount} page(s).`,
-        });
-      } else {
-        let errorMessage = "Failed to connect to Facebook";
-        if (loginResult.error === 'not_authorized') {
-          errorMessage = "Please authorize Fandomly to access your Facebook account";
-        } else if (loginResult.error === 'unknown') {
-          errorMessage = "Please log into Facebook first, then try connecting again";
-        }
-        
-        toast({
-          title: "Connection Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      await connectFacebook();
     } catch (error) {
-      console.error('Facebook connection error:', error);
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to Facebook. Make sure you're logged into Facebook.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsConnecting(false);
+      toast({ title: 'Connection Error', description: 'Unable to connect to Facebook', variant: 'destructive' });
     }
   };
 
   const handlePageSelect = async (page: FacebookPage) => {
-    setSelectedPage(page);
-    
-    // Get enhanced page data using your new permissions
     try {
-      const followerCount = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
-      const engagementData = await FacebookSDK.getPageEngagementData(page.id, page.access_token);
-      
-      const enhancedPage = { 
-        ...page, 
-        followers_count: followerCount,
-        engagement_data: engagementData
-      };
-      
-      onConnectionSuccess?.(enhancedPage);
-      
-      let description = `Connected to ${page.name} with ${followerCount.toLocaleString()} followers`;
-      if (engagementData) {
-        description += ` • Enhanced analytics available`;
-      }
-      
-      toast({
-        title: "Page Connected with Analytics",
-        description,
-      });
-    } catch (error) {
-      console.error('Error getting enhanced page data:', error);
+      await selectPage(page);
       onConnectionSuccess?.(page);
-    }
-  };
-
-  const handleFacebookResponse = async (response: any) => {
-    console.log('Handling Facebook response:', response);
-    
-    if (response.status === 'connected' && response.authResponse) {
-      setIsConnected(true);
-      const pageCount = await loadUserDataFromStoredToken(response.authResponse.accessToken);
-      
-      toast({
-        title: "Facebook Connected",
-        description: `Connected successfully! Found ${pageCount} page(s).`,
-      });
-    } else if (response.status === 'not_authorized') {
-      toast({
-        title: "Authorization Required",
-        description: "Please authorize Fandomly to access your Facebook account",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Facebook Login Required",
-        description: "Please log into Facebook to continue",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDisconnect = async () => {
-    try {
-      await FacebookSDK.logout();
-      setIsConnected(false);
-      setUserInfo(null);
-      setPages([]);
-      setSelectedPage(null);
-      
-      toast({
-        title: "Disconnected",
-        description: "Successfully disconnected from Facebook",
-      });
     } catch (error) {
-      console.error('Facebook disconnect error:', error);
+      console.error('Select page failed:', error);
     }
   };
 
@@ -300,26 +98,16 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Official Facebook Login Button - Only basic permissions */}
-            <div 
-              className="fb-login-button" 
-              data-size="large"
-              data-button-type="continue_with"
-              data-layout="default"
-              data-auto-logout-link="false"
-              data-use-continue-as="true"
-              data-scope="public_profile,email"
-              data-onlogin="checkLoginState"
-              data-testid="facebook-login-button"
-              style={{minHeight: '40px', display: 'block'}}
-            ></div>
+            <Button onClick={handleConnect} disabled={isConnecting} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {isConnecting ? 'Connecting…' : 'Connect with Facebook'}
+            </Button>
           </div>
-          
           <div className="mt-4 text-xs text-gray-400 space-y-1">
-            <p>Basic permissions:</p>
+            <p>Permissions requested:</p>
             <ul className="list-disc list-inside space-y-1 pl-2">
-              <li>Access to your public profile</li>
-              <li>Your email address</li>
+              <li>public_profile, email</li>
+              <li>pages_show_list, pages_read_engagement</li>
+              <li>business_management, instagram_basic</li>
             </ul>
           </div>
         </CardContent>
@@ -339,7 +127,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
           <Button
             variant="outline"
             size="sm"
-            onClick={handleDisconnect}
+            onClick={disconnectFacebook}
             className="text-gray-300 border-gray-600 hover:bg-red-500/10"
             data-testid="button-facebook-disconnect"
           >
@@ -349,12 +137,11 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
         {userInfo && (
           <div className="text-gray-300 text-sm space-y-2">
             <p>Connected as {userInfo.name}</p>
-            {userInfo.email && <p className="text-xs">Email: {userInfo.email}</p>}
+            {(userInfo as any).email && <p className="text-xs">Email: {(userInfo as any).email}</p>}
             <p className="text-xs">ID: {userInfo.id}</p>
-            {userInfo.likes && (
-              <p className="text-xs">Likes: {userInfo.likes.data?.length || 0} pages/interests</p>
+            {(userInfo as any).likes && (
+              <p className="text-xs">Likes: {(userInfo as any).likes.data?.length || 0} pages/interests</p>
             )}
-            
             {user && (
               <div className="pt-2">
                 <Button
@@ -373,13 +160,13 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
           </div>
         )}
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
-        {pages.length > 0 && (
+        {connectedPages.length > 0 && (
           <div>
             <h4 className="text-white font-medium mb-3">Select Your Page for Campaigns:</h4>
             <div className="space-y-2">
-              {pages.map((page) => (
+              {connectedPages.map((page) => (
                 <div
                   key={page.id}
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
@@ -393,13 +180,13 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
                   <div className="flex items-center justify-between">
                     <div>
                       <h5 className="text-white font-medium">{page.name}</h5>
-                      <p className="text-gray-400 text-sm capitalize">{page.category}</p>
+                      <p className="text-gray-400 text-sm capitalize">{(page as any).category}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {page.fan_count && (
+                      {(page as any).fan_count && (
                         <Badge variant="secondary" className="text-xs">
                           <Users className="h-3 w-3 mr-1" />
-                          {page.fan_count.toLocaleString()}
+                          {(page as any).fan_count.toLocaleString()}
                         </Badge>
                       )}
                       {selectedPage?.id === page.id && (
@@ -410,9 +197,40 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
                 </div>
               ))}
             </div>
+            <div className="pt-3">
+              <Button
+                variant="outline"
+                className="border-white/20 text-gray-300 hover:bg-white/10"
+                onClick={async () => {
+                  try {
+                    if (!user) return;
+                    const mapped = connectedPages.map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      access_token: (p as any).access_token,
+                      followers_count: (p as any).followers_count || (p as any).fan_count,
+                      fan_count: (p as any).fan_count,
+                      instagram_business_account: (p as any).instagram_business_account,
+                    }));
+                    const creatorId = (user as any)?.creator?.id || user.id;
+                    await fetch(`/api/creators/${creatorId}/facebook-pages`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ pages: mapped })
+                    });
+                    toast({ title: 'Saved Pages', description: 'Your pages are saved for use in campaigns and webhooks.' });
+                  } catch (e: any) {
+                    toast({ title: 'Save Failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+                  }
+                }}
+              >
+                Save Pages to Backend
+              </Button>
+            </div>
           </div>
         )}
-        
+
         {selectedPage && (
           <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
             <div className="flex items-center gap-2 text-green-400 mb-2">
@@ -424,8 +242,8 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
             </p>
           </div>
         )}
-        
-        {pages.length === 0 && (
+
+        {connectedPages.length === 0 && (
           <div className="text-center py-4">
             <p className="text-gray-400 text-sm">
               No Facebook pages found. Make sure you're an admin of at least one Facebook page.

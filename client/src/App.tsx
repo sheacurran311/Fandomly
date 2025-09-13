@@ -36,6 +36,9 @@ import Profile from "@/pages/profile";
 import FanProfile from "@/pages/fan-profile";
 import FacebookLikeCampaign from "@/pages/facebook-like-campaign";
 import CreatorShowcase from "@/pages/creator-showcase";
+import MetaGraphDebugger from "@/pages/meta-graph-debugger";
+import FacebookLogin from "@/pages/facebook-login";
+import FacebookLoginFan from "@/pages/facebook-login-fan";
 
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
@@ -70,6 +73,9 @@ function Router() {
       <Route path="/fan-profile" component={FanProfile} />
       <Route path="/facebook-like-campaign" component={FacebookLikeCampaign} />
       <Route path="/creator-showcase" component={CreatorShowcase} />
+      <Route path="/meta-graph-debugger" component={MetaGraphDebugger} />
+      <Route path="/facebook-login" component={FacebookLogin} />
+      <Route path="/facebook-login-fan" component={FacebookLoginFan} />
       
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />

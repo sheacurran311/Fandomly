@@ -49,6 +49,12 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
   const checkFacebookStatus = async () => {
     try {
       await FacebookSDK.waitForSDK();
+      // Ensure Fan App ID is active for fan-side auth
+      try {
+        const fanAppId = (window as any).__FB_DEFAULTS__?.FAN_APP_ID || '4233782626946744';
+        const reinit = (window as any).reinitializeFacebookApp;
+        if (reinit) reinit(fanAppId);
+      } catch {}
       
       window.FB.getLoginStatus((response) => {
         setIsCheckingStatus(false);
@@ -88,6 +94,13 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
   const connectFacebook = useMutation({
     mutationFn: async () => {
       await FacebookSDK.waitForSDK();
+      // Ensure Fan App ID for login flow
+      try {
+        const fanAppId = (window as any).__FB_DEFAULTS__?.FAN_APP_ID || '4233782626946744';
+        const reinit = (window as any).reinitializeFacebookApp;
+        if (reinit) reinit(fanAppId);
+        await new Promise(r => setTimeout(r, 100));
+      } catch {}
       
       return new Promise<FacebookProfileData>((resolve, reject) => {
         window.FB.login((response) => {
