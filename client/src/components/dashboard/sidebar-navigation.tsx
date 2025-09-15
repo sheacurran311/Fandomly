@@ -53,6 +53,7 @@ const fanItems: SidebarItem[] = [
   { label: "Profile", href: "/fan-profile", icon: User },
   { label: "Following", href: "/fan-dashboard/following", icon: Heart, color: "text-red-400" },
   { label: "Campaigns", href: "/fan-dashboard/campaigns", icon: Trophy, color: "text-yellow-400" },
+  { label: "Social Accounts", href: "/fan-dashboard/social", icon: Instagram, color: "text-pink-400" },
   { label: "Achievements", href: "/fan-dashboard/achievements", icon: Star, color: "text-purple-400" },
   { label: "Points", href: "/fan-dashboard/points", icon: CreditCard, color: "text-green-400" },
   { label: "Notifications", href: "/fan-dashboard/notifications", icon: Bell, color: "text-blue-400" },

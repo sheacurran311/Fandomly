@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { FacebookSDK } from "@/lib/facebook";
+import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 import { Instagram, Twitter, Facebook, Music2, Check } from "lucide-react";
 
 interface SocialConnectionsProps {
@@ -13,6 +13,7 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
+  const { connectFacebook, isConnected } = useFacebookConnection();
 
   const handleFacebookConnect = async () => {
     if (userType !== "creator") {
@@ -27,31 +28,9 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
     setIsConnecting(true);
     
     try {
-      // Use the updated Facebook SDK for creators
-      const loginResult = await FacebookSDK.login('public_profile,email');
-      
-      if (loginResult.success) {
-        // Get creator-specific data using your updated API call
-        const creatorData = await FacebookSDK.getCreatorData();
-        
-        if (creatorData) {
-          setFacebookConnected(true);
-          
-          toast({
-            title: "Facebook Connected! 🎉",
-            description: `Successfully connected as ${creatorData.name}. Creator data imported.`,
-            duration: 4000,
-          });
-          
-          console.log('Creator Facebook data:', creatorData);
-        }
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: "Failed to connect to Facebook. Please try again.",
-          variant: "destructive",
-        });
-      }
+      await connectFacebook();
+      setFacebookConnected(true);
+      toast({ title: "Facebook Connected! 🎉", description: "Your Facebook account is linked." });
     } catch (error) {
       console.error('Facebook connection error:', error);
       toast({
@@ -84,7 +63,7 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
           data-testid="button-connect-facebook-creator"
         >
           <Facebook className="h-4 w-4 mr-2"/>
-          {isConnecting ? 'Connecting...' : facebookConnected ? (
+          {isConnecting ? 'Connecting...' : (facebookConnected || isConnected) ? (
             <>
               <Check className="h-4 w-4 ml-auto" />
               Facebook Connected

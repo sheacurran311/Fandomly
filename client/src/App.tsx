@@ -23,11 +23,16 @@ import CreatorFans from "@/pages/creator-dashboard/fans";
 import CreatorGrowth from "@/pages/creator-dashboard/growth";
 import CreatorRevenue from "@/pages/creator-dashboard/revenue";
 import CreatorNIL from "@/pages/creator-dashboard/nil";
+import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
+import CreatorSettings from "@/pages/creator-dashboard/settings";
 import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
+import FanSocial from "@/pages/fan-dashboard/social";
 import FanFollowing from "@/pages/fan-dashboard/following";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
 import FanPoints from "@/pages/fan-dashboard/points";
+import FanNotifications from "@/pages/fan-dashboard/notifications";
+import FanSettings from "@/pages/fan-dashboard/settings";
 import NILDashboard from "@/pages/nil-dashboard";
 // RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
@@ -37,8 +42,7 @@ import FanProfile from "@/pages/fan-profile";
 import FacebookLikeCampaign from "@/pages/facebook-like-campaign";
 import CreatorShowcase from "@/pages/creator-showcase";
 import MetaGraphDebugger from "@/pages/meta-graph-debugger";
-import FacebookLogin from "@/pages/facebook-login";
-import FacebookLoginFan from "@/pages/facebook-login-fan";
+// Removed obsolete Facebook test login pages
 
 import PrivacyPolicy from "@/pages/privacy-policy";
 import DataDeletion from "@/pages/data-deletion";
@@ -62,11 +66,16 @@ function Router() {
       <Route path="/creator-dashboard/growth" component={CreatorGrowth} />
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
+      <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
+      <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
+      <Route path="/fan-dashboard/social" component={FanSocial} />
       <Route path="/fan-dashboard/following" component={FanFollowing} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
+      <Route path="/fan-dashboard/notifications" component={FanNotifications} />
+      <Route path="/fan-dashboard/settings" component={FanSettings} />
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/profile" component={Profile} />
@@ -74,8 +83,7 @@ function Router() {
       <Route path="/facebook-like-campaign" component={FacebookLikeCampaign} />
       <Route path="/creator-showcase" component={CreatorShowcase} />
       <Route path="/meta-graph-debugger" component={MetaGraphDebugger} />
-      <Route path="/facebook-login" component={FacebookLogin} />
-      <Route path="/facebook-login-fan" component={FacebookLoginFan} />
+      {/* Deprecated facebook-login routes removed */}
       
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />

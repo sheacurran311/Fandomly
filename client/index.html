@@ -22,7 +22,10 @@
         var FAN_APP_ID = window.FACEBOOK_FAN_APP_ID || '4233782626946744';
         var CREATOR_APP_ID = window.FACEBOOK_CREATOR_APP_ID || '1665384740795979';
         var API_VERSION = window.FACEBOOK_API_VERSION || 'v23.0';
-        var INITIAL_APP_ID = window.FACEBOOK_APP_ID || FAN_APP_ID;
+        // Choose initial App ID based on route context: use Creator app on creator routes, else Fan app
+        var PATHNAME = (window.location && window.location.pathname) || '/';
+        var IS_CREATOR_CONTEXT = PATHNAME.startsWith('/creator') || PATHNAME === '/profile';
+        var INITIAL_APP_ID = window.FACEBOOK_APP_ID || (IS_CREATOR_CONTEXT ? CREATOR_APP_ID : FAN_APP_ID);
         window.__FB_DEFAULTS__ = { FAN_APP_ID: FAN_APP_ID, CREATOR_APP_ID: CREATOR_APP_ID, API_VERSION: API_VERSION };
 
         window.fbAsyncInit = function() {

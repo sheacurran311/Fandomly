@@ -111,11 +111,6 @@ export default function FanDashboard() {
             )}
           </div>
 
-          {/* Facebook Profile Import */}
-          <div className="mb-8">
-            <FacebookProfileImport />
-          </div>
-
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Active Campaigns */}
@@ -124,7 +119,12 @@ export default function FanDashboard() {
                 <CardHeader>
                   <CardTitle className="text-white flex items-center justify-between">
                     <span>Active Campaigns</span>
-                    <Button variant="outline" size="sm" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+                      onClick={() => window.location.href = '/fan-dashboard/campaigns'}
+                    >
                       View All
                     </Button>
                   </CardTitle>
@@ -186,21 +186,35 @@ export default function FanDashboard() {
 
             {/* Sidebar Cards */}
             <div className="space-y-6">
+              {/* Facebook Profile Import */}
+              <FacebookProfileImport />
+              
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white text-sm">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full bg-brand-secondary hover:bg-brand-secondary/80 justify-start">
+                  <Button 
+                    className="w-full bg-brand-secondary hover:bg-brand-secondary/80 justify-start"
+                    onClick={() => window.location.href = '/fan-dashboard/campaigns'}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Join New Campaign
                   </Button>
-                  <Button variant="outline" className="w-full border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 justify-start"
+                    onClick={() => window.location.href = '/marketplace'}
+                  >
                     <Gift className="h-4 w-4 mr-2" />
                     Browse Rewards
                   </Button>
-                  <Button variant="outline" className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start"
+                    onClick={() => window.location.href = '/marketplace'}
+                  >
                     <Users className="h-4 w-4 mr-2" />
                     Discover Creators
                   </Button>

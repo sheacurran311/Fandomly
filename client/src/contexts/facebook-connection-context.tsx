@@ -44,19 +44,67 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
   }, [user]);
 
   useEffect(() => {
-    checkConnectionStatus();
-  }, []);
+    // Only initialize Facebook for authenticated users
+    if (!user) {
+      console.log('[FB] No authenticated user - skipping Facebook initialization');
+      return;
+    }
+
+    // Register a basic statusChangeCallback compatible with FB docs (no async in callback)
+    const statusChangeCallback = (response: any) => {
+      try {
+        console.log('[FB] statusChangeCallback ->', response?.status);
+        if (response && response.status === 'connected' && response.authResponse?.accessToken) {
+          const token = response.authResponse.accessToken;
+          loadUserDataFromToken(token).catch((error) => {
+            console.error('[FB] statusChangeCallback load error:', error);
+            setState(prev => ({ ...prev, isConnected: false }));
+          });
+        } else {
+          setState(prev => ({ ...prev, isConnected: false, userInfo: null, connectedPages: [], selectedPage: null }));
+        }
+      } catch (error) {
+        console.error('[FB] statusChangeCallback error:', error);
+        setState(prev => ({ ...prev, isConnected: false }));
+      }
+    };
+
+    (window as any).handleFacebookLoginStatus = statusChangeCallback;
+
+    // Only check status for authenticated users, and only when explicitly requested
+    console.log('[FB] Authenticated user detected - Facebook provider ready');
+  }, [user]);
 
   const checkConnectionStatus = useCallback(async () => {
     try {
-      await reinitForCurrentUser();
       console.log('[FB] checkConnectionStatus');
-      const status = await FacebookSDK.getLoginStatus();
-      console.log('[FB] getLoginStatus ->', status?.status);
-      if (status.isLoggedIn && status.accessToken) {
-        await loadUserDataFromToken(status.accessToken);
+      // First, check status without reinitializing (per FB docs)
+      if (typeof window !== 'undefined' && (window as any).FB && typeof (window as any).FB.getLoginStatus === 'function') {
+        await new Promise<void>((resolve) => {
+          (window as any).FB.getLoginStatus((response: any) => {
+            console.log('[FB] getLoginStatus ->', response?.status);
+            if (response?.status === 'connected' && response.authResponse?.accessToken) {
+              loadUserDataFromToken(response.authResponse.accessToken)
+                .catch((error) => {
+                  console.error('[FB] getLoginStatus load error:', error);
+                  setState(prev => ({ ...prev, isConnected: false }));
+                })
+                .finally(() => resolve());
+            } else {
+              setState(prev => ({ ...prev, isConnected: false, userInfo: null, connectedPages: [], selectedPage: null }));
+              resolve();
+            }
+          });
+        });
       } else {
-        setState(prev => ({ ...prev, isConnected: false, userInfo: null, connectedPages: [], selectedPage: null }));
+        // SDK wrapper fallback
+        const status = await FacebookSDK.getLoginStatus();
+        console.log('[FB] wrapper getLoginStatus ->', status?.status);
+        if (status.isLoggedIn && status.accessToken) {
+          await loadUserDataFromToken(status.accessToken);
+        } else {
+          setState(prev => ({ ...prev, isConnected: false, userInfo: null, connectedPages: [], selectedPage: null }));
+        }
       }
     } catch (error) {
       console.error('[FB] checkConnectionStatus error:', error);
@@ -66,18 +114,32 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
 
   const loadUserDataFromToken = useCallback(async (accessToken: string) => {
     try {
-      console.log('[FB] loadUserDataFromToken start');
+      console.log('[FB] loadUserDataFromToken start with token:', accessToken?.substring(0, 10) + '...');
+      
+      console.log('[FB] calling getUserInfo...');
       const facebookUser = await FacebookSDK.getUserInfo(accessToken);
+      console.log('[FB] getUserInfo result:', facebookUser ? 'SUCCESS' : 'NULL');
+      
       if (facebookUser) {
         console.log('[FB] user OK ->', facebookUser?.id);
+        
+        console.log('[FB] calling getUserPages...');
         const userPages = await FacebookSDK.getUserPages(accessToken);
-        console.log('[FB] pages count ->', userPages?.length);
+        console.log('[FB] getUserPages result:', userPages?.length || 0, 'pages');
+        
         const savedPageId = localStorage.getItem('fandomly_selected_facebook_page');
-        const selectedPage = savedPageId ? userPages.find(page => page.id === savedPageId) || userPages[0] : userPages[0];
+        const selectedPage = savedPageId ? userPages.find((page: any) => page.id === savedPageId) || userPages[0] : userPages[0];
+        
+        console.log('[FB] setting state with connected=true, pages:', userPages?.length);
         setState(prev => ({ ...prev, isConnected: true, userInfo: facebookUser, connectedPages: userPages, selectedPage: selectedPage || null }));
+        
+        console.log('[FB] loadUserDataFromToken COMPLETE');
         return userPages.length;
+      } else {
+        console.log('[FB] loadUserDataFromToken - no user data returned');
+        setState(prev => ({ ...prev, isConnected: false }));
+        return 0;
       }
-      return 0;
     } catch (error) {
       console.error('[FB] loadUserDataFromToken error:', error);
       setState(prev => ({ ...prev, isConnected: false }));
@@ -87,6 +149,8 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
 
   const connectFacebook = useCallback(async () => {
     if (state.isConnecting) return;
+    
+    console.log('[FB] connectFacebook called, current state.isConnected:', state.isConnected);
     setState(prev => ({ ...prev, isConnecting: true }));
 
     try {
@@ -97,12 +161,18 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
         throw new Error('Facebook SDK not ready');
       }
 
+      // Ensure correct app id before login only if different
       try {
         const defaults = (window as any).__FB_DEFAULTS__;
         const reinit = (window as any).reinitializeFacebookApp;
+        const current = (window as any).__FB_CURRENT_APP_ID__;
         if (defaults?.CREATOR_APP_ID && defaults?.FAN_APP_ID && reinit) {
-          const appId = user?.userType === 'creator' ? defaults.CREATOR_APP_ID : defaults.FAN_APP_ID;
-          reinit(appId);
+          const desired = user?.userType === 'creator' ? defaults.CREATOR_APP_ID : defaults.FAN_APP_ID;
+          console.log('[FB] current appId:', current, 'desired:', desired);
+          if (current !== desired) {
+            console.log('[FB] reinitializing with desired appId:', desired);
+            reinit(desired);
+          }
         }
       } catch {}
 
@@ -114,37 +184,42 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
       await new Promise<void>((resolve) => {
         let resolved = false;
         const done = () => { if (!resolved) { resolved = true; resolve(); } };
-        // Fallback timer: if callback never fires, check status and resolve
-        const t = setTimeout(async () => {
-          console.warn('[FB] FB.login timeout fallback - checking status');
-          try {
-            const st = await FacebookSDK.getLoginStatus();
-            if (st?.isLoggedIn && st.accessToken) {
-              await loadUserDataFromToken(st.accessToken);
-              toast({ title: 'Facebook Connected', description: 'Loaded session from status.' });
-            }
-          } catch {}
+        
+        // Timeout to prevent stuck "Connecting..." state
+        const timeout = setTimeout(() => {
+          console.warn('[FB] FB.login timeout - forcing resolve');
+          toast({ title: 'Connection Timeout', description: 'Facebook login took too long. Please try again.', variant: 'destructive' });
           done();
-        }, 8000);
-
-        window.FB.login((response: any) => {
-          (async () => {
-            try {
-              console.log('[FB] FB.login callback status:', response?.status);
-              if (response && response.status === 'connected' && response.authResponse?.accessToken) {
-                await loadUserDataFromToken(response.authResponse.accessToken);
-                toast({ title: 'Facebook Connected Successfully! 🎉', description: 'Connected to Facebook and loaded your pages.', duration: 4000 });
-              } else {
-                toast({ title: 'Connection Failed', description: 'Please authorize access', variant: 'destructive' });
-              }
-            } catch (err) {
-              console.error('[FB] FB.login handler error:', err);
-              toast({ title: 'Connection Error', description: 'Could not complete Facebook login', variant: 'destructive' });
-            } finally {
-              clearTimeout(t);
+        }, 15000);
+        
+        window.FB.login(function(response: any) {
+          try {
+            console.log('[FB] FB.login callback status:', response?.status);
+            if (response && response.status === 'connected' && response.authResponse?.accessToken) {
+              const token = response.authResponse.accessToken;
+              loadUserDataFromToken(token)
+                .then(() => {
+                  toast({ title: 'Facebook Connected Successfully! 🎉', description: 'Connected to Facebook and loaded your pages.', duration: 4000 });
+                })
+                .catch((err) => {
+                  console.error('[FB] FB.login handler error:', err);
+                  toast({ title: 'Connection Error', description: 'Could not complete Facebook login', variant: 'destructive' });
+                })
+                .finally(() => {
+                  clearTimeout(timeout);
+                  done();
+                });
+            } else {
+              toast({ title: 'Connection Failed', description: 'Please authorize access', variant: 'destructive' });
+              clearTimeout(timeout);
               done();
             }
-          })();
+          } catch (err) {
+            console.error('[FB] FB.login handler error:', err);
+            toast({ title: 'Connection Error', description: 'Could not complete Facebook login', variant: 'destructive' });
+            clearTimeout(timeout);
+            done();
+          }
         }, { scope: scopes });
       });
     } catch (error) {

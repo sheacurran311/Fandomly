@@ -29,10 +29,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   } = useFacebookConnection();
   const [isImportingProfile, setIsImportingProfile] = useState(false);
 
-  useEffect(() => {
-    // On mount, refresh connection status via context (which re-inits proper App ID)
-    refreshConnection();
-  }, [refreshConnection]);
+  // Removed automatic refresh on mount - Facebook connection is now opt-in only
 
   const importFacebookProfile = async (facebookData: FacebookUser) => {
     if (!user) {

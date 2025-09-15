@@ -161,26 +161,34 @@ export class FacebookSDK {
 
   static async getUserInfo(accessToken: string): Promise<FacebookUser | null> {
     await this.waitForSDK();
+    console.log('[FB SDK] getUserInfo called');
 
     return new Promise((resolve) => {
+      console.log('[FB SDK] calling FB.api /me...');
       window.FB.api(
         '/me',
         'GET',
         { fields: 'id,name,email,picture.width(200).height(200)' },
         function(response) {
+          console.log('[FB SDK] /me response:', response);
           if (response && !response.error) {
+            console.log('[FB SDK] /me SUCCESS');
             resolve(response as FacebookUser);
           } else {
             console.error('[FB] /me error:', response?.error || response);
+            console.log('[FB SDK] trying fallback /me with minimal fields...');
             window.FB.api(
               '/me',
               'GET',
               { fields: 'id,name' },
               function(fallbackResponse) {
+                console.log('[FB SDK] /me fallback response:', fallbackResponse);
                 if (fallbackResponse && !fallbackResponse.error) {
+                  console.log('[FB SDK] /me fallback SUCCESS');
                   resolve(fallbackResponse as FacebookUser);
                 } else {
                   console.error('[FB] /me fallback error:', fallbackResponse?.error || fallbackResponse);
+                  console.log('[FB SDK] /me fallback FAILED');
                   resolve(null);
                 }
               }
@@ -193,15 +201,20 @@ export class FacebookSDK {
 
   static async getUserPages(accessToken: string): Promise<FacebookPage[]> {
     await this.waitForSDK();
+    console.log('[FB SDK] getUserPages called');
 
     return new Promise((resolve) => {
+      console.log('[FB SDK] calling FB.api /me/accounts...');
       window.FB.api('/me/accounts', 'GET', {
         fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account'
       }, (response: any) => {
+        console.log('[FB SDK] /me/accounts response:', response);
         if (response && response.data && !response.error) {
+          console.log('[FB SDK] /me/accounts SUCCESS ->', response.data.length, 'pages');
           resolve(response.data as FacebookPage[]);
         } else {
           console.error('[FB] /me/accounts error:', response?.error || response);
+          console.log('[FB SDK] /me/accounts FAILED');
           resolve([]);
         }
       });

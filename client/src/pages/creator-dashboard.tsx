@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import FacebookConnect from "@/components/facebook-connect";
-import { FacebookSDK } from "@/lib/facebook";
+// Removed unused FacebookSDK.getCreatorData reference
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -91,7 +91,12 @@ export default function CreatorDashboard() {
                 <CardHeader>
                   <CardTitle className="text-white flex items-center justify-between">
                     <span>Recent Activity</span>
-                    <Button variant="outline" size="sm" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+                      onClick={() => window.location.href = '/creator-dashboard/campaigns'}
+                    >
                       View All
                     </Button>
                   </CardTitle>
@@ -137,30 +142,30 @@ export default function CreatorDashboard() {
                   <CardTitle className="text-white text-sm">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full bg-brand-primary hover:bg-brand-primary/80 justify-start">
+                  <Button 
+                    className="w-full bg-brand-primary hover:bg-brand-primary/80 justify-start"
+                    onClick={() => window.location.href = '/campaign-builder'}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Campaign
                   </Button>
                   <Button 
                     variant="outline" 
                     className="w-full border-[#101636]/30 text-[#101636] hover:bg-[#101636]/10 justify-start"
-                    onClick={async () => {
-                      try {
-                        const creatorData = await FacebookSDK.getCreatorData();
-                        if (creatorData) {
-                          console.log('Creator Facebook campaign data:', creatorData);
-                          // Navigate to Facebook campaign builder or show campaign options
-                        }
-                      } catch (error) {
-                        console.error('Error accessing Facebook for campaign:', error);
-                      }
+                    onClick={() => {
+                      // Placeholder: open Social page to manage Facebook campaigns
+                      window.location.href = '/creator-dashboard/social';
                     }}
                     data-testid="button-facebook-campaign"
                   >
                     <Facebook className="h-4 w-4 mr-2" />
                     Facebook Campaign
                   </Button>
-                  <Button variant="outline" className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start"
+                    onClick={() => window.location.href = '/creator-dashboard/analytics'}
+                  >
                     <BarChart3 className="h-4 w-4 mr-2" />
                     View Analytics
                   </Button>
