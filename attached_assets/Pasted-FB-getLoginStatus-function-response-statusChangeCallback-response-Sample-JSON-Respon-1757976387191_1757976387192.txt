@@ -1,0 +1,63 @@
+FB.getLoginStatus(function(response) {
+    statusChangeCallback(response);
+});
+Sample JSON Response
+{
+    status: 'connected',
+    authResponse: {
+        accessToken: '{access-token}',
+        expiresIn:'{unix-timestamp}',
+        reauthorize_required_in:'{seconds-until-token-expires}',
+        signedRequest:'{signed-parameter}',
+        userID:'{user-id}'
+    }
+}
+status specifies the login status of the person using the webpage. The status can be one of the following:
+
+Status Type	Description
+connected
+
+The person is logged into Facebook, and has logged into your webpage.
+
+not_authorized
+
+The person is logged into Facebook, but has not logged into your webpage.
+
+unknown
+
+The person is not logged into Facebook, so you don't know if they have logged into your webpage. Or FB.logout() was called before, and therefore, it cannot connect to Facebook.
+
+If the status is connected, the following authResponse parameters are included in the response:
+
+authResponse Parameters	Value
+accessToken
+
+An access token for the person using the webpage.
+
+expiresIn
+
+A UNIX time stamp when the token expires. Once the token expires, the person will need to login again.
+
+reauthorize_required_in
+
+The amount of time before the login expires, in seconds, and the person will need to login again.
+
+signedRequest
+
+A signed parameter that contains information about the person using your webpage.
+
+userID
+
+The ID of the person using your webpage.
+
+The JavaScript SDK automatically detects login status, so you don't need to do anything to enable this behavior.
+
+3. Log a Person In
+If a person opens your webpage but is not logged in or not logged in to Facebook, you can use the Login dialog to prompt them to log in to both. If they are not logged into Facebook, they will first be prompted to log in, then prompted to log in to your webpage.
+
+There are two ways to log someone in:
+
+The Facebook Login Button
+The Login Dialog from the JavaScript SDK
+A. Log In with the Login Button
+To use the Facebook Login Button, use our Plugin Configurator to customize the Login Button and get the code.

@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useFanFacebookConnection } from "@/contexts/fan-facebook-context";
+import SimpleFanFacebookConnect from "@/components/social/simple-fan-facebook-connect";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,13 +31,9 @@ import {
 
 export default function FanSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
-  const { 
-    isConnected: facebookConnected, 
-    isConnecting: facebookConnecting,
-    userInfo: facebookUser,
-    connectFacebook,
-    disconnectFacebook
-  } = useFanFacebookConnection();
+  
+  // For now, we'll use the simple Facebook connect component in the sidebar
+  // The social accounts display will show placeholder data except Facebook
 
   if (isLoading) {
     return (
@@ -93,16 +89,14 @@ export default function FanSocial() {
       bgColor: "bg-red-400/20",
       description: "Connect to participate in YouTube campaigns"
     },
-    // Real Facebook data for fan participation
     {
       platform: "Facebook",
       icon: Facebook,
-      handle: facebookUser?.name || "Connect Facebook",
-      connected: facebookConnected,
+      handle: "Connect Facebook",
+      connected: false,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
-      description: "Connect to participate in Facebook campaigns",
-      realData: true // Flag to identify real Facebook data
+      description: "Use the sidebar Facebook Connect widget"
     }
   ];
 
@@ -199,32 +193,10 @@ export default function FanSocial() {
                       
                       <div className="flex items-center space-x-2">
                         {isFacebook ? (
-                          // Facebook-specific buttons using unified state
-                          account.connected ? (
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-5 w-5 text-green-400" />
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="border-white/20 text-gray-300 hover:bg-white/10"
-                                onClick={disconnectFacebook}
-                                data-testid="button-disconnect-facebook-fan"
-                              >
-                                <Unlink className="h-4 w-4 mr-1" />
-                                Disconnect
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button 
-                              className="bg-brand-primary hover:bg-brand-primary/80"
-                              onClick={connectFacebook}
-                              disabled={facebookConnecting}
-                              data-testid="button-connect-facebook-fan"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              {facebookConnecting ? 'Connecting...' : 'Connect'}
-                            </Button>
-                          )
+                          // Facebook - use sidebar widget instead
+                          <Badge variant="outline" className="border-brand-primary/30 text-brand-primary text-xs">
+                            Use Sidebar Widget →
+                          </Badge>
                         ) : (
                           // Other platform buttons (coming soon)
                           <Button 
@@ -288,12 +260,8 @@ export default function FanSocial() {
                         <Button 
                           size="sm" 
                           className="w-full mt-3 bg-brand-primary hover:bg-brand-primary/80"
-                          disabled={!facebookConnected && campaign.platform === "Facebook"}
                         >
-                          {!facebookConnected && campaign.platform === "Facebook" ? 
-                            "Connect Facebook First" : 
-                            "Participate"
-                          }
+                          Participate
                         </Button>
                       </div>
                     );
