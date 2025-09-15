@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import SimpleFanFacebookConnect from "@/components/social/simple-fan-facebook-connect";
+import FanFacebookConnect from "@/components/social/fan-facebook-connect";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

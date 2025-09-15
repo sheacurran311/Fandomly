@@ -1,18 +1,129 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Facebook, User, CheckCircle, AlertCircle, Unlink, Plus } from "lucide-react";
-import { useFanFacebookConnection } from "@/contexts/fan-facebook-context";
+import { useToast } from "@/hooks/use-toast";
+
+interface FacebookUser {
+  id: string;
+  name: string;
+  email?: string;
+}
 
 export default function FanFacebookConnect() {
-  const { 
-    isConnected,
-    isConnecting,
-    userInfo,
-    connectFacebook,
-    disconnectFacebook,
-  } = useFanFacebookConnection();
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [userInfo, setUserInfo] = useState<FacebookUser | null>(null);
+  const { toast } = useToast();
+
+  // Initialize Facebook SDK when component mounts
+  useEffect(() => {
+    // Check if Facebook SDK is loaded
+    if (typeof window !== 'undefined' && window.FB) {
+      checkLoginStatus();
+    } else {
+      // Wait for FB SDK to load
+      const checkFB = setInterval(() => {
+        if (window.FB) {
+          clearInterval(checkFB);
+          checkLoginStatus();
+        }
+      }, 100);
+    }
+  }, []);
+
+  const checkLoginStatus = () => {
+    console.log('[Fan FB Simple] Checking login status...');
+    window.FB.getLoginStatus((response: any) => {
+      console.log('[Fan FB Simple] Login status:', response);
+      if (response.status === 'connected' && response.authResponse?.accessToken) {
+        loadUserInfo(response.authResponse.accessToken);
+      } else {
+        setIsConnected(false);
+        setUserInfo(null);
+      }
+    });
+  };
+
+  const loadUserInfo = async (accessToken: string) => {
+    try {
+      console.log('[Fan FB Simple] Loading user info...');
+      window.FB.api('/me', 'GET', { fields: 'name,email' }, (response: any) => {
+        console.log('[Fan FB Simple] User info response:', response);
+        if (response && !response.error) {
+          setUserInfo({
+            id: response.id,
+            name: response.name,
+            email: response.email
+          });
+          setIsConnected(true);
+          console.log('[Fan FB Simple] User connected successfully');
+        } else {
+          console.error('[Fan FB Simple] Error loading user info:', response?.error);
+          setIsConnected(false);
+          setUserInfo(null);
+        }
+      });
+    } catch (error) {
+      console.error('[Fan FB Simple] Error in loadUserInfo:', error);
+      setIsConnected(false);
+      setUserInfo(null);
+    }
+  };
+
+  const connectFacebook = async () => {
+    console.log('[Fan FB Simple] Connecting to Facebook...');
+    setIsConnecting(true);
+
+    try {
+      // Use Facebook's basic login pattern
+      window.FB.login((response: any) => {
+        console.log('[Fan FB Simple] Login response:', response);
+        
+        if (response.authResponse && response.status === 'connected') {
+          console.log('[Fan FB Simple] Login successful, loading user info...');
+          loadUserInfo(response.authResponse.accessToken);
+          toast({
+            title: "Facebook Connected! 🎉",
+            description: "Successfully connected to Facebook for fan campaigns.",
+            duration: 4000
+          });
+        } else {
+          console.log('[Fan FB Simple] Login failed or cancelled');
+          toast({
+            title: "Connection Failed",
+            description: "Facebook login was cancelled or failed. Please try again.",
+            variant: "destructive"
+          });
+        }
+        
+        setIsConnecting(false);
+      }, { 
+        scope: 'public_profile,email'
+      });
+    } catch (error) {
+      console.error('[Fan FB Simple] Connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: "An error occurred while connecting to Facebook.",
+        variant: "destructive"
+      });
+      setIsConnecting(false);
+    }
+  };
+
+  const disconnectFacebook = () => {
+    console.log('[Fan FB Simple] Disconnecting Facebook...');
+    window.FB.logout(() => {
+      setIsConnected(false);
+      setUserInfo(null);
+      toast({
+        title: "Facebook Disconnected",
+        description: "Successfully disconnected from Facebook.",
+      });
+    });
+  };
 
   return (
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">

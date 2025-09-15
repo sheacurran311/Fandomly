@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFanStats, useActiveCampaigns, useRecommendations } from "@/hooks/use-fan-dashboard";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
-import SimpleFanFacebookConnect from "@/components/social/simple-fan-facebook-connect";
+import FanFacebookConnect from "@/components/social/fan-facebook-connect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -187,7 +187,7 @@ export default function FanDashboard() {
             {/* Sidebar Cards */}
             <div className="space-y-6">
               {/* Facebook Profile Import */}
-              <SimpleFanFacebookConnect />
+              <FanFacebookConnect />
               
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
