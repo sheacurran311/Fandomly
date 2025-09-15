@@ -2,22 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Facebook, User, CheckCircle, AlertCircle, Unlink, Plus, Users, BarChart3 } from "lucide-react";
+import { Facebook, User, CheckCircle, AlertCircle, Unlink, Plus, Users, BarChart3, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface FacebookUser {
-  id: string;
-  name: string;
-  email?: string;
-}
-
-interface FacebookPage {
-  id: string;
-  name: string;
-  access_token: string;
-  category: string;
-  fan_count?: number;
-}
+import { FacebookSDKManager, FacebookUser, FacebookPage, FacebookLoginResult } from "@/lib/facebook";
 
 export default function SimpleCreatorFacebookConnect() {
   const [isConnected, setIsConnected] = useState(false);
@@ -25,153 +12,200 @@ export default function SimpleCreatorFacebookConnect() {
   const [userInfo, setUserInfo] = useState<FacebookUser | null>(null);
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [selectedPage, setSelectedPage] = useState<FacebookPage | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<{
+    grantedScopes?: string[];
+    deniedScopes?: string[];
+  }>({});
   const { toast } = useToast();
 
   // Initialize Facebook SDK when component mounts
   useEffect(() => {
-    // Check if Facebook SDK is loaded
-    if (typeof window !== 'undefined' && window.FB) {
-      checkLoginStatus();
-    } else {
-      // Wait for FB SDK to load
-      const checkFB = setInterval(() => {
-        if (window.FB) {
-          clearInterval(checkFB);
-          checkLoginStatus();
-        }
-      }, 100);
-    }
+    initializeFacebookForCreator();
   }, []);
 
-  const checkLoginStatus = () => {
-    console.log('[Creator FB Simple] Checking login status...');
-    window.FB.getLoginStatus((response: any) => {
-      console.log('[Creator FB Simple] Login status:', response);
-      if (response.status === 'connected' && response.authResponse?.accessToken) {
-        loadUserInfo(response.authResponse.accessToken);
+  const initializeFacebookForCreator = async () => {
+    try {
+      await FacebookSDKManager.ensureFBReady('creator');
+      checkLoginStatus();
+    } catch (error) {
+      console.error('[Creator FB] Failed to initialize Facebook SDK:', error);
+      toast({
+        title: "Initialization Error",
+        description: "Failed to initialize Facebook. Please refresh the page.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const checkLoginStatus = async () => {
+    try {
+      const status = await FacebookSDKManager.getLoginStatus();
+      if (status.isLoggedIn) {
+        // Load user info and pages if connected
+        await loadUserInfo();
       } else {
         setIsConnected(false);
         setUserInfo(null);
         setPages([]);
         setSelectedPage(null);
+        setPermissionStatus({});
       }
-    });
+    } catch (error) {
+      console.error('[Creator FB] Error checking login status:', error);
+      resetConnectionState();
+    }
   };
 
-  const loadUserInfo = async (accessToken: string) => {
+  const resetConnectionState = () => {
+    setIsConnected(false);
+    setUserInfo(null);
+    setPages([]);
+    setSelectedPage(null);
+    setPermissionStatus({});
+  };
+
+  const loadUserInfo = async () => {
     try {
-      console.log('[Creator FB Simple] Loading user info...');
-      window.FB.api('/me', 'GET', { fields: 'name,email' }, (response: any) => {
-        console.log('[Creator FB Simple] User info response:', response);
+      // Use FB API directly since we know we're connected
+      window.FB.api('/me', 'GET', { fields: 'id,name,email,picture.width(200).height(200)' }, (response: any) => {
         if (response && !response.error) {
           setUserInfo({
             id: response.id,
             name: response.name,
-            email: response.email
+            email: response.email,
+            picture: response.picture
           });
           setIsConnected(true);
-          loadPages(accessToken);
-          console.log('[Creator FB Simple] User connected successfully');
+          loadPages();
         } else {
-          console.error('[Creator FB Simple] Error loading user info:', response?.error);
-          setIsConnected(false);
-          setUserInfo(null);
+          console.error('[Creator FB] Error loading user info:', response?.error?.message || 'Unknown error');
+          resetConnectionState();
         }
       });
     } catch (error) {
-      console.error('[Creator FB Simple] Error in loadUserInfo:', error);
-      setIsConnected(false);
-      setUserInfo(null);
+      console.error('[Creator FB] Error in loadUserInfo:', error);
+      resetConnectionState();
     }
   };
 
-  const loadPages = async (accessToken: string) => {
+  const loadPages = async () => {
     try {
-      console.log('[Creator FB Simple] Loading pages...');
-      window.FB.api('/me/accounts', 'GET', { fields: 'name,category,fan_count,access_token' }, (response: any) => {
-        console.log('[Creator FB Simple] Pages response:', response);
-        if (response && response.data && !response.error) {
-          setPages(response.data);
-          
-          // Auto-select first page or previously selected page
-          const savedPageId = localStorage.getItem('fandomly_selected_facebook_page_creator');
-          if (savedPageId) {
-            const savedPage = response.data.find((page: FacebookPage) => page.id === savedPageId);
-            if (savedPage) {
-              setSelectedPage(savedPage);
-            } else if (response.data.length > 0) {
-              setSelectedPage(response.data[0]);
-              localStorage.setItem('fandomly_selected_facebook_page_creator', response.data[0].id);
-            }
-          } else if (response.data.length > 0) {
-            setSelectedPage(response.data[0]);
-            localStorage.setItem('fandomly_selected_facebook_page_creator', response.data[0].id);
-          }
-        } else {
-          console.error('[Creator FB Simple] Error loading pages:', response?.error);
+      const loadedPages = await FacebookSDKManager.getUserPages();
+      setPages(loadedPages);
+      
+      if (loadedPages.length > 0) {
+        // Auto-select first page or previously selected page
+        const savedPageId = localStorage.getItem('fandomly_selected_facebook_page_creator');
+        let pageToSelect = null;
+        
+        if (savedPageId) {
+          pageToSelect = loadedPages.find((page: FacebookPage) => page.id === savedPageId);
         }
-      });
+        
+        if (!pageToSelect) {
+          pageToSelect = loadedPages[0];
+        }
+        
+        setSelectedPage(pageToSelect);
+        if (pageToSelect) {
+          localStorage.setItem('fandomly_selected_facebook_page_creator', pageToSelect.id);
+        }
+      } else {
+        // No pages found - could be permissions issue
+        if (permissionStatus.deniedScopes?.includes('pages_show_list')) {
+          toast({
+            title: "Pages Access Denied",
+            description: "Cannot load Facebook pages. You denied pages access permission.",
+            variant: "destructive",
+            duration: 6000
+          });
+        } else {
+          toast({
+            title: "No Pages Found",
+            description: "No Facebook pages found. You may need to create a Facebook page first.",
+            variant: "destructive",
+            duration: 6000
+          });
+        }
+      }
     } catch (error) {
-      console.error('[Creator FB Simple] Error in loadPages:', error);
+      console.error('[Creator FB] Error loading pages:', error);
     }
   };
 
   const connectFacebook = async () => {
-    console.log('[Creator FB Simple] Connecting to Facebook...');
     setIsConnecting(true);
 
     try {
-      // Creator-specific permissions for page management
-      const creatorScopes = 'public_profile,email,pages_show_list,business_management,instagram_basic,pages_read_engagement';
+      const result: FacebookLoginResult = await FacebookSDKManager.secureLogin('creator');
       
-      window.FB.login((response: any) => {
-        console.log('[Creator FB Simple] Login response:', response);
-        
-        if (response.authResponse && response.status === 'connected') {
-          console.log('[Creator FB Simple] Login successful, loading user info...');
-          loadUserInfo(response.authResponse.accessToken);
+      if (result.success && result.user) {
+        setUserInfo(result.user);
+        setIsConnected(true);
+        setPermissionStatus({
+          grantedScopes: result.grantedScopes,
+          deniedScopes: result.deniedScopes
+        });
+
+        // Check if any important permissions were denied
+        const importantPermissions = ['pages_show_list', 'business_management', 'pages_read_engagement'];
+        const deniedImportant = result.deniedScopes?.filter(scope => 
+          importantPermissions.includes(scope)
+        ) || [];
+
+        if (deniedImportant.length > 0) {
           toast({
-            title: "Facebook Connected! 🎉",
-            description: "Successfully connected to Facebook and loaded your pages.",
-            duration: 4000
+            title: "Limited Business Access",
+            description: `Connected but some business permissions were denied: ${deniedImportant.join(', ')}. Page management may be limited.`,
+            variant: "destructive",
+            duration: 8000
           });
         } else {
-          console.log('[Creator FB Simple] Login failed or cancelled');
           toast({
-            title: "Connection Failed",
-            description: "Facebook login was cancelled or failed. Please try again.",
-            variant: "destructive"
+            title: "Facebook Business Connected! 🎉",
+            description: "Successfully connected to Facebook and loaded your business pages.",
+            duration: 4000
           });
         }
-        
-        setIsConnecting(false);
-      }, { 
-        scope: creatorScopes
-      });
+
+        // Load pages after successful connection
+        await loadPages();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Facebook login was cancelled or failed. Please try again.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
-      console.error('[Creator FB Simple] Connection error:', error);
+      console.error('[Creator FB] Connection error:', error);
       toast({
         title: "Connection Error",
         description: "An error occurred while connecting to Facebook.",
         variant: "destructive"
       });
+    } finally {
       setIsConnecting(false);
     }
   };
 
-  const disconnectFacebook = () => {
-    console.log('[Creator FB Simple] Disconnecting Facebook...');
-    window.FB.logout(() => {
-      setIsConnected(false);
-      setUserInfo(null);
-      setPages([]);
-      setSelectedPage(null);
+  const disconnectFacebook = async () => {
+    try {
+      await FacebookSDKManager.secureLogout();
+      resetConnectionState();
       localStorage.removeItem('fandomly_selected_facebook_page_creator');
       toast({
         title: "Facebook Disconnected",
         description: "Successfully disconnected from Facebook.",
       });
-    });
+    } catch (error) {
+      console.error('[Creator FB] Error during logout:', error);
+      toast({
+        title: "Logout Error",
+        description: "Error occurred while disconnecting. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const selectPage = (page: FacebookPage) => {
@@ -197,11 +231,22 @@ export default function SimpleCreatorFacebookConnect() {
             {/* User Info */}
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                <User className="h-5 w-5 text-blue-400" />
+                {userInfo.picture?.data?.url ? (
+                  <img 
+                    src={userInfo.picture.data.url} 
+                    alt={userInfo.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-5 w-5 text-blue-400" />
+                )}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">{userInfo.name}</p>
                 <p className="text-xs text-gray-400">Connected to Facebook</p>
+                {userInfo.email && (
+                  <p className="text-xs text-gray-500">{userInfo.email}</p>
+                )}
               </div>
               <Badge className="bg-green-500/20 text-green-400 text-xs">
                 <CheckCircle className="h-3 w-3 mr-1" />
@@ -209,8 +254,23 @@ export default function SimpleCreatorFacebookConnect() {
               </Badge>
             </div>
 
+            {/* Permission Status */}
+            {permissionStatus.deniedScopes && permissionStatus.deniedScopes.length > 0 && (
+              <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-yellow-400 font-medium">Limited Business Permissions</p>
+                    <p className="text-xs text-yellow-300">
+                      Denied: {permissionStatus.deniedScopes.join(', ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Selected Page */}
-            {selectedPage && (
+            {selectedPage ? (
               <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
@@ -246,6 +306,7 @@ export default function SimpleCreatorFacebookConnect() {
                               ? 'bg-brand-primary/20 text-brand-primary' 
                               : 'hover:bg-white/10 text-gray-300'
                           }`}
+                          data-testid={`button-select-page-${page.id}`}
                         >
                           {page.name} {page.fan_count ? `(${page.fan_count.toLocaleString()})` : ''}
                         </button>
@@ -254,10 +315,24 @@ export default function SimpleCreatorFacebookConnect() {
                   </div>
                 )}
               </div>
-            )}
+            ) : pages.length === 0 ? (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-red-400 font-medium">No Pages Found</p>
+                    <p className="text-xs text-red-300">
+                      Create a Facebook page first or check permissions
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             
             <div className="pt-2 border-t border-white/10">
-              <p className="text-xs text-gray-400 mb-2">Ready for campaign management!</p>
+              <p className="text-xs text-gray-400 mb-2">
+                {selectedPage ? 'Ready for campaign management!' : 'Need pages for campaigns'}
+              </p>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -290,9 +365,15 @@ export default function SimpleCreatorFacebookConnect() {
               {isConnecting ? 'Connecting...' : 'Connect Facebook'}
             </Button>
             
-            <p className="text-xs text-gray-500 text-center">
-              Connect your Facebook Business account to create and manage campaigns
-            </p>
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">
+                Connect your Facebook Business account to create and manage campaigns
+              </p>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>Required: Public profile, Email, Page access</p>
+                <p>Optional: Business management, Insights</p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

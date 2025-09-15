@@ -1,4 +1,6 @@
-// Facebook SDK utilities and types for Fandomly
+// Centralized Facebook SDK loader and utilities for Fandomly
+// Handles proper App ID separation between Fan and Creator contexts
+
 declare global {
   interface Window {
     FB: {
@@ -45,21 +47,6 @@ export interface FacebookUser {
   id: string;
   name: string;
   email?: string;
-  likes?: {
-    data: Array<{
-      id: string;
-      name: string;
-      category?: string;
-    }>;
-  };
-  photos?: any;
-  posts?: any;
-  friends?: any;
-  profile_pic?: string;
-  favorite_athletes?: string[];
-  favorite_teams?: string[];
-  sports?: string[];
-  businesses?: any;
   picture?: {
     data: {
       url: string;
@@ -77,236 +64,332 @@ export interface FacebookPage {
   engagement_data?: any;
 }
 
-export class FacebookSDK {
-  private static isInitialized = false;
+export interface FacebookLoginResult {
+  success: boolean;
+  user?: FacebookUser;
+  grantedScopes?: string[];
+  deniedScopes?: string[];
+  error?: string;
+  errorCode?: string;
+}
 
-  static async waitForSDK(): Promise<void> {
+export type UserType = 'fan' | 'creator';
+
+// App ID configuration
+const FB_APP_CONFIG = {
+  fan: {
+    appId: '4233782626946744', // Fan App ID
+    requiredScopes: ['public_profile', 'email']
+  },
+  creator: {
+    appId: import.meta.env.VITE_FACEBOOK_CREATOR_APP_ID || '4233782626946744', // Creator App ID (fallback to fan for now)
+    requiredScopes: ['public_profile', 'email', 'pages_show_list', 'business_management', 'pages_read_engagement']
+  }
+};
+
+const FB_API_VERSION = 'v23.0';
+
+class FacebookSDKManager {
+  private static currentAppId: string | null = null;
+  private static isInitialized = false;
+  private static initPromise: Promise<void> | null = null;
+  private static reinitInProgress = false;
+
+  /**
+   * Centralized Facebook SDK ready function
+   * Ensures FB SDK is loaded and initialized with correct App ID for user type
+   */
+  static async ensureFBReady(userType: UserType): Promise<void> {
+    const config = FB_APP_CONFIG[userType];
+    const requiredAppId = config.appId;
+
+    console.log(`[FB Manager] Ensuring FB ready for ${userType} with App ID: ${requiredAppId.substring(0, 6)}...`);
+
+    // If we need to reinitialize with different App ID
+    if (this.currentAppId && this.currentAppId !== requiredAppId && !this.reinitInProgress) {
+      console.log(`[FB Manager] App ID change detected, reinitializing...`);
+      await this.reinitializeSDK(requiredAppId);
+      return;
+    }
+
+    // If already initialized with correct App ID
+    if (this.isInitialized && this.currentAppId === requiredAppId && window.FB) {
+      console.log(`[FB Manager] Already initialized for ${userType}`);
+      return;
+    }
+
+    // Wait for existing initialization if in progress
+    if (this.initPromise) {
+      console.log(`[FB Manager] Waiting for existing initialization...`);
+      await this.initPromise;
+      return;
+    }
+
+    // Start new initialization
+    this.initPromise = this.initializeSDK(requiredAppId);
+    await this.initPromise;
+  }
+
+  private static async initializeSDK(appId: string): Promise<void> {
     return new Promise((resolve) => {
-      if (window.FB && FacebookSDK.isInitialized) {
+      console.log(`[FB Manager] Initializing SDK with App ID: ${appId.substring(0, 6)}...`);
+
+      if (window.FB) {
+        // SDK already loaded, just init with new config
+        this.finalizeInitialization(appId);
         resolve();
         return;
       }
 
-      if (window.fbAsyncInit) {
-        const originalInit = window.fbAsyncInit;
-        window.fbAsyncInit = function() {
-          originalInit();
-          FacebookSDK.isInitialized = true;
-          FacebookSDK.checkLoginStatusOnInit();
-          resolve();
-        };
-      } else {
-        window.fbAsyncInit = function() {
-          window.FB.init({
-            appId: (import.meta as any)?.env?.VITE_FACEBOOK_APP_ID || '4233782626946744',
-            xfbml: true,
-            version: (import.meta as any)?.env?.VITE_FACEBOOK_API_VERSION || 'v23.0'
-          });
-          window.FB.AppEvents.logPageView();
-          FacebookSDK.isInitialized = true;
-          FacebookSDK.checkLoginStatusOnInit();
-          resolve();
-        };
+      // Set up fbAsyncInit
+      window.fbAsyncInit = () => {
+        this.finalizeInitialization(appId);
+        resolve();
+      };
+
+      // Load FB SDK script if not present
+      if (!document.getElementById('facebook-jssdk')) {
+        const script = document.createElement('script');
+        script.id = 'facebook-jssdk';
+        script.src = `https://connect.facebook.net/en_US/sdk.js`;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
       }
     });
   }
 
-  private static checkLoginStatusOnInit(): void {
-    window.FB.getLoginStatus((response) => {
-      console.log('Facebook login status on page load:', response);
-      FacebookSDK.handleLoginStatusResponse(response);
+  private static async reinitializeSDK(newAppId: string): Promise<void> {
+    this.reinitInProgress = true;
+    console.log(`[FB Manager] Reinitializing with new App ID: ${newAppId.substring(0, 6)}...`);
+
+    // Reset state
+    this.isInitialized = false;
+    this.initPromise = null;
+
+    // Reinitialize
+    window.FB.init({
+      appId: newAppId,
+      xfbml: true,
+      version: FB_API_VERSION
     });
+
+    this.currentAppId = newAppId;
+    this.isInitialized = true;
+    this.reinitInProgress = false;
+
+    // Small delay to ensure reinitialization is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log(`[FB Manager] Reinitialization complete`);
   }
 
-  private static handleLoginStatusResponse(response: any): void {
-    if (response.status === 'connected') {
-      sessionStorage.setItem('fb_access_token', response.authResponse.accessToken);
-      sessionStorage.setItem('fb_user_id', response.authResponse.userID);
-      sessionStorage.setItem('fb_expires_in', response.authResponse.expiresIn.toString());
-      const expiresAtMs = Date.now() + (Number(response.authResponse.expiresIn) * 1000);
-      sessionStorage.setItem('fb_expires_at', String(expiresAtMs));
-      sessionStorage.setItem('fb_captured_at', String(Date.now()));
-    } else {
-      FacebookSDK.clearStoredTokens();
-    }
+  private static finalizeInitialization(appId: string): void {
+    window.FB.init({
+      appId: appId,
+      xfbml: true,
+      version: FB_API_VERSION
+    });
+
+    window.FB.AppEvents.logPageView();
+
+    this.currentAppId = appId;
+    this.isInitialized = true;
+    this.initPromise = null;
+
+    console.log(`[FB Manager] SDK initialized successfully`);
   }
 
-  private static clearStoredTokens(): void {
-    sessionStorage.removeItem('fb_access_token');
-    sessionStorage.removeItem('fb_user_id');
-    sessionStorage.removeItem('fb_expires_in');
-    sessionStorage.removeItem('fb_expires_at');
-    sessionStorage.removeItem('fb_captured_at');
-  }
+  /**
+   * Secure login with permissions verification
+   */
+  static async secureLogin(userType: UserType): Promise<FacebookLoginResult> {
+    await this.ensureFBReady(userType);
+    
+    const config = FB_APP_CONFIG[userType];
+    const scope = config.requiredScopes.join(',');
 
-  static async login(scope: string = 'public_profile,email'): Promise<{
-    success: boolean;
-    accessToken?: string;
-    userID?: string;
-    error?: string;
-  }> {
-    await this.waitForSDK();
+    console.log(`[FB Manager] Starting secure login for ${userType}`);
 
     return new Promise((resolve) => {
       window.FB.login((response) => {
-        FacebookSDK.handleLoginStatusResponse(response);
+        // Security: Never log full response which contains tokens
+        console.log(`[FB Manager] Login completed with status: ${response.status}`);
+
         if (response.status === 'connected' && response.authResponse) {
-          resolve({ success: true, accessToken: response.authResponse.accessToken, userID: response.authResponse.userID });
+          this.handleSuccessfulLogin(response, config.requiredScopes, resolve);
         } else {
-          resolve({ success: false, error: response.status });
+          resolve({
+            success: false,
+            error: `Login failed with status: ${response.status}`,
+            errorCode: response.status
+          });
         }
       }, { scope });
     });
   }
 
-  static async getUserInfo(accessToken: string): Promise<FacebookUser | null> {
-    await this.waitForSDK();
-    console.log('[FB SDK] getUserInfo called');
-
-    return new Promise((resolve) => {
-      console.log('[FB SDK] calling FB.api /me...');
-      window.FB.api(
-        '/me',
-        'GET',
-        { fields: 'id,name,email,picture.width(200).height(200)' },
-        function(response) {
-          console.log('[FB SDK] /me response:', response);
-          if (response && !response.error) {
-            console.log('[FB SDK] /me SUCCESS');
-            resolve(response as FacebookUser);
-          } else {
-            console.error('[FB] /me error:', response?.error || response);
-            console.log('[FB SDK] trying fallback /me with minimal fields...');
-            window.FB.api(
-              '/me',
-              'GET',
-              { fields: 'id,name' },
-              function(fallbackResponse) {
-                console.log('[FB SDK] /me fallback response:', fallbackResponse);
-                if (fallbackResponse && !fallbackResponse.error) {
-                  console.log('[FB SDK] /me fallback SUCCESS');
-                  resolve(fallbackResponse as FacebookUser);
-                } else {
-                  console.error('[FB] /me fallback error:', fallbackResponse?.error || fallbackResponse);
-                  console.log('[FB SDK] /me fallback FAILED');
-                  resolve(null);
-                }
-              }
-            );
-          }
-        }
-      );
+  private static handleSuccessfulLogin(
+    response: any, 
+    requiredScopes: string[], 
+    resolve: (result: FacebookLoginResult) => void
+  ): void {
+    // Get user info and verify permissions
+    window.FB.api('/me', 'GET', { 
+      fields: 'id,name,email,picture.width(200).height(200)' 
+    }, (userResponse) => {
+      if (userResponse && !userResponse.error) {
+        // Verify permissions
+        window.FB.api('/me/permissions', 'GET', {}, (permResponse) => {
+          const result = this.processPermissions(userResponse, permResponse, requiredScopes);
+          resolve(result);
+        });
+      } else {
+        console.error('[FB Manager] Failed to get user info:', userResponse?.error?.message || 'Unknown error');
+        resolve({
+          success: false,
+          error: 'Failed to get user information',
+          errorCode: 'USER_INFO_ERROR'
+        });
+      }
     });
   }
 
-  static async getUserPages(accessToken: string): Promise<FacebookPage[]> {
-    await this.waitForSDK();
-    console.log('[FB SDK] getUserPages called');
+  private static processPermissions(
+    userResponse: any,
+    permResponse: any,
+    requiredScopes: string[]
+  ): FacebookLoginResult {
+    const grantedScopes: string[] = [];
+    const deniedScopes: string[] = [];
+
+    if (permResponse && permResponse.data) {
+      permResponse.data.forEach((perm: any) => {
+        if (perm.status === 'granted') {
+          grantedScopes.push(perm.permission);
+        } else {
+          deniedScopes.push(perm.permission);
+        }
+      });
+    }
+
+    // Check if all required scopes are granted
+    const missingScopes = requiredScopes.filter(scope => !grantedScopes.includes(scope));
+    
+    if (missingScopes.length > 0) {
+      console.warn('[FB Manager] Missing required permissions:', missingScopes);
+    }
+
+    return {
+      success: true,
+      user: {
+        id: userResponse.id,
+        name: userResponse.name,
+        email: userResponse.email,
+        picture: userResponse.picture
+      },
+      grantedScopes,
+      deniedScopes
+    };
+  }
+
+  /**
+   * Get user pages with error handling
+   */
+  static async getUserPages(): Promise<FacebookPage[]> {
+    if (!window.FB || !this.isInitialized) {
+      console.error('[FB Manager] SDK not initialized for getUserPages');
+      return [];
+    }
 
     return new Promise((resolve) => {
-      console.log('[FB SDK] calling FB.api /me/accounts...');
       window.FB.api('/me/accounts', 'GET', {
         fields: 'id,name,access_token,category,followers_count,fan_count,instagram_business_account'
       }, (response: any) => {
-        console.log('[FB SDK] /me/accounts response:', response);
         if (response && response.data && !response.error) {
-          console.log('[FB SDK] /me/accounts SUCCESS ->', response.data.length, 'pages');
+          console.log(`[FB Manager] Successfully loaded ${response.data.length} pages`);
           resolve(response.data as FacebookPage[]);
         } else {
-          console.error('[FB] /me/accounts error:', response?.error || response);
-          console.log('[FB SDK] /me/accounts FAILED');
+          const errorMsg = response?.error?.message || 'Unknown error';
+          console.error('[FB Manager] Failed to load pages:', errorMsg);
           resolve([]);
         }
       });
     });
   }
 
-  static async getPageEngagementData(pageId: string, pageAccessToken: string): Promise<any> {
-    await this.waitForSDK();
-
-    return new Promise((resolve) => {
-      window.FB.api(`/${pageId}/insights`, 'GET', {
-        metric: 'page_engaged_users,page_post_engagements,page_fans,page_impressions',
-        period: 'day',
-        since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        until: new Date().toISOString().split('T')[0],
-        access_token: pageAccessToken
-      }, (response: any) => {
-        if (response && response.data && !response.error) {
-          resolve(response.data);
-        } else {
-          console.error('[FB] /:pageId/insights error:', response?.error || response);
-          resolve(null);
-        }
-      });
-    });
-  }
-
-  static async getPageFollowerCount(pageId: string, pageAccessToken: string): Promise<number> {
-    await this.waitForSDK();
-
-    return new Promise((resolve) => {
-      window.FB.api(`/${pageId}`, 'GET', {
-        fields: 'followers_count,fan_count',
-        access_token: pageAccessToken
-      }, (response) => {
-        if (response && !(response as any).error) {
-          const count = (response as any).followers_count || (response as any).fan_count || 0;
-          resolve(count);
-        } else {
-          console.error('[FB] /:pageId error:', (response as any)?.error || response);
-          resolve(0);
-        }
-      });
-    });
-  }
-
-  static async logout(): Promise<void> {
-    await this.waitForSDK();
-    return new Promise((resolve) => {
-      window.FB.logout(() => { FacebookSDK.clearStoredTokens(); resolve(); });
-    });
-  }
-
-  static async getLoginStatus(): Promise<{ isLoggedIn: boolean; accessToken?: string; userID?: string; status?: string; }> {
-    await this.waitForSDK();
+  /**
+   * Get login status without sensitive logging
+   */
+  static async getLoginStatus(): Promise<{ 
+    isLoggedIn: boolean; 
+    userID?: string; 
+    status?: string; 
+  }> {
+    if (!window.FB || !this.isInitialized) {
+      return { isLoggedIn: false, status: 'sdk_not_ready' };
+    }
 
     return new Promise((resolve) => {
       window.FB.getLoginStatus((response) => {
-        FacebookSDK.handleLoginStatusResponse(response);
+        // Security: Only log status, never tokens
+        console.log(`[FB Manager] Login status check: ${response.status}`);
+        
         if (response.status === 'connected' && response.authResponse) {
-          resolve({ isLoggedIn: true, accessToken: response.authResponse.accessToken, userID: response.authResponse.userID, status: response.status });
+          resolve({ 
+            isLoggedIn: true, 
+            userID: response.authResponse.userID,
+            status: response.status 
+          });
         } else {
-          resolve({ isLoggedIn: false, status: response.status });
+          resolve({ 
+            isLoggedIn: false, 
+            status: response.status 
+          });
         }
       });
     });
   }
 
-  static getStoredAccessToken(): string | null {
-    return sessionStorage.getItem('fb_access_token');
+  /**
+   * Secure logout
+   */
+  static async secureLogout(): Promise<void> {
+    if (!window.FB || !this.isInitialized) {
+      return;
+    }
+
+    return new Promise((resolve) => {
+      console.log('[FB Manager] Logging out user');
+      window.FB.logout(() => {
+        console.log('[FB Manager] User logged out successfully');
+        resolve();
+      });
+    });
   }
 
-  static getStoredUserID(): string | null {
-    return sessionStorage.getItem('fb_user_id');
+  /**
+   * Get current App ID (for debugging)
+   */
+  static getCurrentAppId(): string | null {
+    return this.currentAppId;
   }
 
-  static isTokenValid(): boolean {
-    const expiresAt = sessionStorage.getItem('fb_expires_at');
-    if (expiresAt) {
-      return Date.now() < Number(expiresAt);
-    }
-    const capturedAt = Number(sessionStorage.getItem('fb_captured_at') || '0');
-    const expiresIn = Number(sessionStorage.getItem('fb_expires_in') || '0');
-    if (capturedAt && expiresIn) {
-      return Date.now() < (capturedAt + expiresIn * 1000);
-    }
-    return false;
+  /**
+   * Check if SDK is ready
+   */
+  static isSDKReady(): boolean {
+    return this.isInitialized && !!window.FB;
   }
 }
 
-export const isFacebookSDKAvailable = (): boolean => {
-  return typeof window !== 'undefined' && !!window.FB;
-};
+// Export the manager and convenience functions
+export { FacebookSDKManager };
 
-export default FacebookSDK;
+// Convenience functions for backward compatibility
+export const ensureFBReady = FacebookSDKManager.ensureFBReady;
+export const secureLogin = FacebookSDKManager.secureLogin;
+export const getUserPages = FacebookSDKManager.getUserPages;
+export const getLoginStatus = FacebookSDKManager.getLoginStatus;
+export const secureLogout = FacebookSDKManager.secureLogout;
+
+export default FacebookSDKManager;
