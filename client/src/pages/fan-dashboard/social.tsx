@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useFacebookConnection } from "@/contexts/facebook-connection-context";
+import { useFanFacebookConnection } from "@/contexts/fan-facebook-context";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,9 @@ export default function FanSocial() {
     isConnected: facebookConnected, 
     isConnecting: facebookConnecting,
     userInfo: facebookUser,
-    connectedPages: facebookPages,
-    selectedPage: facebookPage,
     connectFacebook,
-    disconnectFacebook,
-    selectPage
-  } = useFacebookConnection();
+    disconnectFacebook
+  } = useFanFacebookConnection();
 
   if (isLoading) {
     return (

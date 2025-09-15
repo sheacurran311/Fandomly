@@ -32,47 +32,46 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const reinitForCurrentUser = useCallback(async () => {
+  const reinitForCreator = useCallback(async () => {
     try {
       const defaults = (window as any).__FB_DEFAULTS__;
       const reinit = (window as any).reinitializeFacebookApp;
       if (!defaults || !reinit) return;
-      const appId = user?.userType === 'creator' ? defaults.CREATOR_APP_ID : defaults.FAN_APP_ID;
+      const appId = defaults.CREATOR_APP_ID || "4233782626946744"; // Creator App ID
       reinit(appId);
       await new Promise((r) => setTimeout(r, 120));
     } catch {}
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    // Only initialize Facebook for authenticated users
-    if (!user) {
-      console.log('[FB] No authenticated user - skipping Facebook initialization');
+    // Only initialize Facebook for authenticated creator users
+    if (!user || user.userType !== 'creator') {
+      console.log('[Creator FB] Not a creator user - skipping Facebook initialization');
       return;
     }
 
-    // Register a basic statusChangeCallback compatible with FB docs (no async in callback)
+    // Register a basic statusChangeCallback for creators
     const statusChangeCallback = (response: any) => {
       try {
-        console.log('[FB] statusChangeCallback ->', response?.status);
+        console.log('[Creator FB] statusChangeCallback ->', response?.status);
         if (response && response.status === 'connected' && response.authResponse?.accessToken) {
           const token = response.authResponse.accessToken;
           loadUserDataFromToken(token).catch((error) => {
-            console.error('[FB] statusChangeCallback load error:', error);
+            console.error('[Creator FB] statusChangeCallback load error:', error);
             setState(prev => ({ ...prev, isConnected: false }));
           });
         } else {
           setState(prev => ({ ...prev, isConnected: false, userInfo: null, connectedPages: [], selectedPage: null }));
         }
       } catch (error) {
-        console.error('[FB] statusChangeCallback error:', error);
+        console.error('[Creator FB] statusChangeCallback error:', error);
         setState(prev => ({ ...prev, isConnected: false }));
       }
     };
 
-    (window as any).handleFacebookLoginStatus = statusChangeCallback;
+    (window as any).handleCreatorFacebookLoginStatus = statusChangeCallback;
 
-    // Only check status for authenticated users, and only when explicitly requested
-    console.log('[FB] Authenticated user detected - Facebook provider ready');
+    console.log('[Creator FB] Creator user detected - Facebook provider ready');
   }, [user]);
 
   const checkConnectionStatus = useCallback(async () => {
@@ -114,34 +113,34 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
 
   const loadUserDataFromToken = useCallback(async (accessToken: string) => {
     try {
-      console.log('[FB] loadUserDataFromToken start with token:', accessToken?.substring(0, 10) + '...');
+      console.log('[Creator FB] loadUserDataFromToken start with token:', accessToken?.substring(0, 10) + '...');
       
-      console.log('[FB] calling getUserInfo...');
+      console.log('[Creator FB] calling getUserInfo...');
       const facebookUser = await FacebookSDK.getUserInfo(accessToken);
-      console.log('[FB] getUserInfo result:', facebookUser ? 'SUCCESS' : 'NULL');
+      console.log('[Creator FB] getUserInfo result:', facebookUser ? 'SUCCESS' : 'NULL');
       
       if (facebookUser) {
-        console.log('[FB] user OK ->', facebookUser?.id);
+        console.log('[Creator FB] user OK ->', facebookUser?.id);
         
-        console.log('[FB] calling getUserPages...');
+        console.log('[Creator FB] calling getUserPages...');
         const userPages = await FacebookSDK.getUserPages(accessToken);
-        console.log('[FB] getUserPages result:', userPages?.length || 0, 'pages');
+        console.log('[Creator FB] getUserPages result:', userPages?.length || 0, 'pages');
         
-        const savedPageId = localStorage.getItem('fandomly_selected_facebook_page');
+        const savedPageId = localStorage.getItem('fandomly_selected_facebook_page_creator');
         const selectedPage = savedPageId ? userPages.find((page: any) => page.id === savedPageId) || userPages[0] : userPages[0];
         
-        console.log('[FB] setting state with connected=true, pages:', userPages?.length);
+        console.log('[Creator FB] setting state with connected=true, pages:', userPages?.length);
         setState(prev => ({ ...prev, isConnected: true, userInfo: facebookUser, connectedPages: userPages, selectedPage: selectedPage || null }));
         
-        console.log('[FB] loadUserDataFromToken COMPLETE');
+        console.log('[Creator FB] loadUserDataFromToken COMPLETE');
         return userPages.length;
       } else {
-        console.log('[FB] loadUserDataFromToken - no user data returned');
+        console.log('[Creator FB] loadUserDataFromToken - no user data returned');
         setState(prev => ({ ...prev, isConnected: false }));
         return 0;
       }
     } catch (error) {
-      console.error('[FB] loadUserDataFromToken error:', error);
+      console.error('[Creator FB] loadUserDataFromToken error:', error);
       setState(prev => ({ ...prev, isConnected: false }));
       return 0;
     }
@@ -150,12 +149,12 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
   const connectFacebook = useCallback(async () => {
     if (state.isConnecting) return;
     
-    console.log('[FB] connectFacebook called, current state.isConnected:', state.isConnected);
+    console.log('[Creator FB] connectFacebook called, current state.isConnected:', state.isConnected);
     setState(prev => ({ ...prev, isConnecting: true }));
 
     try {
       if (!window.FB || typeof window.FB.login !== 'function') {
-        await reinitForCurrentUser();
+        await reinitForCreator();
       }
       if (!window.FB || typeof window.FB.login !== 'function') {
         throw new Error('Facebook SDK not ready');
@@ -228,7 +227,7 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
     } finally {
       setState(prev => ({ ...prev, isConnecting: false }));
     }
-  }, [state.isConnecting, loadUserDataFromToken, toast, reinitForCurrentUser, user?.userType]);
+  }, [state.isConnecting, loadUserDataFromToken, toast, reinitForCreator, user?.userType]);
 
   const disconnectFacebook = useCallback(async () => {
     try {
