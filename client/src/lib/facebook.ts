@@ -82,7 +82,7 @@ const FB_APP_CONFIG = {
     requiredScopes: ['public_profile', 'email']
   },
   creator: {
-    appId: import.meta.env.VITE_FACEBOOK_CREATOR_APP_ID || '4233782626946744', // Creator App ID (fallback to fan for now)
+    appId: '1665384740795979', // Creator App ID for business page access
     requiredScopes: ['public_profile', 'email', 'pages_show_list', 'business_management', 'pages_read_engagement']
   }
 };
@@ -197,6 +197,34 @@ class FacebookSDKManager {
     this.initPromise = null;
 
     console.log(`[FB Manager] SDK initialized successfully`);
+  }
+
+  /**
+   * Logout from Facebook and clear current session
+   * Should be called when switching between user types to prevent App ID conflicts
+   */
+  static async logoutFromFacebook(): Promise<void> {
+    return new Promise((resolve) => {
+      if (!window.FB) {
+        console.log('[FB Manager] No FB SDK loaded, logout not needed');
+        resolve();
+        return;
+      }
+
+      console.log('[FB Manager] Logging out from Facebook...');
+      
+      window.FB.logout(() => {
+        console.log('[FB Manager] Facebook logout completed');
+        
+        // Clear our internal state
+        this.currentAppId = null;
+        this.isInitialized = false;
+        this.initPromise = null;
+        this.reinitInProgress = false;
+        
+        resolve();
+      });
+    });
   }
 
   /**

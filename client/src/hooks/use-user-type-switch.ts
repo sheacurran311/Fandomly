@@ -3,6 +3,7 @@ import { fetchApi } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { FacebookSDKManager } from "@/lib/facebook";
 
 interface SwitchUserTypeRequest {
   userId: string;
@@ -18,6 +19,11 @@ export function useUserTypeSwitch() {
   return useMutation({
     mutationFn: async ({ userId, userType }: SwitchUserTypeRequest) => {
       console.log("Switching user type:", { userId, userType });
+      
+      // CRITICAL: Disconnect from Facebook first to prevent App ID conflicts
+      console.log("Disconnecting from Facebook before user type switch...");
+      await FacebookSDKManager.logoutFromFacebook();
+      
       const response = await fetchApi("/api/auth/switch-user-type", {
         method: "POST",
         body: JSON.stringify({ userId, userType }),
