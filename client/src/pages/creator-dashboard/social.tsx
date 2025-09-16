@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import SimpleCreatorFacebookConnect from "@/components/social/simple-creator-facebook-connect";
+import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -350,7 +350,7 @@ export default function CreatorSocial() {
               <CardTitle className="text-white">Facebook Integration</CardTitle>
             </CardHeader>
             <CardContent>
-              <SimpleCreatorFacebookConnect />
+              <CreatorFacebookConnect />
             </CardContent>
           </Card>
 

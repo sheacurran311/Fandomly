@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
-import SimpleCreatorFacebookConnect from "@/components/social/simple-creator-facebook-connect";
+import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
 // Removed unused FacebookSDK.getCreatorData reference
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,7 +130,7 @@ export default function CreatorDashboard() {
             {/* Quick Actions & Stats */}
             <div className="space-y-6">
               {/* Facebook Integration */}
-              <SimpleCreatorFacebookConnect />
+              <CreatorFacebookConnect />
 
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">

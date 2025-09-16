@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FacebookSDK } from "@/lib/facebook";
+import { FacebookSDKManager as FacebookSDK } from "@/lib/facebook";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -48,24 +48,24 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
 
   const checkFacebookStatus = async () => {
     try {
-      await FacebookSDK.waitForSDK();
-      // Ensure Fan App ID is active for fan-side auth
-      try {
-        const fanAppId = (window as any).__FB_DEFAULTS__?.FAN_APP_ID || '4233782626946744';
-        const reinit = (window as any).reinitializeFacebookApp;
-        if (reinit) reinit(fanAppId);
-      } catch {}
+      await FacebookSDK.ensureFBReady('fan');
+      const status = await FacebookSDK.getLoginStatus();
+      setIsCheckingStatus(false);
       
-      window.FB.getLoginStatus((response) => {
-        setIsCheckingStatus(false);
-        if (response.status === 'connected' && response.authResponse) {
-          setIsConnected(true);
-          fetchFacebookProfile(response.authResponse.accessToken);
-        } else {
-          setIsConnected(false);
-          setFacebookProfile(null);
-        }
-      });
+      if (status.isLoggedIn) {
+        setIsConnected(true);
+        // Load user info
+        window.FB.api('/me', 'GET', {
+          fields: 'id,name,email,picture.width(200).height(200)'
+        }, (response) => {
+          if (response && !response.error) {
+            setFacebookProfile(response as FacebookProfileData);
+          }
+        });
+      } else {
+        setIsConnected(false);
+        setFacebookProfile(null);
+      }
     } catch (error) {
       console.error('Error checking Facebook status:', error);
       setIsCheckingStatus(false);
@@ -93,36 +93,13 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
   // Connect to Facebook mutation
   const connectFacebook = useMutation({
     mutationFn: async () => {
-      await FacebookSDK.waitForSDK();
-      // Ensure Fan App ID for login flow
-      try {
-        const fanAppId = (window as any).__FB_DEFAULTS__?.FAN_APP_ID || '4233782626946744';
-        const reinit = (window as any).reinitializeFacebookApp;
-        if (reinit) reinit(fanAppId);
-        await new Promise(r => setTimeout(r, 100));
-      } catch {}
+      const result = await FacebookSDK.secureLogin('fan');
       
-      return new Promise<FacebookProfileData>((resolve, reject) => {
-        window.FB.login((response) => {
-          if (response.authResponse && response.authResponse.accessToken) {
-            // Fetch user profile with approved permissions only
-            window.FB.api('/me', 'GET', {
-              fields: 'id,name,email,picture.width(200).height(200)',
-              access_token: response.authResponse.accessToken
-            }, (profileResponse) => {
-              if (profileResponse && !profileResponse.error) {
-                resolve(profileResponse as FacebookProfileData);
-              } else {
-                reject(new Error(profileResponse.error?.message || 'Failed to fetch profile'));
-              }
-            });
-          } else {
-            reject(new Error('Facebook login was cancelled or failed'));
-          }
-        }, {
-          scope: 'email,public_profile' // Only use approved permissions
-        });
-      });
+      if (result.success && result.user) {
+        return result.user as FacebookProfileData;
+      } else {
+        throw new Error(result.error || 'Facebook login failed');
+      }
     },
     onSuccess: (profileData) => {
       setIsConnected(true);
