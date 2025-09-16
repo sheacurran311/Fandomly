@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { FacebookSDKManager } from "@/lib/facebook";
 import { Instagram, Twitter, Facebook, Music2, Check } from "lucide-react";
 
 interface SocialConnectionsProps {
@@ -12,7 +13,50 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
-  // Simplified: Facebook connection handled by dedicated components
+
+  // Check Facebook connection status
+  useEffect(() => {
+    checkFacebookStatus();
+  }, [userType]);
+
+  const checkFacebookStatus = async () => {
+    try {
+      await FacebookSDKManager.ensureFBReady(userType);
+      const status = await FacebookSDKManager.getLoginStatus();
+      setFacebookConnected(status.isLoggedIn);
+    } catch (error) {
+      console.error('[Social] Error checking Facebook status:', error);
+      setFacebookConnected(false);
+    }
+  };
+
+  const handleFacebookConnect = async () => {
+    setIsConnecting(true);
+    try {
+      const result = await FacebookSDKManager.secureLogin(userType);
+      if (result.success) {
+        setFacebookConnected(true);
+        toast({
+          title: "Facebook Connected! 🎉",
+          description: "Successfully connected to Facebook.",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Facebook login failed. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Error",
+        description: "An error occurred while connecting to Facebook.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   return (
     <Card className="bg-white/5 border-white/10">
@@ -34,7 +78,7 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
           data-testid="button-connect-facebook-creator"
         >
           <Facebook className="h-4 w-4 mr-2"/>
-          {isConnecting ? 'Connecting...' : (facebookConnected || isConnected) ? (
+          {isConnecting ? 'Connecting...' : facebookConnected ? (
             <>
               <Check className="h-4 w-4 ml-auto" />
               Facebook Connected
