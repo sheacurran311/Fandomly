@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, X, User, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
@@ -93,9 +94,15 @@ export default function Navigation() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="flex items-center space-x-2 text-white hover:text-brand-secondary">
-                        <div className="w-8 h-8 bg-brand-primary rounded-full flex items-center justify-center">
-                          {dynamicUser?.email?.[0] || "U"}
-                        </div>
+                        <Avatar className="w-8 h-8" data-testid="img-nav-user-avatar">
+                          <AvatarImage 
+                            src={userData?.profileData?.avatar} 
+                            alt={userData?.profileData?.name || userData?.username || dynamicUser?.email || "User"} 
+                          />
+                          <AvatarFallback className="w-8 h-8 bg-brand-primary text-white text-sm font-bold">
+                            {dynamicUser?.email?.[0] || "U"}
+                          </AvatarFallback>
+                        </Avatar>
                         <ChevronDown className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
