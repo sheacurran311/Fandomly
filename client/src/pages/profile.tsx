@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -74,12 +75,17 @@ export default function Profile() {
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader className="text-center">
                   <div className="relative mx-auto mb-4">
-                    {/* Profile Photo Placeholder */}
-                    <div 
-                      className="w-32 h-32 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-2xl font-bold mx-auto relative"
-                      data-testid="img-profile-photo"
-                    >
-                      {userInitials}
+                    {/* Profile Photo */}
+                    <div className="relative">
+                      <Avatar className="w-32 h-32 mx-auto" data-testid="img-profile-photo">
+                        <AvatarImage 
+                          src={user.profileData?.avatar} 
+                          alt={user.profileData?.name || user.username || "Creator"} 
+                        />
+                        <AvatarFallback className="w-32 h-32 bg-gradient-to-br from-pink-400 to-pink-600 text-white text-2xl font-bold">
+                          {userInitials}
+                        </AvatarFallback>
+                      </Avatar>
                       
                       {/* Camera Icon Overlay */}
                       <div className="absolute bottom-2 right-2 bg-white/20 backdrop-blur-sm rounded-full p-2">

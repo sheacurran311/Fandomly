@@ -257,8 +257,8 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
             {facebookProfile && (
               <div className="space-y-4">
                 {/* Facebook Profile Preview */}
-                <div className="flex items-center space-x-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <Avatar className="w-16 h-16">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                  <Avatar className="w-16 h-16 flex-shrink-0">
                     <AvatarImage 
                       src={facebookProfile.picture?.data?.url} 
                       alt={facebookProfile.name} 
@@ -267,15 +267,15 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
                       {facebookProfile.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-white flex items-center space-x-2">
-                      <span>{facebookProfile.name}</span>
-                      <CheckCircle className="h-4 w-4 text-blue-400" />
+                      <span className="truncate">{facebookProfile.name}</span>
+                      <CheckCircle className="h-4 w-4 text-blue-400 flex-shrink-0" />
                     </h4>
                     {facebookProfile.email && (
-                      <p className="text-sm text-gray-300">{facebookProfile.email}</p>
+                      <p className="text-sm text-gray-300 truncate">{facebookProfile.email}</p>
                     )}
-                    <p className="text-xs text-gray-400">Facebook ID: {facebookProfile.id}</p>
+                    <p className="text-xs text-gray-400 truncate">Facebook ID: {facebookProfile.id}</p>
                   </div>
                 </div>
 
@@ -303,7 +303,7 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
                     </ul>
                   </div>
 
-                  <div className="flex space-x-3">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                     <Button
                       onClick={() => importProfile.mutate()}
                       disabled={importProfile.isPending}
@@ -326,7 +326,7 @@ export default function FacebookProfileImport({ className }: FacebookProfileImpo
                     <Button
                       onClick={disconnectFacebook}
                       variant="outline"
-                      className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      className="border-red-500/30 text-red-400 hover:bg-red-500/10 sm:w-auto"
                       data-testid="button-disconnect-facebook"
                     >
                       Disconnect

@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
-import FanFacebookConnect from "@/components/social/fan-facebook-connect";
+import { useState, useEffect } from "react";
+import { FacebookSDKManager } from "@/lib/facebook";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,23 @@ import {
 
 export default function FanSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const [facebookConnected, setFacebookConnected] = useState(false);
+  
+  // Check Facebook connection status
+  useEffect(() => {
+    checkFacebookStatus();
+  }, []);
+
+  const checkFacebookStatus = async () => {
+    try {
+      await FacebookSDKManager.ensureFBReady('fan');
+      const status = await FacebookSDKManager.getLoginStatus();
+      setFacebookConnected(status.isLoggedIn);
+    } catch (error) {
+      console.error('[Fan Social] Error checking Facebook status:', error);
+      setFacebookConnected(false);
+    }
+  };
   
   // For now, we'll use the simple Facebook connect component in the sidebar
   // The social accounts display will show placeholder data except Facebook
@@ -92,11 +110,11 @@ export default function FanSocial() {
     {
       platform: "Facebook",
       icon: Facebook,
-      handle: "Connect Facebook",
-      connected: false,
+      handle: facebookConnected ? (user?.email || "Connected") : "Connect Facebook",
+      connected: facebookConnected,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
-      description: "Use the sidebar Facebook Connect widget"
+      description: "Connect to participate in Facebook campaigns and earn rewards"
     }
   ];
 
@@ -193,10 +211,19 @@ export default function FanSocial() {
                       
                       <div className="flex items-center space-x-2">
                         {isFacebook ? (
-                          // Facebook - use sidebar widget instead
-                          <Badge variant="outline" className="border-brand-primary/30 text-brand-primary text-xs">
-                            Use Sidebar Widget →
-                          </Badge>
+                          // Facebook - show connection status
+                          <div className="flex items-center space-x-2">
+                            {facebookConnected ? (
+                              <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Connected
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-brand-primary/30 text-brand-primary text-xs">
+                                Connect in Profile →
+                              </Badge>
+                            )}
+                          </div>
                         ) : (
                           // Other platform buttons (coming soon)
                           <Button 
