@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 import { Instagram, Twitter, Facebook, Music2, Check } from "lucide-react";
 
 interface SocialConnectionsProps {
@@ -13,35 +12,7 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
-  const { connectFacebook, isConnected } = useFacebookConnection();
-
-  const handleFacebookConnect = async () => {
-    if (userType !== "creator") {
-      toast({
-        title: "Creator Feature",
-        description: "Facebook connection is available for creators only.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsConnecting(true);
-    
-    try {
-      await connectFacebook();
-      setFacebookConnected(true);
-      toast({ title: "Facebook Connected! 🎉", description: "Your Facebook account is linked." });
-    } catch (error) {
-      console.error('Facebook connection error:', error);
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to Facebook.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
+  // Simplified: Facebook connection handled by dedicated components
 
   return (
     <Card className="bg-white/5 border-white/10">

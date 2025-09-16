@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,15 +24,7 @@ import {
 
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
-  const { 
-    isConnected: facebookConnected, 
-    isConnecting: facebookConnecting,
-    userInfo: facebookUser,
-    connectedPages: facebookPages,
-    selectedPage: facebookPage,
-    connectFacebook,
-    disconnectFacebook
-  } = useFacebookConnection();
+  // Simplified: Facebook integration handled by dedicated components
 
   if (isLoading) {
     return (
@@ -255,48 +246,19 @@ export default function Profile() {
                       <div>
                         <div className="text-white font-medium">Facebook</div>
                         <div className="text-xs text-gray-400">
-                          {facebookConnected ? 
-                            `Connected: ${facebookPage?.name || 'Facebook Page'}` : 
-                            'Connect your Facebook page'
-                          }
+                          Connect your Facebook page from the dashboard
                         </div>
-                        {facebookConnected && facebookPage && (
-                          <div className="text-xs text-blue-400">
-                            {facebookPage.followers_count ? 
-                              `${facebookPage.followers_count.toLocaleString()} followers` : 
-                              'Page connected'
-                            }
-                          </div>
-                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {facebookConnected ? (
-                        <>
-                          <CheckCircle className="h-4 w-4 text-green-400" />
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={disconnectFacebook}
-                            data-testid="button-disconnect-facebook-profile"
-                          >
-                            <Unlink className="h-3 w-3 mr-1" />
-                            Disconnect
-                          </Button>
-                        </>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={connectFacebook}
-                          disabled={facebookConnecting}
-                          data-testid="button-connect-facebook-profile"
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          {facebookConnecting ? 'Connecting...' : 'Connect'}
-                        </Button>
-                      )}
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => window.location.href = '/creator-dashboard/social'}
+                      data-testid="button-connect-facebook-profile"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Manage
+                    </Button>
                   </div>
                   
                   <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">

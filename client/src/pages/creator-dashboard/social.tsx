@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useFacebookConnection } from "@/contexts/facebook-connection-context";
+import SimpleCreatorFacebookConnect from "@/components/social/simple-creator-facebook-connect";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,16 +27,7 @@ import {
 
 export default function CreatorSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
-  const { 
-    isConnected: facebookConnected, 
-    isConnecting: facebookConnecting,
-    userInfo: facebookUser,
-    connectedPages: facebookPages,
-    selectedPage: facebookPage,
-    connectFacebook,
-    disconnectFacebook,
-    selectPage
-  } = useFacebookConnection();
+  // Simplified: Using direct Facebook component instead of complex context
 
   // Load saved creator pages from backend
   // Note: In real app, use creatorId from user.creator.id
@@ -101,21 +92,17 @@ export default function CreatorSocial() {
       color: "text-red-400",
       bgColor: "bg-red-400/20"
     },
-    // Real Facebook data from your connected page
+    // Facebook managed by dedicated component below
     {
       platform: "Facebook",
       icon: Facebook,
-      handle: facebookPage?.name || "Connect Facebook Page",
-      followers: facebookPage?.followers_count ? 
-        (facebookPage.followers_count >= 1000 ? 
-          `${(facebookPage.followers_count / 1000).toFixed(1)}K` : 
-          facebookPage.followers_count.toString()) : 
-        "0",
-      engagement: facebookPage?.engagement_data ? "Analytics Available" : "N/A",
-      connected: facebookConnected,
+      handle: "Managed below",
+      followers: "See below",
+      engagement: "See below", 
+      connected: true,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
-      realData: true // Flag to identify real Facebook data
+      isManaged: true // Flag to show it's managed separately
     }
   ];
 
@@ -356,6 +343,17 @@ export default function CreatorSocial() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Simplified Facebook Integration */}
+          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Facebook Integration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SimpleCreatorFacebookConnect />
+            </CardContent>
+          </Card>
+
         </div>
       </div>
     </div>
