@@ -132,6 +132,19 @@ export default function AuthRouter({ children }: AuthRouterProps) {
       return;
     }
     
+    // Dashboard mismatch guards - auto-correct when user is on wrong dashboard for their type
+    if (currentPath === '/fan-dashboard' && userData?.userType === 'creator' && userData?.onboardingState?.isCompleted) {
+      console.log('Creator on Fan Dashboard - redirecting to Creator Dashboard');
+      setLocation('/creator-dashboard');
+      return;
+    }
+    
+    if (currentPath === '/creator-dashboard' && userData?.userType === 'fan' && userData?.onboardingState?.isCompleted) {
+      console.log('Fan on Creator Dashboard - redirecting to Fan Dashboard');
+      setLocation('/fan-dashboard');
+      return;
+    }
+    
     // Allow access to public routes like privacy policy
     
   }, [dynamicUser, userData, isLoading, setLocation]);
