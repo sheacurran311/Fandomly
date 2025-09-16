@@ -385,6 +385,9 @@ class FacebookSDKManager {
 // Export the manager and convenience functions
 export { FacebookSDKManager };
 
+// Backward compatibility alias - many files expect 'FacebookSDK'
+export const FacebookSDK = FacebookSDKManager;
+
 // Convenience functions for backward compatibility
 export const ensureFBReady = FacebookSDKManager.ensureFBReady;
 export const secureLogin = FacebookSDKManager.secureLogin;
