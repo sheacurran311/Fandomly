@@ -138,7 +138,7 @@ export default function Navigation() {
                         <div className="px-2 py-1">
                           <UserTypeSwitcher 
                             userId={userData.id}
-                            currentUserType={userData.userType}
+                            currentUserType={userData.userType as "fan" | "creator"}
                           />
                         </div>
                       )}
