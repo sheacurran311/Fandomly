@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Instagram, 
@@ -36,7 +38,9 @@ export default function CreatorSocial() {
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [facebookConnecting, setFacebookConnecting] = useState(false);
   const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
+  const [activePage, setActivePage] = useState<FacebookPage | null>(null);
   const [isCheckingFacebookStatus, setIsCheckingFacebookStatus] = useState(true);
+  const [showPageModal, setShowPageModal] = useState(false);
 
   // Check Facebook status on mount
   useEffect(() => {
@@ -54,6 +58,7 @@ export default function CreatorSocial() {
       } else {
         setFacebookConnected(false);
         setFacebookPages([]);
+        setActivePage(null); // Clear active page when not logged in
       }
     } catch (error) {
       console.error('Error checking Facebook status:', error);
@@ -68,9 +73,32 @@ export default function CreatorSocial() {
     try {
       const pages = await FacebookSDKManager.getUserPages();
       setFacebookPages(pages);
+      
+      // Handle active page reconciliation
+      if (pages.length > 0) {
+        if (!activePage) {
+          // Set first page as active by default if no active page is set
+          setActivePage(pages[0]);
+        } else {
+          // Check if current active page still exists in the updated pages
+          const activePageStillExists = pages.some(page => page.id === activePage.id);
+          if (!activePageStillExists) {
+            // Active page no longer exists, set to first available page
+            setActivePage(pages[0]);
+            toast({
+              title: "Active Page Updated",
+              description: `Your previous active page is no longer available. Switched to "${pages[0].name}".`,
+              duration: 4000
+            });
+          }
+        }
+      } else {
+        setActivePage(null);
+      }
     } catch (error) {
       console.error('Error loading Facebook pages:', error);
       setFacebookPages([]);
+      setActivePage(null);
     }
   };
 
@@ -110,6 +138,7 @@ export default function CreatorSocial() {
       await FacebookSDKManager.logoutFromFacebook();
       setFacebookConnected(false);
       setFacebookPages([]);
+      setActivePage(null); // Clear active page on disconnect
       toast({
         title: "Facebook Disconnected",
         description: "Successfully disconnected from Facebook.",
@@ -193,10 +222,10 @@ export default function CreatorSocial() {
     {
       platform: "Facebook",
       icon: Facebook,
-      handle: facebookPages.length > 0 ? facebookPages[0].name : "@your-page",
-      followers: facebookPages.length > 0 && facebookPages[0].followers_count ? 
-        `${facebookPages[0].followers_count.toLocaleString()}` : "0",
-      engagement: facebookPages.length > 0 ? "Active" : "Connect to view", 
+      handle: facebookConnected && activePage ? activePage.name : (facebookConnected ? "No active page" : "@your-page"),
+      followers: facebookConnected && activePage?.followers_count ? 
+        `${activePage.followers_count.toLocaleString()}` : "0",
+      engagement: facebookConnected && activePage ? "Active" : (facebookConnected ? "Select page" : "Connect to view"), 
       connected: facebookConnected,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
@@ -333,8 +362,14 @@ export default function CreatorSocial() {
                                 <Unlink className="h-4 w-4 mr-1" />
                                 Disconnect
                               </Button>
-                              {facebookPages.length > 1 && (
-                                <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
+                              {facebookPages.length > 0 && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  onClick={() => setShowPageModal(true)}
+                                  data-testid="button-switch-facebook-page"
+                                >
                                   <Settings className="h-4 w-4 mr-1" />
                                   Switch Page
                                 </Button>
@@ -454,6 +489,110 @@ export default function CreatorSocial() {
 
         </div>
       </div>
+      
+      {/* Facebook Page Selection Modal */}
+      <Dialog open={showPageModal} onOpenChange={setShowPageModal}>
+        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Manage Facebook Pages</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="text-sm text-gray-400 mb-4">
+              Select which Facebook page to use for your campaigns. Only one page can be active at a time.
+            </div>
+            
+            {facebookPages.length > 0 ? (
+              <div className="space-y-3">
+                {facebookPages.map((page, index) => (
+                  <div 
+                    key={page.id} 
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                      activePage?.id === page.id 
+                        ? 'border-brand-primary bg-brand-primary/10' 
+                        : 'border-white/20 hover:border-white/30 bg-white/5'
+                    }`}
+                    onClick={() => {
+                      setActivePage(page);
+                      toast({
+                        title: "Active Page Changed",
+                        description: `"${page.name}" is now your active Facebook page.`,
+                        duration: 3000
+                      });
+                    }}
+                    data-testid={`facebook-page-${index}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={page.picture?.data?.url} alt={page.name} />
+                        <AvatarFallback className="bg-blue-500/20 text-blue-400">
+                          {page.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <div className="text-white font-medium">{page.name}</div>
+                          {activePage?.id === page.id && (
+                            <Badge className="bg-brand-primary/20 text-brand-primary text-xs">
+                              Active
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {page.category} • {page.followers_count?.toLocaleString() || 0} followers
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-400">
+                No Facebook pages found. Connect to Facebook first.
+              </div>
+            )}
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1 border-white/20 text-gray-300 hover:bg-white/10"
+                onClick={async () => {
+                  try {
+                    // Re-login to get access to potentially new pages
+                    await FacebookSDKManager.secureLogin('creator');
+                    await loadFacebookPages();
+                    toast({
+                      title: "Pages Refreshed",
+                      description: "Successfully refreshed your Facebook pages.",
+                      duration: 3000
+                    });
+                  } catch (error) {
+                    console.error('Error refreshing pages:', error);
+                    toast({
+                      title: "Refresh Failed",
+                      description: "Failed to refresh Facebook pages. Please try again.",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                data-testid="button-refresh-facebook-pages"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add More Pages
+              </Button>
+              
+              <Button 
+                onClick={() => setShowPageModal(false)}
+                className="bg-brand-primary hover:bg-brand-primary/80"
+                data-testid="button-close-page-modal"
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
