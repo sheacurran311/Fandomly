@@ -74,7 +74,7 @@ export default function Profile() {
         }, (response) => {
           if (response && !response.error) {
             // Call backend to save the imported data
-            apiRequest("/api/auth/facebook-profile-import", "POST", {
+            apiRequest("POST", "/api/auth/facebook-profile-import", {
               userId: user.id,
               facebookData: {
                 id: response.id,
