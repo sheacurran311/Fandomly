@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
 import { 
   BarChart3, 
   Users, 
@@ -19,7 +24,10 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
-  Shield
+  Shield,
+  Facebook,
+  Plus,
+  MoreHorizontal
 } from "lucide-react";
 
 interface SidebarItem {
@@ -63,6 +71,14 @@ const fanItems: SidebarItem[] = [
 export default function SidebarNavigation({ userType, className, isNILAthlete = false }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { toast } = useToast();
+  
+  // Facebook page state for creators
+  const [facebookConnected, setFacebookConnected] = useState(false);
+  const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
+  const [activePage, setActivePage] = useState<FacebookPage | null>(null);
+  const [showPageModal, setShowPageModal] = useState(false);
+  const [isLoadingFacebook, setIsLoadingFacebook] = useState(false);
   
   // Add NIL dashboard for athletes
   const creatorItemsWithNIL = isNILAthlete 
@@ -70,6 +86,57 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
     : creatorItems;
   
   const items = userType === "creator" ? creatorItemsWithNIL : fanItems;
+
+  // Load Facebook status for creators
+  useEffect(() => {
+    if (userType === 'creator') {
+      checkFacebookStatus();
+    }
+  }, [userType]);
+
+  const checkFacebookStatus = async () => {
+    try {
+      setIsLoadingFacebook(true);
+      await FacebookSDKManager.ensureFBReady('creator');
+      const status = await FacebookSDKManager.getLoginStatus();
+      
+      if (status.isLoggedIn) {
+        setFacebookConnected(true);
+        await loadFacebookPages();
+      } else {
+        setFacebookConnected(false);
+        setFacebookPages([]);
+        setActivePage(null);
+        localStorage.removeItem('fandomly_active_facebook_page_id'); // Clear saved page when not logged in
+      }
+    } catch (error) {
+      console.error('Error checking Facebook status in sidebar:', error);
+      setFacebookConnected(false);
+    } finally {
+      setIsLoadingFacebook(false);
+    }
+  };
+
+  const loadFacebookPages = async () => {
+    try {
+      const pages = await FacebookSDKManager.getUserPages();
+      setFacebookPages(pages);
+      
+      if (pages.length > 0) {
+        const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
+        let pageToSet = pages.find(page => page.id === savedActivePageId) || pages[0];
+        setActivePage(pageToSet);
+        // Save to localStorage if we're setting a default page
+        if (!savedActivePageId && pageToSet) {
+          localStorage.setItem('fandomly_active_facebook_page_id', pageToSet.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading Facebook pages in sidebar:', error);
+      setFacebookPages([]);
+      setActivePage(null);
+    }
+  };
 
   return (
     <div className={cn(
@@ -137,6 +204,44 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
         })}
       </nav>
 
+      {/* Facebook Page Widget for Creators */}
+      {userType === 'creator' && facebookConnected && activePage && !isCollapsed && (
+        <div className="p-3 mx-2 mb-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-blue-400 uppercase tracking-wider">
+              Active Page
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+              onClick={() => setShowPageModal(true)}
+              data-testid="button-sidebar-switch-page"
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={activePage.picture?.data?.url} alt={activePage.name} />
+              <AvatarFallback className="bg-blue-500/20 text-blue-400 text-xs">
+                {activePage.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-white truncate">
+                {activePage.name}
+              </div>
+              <div className="text-xs text-blue-400">
+                {activePage.followers_count?.toLocaleString() || 0} followers
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* User Section */}
       <div className="p-4 border-t border-white/10">
         {!isCollapsed ? (
@@ -161,6 +266,84 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
           </div>
         )}
       </div>
+
+      {/* Facebook Page Selection Modal */}
+      <Dialog open={showPageModal} onOpenChange={setShowPageModal}>
+        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Switch Active Page</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="text-sm text-gray-400 mb-4">
+              Select which Facebook page to use for your campaigns.
+            </div>
+            
+            {facebookPages.length > 0 ? (
+              <div className="space-y-3">
+                {facebookPages.map((page, index) => (
+                  <div 
+                    key={page.id} 
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                      activePage?.id === page.id 
+                        ? 'border-brand-primary bg-brand-primary/10' 
+                        : 'border-white/20 hover:border-white/30 bg-white/5'
+                    }`}
+                    onClick={() => {
+                      setActivePage(page);
+                      localStorage.setItem('fandomly_active_facebook_page_id', page.id);
+                      toast({
+                        title: "Active Page Changed",
+                        description: `"${page.name}" is now your active Facebook page.`,
+                        duration: 3000
+                      });
+                      setShowPageModal(false);
+                    }}
+                    data-testid={`sidebar-facebook-page-${index}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={page.picture?.data?.url} alt={page.name} />
+                        <AvatarFallback className="bg-blue-500/20 text-blue-400">
+                          {page.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <div className="text-white font-medium">{page.name}</div>
+                          {activePage?.id === page.id && (
+                            <Badge className="bg-brand-primary/20 text-brand-primary text-xs">
+                              Active
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {page.category} • {page.followers_count?.toLocaleString() || 0} followers
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-400">
+                No Facebook pages found.
+              </div>
+            )}
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                onClick={() => setShowPageModal(false)}
+                className="flex-1 bg-brand-primary hover:bg-brand-primary/80"
+                data-testid="button-close-sidebar-page-modal"
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -42,9 +42,14 @@ export default function CreatorSocial() {
   const [isCheckingFacebookStatus, setIsCheckingFacebookStatus] = useState(true);
   const [showPageModal, setShowPageModal] = useState(false);
 
-  // Check Facebook status on mount
+  // Check Facebook status on mount and load saved active page
   useEffect(() => {
     checkFacebookStatus();
+    // Load saved active page ID from localStorage
+    const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
+    if (savedActivePageId) {
+      // We'll set this after pages are loaded in loadFacebookPages
+    }
   }, []);
 
   const checkFacebookStatus = async () => {
@@ -59,6 +64,7 @@ export default function CreatorSocial() {
         setFacebookConnected(false);
         setFacebookPages([]);
         setActivePage(null); // Clear active page when not logged in
+        localStorage.removeItem('fandomly_active_facebook_page_id'); // Clear saved page
       }
     } catch (error) {
       console.error('Error checking Facebook status:', error);
@@ -74,31 +80,47 @@ export default function CreatorSocial() {
       const pages = await FacebookSDKManager.getUserPages();
       setFacebookPages(pages);
       
-      // Handle active page reconciliation
+      // Handle active page reconciliation with localStorage persistence
       if (pages.length > 0) {
-        if (!activePage) {
-          // Set first page as active by default if no active page is set
-          setActivePage(pages[0]);
-        } else {
-          // Check if current active page still exists in the updated pages
-          const activePageStillExists = pages.some(page => page.id === activePage.id);
-          if (!activePageStillExists) {
-            // Active page no longer exists, set to first available page
-            setActivePage(pages[0]);
-            toast({
-              title: "Active Page Updated",
-              description: `Your previous active page is no longer available. Switched to "${pages[0].name}".`,
-              duration: 4000
-            });
-          }
+        const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
+        let pageToSet: FacebookPage | null = null;
+        
+        if (savedActivePageId) {
+          // Try to find the saved page
+          pageToSet = pages.find(page => page.id === savedActivePageId) || null;
+        }
+        
+        if (!pageToSet && activePage) {
+          // Check if current active page still exists
+          pageToSet = pages.find(page => page.id === activePage.id) || null;
+        }
+        
+        if (!pageToSet) {
+          // Fall back to first page
+          pageToSet = pages[0];
+        }
+        
+        setActivePage(pageToSet);
+        // Save to localStorage
+        localStorage.setItem('fandomly_active_facebook_page_id', pageToSet.id);
+        
+        // Notify if we had to switch from a previously saved page
+        if (savedActivePageId && pageToSet.id !== savedActivePageId) {
+          toast({
+            title: "Active Page Updated",
+            description: `Your previous active page is no longer available. Switched to "${pageToSet.name}".`,
+            duration: 4000
+          });
         }
       } else {
         setActivePage(null);
+        localStorage.removeItem('fandomly_active_facebook_page_id');
       }
     } catch (error) {
       console.error('Error loading Facebook pages:', error);
       setFacebookPages([]);
       setActivePage(null);
+      localStorage.removeItem('fandomly_active_facebook_page_id');
     }
   };
 
@@ -139,6 +161,7 @@ export default function CreatorSocial() {
       setFacebookConnected(false);
       setFacebookPages([]);
       setActivePage(null); // Clear active page on disconnect
+      localStorage.removeItem('fandomly_active_facebook_page_id'); // Clear saved page
       toast({
         title: "Facebook Disconnected",
         description: "Successfully disconnected from Facebook.",
@@ -514,6 +537,7 @@ export default function CreatorSocial() {
                     }`}
                     onClick={() => {
                       setActivePage(page);
+                      localStorage.setItem('fandomly_active_facebook_page_id', page.id);
                       toast({
                         title: "Active Page Changed",
                         description: `"${page.name}" is now your active Facebook page.`,
