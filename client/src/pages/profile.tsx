@@ -154,7 +154,7 @@ export default function Profile() {
       <SidebarNavigation userType="creator" />
       
       <div className="flex-1 overflow-auto">
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Profile</h1>
@@ -163,7 +163,7 @@ export default function Profile() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
             {/* Profile Overview Card */}
             <div className="lg:col-span-1">
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
@@ -259,26 +259,26 @@ export default function Profile() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm text-gray-400 mb-1 block">Full Name</label>
-                      <div className="text-white" data-testid="text-full-name">
+                      <div className="text-white break-words" data-testid="text-full-name">
                         {user.profileData?.name || user.username || 'Not provided'}
                       </div>
                     </div>
                     
                     <div>
                       <label className="text-sm text-gray-400 mb-1 block">Username</label>
-                      <div className="text-white" data-testid="text-username">
+                      <div className="text-white break-words" data-testid="text-username">
                         @{user.username || 'username'}
                       </div>
                     </div>
                     
-                    <div>
+                    <div className="sm:col-span-2">
                       <label className="text-sm text-gray-400 mb-1 block">Email</label>
-                      <div className="text-white flex items-center gap-2" data-testid="text-email">
-                        <Mail className="h-4 w-4 text-gray-400" />
-                        {user.email || 'Not provided'}
+                      <div className="text-white flex items-start gap-2" data-testid="text-email">
+                        <Mail className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <span className="break-all min-w-0">{user.email || 'Not provided'}</span>
                       </div>
                     </div>
                     
