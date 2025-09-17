@@ -1,10 +1,15 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { FacebookSDKManager } from "@/lib/facebook";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import { 
   User, 
   Mail, 
@@ -25,6 +30,95 @@ import {
 
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Facebook import state
+  const [isImporting, setIsImporting] = useState(false);
+  const [isConnectedToFacebook, setIsConnectedToFacebook] = useState(false);
+  
+  // Check Facebook connection status
+  useEffect(() => {
+    checkFacebookStatus();
+  }, []);
+  
+  const checkFacebookStatus = async () => {
+    try {
+      await FacebookSDKManager.ensureFBReady('creator');
+      const status = await FacebookSDKManager.getLoginStatus();
+      setIsConnectedToFacebook(status.isLoggedIn);
+    } catch (error) {
+      console.error('Error checking Facebook status:', error);
+      setIsConnectedToFacebook(false);
+    }
+  };
+  
+  // Facebook profile import mutation
+  const importFacebookProfile = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("No user found");
+      
+      // First ensure we're connected to Facebook
+      if (!isConnectedToFacebook) {
+        const result = await FacebookSDKManager.secureLogin('creator');
+        if (!result.success) {
+          throw new Error(result.error || "Failed to connect to Facebook");
+        }
+        setIsConnectedToFacebook(true);
+      }
+      
+      // Get user profile data from Facebook
+      return new Promise((resolve, reject) => {
+        window.FB.api('/me', 'GET', {
+          fields: 'id,name,email,picture.width(200).height(200)'
+        }, (response) => {
+          if (response && !response.error) {
+            // Call backend to save the imported data
+            apiRequest("/api/auth/facebook-profile-import", "POST", {
+              userId: user.id,
+              facebookData: {
+                id: response.id,
+                name: response.name,
+                email: response.email,
+                picture: response.picture?.data?.url
+              }
+            })
+            .then(resolve)
+            .catch(reject);
+          } else {
+            reject(new Error(response?.error?.message || "Failed to get Facebook profile data"));
+          }
+        });
+      });
+    },
+    onSuccess: () => {
+      // Invalidate user query to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      toast({
+        title: "Profile Imported! 🎉",
+        description: "Successfully imported your profile data from Facebook.",
+        duration: 4000
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import profile from Facebook.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const handleImportFromFacebook = async () => {
+    setIsImporting(true);
+    try {
+      await importFacebookProfile.mutateAsync();
+    } finally {
+      setIsImporting(false);
+    }
+  };
+  
   // Simplified: Facebook integration handled by dedicated components
 
   if (isLoading) {
@@ -53,7 +147,7 @@ export default function Profile() {
       .slice(0, 2);
   };
 
-  const userInitials = getInitials(user.username || user.firstName || 'User');
+  const userInitials = getInitials(user.username || user.profileData?.name || 'User');
 
   return (
     <div className="min-h-screen bg-brand-dark-bg flex">
@@ -97,22 +191,24 @@ export default function Profile() {
                       variant="outline"
                       size="sm"
                       className="mt-3 text-gray-300 border-gray-600 hover:bg-white/10"
-                      data-testid="button-update-photo"
+                      onClick={handleImportFromFacebook}
+                      disabled={isImporting || importFacebookProfile.isPending}
+                      data-testid="button-import-facebook-profile"
                     >
                       <Facebook className="h-4 w-4 mr-2" />
-                      Import from Facebook
+                      {isImporting || importFacebookProfile.isPending ? 'Importing...' : 'Import from Facebook'}
                     </Button>
                   </div>
                   
                   <CardTitle className="text-white text-xl">
-                    {user.username || user.firstName || 'Creator'}
+                    {user.profileData?.name || user.username || 'Creator'}
                   </CardTitle>
                   
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <Badge variant="secondary" className="capitalize">
-                      {user.type || 'Creator'}
+                      {user.userType || 'Creator'}
                     </Badge>
-                    {user.type === 'creator' && (
+                    {user.userType === 'creator' && (
                       <Badge variant="outline" className="text-brand-primary border-brand-primary">
                         <Star className="h-3 w-3 mr-1" />
                         Verified
@@ -136,6 +232,13 @@ export default function Profile() {
                   
                   <Button 
                     className="w-full bg-brand-primary hover:bg-brand-primary/80"
+                    onClick={() => {
+                      toast({
+                        title: "Edit Profile",
+                        description: "Profile editing modal will be implemented soon. Currently, you can import your profile data from Facebook!",
+                        duration: 3000
+                      });
+                    }}
                     data-testid="button-edit-profile"
                   >
                     <Edit className="h-4 w-4 mr-2" />
@@ -160,9 +263,7 @@ export default function Profile() {
                     <div>
                       <label className="text-sm text-gray-400 mb-1 block">Full Name</label>
                       <div className="text-white" data-testid="text-full-name">
-                        {user.firstName && user.lastName 
-                          ? `${user.firstName} ${user.lastName}` 
-                          : user.username || 'Not provided'}
+                        {user.profileData?.name || user.username || 'Not provided'}
                       </div>
                     </div>
                     
@@ -193,7 +294,7 @@ export default function Profile() {
               </Card>
 
               {/* Creator Details (if creator) */}
-              {user.type === 'creator' && (
+              {user.userType === 'creator' && (
                 <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2">
@@ -206,14 +307,14 @@ export default function Profile() {
                       <div>
                         <label className="text-sm text-gray-400 mb-1 block">Creator Type</label>
                         <div className="text-white capitalize" data-testid="text-creator-type">
-                          {user.creatorType || 'General Creator'}
+                          {user.profileData?.creatorType || 'General Creator'}
                         </div>
                       </div>
                       
                       <div>
                         <label className="text-sm text-gray-400 mb-1 block">Specialty</label>
                         <div className="text-white" data-testid="text-specialty">
-                          {user.specialty || 'Content Creation'}
+                          {user.profileData?.specialty || 'Content Creation'}
                         </div>
                       </div>
                       
@@ -221,7 +322,7 @@ export default function Profile() {
                         <label className="text-sm text-gray-400 mb-1 block">Location</label>
                         <div className="text-white flex items-center gap-2" data-testid="text-location">
                           <MapPin className="h-4 w-4 text-gray-400" />
-                          {user.location || 'Not specified'}
+                          {user.profileData?.location || 'Not specified'}
                         </div>
                       </div>
                       

@@ -1,11 +1,14 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
+import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Instagram, 
   Twitter, 
@@ -27,6 +30,100 @@ import {
 
 export default function CreatorSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  
+  // Facebook connection state
+  const [facebookConnected, setFacebookConnected] = useState(false);
+  const [facebookConnecting, setFacebookConnecting] = useState(false);
+  const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
+  const [isCheckingFacebookStatus, setIsCheckingFacebookStatus] = useState(true);
+
+  // Check Facebook status on mount
+  useEffect(() => {
+    checkFacebookStatus();
+  }, []);
+
+  const checkFacebookStatus = async () => {
+    try {
+      await FacebookSDKManager.ensureFBReady('creator');
+      const status = await FacebookSDKManager.getLoginStatus();
+      
+      if (status.isLoggedIn) {
+        setFacebookConnected(true);
+        await loadFacebookPages();
+      } else {
+        setFacebookConnected(false);
+        setFacebookPages([]);
+      }
+    } catch (error) {
+      console.error('Error checking Facebook status:', error);
+      setFacebookConnected(false);
+      setFacebookPages([]);
+    } finally {
+      setIsCheckingFacebookStatus(false);
+    }
+  };
+
+  const loadFacebookPages = async () => {
+    try {
+      const pages = await FacebookSDKManager.getUserPages();
+      setFacebookPages(pages);
+    } catch (error) {
+      console.error('Error loading Facebook pages:', error);
+      setFacebookPages([]);
+    }
+  };
+
+  const connectFacebook = async () => {
+    setFacebookConnecting(true);
+    try {
+      const result = await FacebookSDKManager.secureLogin('creator');
+      if (result.success) {
+        setFacebookConnected(true);
+        await loadFacebookPages();
+        toast({
+          title: "Facebook Connected! 🎉",
+          description: "Successfully connected to Facebook for creator campaigns.",
+          duration: 4000
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Facebook login was cancelled or failed.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Facebook connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: "An error occurred while connecting to Facebook.",
+        variant: "destructive"
+      });
+    } finally {
+      setFacebookConnecting(false);
+    }
+  };
+
+  const disconnectFacebook = async () => {
+    try {
+      await FacebookSDKManager.logoutFromFacebook();
+      setFacebookConnected(false);
+      setFacebookPages([]);
+      toast({
+        title: "Facebook Disconnected",
+        description: "Successfully disconnected from Facebook.",
+      });
+    } catch (error) {
+      console.error('Error during Facebook logout:', error);
+      toast({
+        title: "Logout Error", 
+        description: "Error occurred while disconnecting. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   // Simplified: Using direct Facebook component instead of complex context
 
   // Load saved creator pages from backend
@@ -92,14 +189,15 @@ export default function CreatorSocial() {
       color: "text-red-400",
       bgColor: "bg-red-400/20"
     },
-    // Facebook managed by dedicated component below
+    // Facebook managed by state above
     {
       platform: "Facebook",
       icon: Facebook,
-      handle: "Managed below",
-      followers: "See below",
-      engagement: "See below", 
-      connected: true,
+      handle: facebookPages.length > 0 ? facebookPages[0].name : "@your-page",
+      followers: facebookPages.length > 0 && facebookPages[0].followers_count ? 
+        `${facebookPages[0].followers_count.toLocaleString()}` : "0",
+      engagement: facebookPages.length > 0 ? "Active" : "Connect to view", 
+      connected: facebookConnected,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
       isManaged: true // Flag to show it's managed separately
