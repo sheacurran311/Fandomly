@@ -9,67 +9,63 @@ import {
   insertCampaignSchema, insertCampaignRuleSchema
 } from "@shared/schema";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
+import { verifyDynamicJWT, extractUserDataFromJWT, validateUserData } from "./utils/dynamic-auth";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Dynamic auth middleware - Dynamic handles JWT verification natively via admin dashboard
+  // Secure Dynamic auth middleware with proper JWT verification
   const verifyDynamicAuth = async (req: any, res: any, next: any) => {
     try {
       const authHeader = req.headers.authorization;
-      const dynamicUserHeader = req.headers['x-dynamic-user'];
-      const dynamicUserBody = req.body.dynamicUser;
 
-      // For routes that don't require authentication, allow through
-      if (req.path.includes('/api/creators') && req.method === 'GET') {
+      // For specific public routes, allow through without authentication
+      if (req.path === '/api/creators' && req.method === 'GET' && !req.params.id) {
         return next();
       }
 
-      // Dynamic handles JWT verification natively - we validate the user data structure
-      let dynamicUser = dynamicUserHeader || dynamicUserBody;
-      
-      if (!dynamicUser) {
-        return res.status(401).json({ error: "Authentication required - Dynamic user data missing" });
+      // Require Bearer token for all protected routes
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Authentication required - Bearer token missing" });
       }
 
-      // Parse Dynamic user if it's a string
-      let parsedDynamicUser;
+      const token = authHeader.substring(7);
+      
       try {
-        parsedDynamicUser = typeof dynamicUser === 'string' ? JSON.parse(dynamicUser) : dynamicUser;
-      } catch (parseError) {
-        return res.status(401).json({ error: "Invalid Dynamic user data format" });
-      }
-
-      // Validate required Dynamic user fields
-      if (!parsedDynamicUser.id && !parsedDynamicUser.dynamicUserId && !parsedDynamicUser.userId) {
-        return res.status(401).json({ error: "Invalid Dynamic user - missing ID" });
-      }
-
-      // Dynamic's admin dashboard handles JWT verification with 2-hour expiration
-      // Validate Bearer token is present for security
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        if (token.length < 10) {
-          return res.status(401).json({ error: "Invalid authentication token format" });
+        // Verify JWT token using Dynamic's JWKS endpoint
+        const jwtPayload = await verifyDynamicJWT(token);
+        
+        // Extract user data from verified JWT
+        const userData = extractUserDataFromJWT(jwtPayload);
+        
+        // Validate user data structure
+        if (!validateUserData(userData)) {
+          return res.status(401).json({ error: "Invalid user data in JWT token" });
         }
-      }
 
-      // Attach validated user to request
-      req.dynamicUser = {
-        id: parsedDynamicUser.dynamicUserId || parsedDynamicUser.userId || parsedDynamicUser.id,
-        dynamicUserId: parsedDynamicUser.dynamicUserId || parsedDynamicUser.userId || parsedDynamicUser.id,
-        alias: parsedDynamicUser.alias,
-        firstName: parsedDynamicUser.firstName,
-        lastName: parsedDynamicUser.lastName,
-        email: parsedDynamicUser.email,
-        verifiedCredentials: parsedDynamicUser.verifiedCredentials || [],
-        walletAddress: parsedDynamicUser.verifiedCredentials?.[0]?.address || parsedDynamicUser.walletAddress || '',
-        walletChain: parsedDynamicUser.verifiedCredentials?.[0]?.chain || parsedDynamicUser.walletChain || '',
-      };
-      
-      next();
+        // Attach verified user data to request
+        req.dynamicUser = {
+          id: userData.dynamicUserId,
+          dynamicUserId: userData.dynamicUserId,
+          alias: userData.alias,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          verifiedCredentials: userData.verifiedCredentials,
+          walletAddress: userData.walletAddress,
+          walletChain: userData.walletChain,
+        };
+        
+        next();
+      } catch (jwtError) {
+        console.error('JWT verification failed:', jwtError);
+        return res.status(401).json({ 
+          error: "Invalid or expired authentication token",
+          details: jwtError instanceof Error ? jwtError.message : 'JWT verification failed'
+        });
+      }
     } catch (error) {
       console.error('Auth middleware error:', error);
-      res.status(401).json({ error: "Authentication failed" });
+      res.status(500).json({ error: "Authentication system error" });
     }
   };
 
@@ -1238,7 +1234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSocialRoutes(app);
 
   // Register tenant routes
-  registerTenantRoutes(app);
+  registerTenantRoutes(app, verifyDynamicAuth);
 
   const httpServer = createServer(app);
   return httpServer;
