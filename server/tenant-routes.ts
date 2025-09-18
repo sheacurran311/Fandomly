@@ -35,7 +35,7 @@ const createTenantSchema = z.object({
 
 export function registerTenantRoutes(app: Express) {
   // Create tenant
-  app.post("/api/tenants", async (req, res) => {
+  app.post("/api/tenants", verifyDynamicAuth, authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {
       console.log("Creating tenant with data:", req.body);
       const tenantData = createTenantSchema.parse(req.body);
@@ -108,7 +108,7 @@ export function registerTenantRoutes(app: Express) {
   });
 
   // Update tenant
-  app.patch("/api/tenants/:id", async (req, res) => {
+  app.patch("/api/tenants/:id", verifyDynamicAuth, authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {
       const tenant = await storage.updateTenant(req.params.id, req.body);
       if (!tenant) {
@@ -133,7 +133,7 @@ export function registerTenantRoutes(app: Express) {
   });
 
   // Join tenant as member
-  app.post("/api/tenants/:tenantId/members", async (req, res) => {
+  app.post("/api/tenants/:tenantId/members", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { userId, role = 'member' } = req.body;
       
