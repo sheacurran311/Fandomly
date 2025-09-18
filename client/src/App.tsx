@@ -24,6 +24,7 @@ import CreatorRevenue from "@/pages/creator-dashboard/revenue";
 import CreatorNIL from "@/pages/creator-dashboard/nil";
 import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
 import CreatorSettings from "@/pages/creator-dashboard/settings";
+import BillingPage from "@/pages/billing";
 import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
 import FanSocial from "@/pages/fan-dashboard/social";
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
+      <Route path="/creator-dashboard/billing" component={BillingPage} />
       <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
@@ -74,6 +76,7 @@ function Router() {
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
+      <Route path="/fan-dashboard/billing" component={BillingPage} />
       <Route path="/fan-dashboard/settings" component={FanSettings} />
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />

@@ -278,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const Stripe = (await import('stripe')).default;
           const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-            apiVersion: "2023-10-16",
+            apiVersion: "2024-06-20",
           });
           
           // Create Stripe customer
@@ -1038,6 +1038,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Branding upload error:', error);
       res.status(500).json({ error: "Branding asset upload failed" });
+    }
+  });
+
+  // Stripe Payment Routes - Using javascript_stripe integration
+  
+  // Stripe payment intent for one-time payments
+  app.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      const { amount, currency = "usd" } = req.body;
+      
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Invalid amount" });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: "2025-08-27.basil",
+      });
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: currency,
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
+      });
+    } catch (error: any) {
+      console.error('Payment intent creation error:', error);
+      res.status(500).json({ 
+        error: "Error creating payment intent", 
+        message: error.message 
+      });
+    }
+  });
+
+  // Get or create subscription for authenticated user
+  app.post('/api/get-or-create-subscription', verifyDynamicAuth, async (req, res) => {
+    try {
+      const dynamicUserId = (req as any).dynamicUser?.id || (req as any).dynamicUser?.dynamicUserId;
+      if (!dynamicUserId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get user from our database
+      const user = await storage.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: "2025-08-27.basil",
+      });
+
+      // Get user's tenant to check existing billing info
+      const userTenants = await storage.getUserTenants(user.id);
+      const tenant = userTenants[0];
+
+      // Check if user already has active subscription
+      if (tenant?.billingInfo?.subscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(tenant.billingInfo.subscriptionId);
+          
+          if (subscription.status === 'active' || subscription.status === 'trialing') {
+            const latestInvoice = subscription.latest_invoice;
+            const paymentIntent = typeof latestInvoice === 'object' && latestInvoice ? latestInvoice.payment_intent : null;
+            return res.json({
+              subscriptionId: subscription.id,
+              clientSecret: typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null,
+              status: subscription.status
+            });
+          }
+        } catch (error) {
+          console.error('Error retrieving existing subscription:', error);
+          // Continue to create new subscription if current one is invalid
+        }
+      }
+
+      // Create new customer if needed
+      let customerId = tenant?.billingInfo?.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email || `${dynamicUserId}@wallet.user`,
+          name: user.username || 'Creator',
+          metadata: {
+            dynamicUserId: dynamicUserId,
+            userId: user.id,
+            tenantId: tenant?.id || ''
+          }
+        });
+        customerId = customer.id;
+      }
+
+      // Create subscription with default price (you can customize this)
+      const { priceId = process.env.STRIPE_DEFAULT_PRICE_ID } = req.body;
+      
+      if (!priceId) {
+        return res.status(400).json({ 
+          error: "No price ID provided and STRIPE_DEFAULT_PRICE_ID not configured" 
+        });
+      }
+
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: priceId }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update tenant with billing info
+      if (tenant) {
+        await storage.updateTenant(tenant.id, {
+          billingInfo: {
+            ...tenant.billingInfo,
+            stripeCustomerId: customerId,
+            subscriptionId: subscription.id
+          }
+        });
+      }
+
+      const latestInvoice = subscription.latest_invoice;
+      const paymentIntent = typeof latestInvoice === 'object' && latestInvoice ? latestInvoice.payment_intent : null;
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null,
+        status: subscription.status
+      });
+
+    } catch (error: any) {
+      console.error('Subscription creation error:', error);
+      res.status(500).json({ 
+        error: "Error creating subscription", 
+        message: error.message 
+      });
+    }
+  });
+
+  // Get subscription status for authenticated user
+  app.get('/api/subscription-status', verifyDynamicAuth, async (req, res) => {
+    try {
+      const dynamicUserId = (req as any).dynamicUser?.id || (req as any).dynamicUser?.dynamicUserId;
+      if (!dynamicUserId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const user = await storage.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userTenants = await storage.getUserTenants(user.id);
+      const tenant = userTenants[0];
+
+      if (!tenant?.billingInfo?.subscriptionId) {
+        return res.json({ status: 'no_subscription' });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: "2025-08-27.basil",
+      });
+
+      const subscription = await stripe.subscriptions.retrieve(tenant.billingInfo.subscriptionId);
+      
+      res.json({
+        subscriptionId: subscription.id,
+        status: subscription.status,
+        currentPeriodEnd: subscription.current_period_end,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        plan: subscription.items.data[0]?.price?.nickname || 'Unknown Plan'
+      });
+
+    } catch (error: any) {
+      console.error('Subscription status error:', error);
+      res.status(500).json({ 
+        error: "Error fetching subscription status", 
+        message: error.message 
+      });
     }
   });
 
