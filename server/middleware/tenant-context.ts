@@ -59,9 +59,10 @@ export function validateTenantContext(paramName: string = 'tenantId') {
         canModify = true;
         canView = true;
       } else {
-        // Check tenant membership
+        // Check tenant membership via member list
         try {
-          const membership = await storage.getTenantMembership(tenantId, userId);
+          const members = await storage.getTenantMembers(tenantId);
+          const membership = members.find(member => member.userId === userId);
           if (membership) {
             switch (membership.role) {
               case 'admin':

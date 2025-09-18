@@ -13,13 +13,13 @@ import { verifyDynamicJWT, extractUserDataFromJWT, validateUserData } from "./ut
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Secure Dynamic auth middleware with proper JWT verification
+  // Secure Dynamic auth middleware - leverages Dynamic's infrastructure with proper server-side verification
   const verifyDynamicAuth = async (req: any, res: any, next: any) => {
     try {
       const authHeader = req.headers.authorization;
 
-      // For specific public routes, allow through without authentication
-      if (req.path === '/api/creators' && req.method === 'GET' && !req.params.id) {
+      // For public routes, allow through without authentication
+      if (req.path === '/api/creators' && req.method === 'GET') {
         return next();
       }
 
@@ -31,10 +31,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const token = authHeader.substring(7);
       
       try {
-        // Verify JWT token using Dynamic's JWKS endpoint
+        // Verify JWT using Dynamic's JWKS endpoint - this leverages Dynamic's infrastructure
+        // while maintaining proper server-side security verification
         const jwtPayload = await verifyDynamicJWT(token);
         
-        // Extract user data from verified JWT
+        // Extract user data from Dynamic's verified JWT payload
         const userData = extractUserDataFromJWT(jwtPayload);
         
         // Validate user data structure
@@ -42,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ error: "Invalid user data in JWT token" });
         }
 
-        // Attach verified user data to request
+        // Attach verified user data to request - derived from verified JWT only
         req.dynamicUser = {
           id: userData.dynamicUserId,
           dynamicUserId: userData.dynamicUserId,
@@ -57,7 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         next();
       } catch (jwtError) {
-        console.error('JWT verification failed:', jwtError);
+        console.error('Dynamic JWT verification failed:', jwtError);
         return res.status(401).json({ 
           error: "Invalid or expired authentication token",
           details: jwtError instanceof Error ? jwtError.message : 'JWT verification failed'
@@ -184,21 +185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Complete onboarding endpoint with Stripe integration
   app.post("/api/auth/complete-onboarding", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      // Get user from Dynamic context (not session since we're using Dynamic Auth)
-      const authHeader = req.headers.authorization;
-      let dynamicUserId = null;
-      
-      // Try to get Dynamic user ID from auth header or body
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        // Would need to verify Dynamic JWT token here in production
-        dynamicUserId = req.body.dynamicUserId;
-      } else {
-        // For development, get from request body
-        dynamicUserId = req.body.dynamicUserId;
-      }
+      // Use verified Dynamic user ID from JWT token (never trust request body for identity)
+      const dynamicUserId = req.dynamicUser.dynamicUserId;
 
       if (!dynamicUserId) {
-        return res.status(401).json({ error: "Unauthorized - Dynamic user ID required" });
+        return res.status(401).json({ error: "Authentication required - verified user ID missing" });
       }
 
       const user = await storage.getUserByDynamicId(dynamicUserId);

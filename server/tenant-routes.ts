@@ -81,13 +81,15 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
     }
   });
 
-  // Get tenant by ID
-  app.get("/api/tenants/:id", async (req, res) => {
+  // Get tenant by ID (protected - requires tenant membership)
+  app.get("/api/tenants/:id", verifyDynamicAuth, authenticateUser, validateTenantContext('id'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
     try {
       const tenant = await storage.getTenant(req.params.id);
       if (!tenant) {
         return res.status(404).json({ error: "Tenant not found" });
       }
+      
+      // Return full tenant data for authorized users
       res.json(tenant);
     } catch (error) {
       console.error("Error fetching tenant:", error);
@@ -95,14 +97,26 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
     }
   });
 
-  // Get tenant by slug
+  // Get tenant by slug (public endpoint with sanitized data)
   app.get("/api/tenants/slug/:slug", async (req, res) => {
     try {
       const tenant = await storage.getTenantBySlug(req.params.slug);
       if (!tenant) {
         return res.status(404).json({ error: "Tenant not found" });
       }
-      res.json(tenant);
+      
+      // Sanitize tenant data for public access - only expose safe fields
+      const publicTenant = {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        branding: tenant.branding,
+        settings: {
+          publicProfile: tenant.settings?.publicProfile || false,
+          allowRegistration: tenant.settings?.allowRegistration || false
+        }
+      };
+      res.json(publicTenant);
     } catch (error) {
       console.error("Error fetching tenant:", error);
       res.status(500).json({ error: "Failed to fetch tenant" });
