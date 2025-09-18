@@ -16,48 +16,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const verifyDynamicAuth = async (req: any, res: any, next: any) => {
     try {
       const authHeader = req.headers.authorization;
-      const dynamicUserHeader = req.headers['x-dynamic-user'];
-      const dynamicUserBody = req.body.dynamicUser;
 
       // For routes that don't require authentication, allow through
       if (req.path.includes('/api/creators') && req.method === 'GET') {
         return next();
       }
 
-      // Check for Dynamic user data (either from header or body)
-      const dynamicUser = dynamicUserHeader || dynamicUserBody;
+      // Require Bearer token for authentication
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Authentication required - Bearer token missing" });
+      }
+
+      const token = authHeader.substring(7);
       
-      if (!dynamicUser) {
-        return res.status(401).json({ error: "Authentication required - Dynamic user data missing" });
-      }
-
-      // Parse Dynamic user if it's a string
-      let parsedDynamicUser;
       try {
-        parsedDynamicUser = typeof dynamicUser === 'string' ? JSON.parse(dynamicUser) : dynamicUser;
-      } catch (parseError) {
-        return res.status(401).json({ error: "Invalid Dynamic user data format" });
-      }
-
-      // Validate required Dynamic user fields
-      if (!parsedDynamicUser.id && !parsedDynamicUser.dynamicUserId) {
-        return res.status(401).json({ error: "Invalid Dynamic user - missing ID" });
-      }
-
-      // Dynamic Labs handles JWT verification natively with 2-hour expiration
-      // The JWT token is validated on the client side by Dynamic SDK
-      // We trust Dynamic's authentication and focus on user data validation
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        // Basic token format validation for Dynamic JWT
-        if (token.length < 10) {
-          return res.status(401).json({ error: "Invalid Dynamic JWT token format" });
+        // Verify JWT token with Dynamic's public keys
+        const jwtPayload = await verifyDynamicJWT(token);
+        
+        // Extract user data from verified JWT
+        const userData = extractUserDataFromJWT(jwtPayload);
+        
+        // Validate user data structure
+        if (!validateDynamicUserData(userData)) {
+          return res.status(401).json({ error: "Invalid user data in JWT token" });
         }
-      }
 
-      // Attach validated user to request
-      req.dynamicUser = parsedDynamicUser;
-      next();
+        // Attach verified user data to request
+        req.dynamicUser = {
+          id: userData.dynamicUserId,
+          dynamicUserId: userData.dynamicUserId,
+          alias: userData.alias,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          verifiedCredentials: userData.verifiedCredentials,
+          walletAddress: userData.walletAddress,
+          walletChain: userData.walletChain,
+        };
+        
+        next();
+      } catch (jwtError) {
+        console.error('JWT verification failed:', jwtError);
+        return res.status(401).json({ 
+          error: "Invalid or expired authentication token",
+          details: jwtError instanceof Error ? jwtError.message : 'Unknown JWT error'
+        });
+      }
     } catch (error) {
       console.error('Auth middleware error:', error);
       res.status(401).json({ error: "Authentication failed" });
