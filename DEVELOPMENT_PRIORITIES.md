@@ -177,6 +177,43 @@ req.dynamicUser = req.body.dynamicUser || req.headers['x-dynamic-user'];
 
 **Expected Outcome**: Points system works completely
 
+#### **Task B4: Fan Profile System Fixes**
+**Priority**: 🟠 HIGH
+**Files to Update:**
+- `client/src/components/fan/facebook-profile-import.tsx`
+- `client/src/components/fan/fan-profile-edit-modal.tsx`
+- `client/src/pages/fan-profile.tsx`
+- `server/routes.ts` (profile endpoints)
+
+**Actions:**
+1. Fix Facebook profile import - ensure data actually saves to database (currently resets on page navigation)
+2. Map profile fields to "Personal Information" section properly
+3. Fix non-functional "Account Settings" buttons
+4. Implement Privacy Settings with Facebook disconnect/delink options
+5. Add privacy disclaimer for private profiles (creators can't communicate)
+6. Integrate Notification Settings into "Edit Profile" modal
+7. Create Connected Accounts modal with disconnect/delink options
+
+**Expected Outcome**: Fan profile management works completely end-to-end
+
+#### **Task B5: Points System Enhancement**
+**Priority**: 🟠 HIGH
+**Dependency**: Requires Task B3 (Points & Rewards System) completion
+**Files to Update:**
+- `client/src/pages/fan-dashboard.tsx`
+- `client/src/hooks/use-points.ts` (new)
+- `server/routes.ts` (extend point endpoints)
+
+**Actions:**
+1. Implement points breakdown by Creator (already pre-built structure)
+2. Add Campaign-based point categorization
+3. Create platform-specific point tracking (Twitter, Instagram, Facebook, TikTok, YouTube, Spotify)
+4. Implement Fandomly-specific points for app referrals and platform quests
+5. Add tenant-scoped point redemption (points only redeemable from originating creator)
+6. Create comprehensive point transaction history
+
+**Expected Outcome**: Advanced points system with proper categorization and redemption rules
+
 ### **PRIORITY 3 (Week 3) - Multi-Tenant & Advanced Features**
 
 #### **Task C1: Multi-Tenant Architecture**
@@ -209,9 +246,179 @@ req.dynamicUser = req.body.dynamicUser || req.headers['x-dynamic-user'];
 
 **Expected Outcome**: Advanced social media campaign functionality
 
-### **PRIORITY 4 (Future) - NFT Integration**
+#### **Task C3: Referral System Implementation**
+**Priority**: 🟡 MEDIUM
+**New Files Needed:**
+- `client/src/components/referral/referral-link-generator.tsx`
+- `client/src/hooks/use-referral.ts`
+- `server/referral-routes.ts`
 
-#### **Task D1: Metaplex Integration**
+**Actions:**
+1. Create unique referral link system for fans
+2. Implement social network-specific sharing templates
+3. Add dual redirect functionality (app OR creator campaign)
+4. Track referral IDs in URLs for new user signups
+5. Implement referral point attribution system
+6. Create referral dashboard and analytics
+
+**Expected Outcome**: Complete referral system driving user acquisition
+
+#### **Task C4: Notification System Infrastructure**
+**Priority**: 🟡 MEDIUM
+**New Files Needed:**
+- `server/notification-routes.ts`
+- `client/src/components/notifications/notification-center.tsx`
+- `client/src/hooks/use-notifications.ts`
+
+**Actions:**
+1. Implement Email notification system
+2. Add SMS notification capabilities
+3. Create browser/push notification support
+4. Build marketing campaign notifications
+5. Add campaign update notifications
+6. Implement creator update alerts
+7. Create achievement alert system
+
+**Expected Outcome**: Comprehensive notification system across all channels
+
+#### **Task C5: Settings & Data Management**
+**Priority**: 🟡 MEDIUM
+**Files to Update:**
+- `client/src/pages/fan-settings.tsx`
+- `client/src/pages/creator-settings.tsx`
+- `server/routes.ts` (data export endpoints)
+
+**Actions:**
+1. Aggregate settings tabs into unified structure (Profile, Notifications, Privacy, Account)
+2. Implement "Export My Data" functionality with CSV download
+3. Create comprehensive user data export from database
+4. Add data privacy controls and deletion options
+5. Implement account closure procedures
+
+**Expected Outcome**: Complete settings management and data export functionality
+
+### **PRIORITY 4 (Week 4) - Creator Experience Enhancements**
+
+#### **Task D1: NIL & Athlete Features**
+**Priority**: 🟡 MEDIUM
+**Files to Update:**
+- `client/src/pages/creator-onboarding.tsx`
+- `client/src/components/creator/athlete-onboarding.tsx`
+- `server/routes.ts` (athlete-specific endpoints)
+
+**Actions:**
+1. Research and implement NIL compliance requirements
+2. Add sports-specific analytics dashboard
+3. Create university integration capabilities
+4. Build sponsorship management tools
+5. Implement NIL valuation calculator
+6. Add sponsor directory access
+7. Create physical & NFT/digital collectibles support
+8. Expand education subcategories (High School: Freshman-Senior, College divisions)
+9. Add position field for athletes (if applicable)
+
+**Expected Outcome**: Comprehensive NIL support for college and professional athletes
+
+#### **Task D2: Musician-Specific Features**
+**Priority**: 🟡 MEDIUM
+**Files to Update:**
+- `client/src/components/creator/musician-onboarding.tsx`
+- Music platform integration components
+
+**Actions:**
+1. Implement music catalogue integrations
+2. Add streaming platform sync (expand beyond Spotify)
+3. Create SoundCloud embedding support with iframe fields
+4. Implement token-gated fan experiences
+5. Add Ticketmaster affiliate program integration
+6. Create ticket marketplace integrations
+7. Build physical & NFT/digital collectibles for musicians
+
+**Expected Outcome**: Advanced musician tools for fan engagement and monetization
+
+#### **Task D3: Content Creator Analytics**
+**Priority**: 🟡 MEDIUM
+**Files to Update:**
+- `client/src/components/creator/content-creator-onboarding.tsx`
+- Analytics dashboard components
+
+**Actions:**
+1. Implement multiplatform tracking capabilities
+2. Create content performance analytics
+3. Build brand partnership management tools
+4. Add audience segmentation features
+5. Implement creator monetization tracking
+6. Create cross-platform content analytics
+
+**Expected Outcome**: Comprehensive content creator analytics and management tools
+
+#### **Task D4: Enhanced Campaign Builder**
+**Priority**: 🟡 MEDIUM
+**Files to Update:**
+- `client/src/pages/campaign-builder.tsx`
+- Campaign template system
+
+**Actions:**
+1. Add campaign naming conventions ("Fan Season 1", "Nike Sponsor Campaign")
+2. Implement campaign types (Points, Raffle tickets, NFT, Badge - combinable)
+3. Add precise campaign duration controls (start/end day/time)
+4. Expand social platform support (Facebook, Instagram, X, TikTok, YouTube, Spotify, Apple Music, Discord, Telegram)
+5. Create detailed task system per social platform:
+   - Follow/Like/Subscribe tasks (including external sponsor accounts)
+   - Playlist follows, album additions
+   - Server/group joins
+   - Specific post interactions (like, repost, hashtag posts)
+   - Referral tracking (1 referral = 1 point)
+6. Implement hierarchical campaigns (Season 2 requires Season 1 completion)
+7. Add flexible reward systems (campaign-level vs task-level rewards)
+8. Create completion requirements and eligibility tracking
+
+**Expected Outcome**: Professional-grade campaign builder with advanced customization
+
+#### **Task D5: Analytics & Growth Engine**
+**Priority**: 🟡 MEDIUM
+**New Files Needed:**
+- `server/analytics-engine.ts`
+- `client/src/components/analytics/campaign-analytics.tsx`
+- `client/src/components/analytics/growth-metrics.tsx`
+
+**Actions:**
+1. Build campaign tracking engine (participation rates, conversions)
+2. Implement fan analytics (enrollment, completion, engagement)
+3. Create task completion tracking and ratios
+4. Add fan journey analytics (enrolled → started → completed)
+5. Build growth metrics with predefined formulas
+6. Consider dynamic Google Sheets integration for formula flexibility
+7. Implement AI agent for insights and recommendations
+8. Create automated reporting and alerts
+
+**Expected Outcome**: Advanced analytics engine driving creator success
+
+#### **Task D6: Revenue & Monetization Features**
+**Priority**: 🟡 MEDIUM
+**New Files Needed:**
+- `client/src/components/creator/creator-store.tsx`
+- `server/revenue-routes.ts`
+- Physical goods management system
+
+**Actions:**
+1. Create creator store infrastructure for revenue features
+2. Implement physical goods support (signed items, sponsor goods, competition memorabilia)
+3. Add digital items system (signed NFTs, digital trading cards, competition photos)
+4. Build subscription tiers for deeper creator access:
+   - Private content before public release
+   - Birthday shoutouts and personalized videos
+   - Sponsor merchandise discounts
+   - Early access to tickets and music releases
+5. Integrate revenue features with paid Fandomly tiers only
+6. Create inventory management for physical items
+7. Add digital asset creation and distribution tools
+
+**Expected Outcome**: Complete creator monetization ecosystem
+
+### **PRIORITY 5 (Future) - NFT Integration**
+
+#### **Task E1: Metaplex Integration**
 **Priority**: 🟢 LOW
 **Note**: Only start after core functionality is complete
 
@@ -283,18 +490,54 @@ FILE UPLOADS:
 POST /api/upload/image
 POST /api/upload/avatar
 POST /api/upload/branding
+POST /api/upload/banner
 
-PAYMENTS:
-POST /api/stripe/create-checkout
-POST /api/stripe/webhook
-GET /api/billing/subscription
-POST /api/billing/cancel
+PAYMENTS: (✅ PARTIALLY COMPLETED - Stripe integration active in server/routes.ts)
+POST /api/create-payment-intent ✅
+POST /api/get-or-create-subscription ✅  
+POST /api/subscription-status ✅
+POST /api/stripe/webhook (needed)
+POST /api/billing/cancel (needed)
 
 SOCIAL ACTIONS:
 POST /api/social/facebook/like
 POST /api/social/facebook/comment
 POST /api/social/facebook/share
 POST /api/social/instagram/follow
+POST /api/social/twitter/follow
+POST /api/social/youtube/subscribe
+POST /api/social/tiktok/follow
+POST /api/social/spotify/follow
+
+REFERRAL SYSTEM:
+POST /api/referral/generate-link
+GET /api/referral/track/:refId
+POST /api/referral/claim-points
+
+NOTIFICATIONS:
+POST /api/notifications/email
+POST /api/notifications/sms
+POST /api/notifications/push
+GET /api/notifications/preferences
+POST /api/notifications/preferences
+
+DATA EXPORT:
+GET /api/export/user-data
+GET /api/export/campaign-data
+GET /api/export/analytics-data
+
+ANALYTICS:
+GET /api/analytics/campaign/:campaignId
+GET /api/analytics/creator/:creatorId
+GET /api/analytics/growth-metrics
+POST /api/analytics/track-event
+
+REVENUE:
+POST /api/store/physical-item
+POST /api/store/digital-item
+POST /api/store/subscription-tier
+GET /api/store/inventory
+POST /api/store/purchase
 ```
 
 ### **Recommended File Structure:**
@@ -337,17 +580,30 @@ server/
 
 ### **Priority 2 Success Criteria:**
 - [ ] File uploads working (profile pics, branding assets)
-- [ ] Stripe payments functional with subscription management
+- [x] Stripe payments functional with subscription management ✅ COMPLETED
 - [ ] Point accrual working for social actions (Facebook likes, follows)
 - [ ] Reward redemption flows complete
+- [ ] Fan profile system completely functional (Facebook import, privacy settings)
+- [ ] Enhanced points system with creator/campaign/platform breakdown
 
 ### **Priority 3 Success Criteria:**
 - [ ] Multi-tenant routing implemented (/:slug/ pattern)
 - [ ] Tenant branding applied from database
 - [ ] Advanced campaign analytics working
-- [ ] Social media integrations complete (Instagram, TikTok)
+- [ ] Social media integrations complete (Instagram, TikTok, Twitter, YouTube)
+- [ ] Referral system operational with tracking and attribution
+- [ ] Notification system functional across all channels
+- [ ] Settings aggregation and data export working
 
 ### **Priority 4 Success Criteria:**
+- [ ] NIL features complete for athletes (compliance, valuation, sponsorship)
+- [ ] Musician tools operational (streaming sync, token-gated experiences)
+- [ ] Content creator analytics and monetization tracking
+- [ ] Enhanced campaign builder with advanced customization
+- [ ] Analytics engine providing actionable insights
+- [ ] Revenue features enabling creator monetization
+
+### **Priority 5 Success Criteria:**
 - [ ] Metaplex integration functional
 - [ ] NFT rewards distributed automatically
 - [ ] NFT marketplace features complete
@@ -425,9 +681,51 @@ curl -H "Authorization: Bearer invalid_token" http://localhost:5000/api/auth/use
 - Use proper TypeScript types from schema
 - Implement proper error handling for database operations
 
+## 🎯 **UI/UX Quick Fixes**
+
+### **Minor UI Improvements:**
+- [ ] Fix dropdown menu "Switch To Creator" button - remove hover background effect, maintain transparent background with white (#FFFFFF) font and border
+- [ ] Replace Social Media "Links" with banner image upload functionality including dimension requirements
+- [ ] Add creator-type-specific example banners for onboarding placeholders
+- [ ] Fix Facebook connection state consistency across all pages (Overview page vs. menu discrepancy)
+- [ ] Implement "Disconnect" and "Switch Page" options for all Facebook Login buttons
+
+### **Campaign System UI Enhancements:**
+- [ ] Update "Available Campaigns" to "Available Tasks From Creators You Follow"
+- [ ] Change "My Campaigns" to show only enrolled live campaigns  
+- [ ] Modify "All Campaigns" to display campaigns from followed creators only
+- [ ] Add "Creator Campaign Directory" redirect button for discovering all campaigns
+- [ ] Implement campaign hierarchy display (prerequisite campaigns)
+
+## 🚨 **Critical Business Logic Requirements**
+
+### **Facebook Integration State Management:**
+- [ ] Ensure Facebook profile import data persists across page navigation
+- [ ] Implement dynamic page switching that updates ALL relevant sections:
+  - Social connections
+  - Points and campaigns 
+  - Fan analytics
+  - Revenue tracking
+  - All campaign data
+- [ ] Build multi-page support for paid tiers (single page for free tiers)
+
+### **Points System Business Rules:**
+- [ ] Implement tenant-scoped redemption (points only redeemable from originating creator)
+- [ ] Create Fandomly-specific points separate from creator points
+- [ ] Track referral attribution for point awards
+- [ ] Build point transaction history with full audit trail
+
+### **Campaign Participation Logic:**
+- [ ] Implement "All tasks must be completed within campaign duration" rule
+- [ ] Build hierarchical campaign dependencies
+- [ ] Create campaign vs. task-level reward logic
+- [ ] Add referral tracking within campaigns (1 referral = 1 point)
+
 ---
 
-**Last Updated**: September 10, 2025
-**Status**: Critical issues identified, prioritized development plan created
-**Next Action**: Begin Priority 1 Task A1 (Dashboard Data Flow)
-**Estimated Timeline**: 3-4 weeks for Priority 1-3 completion
+**Last Updated**: September 18, 2025
+**Status**: ✅ Comprehensive TODO list integrated from user requirements, 25+ new API endpoints identified for implementation
+**Priority Update**: Added extensive fan experience improvements, creator monetization features, and NIL compliance requirements
+**Next Action**: Begin Priority 1 Task A4 (Security Fixes) → A1 (Dashboard Data Flow) → A2 (Campaign System)
+**Estimated Timeline**: 5-6 weeks for Priority 1-4 completion (expanded scope)
+**Security Alert**: 🚨 JWT verification currently disabled - IMMEDIATE fix required before production
