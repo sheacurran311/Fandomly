@@ -418,6 +418,16 @@ export const campaignTriggerEnum = pgEnum('campaign_trigger', [
 ]);
 export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive', 'draft', 'archived']);
 
+// Advanced Campaign Types & Rewards
+export const rewardTypeEnum = pgEnum('reward_type', ['points', 'raffle', 'nft', 'badge']);
+export const socialPlatformEnum = pgEnum('social_platform', [
+  'facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify', 
+  'apple_music', 'discord', 'telegram'
+]);
+export const taskTypeEnum = pgEnum('task_type', [
+  'follow', 'playlist', 'album', 'join', 'like_post', 'repost', 'hashtag_post', 'referral'
+]);
+
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
@@ -471,6 +481,20 @@ export const campaigns = pgTable("campaigns", {
   // Usage tracking
   totalIssued: integer("total_issued").default(0),
   totalParticipants: integer("total_participants").default(0),
+
+  // Extended Features for Advanced Campaign Builder
+  campaignTypes: jsonb("campaign_types").$type<string[]>().default(['points']), // Multiple types: points, raffle, nft, badge
+  rewardStructure: jsonb("reward_structure").$type<{
+    taskRewards: boolean;
+    campaignRewards: Array<{
+      type: 'points' | 'raffle' | 'nft' | 'badge';
+      value: number;
+      metadata?: Record<string, any>;
+    }>;
+    defaultPoints: number;
+  }>(),
+  prerequisiteCampaigns: jsonb("prerequisite_campaigns").$type<string[]>().default([]), // Campaign IDs that must be completed first
+  allTasksRequired: boolean("all_tasks_required").default(true), // Must complete all tasks for reward
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -505,6 +529,41 @@ export const campaignRules = pgTable("campaign_rules", {
   }>>().notNull(),
   
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Social Campaign Tasks
+export const socialCampaignTasks = pgTable("social_campaign_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Task Configuration
+  platform: socialPlatformEnum("platform").notNull(),
+  taskType: taskTypeEnum("task_type").notNull(),
+  displayOrder: integer("display_order").default(1),
+  
+  // Task-specific Data
+  targetUrl: text("target_url"), // URL for posts/videos/playlists to like/share
+  hashtags: jsonb("hashtags").$type<string[]>(), // Required hashtags for hashtag_post tasks
+  inviteCode: text("invite_code"), // Discord server invite or Telegram group link
+  customInstructions: text("custom_instructions"), // Additional task instructions
+  
+  // Reward Configuration
+  rewardType: rewardTypeEnum("reward_type").notNull().default('points'),
+  rewardValue: integer("reward_value").notNull().default(50),
+  rewardMetadata: jsonb("reward_metadata").$type<{
+    nftContractAddress?: string;
+    badgeImageUrl?: string;
+    rafflePrize?: string;
+    additionalData?: Record<string, any>;
+  }>(),
+  
+  // Verification Settings
+  requiresManualVerification: boolean("requires_manual_verification").default(false),
+  verificationInstructions: text("verification_instructions"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Campaign Participation Tracking
@@ -747,6 +806,12 @@ export const insertCampaignSchema = createInsertSchema(campaigns).omit({
 export const insertCampaignRuleSchema = createInsertSchema(campaignRules).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertSocialCampaignTaskSchema = createInsertSchema(socialCampaignTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertCampaignParticipationSchema = createInsertSchema(campaignParticipations).omit({

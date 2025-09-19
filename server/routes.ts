@@ -753,13 +753,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/campaigns", async (req, res) => {
+  app.post("/api/campaigns", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const payload = insertCampaignSchema.parse(req.body);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get user's creator profile for tenant scoping
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required to create campaigns" });
+      }
+
+      const payload = insertCampaignSchema.parse({
+        ...req.body,
+        tenantId: creator.tenantId,
+        creatorId: creator.id
+      });
+      
       const created = await storage.createCampaign(payload);
       res.json(created);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid campaign data" });
+    }
+  });
+
+  // Enhanced campaign creation endpoint for multi-step modal
+  app.post("/api/campaigns/enhanced", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get user's creator profile to ensure they can create campaigns
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required to create campaigns" });
+      }
+
+      const { 
+        campaignData, 
+        socialTasks = [] 
+      }: {
+        campaignData: any;
+        socialTasks: any[];
+      } = req.body;
+
+      // Validate campaign data
+      if (!campaignData.name || !campaignData.type || campaignData.type.length === 0) {
+        return res.status(400).json({ error: "Campaign name and type are required" });
+      }
+
+      // Create the main campaign with proper tenant scoping
+      const campaignPayload = {
+        tenantId: creator.tenantId,
+        creatorId: creator.id,
+        name: campaignData.name,
+        description: campaignData.description || '',
+        campaignType: 'direct' as const,
+        trigger: 'custom_event' as const,
+        startDate: campaignData.startDate || new Date().toISOString(),
+        endDate: campaignData.endDate || null,
+        status: 'active' as const,
+        campaignTypes: campaignData.type || ['points'],
+        rewardStructure: campaignData.rewardStructure,
+        prerequisiteCampaigns: campaignData.requirements?.prerequisiteCampaigns || [],
+        allTasksRequired: campaignData.requirements?.allTasksRequired ?? true
+      };
+
+      const campaign = await storage.createCampaign(campaignPayload);
+
+      // Create social campaign tasks
+      const createdTasks = [];
+      for (const task of socialTasks) {
+        const taskPayload = {
+          tenantId: campaign.tenantId,
+          campaignId: campaign.id,
+          platform: task.platform,
+          taskType: task.taskType,
+          targetUrl: task.targetUrl,
+          hashtags: task.hashtags,
+          inviteCode: task.inviteCode,
+          customInstructions: task.customInstructions,
+          rewardType: task.rewardType || 'points',
+          rewardValue: task.rewardValue || 50,
+          rewardMetadata: task.rewardMetadata,
+          displayOrder: task.displayOrder || 1
+        };
+        
+        const createdTask = await storage.createSocialCampaignTask(taskPayload);
+        createdTasks.push(createdTask);
+      }
+
+      res.json({ 
+        campaign, 
+        tasks: createdTasks,
+        message: "Campaign created successfully with social tasks" 
+      });
+    } catch (error) {
+      console.error('Enhanced campaign creation failed:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create enhanced campaign" });
+    }
+  });
+
+  // Social Campaign Tasks routes
+  app.get("/api/campaigns/:campaignId/tasks", async (req, res) => {
+    try {
+      const { campaignId } = req.params;
+      const tasks = await storage.getSocialCampaignTasks(campaignId);
+      res.json(tasks);
+    } catch (error) {
+      console.error('Failed to fetch campaign tasks:', error);
+      res.status(500).json({ error: "Failed to fetch campaign tasks" });
+    }
+  });
+
+  app.post("/api/campaigns/:campaignId/tasks", async (req, res) => {
+    try {
+      const { campaignId } = req.params;
+      const taskData = { ...req.body, campaignId };
+      const created = await storage.createSocialCampaignTask(taskData);
+      res.json(created);
+    } catch (error) {
+      console.error('Failed to create campaign task:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create campaign task" });
+    }
+  });
+
+  app.put("/api/campaigns/tasks/:taskId", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const updated = await storage.updateSocialCampaignTask(taskId, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to update campaign task:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update campaign task" });
+    }
+  });
+
+  app.delete("/api/campaigns/tasks/:taskId", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      await storage.deleteSocialCampaignTask(taskId);
+      res.json({ success: true, message: "Campaign task deleted successfully" });
+    } catch (error) {
+      console.error('Failed to delete campaign task:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to delete campaign task" });
     }
   });
 

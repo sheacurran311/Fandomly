@@ -1,7 +1,7 @@
 import { 
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
-  campaigns, campaignRules, campaignParticipations,
+  campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -9,6 +9,7 @@ import {
   type RewardRedemption, type InsertRewardRedemption,
   type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership,
   type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
+  insertSocialCampaignTaskSchema,
   creatorFacebookPages
 } from "@shared/schema";
 import { db } from "./db";
@@ -80,6 +81,12 @@ export interface IStorage {
   updateCampaign(id: string, data: any): Promise<Campaign>;
   getCampaignRules(campaignId: string): Promise<CampaignRule[]>;
   createCampaignRule(data: any): Promise<CampaignRule>;
+  
+  // Social Campaign Task operations
+  getSocialCampaignTasks(campaignId: string): Promise<any[]>;
+  createSocialCampaignTask(data: any): Promise<any>;
+  updateSocialCampaignTask(id: string, data: any): Promise<any>;
+  deleteSocialCampaignTask(id: string): Promise<void>;
   
   // Campaign Participation operations
   createCampaignParticipation(data: any): Promise<any>;
@@ -387,6 +394,30 @@ export class DatabaseStorage implements IStorage {
   async createCampaignRule(data: InsertCampaignRule): Promise<CampaignRule> {
     const [row] = await db.insert(campaignRules).values(data as any).returning();
     return row;
+  }
+
+  // Social Campaign Task operations
+  async getSocialCampaignTasks(campaignId: string): Promise<any[]> {
+    return await db.select().from(socialCampaignTasks)
+      .where(eq(socialCampaignTasks.campaignId, campaignId))
+      .orderBy(socialCampaignTasks.displayOrder, socialCampaignTasks.createdAt);
+  }
+
+  async createSocialCampaignTask(data: any): Promise<any> {
+    const [row] = await db.insert(socialCampaignTasks).values(data as any).returning();
+    return row;
+  }
+
+  async updateSocialCampaignTask(id: string, data: any): Promise<any> {
+    const [row] = await db.update(socialCampaignTasks)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(socialCampaignTasks.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteSocialCampaignTask(id: string): Promise<void> {
+    await db.delete(socialCampaignTasks).where(eq(socialCampaignTasks.id, id));
   }
 
   // Creator Facebook Pages
