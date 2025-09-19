@@ -1,5 +1,23 @@
 # 🔍 Fandomly Development Priorities & Current State Analysis
 
+## 🚨 CRITICAL AUTHENTICATION LESSON LEARNED
+
+### ✅ **AUTHENTICATION FIXED - SEPTEMBER 19, 2025**
+
+**LESSON**: Dynamic SDK handles ALL authentication natively. NEVER implement custom JWT verification.
+
+**What Was Removed/Fixed**:
+- [x] Custom `verifyDynamicAuth` middleware (was causing 500 errors)
+- [x] Server-side JWT token parsing and validation
+- [x] All undefined `dynamicUserId` variable references
+- [x] Tenant routes JWT dependency
+
+**Architecture Rule Going Forward**:
+🚫 **NEVER DO**: Custom JWT middleware, Dynamic SDK modifications, server-side token verification
+✅ **ALWAYS DO**: Trust Dynamic's client-side auth, use headers/body for user identity, standard RBAC middleware only
+
+---
+
 ## 📊 Project Overview
 
 Fandomly is a Web3-enabled loyalty rewards platform targeting athletes, creators, and musicians with NIL opportunities. This document outlines the current state, critical issues, and prioritized development tasks.
@@ -55,16 +73,14 @@ Replace hardcoded data with `useQuery` calls to actual API endpoints
 
 ### **Issue 3: Security Critical Issues**
 
-**MAJOR SECURITY VULNERABILITY** in `server/routes.ts` lines 23-26:
-```javascript
-// For now, we'll skip JWT verification and trust the client
-// In production, you'd verify the JWT token here  
-req.dynamicUser = req.body.dynamicUser || req.headers['x-dynamic-user'];
-```
+**MAJOR SECURITY VULNERABILITY** in `server/routes.ts` - ✅ **RESOLVED**:
+- Custom JWT verification removed (was causing errors)
+- Dynamic's native authentication restored
+- All authentication now flows through Dynamic SDK properly
 
-**Other Security Issues:**
+**Remaining Security Issues:**
 - No proper tenant isolation in queries
-- RBAC middleware exists but not consistently applied
+- RBAC middleware exists but not consistently applied  
 - Client-side data trusted without server validation
 
 ## 🎯 **PRIORITIZED DEVELOPMENT TASKS**

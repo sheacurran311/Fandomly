@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useCreatorStats, useCreatorActivity } from "@/hooks/use-creator-dashboard";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
@@ -16,11 +17,14 @@ import {
   Target,
   Plus,
   BarChart3,
-  Facebook
+  Facebook,
+  Loader2
 } from "lucide-react";
 
 export default function CreatorDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
+  const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
 
   if (isLoading) {
     return (
@@ -56,31 +60,49 @@ export default function CreatorDashboard() {
 
           {/* Key Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <DashboardCard
-              title="Total Fans"
-              value="2,847"
-              change={{ value: 12.5, type: "increase", period: "this month" }}
-              icon={<Users className="h-5 w-5" />}
-              gradient
-            />
-            <DashboardCard
-              title="Monthly Revenue"
-              value="$4,892"
-              change={{ value: 8.2, type: "increase", period: "vs last month" }}
-              icon={<DollarSign className="h-5 w-5" />}
-            />
-            <DashboardCard
-              title="Engagement Rate"
-              value="24.8%"
-              change={{ value: 3.1, type: "increase", period: "this week" }}
-              icon={<Heart className="h-5 w-5" />}
-            />
-            <DashboardCard
-              title="Active Campaigns"
-              value="5"
-              description="2 ending soon"
-              icon={<Target className="h-5 w-5" />}
-            />
+            {statsLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="bg-white/5 backdrop-blur-lg border border-white/10">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-center h-16">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : statsError ? (
+              <div className="col-span-4 text-center text-red-400">
+                Failed to load stats. Please try again.
+              </div>
+            ) : (
+              <>
+                <DashboardCard
+                  title="Total Fans"
+                  value={creatorStats?.totalFans?.toLocaleString() || "0"}
+                  change={creatorStats?.fansChange}
+                  icon={<Users className="h-5 w-5" />}
+                  gradient
+                />
+                <DashboardCard
+                  title="Monthly Revenue"
+                  value={`$${creatorStats?.monthlyRevenue?.toLocaleString() || "0"}`}
+                  change={creatorStats?.revenueChange}
+                  icon={<DollarSign className="h-5 w-5" />}
+                />
+                <DashboardCard
+                  title="Engagement Rate"
+                  value={`${creatorStats?.engagementRate || "0"}%`}
+                  change={creatorStats?.engagementChange}
+                  icon={<Heart className="h-5 w-5" />}
+                />
+                <DashboardCard
+                  title="Active Campaigns"
+                  value={creatorStats?.activeCampaigns?.toString() || "0"}
+                  description={creatorStats?.activeCampaigns && creatorStats.activeCampaigns > 0 ? "campaigns running" : "no active campaigns"}
+                  icon={<Target className="h-5 w-5" />}
+                />
+              </>
+            )}
           </div>
 
           {/* Main Content Grid */}
