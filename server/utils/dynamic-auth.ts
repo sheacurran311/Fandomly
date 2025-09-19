@@ -70,6 +70,15 @@ export async function verifyDynamicJWT(token: string): Promise<DynamicJWTPayload
       throw new Error('Invalid JWT token - missing key ID in header');
     }
 
+    // Debug: decode the token without verification to see its claims
+    const decodedPayload = jwt.decode(token) as any;
+    console.log('Debug JWT payload:', {
+      audience: decodedPayload?.aud,
+      expectedAudience: DYNAMIC_ENV_ID,
+      issuer: decodedPayload?.iss,
+      sub: decodedPayload?.sub
+    });
+
     // Get signing key from Dynamic's JWKS endpoint
     const signingKey = await getSigningKey(decodedHeader.header.kid);
 
