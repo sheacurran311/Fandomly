@@ -10,12 +10,22 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
-// Initialize Stripe
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
+// Initialize Stripe with testing keys in development, production keys in production
+const getStripePublicKey = () => {
+  // In development, prefer testing keys
+  if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
+    return import.meta.env.TESTING_VITE_STRIPE_PUBLIC_KEY || import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+  }
+  // In production, use production keys
+  return import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+};
+
+const stripePublicKey = getStripePublicKey();
+if (!stripePublicKey) {
+  throw new Error('Missing required Stripe key. Please set VITE_STRIPE_PUBLIC_KEY for production or TESTING_VITE_STRIPE_PUBLIC_KEY for development.');
 }
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+const stripePromise = loadStripe(stripePublicKey);
 
 // Type definitions for API responses
 interface SubscriptionStatusResponse {
