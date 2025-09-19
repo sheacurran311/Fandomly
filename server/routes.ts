@@ -135,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Authentication required - user ID missing" });
       }
 
-      const user = await storage.getUserByDynamicId(dynamicUserId);
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -222,10 +222,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Create Stripe customer
           const customer = await stripe.customers.create({
-            email: user.email || `${dynamicUserId}@wallet.user`,
+            email: user.email || `${user.dynamicUserId}@wallet.user`,
             name: displayName || name || 'Creator',
             metadata: {
-              dynamicUserId: dynamicUserId,
+              dynamicUserId: user.dynamicUserId,
               userId: user.id,
               creatorType: creatorType
             }
@@ -1018,15 +1018,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get or create subscription for authenticated user
-  app.post('/api/get-or-create-subscription', async (req, res) => {
+  app.post('/api/get-or-create-subscription', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req as any).dynamicUser?.id || (req as any).dynamicUser?.dynamicUserId;
-      if (!dynamicUserId) {
+      const userId = req.user?.id;
+      if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
 
       // Get user from our database
-      const user = await storage.getUserByDynamicId(dynamicUserId);
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -1064,10 +1064,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = tenant?.billingInfo?.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
-          email: user.email || `${dynamicUserId}@wallet.user`,
+          email: user.email || `${user.dynamicUserId}@wallet.user`,
           name: user.username || 'Creator',
           metadata: {
-            dynamicUserId: dynamicUserId,
+            dynamicUserId: user.dynamicUserId,
             userId: user.id,
             tenantId: tenant?.id || ''
           }
@@ -1121,14 +1121,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subscription status for authenticated user
-  app.get('/api/subscription-status', async (req, res) => {
+  app.get('/api/subscription-status', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req as any).dynamicUser?.id || (req as any).dynamicUser?.dynamicUserId;
-      if (!dynamicUserId) {
+      const userId = req.user?.id;
+      if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      const user = await storage.getUserByDynamicId(dynamicUserId);
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
