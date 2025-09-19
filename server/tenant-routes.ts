@@ -35,9 +35,9 @@ const createTenantSchema = z.object({
   })
 });
 
-export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
+export function registerTenantRoutes(app: Express) {
   // Create tenant
-  app.post("/api/tenants", verifyDynamicAuth, authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/tenants", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {
       console.log("Creating tenant with data:", req.body);
       const tenantData = createTenantSchema.parse(req.body);
@@ -82,7 +82,7 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
   });
 
   // Get tenant by ID (protected - requires tenant membership)
-  app.get("/api/tenants/:id", verifyDynamicAuth, authenticateUser, validateTenantContext('id'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
+  app.get("/api/tenants/:id", authenticateUser, validateTenantContext('id'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
     try {
       const tenant = await storage.getTenant(req.params.id);
       if (!tenant) {
@@ -124,7 +124,7 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
   });
 
   // Update tenant
-  app.patch("/api/tenants/:id", verifyDynamicAuth, authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), validateTenantContext('id'), requireTenantModifyPermission(), async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/tenants/:id", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), validateTenantContext('id'), requireTenantModifyPermission(), async (req: AuthenticatedRequest, res) => {
     try {
       const tenant = await storage.updateTenant(req.params.id, req.body);
       if (!tenant) {
@@ -138,7 +138,7 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
   });
 
   // Get user's tenants
-  app.get("/api/users/:userId/tenants", verifyDynamicAuth, authenticateUser, validateUserResourceAccess('userId'), async (req: AuthenticatedRequest, res) => {
+  app.get("/api/users/:userId/tenants", authenticateUser, validateUserResourceAccess('userId'), async (req: AuthenticatedRequest, res) => {
     try {
       const tenants = await storage.getUserTenants(req.params.userId);
       res.json(tenants);
@@ -149,7 +149,7 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
   });
 
   // Join tenant as member
-  app.post("/api/tenants/:tenantId/members", verifyDynamicAuth, authenticateUser, validateTenantContext('tenantId'), requireTenantModifyPermission(), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/tenants/:tenantId/members", authenticateUser, validateTenantContext('tenantId'), requireTenantModifyPermission(), async (req: AuthenticatedRequest, res) => {
     try {
       const { userId, role = 'member' } = req.body;
       
@@ -172,7 +172,7 @@ export function registerTenantRoutes(app: Express, verifyDynamicAuth: any) {
   });
 
   // Get tenant members
-  app.get("/api/tenants/:tenantId/members", verifyDynamicAuth, authenticateUser, validateTenantContext('tenantId'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
+  app.get("/api/tenants/:tenantId/members", authenticateUser, validateTenantContext('tenantId'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
     try {
       const members = await storage.getTenantMembers(req.params.tenantId);
       res.json(members);

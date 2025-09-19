@@ -9,66 +9,9 @@ import {
   insertCampaignSchema, insertCampaignRuleSchema
 } from "@shared/schema";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
-import { verifyDynamicJWT, extractUserDataFromJWT, validateUserData } from "./utils/dynamic-auth";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Secure Dynamic auth middleware - leverages Dynamic's infrastructure with proper server-side verification
-  const verifyDynamicAuth = async (req: any, res: any, next: any) => {
-    try {
-      const authHeader = req.headers.authorization;
-
-      // For public routes, allow through without authentication
-      if (req.path === '/api/creators' && req.method === 'GET') {
-        return next();
-      }
-
-      // Require Bearer token for all protected routes
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: "Authentication required - Bearer token missing" });
-      }
-
-      const token = authHeader.substring(7);
-      
-      try {
-        // Verify JWT using Dynamic's JWKS endpoint - this leverages Dynamic's infrastructure
-        // while maintaining proper server-side security verification
-        const jwtPayload = await verifyDynamicJWT(token);
-        
-        // Extract user data from Dynamic's verified JWT payload
-        const userData = extractUserDataFromJWT(jwtPayload);
-        
-        // Validate user data structure
-        if (!validateUserData(userData)) {
-          return res.status(401).json({ error: "Invalid user data in JWT token" });
-        }
-
-        // Attach verified user data to request - derived from verified JWT only
-        req.dynamicUser = {
-          id: userData.dynamicUserId,
-          dynamicUserId: userData.dynamicUserId,
-          alias: userData.alias,
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          verifiedCredentials: userData.verifiedCredentials,
-          walletAddress: userData.walletAddress,
-          walletChain: userData.walletChain,
-        };
-        
-        next();
-      } catch (jwtError) {
-        console.error('Dynamic JWT verification failed:', jwtError);
-        return res.status(401).json({ 
-          error: "Invalid or expired authentication token",
-          details: jwtError instanceof Error ? jwtError.message : 'JWT verification failed'
-        });
-      }
-    } catch (error) {
-      console.error('Auth middleware error:', error);
-      res.status(500).json({ error: "Authentication system error" });
-    }
-  };
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -183,13 +126,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Complete onboarding endpoint with Stripe integration
-  app.post("/api/auth/complete-onboarding", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/auth/complete-onboarding", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      // Use verified Dynamic user ID from JWT token (never trust request body for identity)
-      const dynamicUserId = req.dynamicUser.dynamicUserId;
+      // Get user data from authenticated user
+      const userId = req.user?.id;
 
-      if (!dynamicUserId) {
-        return res.status(401).json({ error: "Authentication required - verified user ID missing" });
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required - user ID missing" });
       }
 
       const user = await storage.getUserByDynamicId(dynamicUserId);
@@ -610,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Creator routes (public creation for onboarding)
-  app.post("/api/creators", verifyDynamicAuth, authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/creators", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {
       console.log("Creating creator with data:", req.body);
       const creatorData = insertCreatorSchema.parse(req.body);
@@ -764,7 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/creators/:creatorId/facebook-pages", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/creators/:creatorId/facebook-pages", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { creatorId } = req.params;
       const rows = await storage.getCreatorFacebookPages(creatorId);
@@ -776,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fan Facebook profile quick fetch (returns saved profileData.facebookData)
-  app.get("/api/fans/:userId/facebook-profile", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/fans/:userId/facebook-profile", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { userId } = req.params;
       const user = await storage.getUser(userId);
@@ -789,7 +732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Follow tenant (create membership) for a fan
-  app.post("/api/tenants/:tenantId/follow", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/tenants/:tenantId/follow", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { userId } = req.body;
       const { tenantId } = req.params;
@@ -802,7 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user profile data (fan onboarding info)
-  app.post("/api/auth/profile", verifyDynamicAuth, authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/auth/profile", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { userId, profileData } = req.body;
       if (!userId) return res.status(400).json({ error: "userId required" });
@@ -1075,7 +1018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get or create subscription for authenticated user
-  app.post('/api/get-or-create-subscription', verifyDynamicAuth, async (req, res) => {
+  app.post('/api/get-or-create-subscription', async (req, res) => {
     try {
       const dynamicUserId = (req as any).dynamicUser?.id || (req as any).dynamicUser?.dynamicUserId;
       if (!dynamicUserId) {
@@ -1178,7 +1121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subscription status for authenticated user
-  app.get('/api/subscription-status', verifyDynamicAuth, async (req, res) => {
+  app.get('/api/subscription-status', async (req, res) => {
     try {
       const dynamicUserId = (req as any).dynamicUser?.id || (req as any).dynamicUser?.dynamicUserId;
       if (!dynamicUserId) {
@@ -1225,7 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSocialRoutes(app);
 
   // Register tenant routes
-  registerTenantRoutes(app, verifyDynamicAuth);
+  registerTenantRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
