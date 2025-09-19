@@ -19,19 +19,30 @@ export interface AuthenticatedRequest extends Request {
     adminPermissions?: any;
     customerAdminData?: any;
   };
+  dynamicUser?: {
+    id: string;
+    dynamicUserId: string;
+    alias?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    verifiedCredentials?: any[];
+    walletAddress?: string;
+    walletChain?: string;
+  };
 }
 
 // Middleware to verify user authentication and attach role information
 export async function authenticateUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
-    // Extract Dynamic user ID from headers or body
-    const dynamicUserId = req.headers['x-dynamic-user-id'] as string || req.body?.dynamicUserId;
+    // Get Dynamic user ID from verified JWT (set by verifyDynamicAuth middleware)
+    const dynamicUserId = req.dynamicUser?.dynamicUserId;
     
     if (!dynamicUserId) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ error: 'Authentication required - no verified user identity' });
     }
 
-    // Fetch user with role information using Dynamic user ID
+    // Fetch user with role information using verified Dynamic user ID from JWT
     const [user] = await db
       .select({
         id: users.id,
