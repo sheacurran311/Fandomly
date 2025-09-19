@@ -59,7 +59,7 @@ export default function Footer() {
           <div className="flex space-x-6 mt-4 md:mt-0">
             <Link href="/privacy-policy" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Privacy Policy</Link>
             <Link href="/data-deletion" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Data Deletion</Link>
-            <a href="#" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Terms of Service</a>
+            <Link href="/terms-of-service" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Terms of Service</Link>
             <a href="#" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Cookie Policy</a>
           </div>
         </div>
