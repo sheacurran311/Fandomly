@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerSocialRoutes } from "./social-routes";
@@ -10,8 +11,54 @@ import {
 } from "@shared/schema";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
 import { z } from "zod";
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { nanoid } from 'nanoid';
+
+// Multer configuration for file uploads
+const storage_multer = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadType = req.path.includes('avatar') ? 'avatars' : 
+                      req.path.includes('branding') ? 'branding' : 'images';
+    const uploadPath = path.join(process.cwd(), 'uploads', uploadType);
+    
+    // Ensure directory exists
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename
+    const uniqueId = nanoid();
+    const ext = path.extname(file.originalname);
+    const filename = `${uniqueId}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const upload = multer({
+  storage: storage_multer,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Error: Images Only!'));
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  // Serve static files for uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -916,23 +963,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File upload endpoints
-  app.post("/api/upload/image", async (req, res) => {
+  app.post("/api/upload/image", upload.single('file'), async (req, res) => {
     try {
-      // For now, we'll simulate file upload by returning a placeholder URL
-      // In production, this would integrate with cloud storage (AWS S3, Cloudinary, etc.)
-      
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Generate a mock file URL (in production this would be the actual uploaded file URL)
-      const mockFileName = `uploaded-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
-      const mockUrl = `https://picsum.photos/400/400?random=${Date.now()}`;
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Generate the URL for the uploaded file
+      const fileUrl = `/uploads/images/${req.file.filename}`;
       
       res.json({
-        url: mockUrl,
-        fileName: mockFileName,
-        fileSize: 1024 * 200, // Mock 200KB
-        mimeType: 'image/jpeg'
+        url: fileUrl,
+        fileName: req.file.filename,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype
       });
     } catch (error) {
       console.error('Upload error:', error);
@@ -940,19 +984,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/upload/avatar", async (req, res) => {
+  app.post("/api/upload/avatar", upload.single('file'), async (req, res) => {
     try {
-      // Simulate avatar upload with smaller dimensions
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const mockFileName = `avatar-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
-      const mockUrl = `https://picsum.photos/200/200?random=${Date.now()}`;
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Generate the URL for the uploaded avatar
+      const fileUrl = `/uploads/avatars/${req.file.filename}`;
       
       res.json({
-        url: mockUrl,
-        fileName: mockFileName,
-        fileSize: 1024 * 50, // Mock 50KB
-        mimeType: 'image/jpeg'
+        url: fileUrl,
+        fileName: req.file.filename,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype
       });
     } catch (error) {
       console.error('Avatar upload error:', error);
@@ -960,19 +1005,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/upload/branding", async (req, res) => {
+  app.post("/api/upload/branding", upload.single('file'), async (req, res) => {
     try {
-      // Simulate branding asset upload
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const mockFileName = `branding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
-      const mockUrl = `https://picsum.photos/800/600?random=${Date.now()}`;
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Generate the URL for the uploaded branding asset
+      const fileUrl = `/uploads/branding/${req.file.filename}`;
       
       res.json({
-        url: mockUrl,
-        fileName: mockFileName,
-        fileSize: 1024 * 500, // Mock 500KB
-        mimeType: 'image/jpeg'
+        url: fileUrl,
+        fileName: req.file.filename,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype
       });
     } catch (error) {
       console.error('Branding upload error:', error);
