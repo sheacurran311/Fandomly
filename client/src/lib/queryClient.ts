@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -14,6 +15,12 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  // Add Dynamic auth token for authenticated requests
+  const authToken = getAuthToken();
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
 
   const res = await fetch(url, {
     method,
@@ -36,7 +43,13 @@ export async function fetchApi(
   }
 ): Promise<any> {
   const method = options?.method || "GET";
-  const headers = { "Content-Type": "application/json", ...options?.headers };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...options?.headers };
+  
+  // Add Dynamic auth token for authenticated requests
+  const authToken = getAuthToken();
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
 
   const res = await fetch(url, {
     method,
@@ -55,7 +68,16 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const headers: Record<string, string> = {};
+    
+    // Add Dynamic auth token for authenticated queries
+    const authToken = getAuthToken();
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
+
     const res = await fetch(queryKey.join("/") as string, {
+      headers,
       credentials: "include",
     });
 
