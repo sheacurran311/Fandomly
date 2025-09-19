@@ -1,0 +1,187 @@
+# JWTs/Authentication Tokens
+
+## Introduction
+
+When an end user connects their wallet, you, the developer, get a [JSON Web Token (JWT)](https://jwt.io/introduction) that can be used to verify some claims about the end user, notably a proof of ownership over a wallet public address.
+
+We use the JWT information in the SDK to create the user object and their Verified Credentials so that you can simply interact with the user object to get the information you need, so if you don't need to access the JWT directly, you can skip this page and visit the [Users section](/users) instead.
+
+## Storing JWTs
+
+<Tabs>
+  <Tab title="React">
+    ### Localstorage
+
+    Once the user has logged in, the JWT gets stored in localstorage under the `dynamic_authentication_token` key. We also store a minified version under the `dynamic_min_authentication_token` key.
+
+    ### Cookies
+
+    If you prefer to store the JWT in a HTTPOnly cookie, you might want to use the [Cookie auth feature](/authentication-methods/cookie-authentication). Bear in mind that with Cookie auth turned on, as long as you're still in Sandbox mode, the JWT will still be stored in localstorage but once you move to live mode it won't be, and you will no longer be able to access it using javascript.
+  </Tab>
+
+  <Tab title="React Native">
+    React Native stores JWT tokens securely in the device's keychain or secure storage, managed by the Dynamic SDK. You don't need to handle JWT storage manually.
+  </Tab>
+
+  <Tab title="Swift">
+    Swift stores JWT tokens securely in the device's keychain, managed by the Dynamic SDK. You don't need to handle JWT storage manually.
+  </Tab>
+
+  <Tab title="Flutter">
+    Flutter stores JWT tokens securely in the device's secure storage, managed by the Dynamic SDK. You don't need to handle JWT storage manually.
+  </Tab>
+</Tabs>
+
+## Accessing JWTs
+
+<Tabs>
+  <Tab title="React">
+    ### Fetch JWT from SDK
+
+    The [getAuthToken](/react-sdk/utilities/getauthtoken) utility function will return the JWT token to you from local storage as long as the user is logged in. It will return undefined otherwise.
+
+    ### Fetch JWT from Local Storage
+
+    You can also access the JWT directly from local storage using the following code (note that this will not work if Cookie auth is enabled):
+
+    ```tsx React
+    const token = localStorage.getItem('dynamic_authentication_token');
+
+    if (token) {
+      // do something with the token
+    }
+    ```
+  </Tab>
+
+  <Tab title="React Native">
+    ### Fetch JWT from SDK
+
+    Access the JWT token through the dynamic client's auth module:
+
+    ```ts React Native
+    import { dynamicClient } from '<path to client file>';
+
+    // Access the JWT token
+    const authToken = dynamicClient.auth.token;
+
+    if (authToken) {
+      // do something with the token
+      console.log('JWT token:', authToken);
+    }
+    ```
+  </Tab>
+
+  <Tab title="Swift">
+    ### Fetch JWT from SDK
+
+    Access the JWT token through the dynamic client's user property:
+
+    ```swift Swift
+    import DynamicSwiftSDK
+
+    // Access the JWT token
+    if let authToken = dynamicClient.user?.token {
+        // do something with the token
+        print("JWT token: \(authToken)")
+    }
+    ```
+  </Tab>
+
+  <Tab title="Flutter">
+    ### Fetch JWT from SDK
+
+    Access the JWT token through the Flutter SDK's auth module:
+
+    ```dart Flutter
+    // Read the current JWT (may be null if not authenticated)
+    final authToken = DynamicSDK.instance.auth.token;
+
+    if (authToken != null) {
+      print('JWT token: $authToken');
+    }
+
+    // Or listen for token changes
+    final sub = DynamicSDK.instance.auth.tokenChanges.listen((token) {
+      if (token != null) {
+        print('JWT token updated: $token');
+      }
+    });
+
+    // Remember to cancel the subscription when appropriate
+    // sub.cancel();
+    ```
+  </Tab>
+</Tabs>
+
+## Using JWTs
+
+### JWT Vs User Object
+
+Normally, you do not need to use the JWT directly, as all of the information/claims are stored on the user object, which you can learn about in the [Users section](/users).
+
+If however you are doing server-side verification, you can use the JWT to verify the user's identity. See the [Server-side verification](/authentication-methods/how-to-validate-users-on-the-backend) page for more information.
+
+### JWT Payload
+
+##### Standard JWT claims:
+
+See: [https://www.rfc-editor.org/rfc/rfc7519#section-4.1](https://www.rfc-editor.org/rfc/rfc7519#section-4.1)
+
+| Field | Description                                                                                   |
+| ----- | --------------------------------------------------------------------------------------------- |
+| aud   | Audience for the JWT token. This claim shows what domain of the intended audience of the JWT. |
+| iss   | Issuer of the JWT token. This claim shows app.dynamic.xyz generated and issued the JWT.       |
+| sub   | Subject of the JWT token. userId in the deprecated info claim.                                |
+| iat   | Timestamp when the JWT token was issued.                                                      |
+| exp   | Timestamp when the JWT token will expire.                                                     |
+
+##### Dynamic-specific claims:
+
+These fields are **optional** and you depends on whether you want to collect this information during onboarding. For more information about collecting this information, see [here](/users/information-capture).
+
+| alias                 | Alias field from customer information capture.                                                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| email                 | Email field from customer information capture.                                                                                                                                     |
+| environment\_id       | Unique ID of the project environment for the SDK, from [https://app.dynamic.xyz/dashboard/api](https://app.dynamic.xyz/dashboard/api). environmentId in the deprecated info claim. |
+| given\_name           | First name field from customer information capture. firstName in the deprecated info claim.                                                                                        |
+| family\_name          | Last name field from customer information capture. lastName in the deprecated info claim.                                                                                          |
+| lists                 | Names of access lists enabled for this user.                                                                                                                                       |
+| verified\_credentials | List of all [verified credentials](/react-sdk/objects/verified-credential) connected to this user.                                                                                 |
+| verified\_account     | If present, this was the most recently signed and verified account.                                                                                                                |
+
+#### Example
+
+```JSON{
+  "alias": "john",
+  "aud": "https://dashboard.hello.xyz",
+  "verified_credentials": [
+    {
+      "address": "0x000123abc",
+      "chain": "eip155",
+      "id": "af615228-99e5-48ee-905d-4575f0a6bfc9",
+      "wallet_name": "metamask"
+    }
+  ],
+  "email": "[[email protected]](/cdn-cgi/l/email-protection)",
+  "environment_id": "fb6dd9d1-09f5-43c3-8a8c-eab6e44c37f9",
+  "family_name": "bot",
+  "given_name": "jon",
+  "iss": "app.dynamic.xyz/fb6dd9d1-09f5-43c3-8a8c-eab6e44c37f9",
+  "lists": [ "Community dashboard access list" ],
+  "sub": "d261ee91-8ea0-4949-b8bb-b6ab4f712a49",
+  "verified_account": {
+    "address": "0x000123abc",
+    "chain": "eip155",
+    "id": "af615228-99e5-48ee-905d-4575f0a6bfc9",
+    "wallet_name": "metamask"
+  },
+  "iat": 1660677597,
+  "exp": 1660684797
+}
+```
+
+## Using your own JWTs
+
+If you have your own authentication system, you can use your own JWTs to authenticate users in Dynamic. This can be done by exchanging your token for a Dynamic JWT. This will return Dynamic's standard sign-in artifacts (i.e., a minified JWT and user).
+
+Checkout the [Third-party Authentication](/external-auth/third-party-auth-overview) page for more information on how to set up and use this feature.

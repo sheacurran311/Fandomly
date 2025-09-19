@@ -7,19 +7,21 @@ interface DynamicJWTPayload extends JwtPayload {
   exp: number;
   aud: string;
   iss: string;
+  environment_id: string;
   scope?: string;
   verified_credentials?: Array<{
     address: string;
     chain: string;
     id: string;
+    wallet_name?: string;
     name_service?: {
       name: string;
     };
   }>;
   alias?: string;
   email?: string;
-  first_name?: string;
-  last_name?: string;
+  given_name?: string;
+  family_name?: string;
 }
 
 // Get environment ID from environment variables
@@ -82,12 +84,12 @@ export async function verifyDynamicJWT(token: string): Promise<DynamicJWTPayload
     // Get signing key from Dynamic's JWKS endpoint
     const signingKey = await getSigningKey(decodedHeader.header.kid);
 
-    // Verify JWT signature and claims
+    // Verify JWT signature and claims - skip audience verification since it's domain-based
     const decodedToken = jwt.verify(token, signingKey, {
       algorithms: ['RS256'], // Dynamic uses RS256
-      audience: DYNAMIC_ENV_ID, // Verify audience matches our environment
-      issuer: 'https://app.dynamic.xyz', // Verify issuer is Dynamic
+      issuer: `https://app.dynamic.xyz/${DYNAMIC_ENV_ID}`, // Verify issuer includes our environment
       ignoreExpiration: false,
+      // Skip audience verification - it contains the domain, not environment ID
     }) as DynamicJWTPayload;
 
     // Additional validation for Dynamic-specific requirements
@@ -98,6 +100,11 @@ export async function verifyDynamicJWT(token: string): Promise<DynamicJWTPayload
     // Validate required claims
     if (!decodedToken.sub) {
       throw new Error('Invalid JWT token - missing subject (user ID)');
+    }
+
+    // Validate environment ID matches our environment
+    if (decodedToken.environment_id !== DYNAMIC_ENV_ID) {
+      throw new Error(`Invalid JWT token - environment ID mismatch. Expected: ${DYNAMIC_ENV_ID}, got: ${decodedToken.environment_id}`);
     }
 
     return decodedToken;
@@ -124,8 +131,8 @@ export function extractUserDataFromJWT(payload: DynamicJWTPayload) {
     dynamicUserId: payload.sub,
     alias: payload.alias,
     email: payload.email,
-    firstName: payload.first_name,
-    lastName: payload.last_name,
+    firstName: payload.given_name,
+    lastName: payload.family_name,
     verifiedCredentials: payload.verified_credentials || [],
     walletAddress: payload.verified_credentials?.[0]?.address || '',
     walletChain: payload.verified_credentials?.[0]?.chain || '',
