@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { FacebookSDKManager } from "@/lib/facebook";
 import { 
   Trophy, 
   Clock, 
@@ -15,16 +20,195 @@ import {
   Star,
   Users,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Facebook,
+  Twitter,
+  Instagram,
+  Heart,
+  Share2,
+  MessageCircle,
+  UserPlus
 } from "lucide-react";
+
+interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  campaignType: string;
+  status: string;
+  startDate: string;
+  endDate?: string;
+  tenantId: string;
+  creatorId: string;
+  creator?: {
+    displayName: string;
+    imageUrl?: string;
+    category: string;
+  };
+  rules?: Array<{
+    effects: Array<{
+      type: string;
+      value: number;
+      notificationTemplate: string;
+    }>;
+  }>;
+}
 
 export default function FanCampaigns() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  if (isLoading) {
+  // Fetch active campaigns
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<Campaign[]>({
+    queryKey: ['/api/campaigns/active'],
+    enabled: isAuthenticated && !!user,
+  });
+
+  // Campaign participation mutation
+  const participateMutation = useMutation({
+    mutationFn: async ({ campaignId, actionType, metadata }: {
+      campaignId: string;
+      actionType: string;
+      metadata?: any;
+    }) => {
+      const response = await apiRequest("POST", "/api/campaigns/participate", {
+        campaignId,
+        actionType,
+        metadata
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "🎉 Points Earned!",
+        description: `${data.message} You earned ${data.pointsEarned} points!`,
+      });
+      // Invalidate relevant queries to refresh points
+      queryClient.invalidateQueries({ queryKey: ['/api/fan-programs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns/active'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Action Failed",
+        description: "Could not complete this action. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleSocialAction = async (campaignId: string, actionType: string) => {
+    try {
+      let metadata = {};
+      
+      if (actionType.includes('facebook')) {
+        // Use Facebook SDK for Facebook actions
+        await FacebookSDKManager.ensureFBReady('fan');
+        const status = await FacebookSDKManager.getLoginStatus();
+        
+        if (!status.isLoggedIn) {
+          toast({
+            title: "Facebook Connection Required",
+            description: "Please connect your Facebook account first.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        metadata = { platform: 'facebook', timestamp: new Date().toISOString() };
+      }
+
+      // Submit campaign participation
+      await participateMutation.mutateAsync({
+        campaignId,
+        actionType,
+        metadata
+      });
+    } catch (error) {
+      console.error('Social action error:', error);
+    }
+  };
+
+  const getSocialActionButton = (campaign: Campaign) => {
+    if (!campaign.rules || campaign.rules.length === 0) {
+      return (
+        <Button 
+          className="w-full bg-brand-primary hover:bg-brand-primary/80"
+          onClick={() => handleSocialAction(campaign.id, 'general_participation')}
+          disabled={participateMutation.isPending}
+        >
+          Join Campaign
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+      );
+    }
+
+    const effects = campaign.rules[0]?.effects || [];
+    
+    return (
+      <div className="space-y-2">
+        {effects.map((effect, index) => {
+          const actionType = effect.notificationTemplate;
+          let icon, text, bgColor;
+          
+          switch(actionType) {
+            case 'follow_facebook':
+              icon = <Facebook className="h-4 w-4" />;
+              text = 'Follow on Facebook';
+              bgColor = 'bg-blue-600 hover:bg-blue-700';
+              break;
+            case 'follow_instagram':
+              icon = <Instagram className="h-4 w-4" />;
+              text = 'Follow on Instagram';
+              bgColor = 'bg-pink-600 hover:bg-pink-700';
+              break;
+            case 'follow_x':
+              icon = <Twitter className="h-4 w-4" />;
+              text = 'Follow on X';
+              bgColor = 'bg-gray-800 hover:bg-gray-900';
+              break;
+            case 'like_post':
+              icon = <Heart className="h-4 w-4" />;
+              text = 'Like Post';
+              bgColor = 'bg-red-600 hover:bg-red-700';
+              break;
+            case 'share_post':
+              icon = <Share2 className="h-4 w-4" />;
+              text = 'Share Post';
+              bgColor = 'bg-green-600 hover:bg-green-700';
+              break;
+            case 'comment_post':
+              icon = <MessageCircle className="h-4 w-4" />;
+              text = 'Comment on Post';
+              bgColor = 'bg-purple-600 hover:bg-purple-700';
+              break;
+            default:
+              icon = <UserPlus className="h-4 w-4" />;
+              text = `${effect.value} pts`;
+              bgColor = 'bg-brand-primary hover:bg-brand-primary/80';
+          }
+          
+          return (
+            <Button
+              key={index}
+              className={`w-full ${bgColor} text-white`}
+              onClick={() => handleSocialAction(campaign.id, actionType)}
+              disabled={participateMutation.isPending}
+              data-testid={`button-${actionType}-${campaign.id}`}
+            >
+              {icon}
+              <span className="ml-2">{text} (+{effect.value} pts)</span>
+            </Button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  if (isLoading || campaignsLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+        <div className="text-white">Loading campaigns...</div>
       </div>
     );
   }
@@ -36,79 +220,6 @@ export default function FanCampaigns() {
       </div>
     );
   }
-
-  const joinedCampaigns = [
-    {
-      id: "1",
-      title: "Follow for Points",
-      creator: "Aerial Ace Athletics",
-      description: "Follow our social media accounts to earn points",
-      points: 500,
-      progress: 75,
-      deadline: "3 days left",
-      category: "Social",
-      status: "active"
-    },
-    {
-      id: "2", 
-      title: "Stream & Earn",
-      creator: "Luna Music",
-      description: "Listen to our latest album on Spotify",
-      points: 1000,
-      progress: 45,
-      deadline: "1 week left", 
-      category: "Music",
-      status: "active"
-    },
-    {
-      id: "3",
-      title: "Referral Bonus",
-      creator: "Tech Creator Hub",
-      description: "Refer friends to join the loyalty program",
-      points: 2000,
-      progress: 20,
-      deadline: "2 weeks left",
-      category: "Referral", 
-      status: "active"
-    }
-  ];
-
-  const allCampaigns = [
-    ...joinedCampaigns,
-    {
-      id: "4",
-      title: "Welcome Bonus",
-      creator: "Fitness Pro",
-      description: "Join our community and get instant rewards",
-      points: 300,
-      progress: 0,
-      deadline: "No deadline",
-      category: "Welcome",
-      status: "available"
-    },
-    {
-      id: "5",
-      title: "Birthday Celebration",
-      creator: "Gaming Legends",
-      description: "Celebrate with us and earn special birthday points",
-      points: 750,
-      progress: 0,
-      deadline: "5 days left",
-      category: "Event",
-      status: "available"
-    },
-    {
-      id: "6",
-      title: "VIP Challenge",
-      creator: "Art Collective",
-      description: "Complete art challenges to unlock VIP status",
-      points: 1500,
-      progress: 0,
-      deadline: "1 month left",
-      category: "Challenge",
-      status: "available"
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-brand-dark-bg flex">
@@ -139,147 +250,58 @@ export default function FanCampaigns() {
             </Button>
           </div>
 
-          {/* Tabs */}
-          <Tabs defaultValue="joined" className="space-y-6">
-            <TabsList className="bg-white/10 border-white/20">
-              <TabsTrigger value="joined" className="data-[state=active]:bg-brand-primary">
-                <Trophy className="h-4 w-4 mr-2" />
-                My Campaigns ({joinedCampaigns.length})
-              </TabsTrigger>
-              <TabsTrigger value="all" className="data-[state=active]:bg-brand-primary">
-                <Target className="h-4 w-4 mr-2" />
-                All Campaigns ({allCampaigns.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="joined" className="space-y-6">
-              {joinedCampaigns.length === 0 ? (
-                <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-                  <CardContent className="text-center py-12">
-                    <Trophy className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-300 mb-2">No Active Campaigns</h3>
-                    <p className="text-gray-400 mb-6">
-                      You haven't joined any campaigns yet. Explore available campaigns to start earning rewards.
-                    </p>
-                    <Button className="bg-brand-primary hover:bg-brand-primary/80">
-                      Browse Campaigns
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {joinedCampaigns.map((campaign) => (
-                    <Card key={campaign.id} className="bg-white/5 backdrop-blur-lg border border-white/10 hover:bg-white/10 transition-colors">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-white text-lg mb-1">{campaign.title}</CardTitle>
-                            <p className="text-sm text-gray-400">by {campaign.creator}</p>
-                          </div>
-                          <Badge variant="outline" className="border-brand-primary/30 text-brand-primary">
-                            {campaign.category}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-gray-300 mb-4">{campaign.description}</p>
-                        
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Star className="h-4 w-4 text-brand-secondary" />
-                              <span className="text-brand-secondary font-medium">{campaign.points} points</span>
-                            </div>
-                            <div className="flex items-center space-x-2 text-gray-400">
-                              <Clock className="h-4 w-4" />
-                              <span className="text-sm">{campaign.deadline}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Progress</span>
-                              <span className="text-white">{campaign.progress}%</span>
-                            </div>
-                            <Progress value={campaign.progress} className="h-2" />
-                          </div>
-                          
-                          <Button className="w-full bg-brand-primary hover:bg-brand-primary/80">
-                            Continue Campaign
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="all" className="space-y-6">
+          {/* Campaigns Grid */}
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-white">Available Campaigns ({campaigns.length})</h2>
+            
+            {campaigns.length === 0 ? (
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+                <CardContent className="text-center py-12">
+                  <Trophy className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-300 mb-2">No Active Campaigns</h3>
+                  <p className="text-gray-400 mb-6">
+                    No campaigns are currently active. Check back later for new opportunities to earn rewards.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {allCampaigns.map((campaign) => (
+                {campaigns.map((campaign: Campaign) => (
                   <Card key={campaign.id} className="bg-white/5 backdrop-blur-lg border border-white/10 hover:bg-white/10 transition-colors">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <CardTitle className="text-white text-lg mb-1">{campaign.title}</CardTitle>
-                          <p className="text-sm text-gray-400">by {campaign.creator}</p>
+                          <p className="text-sm text-gray-400">
+                            by {campaign.creator?.displayName || 'Creator'}
+                          </p>
                         </div>
-                        <div className="flex flex-col items-end space-y-1">
-                          <Badge variant="outline" className="border-brand-primary/30 text-brand-primary">
-                            {campaign.category}
-                          </Badge>
-                          {campaign.status === "active" && (
-                            <Badge className="bg-green-500/20 text-green-400 text-xs">
-                              Joined
-                            </Badge>
-                          )}
-                        </div>
+                        <Badge variant="outline" className="border-brand-primary/30 text-brand-primary">
+                          {campaign.creator?.category || 'General'}
+                        </Badge>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <p className="text-gray-300 mb-4">{campaign.description}</p>
                       
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                        {campaign.rules && campaign.rules.length > 0 && (
                           <div className="flex items-center space-x-2">
                             <Star className="h-4 w-4 text-brand-secondary" />
-                            <span className="text-brand-secondary font-medium">{campaign.points} points</span>
-                          </div>
-                          <div className="flex items-center space-x-2 text-gray-400">
-                            <Clock className="h-4 w-4" />
-                            <span className="text-sm">{campaign.deadline}</span>
-                          </div>
-                        </div>
-                        
-                        {campaign.status === "active" && (
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Progress</span>
-                              <span className="text-white">{campaign.progress}%</span>
-                            </div>
-                            <Progress value={campaign.progress} className="h-2" />
+                            <span className="text-brand-secondary font-medium">
+                              Up to {Math.max(...campaign.rules[0]?.effects?.map(e => e.value) || [0])} points per action
+                            </span>
                           </div>
                         )}
                         
-                        <Button 
-                          className={`w-full ${
-                            campaign.status === "active" 
-                              ? "bg-brand-primary hover:bg-brand-primary/80" 
-                              : "bg-brand-secondary hover:bg-brand-secondary/80"
-                          }`}
-                        >
-                          {campaign.status === "active" ? "Continue" : "Join Campaign"}
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
+                        {getSocialActionButton(campaign)}
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
         </div>
       </div>
     </div>

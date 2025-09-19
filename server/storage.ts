@@ -1,7 +1,7 @@
 import { 
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
-  campaigns, campaignRules,
+  campaigns, campaignRules, campaignParticipations,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -75,10 +75,16 @@ export interface IStorage {
   // Campaign operations
   getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]>;
   getActiveCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]>;
+  getAllActiveCampaigns(tenantId?: string): Promise<Campaign[]>;
   createCampaign(data: any): Promise<Campaign>;
   updateCampaign(id: string, data: any): Promise<Campaign>;
   getCampaignRules(campaignId: string): Promise<CampaignRule[]>;
   createCampaignRule(data: any): Promise<CampaignRule>;
+  
+  // Campaign Participation operations
+  createCampaignParticipation(data: any): Promise<any>;
+  getCampaignParticipation(campaignId: string, memberId: string): Promise<any>;
+  updateCampaignParticipation(id: string, data: any): Promise<any>;
 
   // Creator Facebook Pages
   upsertCreatorFacebookPages(creatorId: string, pages: Array<{
@@ -357,6 +363,13 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(campaigns).where(conditions);
   }
 
+  async getAllActiveCampaigns(tenantId?: string): Promise<Campaign[]> {
+    const conditions = tenantId 
+      ? and(eq(campaigns.status, 'active'), eq(campaigns.tenantId, tenantId))
+      : eq(campaigns.status, 'active');
+    return await db.select().from(campaigns).where(conditions);
+  }
+
   async createCampaign(data: InsertCampaign): Promise<Campaign> {
     const [row] = await db.insert(campaigns).values(data as any).returning();
     return row;
@@ -421,6 +434,26 @@ export class DatabaseStorage implements IStorage {
 
   async getCreatorFacebookPages(creatorId: string): Promise<any[]> {
     return await db.select().from(creatorFacebookPages).where(eq(creatorFacebookPages.creatorId, creatorId));
+  }
+
+  // Campaign Participation operations
+  async createCampaignParticipation(data: any): Promise<any> {
+    const [participation] = await db.insert(campaignParticipations).values(data).returning();
+    return participation;
+  }
+
+  async getCampaignParticipation(campaignId: string, memberId: string): Promise<any> {
+    const [participation] = await db.select().from(campaignParticipations)
+      .where(and(eq(campaignParticipations.campaignId, campaignId), eq(campaignParticipations.memberId, memberId)));
+    return participation || undefined;
+  }
+
+  async updateCampaignParticipation(id: string, data: any): Promise<any> {
+    const [participation] = await db.update(campaignParticipations)
+      .set(data)
+      .where(eq(campaignParticipations.id, id))
+      .returning();
+    return participation;
   }
 }
 

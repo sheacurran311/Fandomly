@@ -726,6 +726,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/campaigns/active", async (req, res) => {
+    try {
+      // Get all active campaigns across all tenants (public marketplace)
+      const campaigns = await storage.getAllActiveCampaigns();
+      
+      // Enrich with creator information
+      const enrichedCampaigns = await Promise.all(campaigns.map(async (campaign) => {
+        const creator = await storage.getCreator(campaign.creatorId);
+        const rules = await storage.getCampaignRules(campaign.id);
+        return {
+          ...campaign,
+          creator: creator ? {
+            displayName: creator.displayName,
+            imageUrl: creator.imageUrl,
+            category: creator.category
+          } : null,
+          rules
+        };
+      }));
+      
+      res.json(enrichedCampaigns);
+    } catch (error) {
+      console.error('Failed to fetch active campaigns:', error);
+      res.status(500).json({ error: "Failed to fetch active campaigns" });
+    }
+  });
+
   app.post("/api/campaigns", async (req, res) => {
     try {
       const payload = insertCampaignSchema.parse(req.body);
@@ -733,6 +760,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(created);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid campaign data" });
+    }
+  });
+
+  app.post("/api/campaigns/participate", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { campaignId, actionType, metadata } = req.body;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get campaign and verify it exists and is active
+      const campaigns = await storage.getAllActiveCampaigns();
+      const campaign = campaigns.find(c => c.id === campaignId);
+      if (!campaign || campaign.status !== 'active') {
+        return res.status(404).json({ error: "Campaign not found or inactive" });
+      }
+
+      // Check if user already participated in this campaign
+      const existingParticipation = await storage.getCampaignParticipation(campaignId, userId);
+      
+      if (existingParticipation) {
+        // Update existing participation
+        const updatedParticipation = await storage.updateCampaignParticipation(existingParticipation.id, {
+          participationCount: existingParticipation.participationCount + 1,
+          lastParticipation: new Date(),
+          participationData: {
+            ...existingParticipation.participationData,
+            rewardsEarned: [
+              ...(existingParticipation.participationData?.rewardsEarned || []),
+              {
+                type: actionType,
+                value: metadata,
+                timestamp: new Date().toISOString()
+              }
+            ]
+          }
+        });
+        
+        res.json({ 
+          success: true, 
+          participation: updatedParticipation,
+          message: "Action completed! Points will be awarded.",
+          pointsEarned: getActionPoints(actionType)
+        });
+      } else {
+        // Create new participation
+        const participation = await storage.createCampaignParticipation({
+          tenantId: campaign.tenantId,
+          campaignId,
+          memberId: userId,
+          participationCount: 1,
+          totalUnitsEarned: 0,
+          participationData: {
+            triggerDetails: { actionType, metadata },
+            rewardsEarned: [{
+              type: actionType,
+              value: metadata,
+              timestamp: new Date().toISOString()
+            }]
+          }
+        });
+        
+        res.json({ 
+          success: true, 
+          participation,
+          message: "Joined campaign! Points will be awarded.",
+          pointsEarned: getActionPoints(actionType)
+        });
+      }
+    } catch (error) {
+      console.error('Campaign participation error:', error);
+      res.status(500).json({ error: "Failed to participate in campaign" });
     }
   });
 
@@ -754,6 +855,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: error instanceof Error ? error.message : "Invalid campaign rule data" });
     }
   });
+
+  // Helper function to get points for social actions
+  function getActionPoints(actionType: string): number {
+    const pointMap: Record<string, number> = {
+      'follow_facebook': 50,
+      'follow_instagram': 50, 
+      'follow_x': 50,
+      'like_post': 50,
+      'share_post': 200,
+      'comment_post': 100,
+      'retweet': 100,
+      'default': 50
+    };
+    return pointMap[actionType] || pointMap['default'];
+  }
 
   // Creator Facebook Pages: import and fetch
   app.post("/api/creators/:creatorId/facebook-pages", async (req, res) => {
