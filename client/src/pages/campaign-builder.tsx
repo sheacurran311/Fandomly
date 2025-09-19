@@ -669,7 +669,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] bg-brand-dark-bg border-white/20">
+      <DialogContent className="w-[95vw] max-w-6xl h-[95vh] bg-brand-dark-bg border-white/20 overflow-hidden flex flex-col p-0">
         <DialogHeader>
           <DialogTitle className="text-white text-2xl">Create New Campaign</DialogTitle>
         </DialogHeader>
@@ -801,6 +801,13 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Export the modal component separately for use in other pages
+export function CampaignBuilderModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  return (
+    <CreateCampaignModal isOpen={isOpen} onClose={onClose} />
   );
 }
 

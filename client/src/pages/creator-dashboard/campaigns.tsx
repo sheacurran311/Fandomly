@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/queryClient";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import { CampaignBuilderModal } from "@/pages/campaign-builder";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ export default function CreatorCampaigns() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
 
   // Fetch real campaigns data
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
@@ -79,8 +81,9 @@ export default function CreatorCampaigns() {
             </div>
             <div className="flex gap-3 mt-4 sm:mt-0">
               <Button 
+                data-testid="button-create-campaign"
                 className="bg-brand-primary hover:bg-brand-primary/80"
-                onClick={() => window.location.href = '/campaign-builder'}
+                onClick={() => setShowCampaignModal(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Campaign
@@ -194,8 +197,9 @@ export default function CreatorCampaigns() {
                     }
                   </p>
                   <Button 
+                    data-testid="button-create-first-campaign"
                     className="bg-brand-primary hover:bg-brand-primary/80"
-                    onClick={() => window.location.href = '/campaign-builder'}
+                    onClick={() => setShowCampaignModal(true)}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Your First Campaign
@@ -267,6 +271,12 @@ export default function CreatorCampaigns() {
           </Card>
         </div>
       </div>
+      
+      {/* Campaign Builder Modal */}
+      <CampaignBuilderModal 
+        isOpen={showCampaignModal}
+        onClose={() => setShowCampaignModal(false)}
+      />
     </div>
   );
 }
