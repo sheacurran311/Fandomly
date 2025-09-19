@@ -26,8 +26,8 @@ export interface IStorage {
   updateOnboardingState(userId: string, onboardingState: any): Promise<User | undefined>;
 
   // Creator operations
-  getCreator(id: string): Promise<Creator | undefined>;
-  getCreatorByUserId(userId: string): Promise<Creator | undefined>;
+  getCreator(id: string, tenantId?: string): Promise<Creator | undefined>;
+  getCreatorByUserId(userId: string, tenantId?: string): Promise<Creator | undefined>;
   createCreator(creator: any): Promise<Creator>;
   updateCreator(id: string, updates: any): Promise<Creator>;
   getAllCreators(): Promise<Creator[]>;
@@ -39,9 +39,9 @@ export interface IStorage {
   updateLoyaltyProgram(id: string, updates: any): Promise<LoyaltyProgram>;
 
   // Reward operations
-  getReward(id: string): Promise<Reward | undefined>;
-  getRewardsByProgram(programId: string): Promise<Reward[]>;
-  getAllRewards(): Promise<Reward[]>;
+  getReward(id: string, tenantId?: string): Promise<Reward | undefined>;
+  getRewardsByProgram(programId: string, tenantId?: string): Promise<Reward[]>;
+  getAllRewards(tenantId?: string): Promise<Reward[]>;
   createReward(reward: any): Promise<Reward>;
   updateReward(id: string, updates: any): Promise<Reward>;
 
@@ -73,8 +73,8 @@ export interface IStorage {
   getUserMemberships(userId: string): Promise<TenantMembership[]>;
 
   // Campaign operations
-  getCampaignsByCreator(creatorId: string): Promise<Campaign[]>;
-  getActiveCampaignsByCreator(creatorId: string): Promise<Campaign[]>;
+  getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]>;
+  getActiveCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]>;
   createCampaign(data: any): Promise<Campaign>;
   updateCampaign(id: string, data: any): Promise<Campaign>;
   getCampaignRules(campaignId: string): Promise<CampaignRule[]>;
@@ -158,13 +158,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Creator operations
-  async getCreator(id: string): Promise<Creator | undefined> {
-    const [creator] = await db.select().from(creators).where(eq(creators.id, id));
+  async getCreator(id: string, tenantId?: string): Promise<Creator | undefined> {
+    const conditions = tenantId 
+      ? and(eq(creators.id, id), eq(creators.tenantId, tenantId))
+      : eq(creators.id, id);
+    const [creator] = await db.select().from(creators).where(conditions);
     return creator || undefined;
   }
 
-  async getCreatorByUserId(userId: string): Promise<Creator | undefined> {
-    const [creator] = await db.select().from(creators).where(eq(creators.userId, userId));
+  async getCreatorByUserId(userId: string, tenantId?: string): Promise<Creator | undefined> {
+    const conditions = tenantId 
+      ? and(eq(creators.userId, userId), eq(creators.tenantId, tenantId))
+      : eq(creators.userId, userId);
+    const [creator] = await db.select().from(creators).where(conditions);
     return creator || undefined;
   }
 
@@ -203,17 +209,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Reward operations
-  async getReward(id: string): Promise<Reward | undefined> {
-    const [reward] = await db.select().from(rewards).where(eq(rewards.id, id));
+  async getReward(id: string, tenantId?: string): Promise<Reward | undefined> {
+    const conditions = tenantId 
+      ? and(eq(rewards.id, id), eq(rewards.tenantId, tenantId))
+      : eq(rewards.id, id);
+    const [reward] = await db.select().from(rewards).where(conditions);
     return reward || undefined;
   }
 
-  async getRewardsByProgram(programId: string): Promise<Reward[]> {
-    return await db.select().from(rewards).where(eq(rewards.programId, programId));
+  async getRewardsByProgram(programId: string, tenantId?: string): Promise<Reward[]> {
+    const conditions = tenantId 
+      ? and(eq(rewards.programId, programId), eq(rewards.tenantId, tenantId))
+      : eq(rewards.programId, programId);
+    return await db.select().from(rewards).where(conditions);
   }
 
-  async getAllRewards(): Promise<Reward[]> {
-    return await db.select().from(rewards);
+  async getAllRewards(tenantId?: string): Promise<Reward[]> {
+    const conditions = tenantId ? eq(rewards.tenantId, tenantId) : undefined;
+    return conditions 
+      ? await db.select().from(rewards).where(conditions)
+      : await db.select().from(rewards);
   }
 
   async createReward(insertReward: InsertReward): Promise<Reward> {
@@ -328,15 +343,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Campaign operations
-  async getCampaignsByCreator(creatorId: string): Promise<Campaign[]> {
-    return await db.select().from(campaigns).where(eq(campaigns.creatorId, creatorId));
+  async getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]> {
+    const conditions = tenantId 
+      ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.tenantId, tenantId))
+      : eq(campaigns.creatorId, creatorId);
+    return await db.select().from(campaigns).where(conditions);
   }
 
-  async getActiveCampaignsByCreator(creatorId: string): Promise<Campaign[]> {
-    return await db
-      .select()
-      .from(campaigns)
-      .where(and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'active')));
+  async getActiveCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]> {
+    const conditions = tenantId 
+      ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'active'), eq(campaigns.tenantId, tenantId))
+      : and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'active'));
+    return await db.select().from(campaigns).where(conditions);
   }
 
   async createCampaign(data: InsertCampaign): Promise<Campaign> {

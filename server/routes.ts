@@ -628,6 +628,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/creators/:id", async (req, res) => {
     try {
+      // For public creator info, we don't require tenant isolation yet
+      // But this should be considered for private creator data
       const creator = await storage.getCreator(req.params.id);
       if (!creator) {
         return res.status(404).json({ error: "Creator not found" });
@@ -684,9 +686,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rewards routes
-  app.get("/api/rewards", async (req, res) => {
+  app.get("/api/rewards", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const rewards = await storage.getAllRewards();
+      // Get user's current tenant context
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Get creator to determine tenant
+      let tenantId = null;
+      if (user.userType === 'creator') {
+        const creator = await storage.getCreatorByUserId(user.id);
+        tenantId = creator?.tenantId;
+      }
+      
+      // Fetch rewards with tenant isolation
+      const rewards = tenantId ? await storage.getAllRewards(tenantId) : [];
       res.json(rewards);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch rewards" });
@@ -696,7 +712,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Campaign routes
   app.get("/api/campaigns/creator/:creatorId", async (req, res) => {
     try {
-      const data = await storage.getCampaignsByCreator(req.params.creatorId);
+      // Get creator to verify tenant context
+      const creator = await storage.getCreator(req.params.creatorId);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      // Fetch campaigns with tenant isolation
+      const data = await storage.getCampaignsByCreator(req.params.creatorId, creator.tenantId);
       res.json(data);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch campaigns" });
@@ -870,7 +893,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/rewards/program/:programId", async (req, res) => {
     try {
-      const rewards = await storage.getRewardsByProgram(req.params.programId);
+      // Get loyalty program to verify tenant context
+      const program = await storage.getLoyaltyProgram(req.params.programId);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      
+      // Fetch rewards with tenant isolation
+      const rewards = await storage.getRewardsByProgram(req.params.programId, program.tenantId);
       res.json(rewards);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch rewards" });
