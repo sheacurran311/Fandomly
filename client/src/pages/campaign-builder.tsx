@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 import { type User, type Creator } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,6 +129,7 @@ const categoryColors = {
 
 // Multi-step Campaign Creation Modal Component
 function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [campaignData, setCampaignData] = useState({
     // Step 1: Basics
@@ -778,12 +780,16 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                       const result = await response.json();
                       console.log('Campaign created successfully:', result);
                       
+                      // Invalidate campaigns cache to refresh the list
+                      if (user?.creator?.id) {
+                        await queryClient.invalidateQueries({ 
+                          queryKey: ["/api/campaigns/creator", user.creator.id] 
+                        });
+                      }
+                      
                       // Show success message and close modal
                       alert(`🎉 Campaign "${campaignData.name}" created successfully with ${socialTasks.length} tasks!`);
                       onClose();
-                      
-                      // Optionally refresh the page or update the campaign list
-                      window.location.reload();
                     } else {
                       throw new Error('Failed to create campaign');
                     }
