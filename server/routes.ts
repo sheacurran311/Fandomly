@@ -878,48 +878,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Atomic transaction: deduct points and increment redemptions
-      const updatedMembership = await storage.updateUserTenantMembership(user.id, reward.tenantId, {
-        memberData: {
-          ...membership.memberData,
-          points: (membership.memberData?.points || 0) - totalCost
-        }
-      });
-
-      const updatedReward = await storage.updateReward(reward.id, {
-        currentRedemptions: (reward.currentRedemptions || 0) + entries
-      });
-
-      // Find or create user's fanProgram for this loyalty program
-      let fanProgram = await storage.getFanProgram(user.id, reward.programId);
-      if (!fanProgram) {
-        fanProgram = await storage.createFanProgram({
-          tenantId: reward.tenantId,
-          fanId: user.id,
-          programId: reward.programId,
-          currentPoints: membership.memberData?.points || 0,
-          totalPointsEarned: 0
-        });
-      }
-
-      // Create redemption record
-      await storage.createPointTransaction({
-        tenantId: reward.tenantId,
-        fanProgramId: fanProgram.id,
-        points: -totalCost,
-        type: 'spent',
-        source: 'reward_redemption',
-        metadata: {
-          rewardId: reward.id
-        }
+      // Use atomic redemption to prevent race conditions and ensure data integrity
+      const result = await storage.redeemRewardAtomic({
+        userId: user.id,
+        rewardId: reward.id,
+        entries,
+        membershipId: membership.id
       });
 
       res.json({
         success: true,
         message: `Successfully redeemed ${reward.name}`,
-        pointsSpent: totalCost,
-        remainingPoints: updatedMembership.memberData?.points || 0,
-        entries: entries
+        pointsSpent: reward.pointsCost * entries,
+        remainingPoints: result.updatedMembership.memberData?.points || 0,
+        entries: entries,
+        redemptionId: result.rewardRedemption.id
       });
     } catch (error) {
       console.error("Reward redemption error:", error);

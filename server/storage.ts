@@ -45,6 +45,21 @@ export interface IStorage {
   getAllRewards(tenantId?: string): Promise<Reward[]>;
   createReward(reward: any): Promise<Reward>;
   updateReward(id: string, updates: any): Promise<Reward>;
+  deleteReward(id: string): Promise<void>;
+  
+  // Atomic redemption operation
+  redeemRewardAtomic(data: {
+    userId: string;
+    rewardId: string;
+    entries: number;
+    membershipId: string;
+  }): Promise<{
+    updatedMembership: TenantMembership;
+    updatedReward: Reward;
+    fanProgram: FanProgram;
+    pointTransaction: PointTransaction;
+    rewardRedemption: RewardRedemption;
+  }>;
 
   // Fan program operations
   getFanProgram(fanId: string, programId: string): Promise<FanProgram | undefined>;
@@ -254,6 +269,148 @@ export class DatabaseStorage implements IStorage {
     return reward;
   }
 
+  async deleteReward(id: string): Promise<void> {
+    // Soft delete by setting isActive to false
+    await db.update(rewards).set({ isActive: false } as any).where(eq(rewards.id, id));
+  }
+
+  async redeemRewardAtomic(data: {
+    userId: string;
+    rewardId: string;
+    entries: number;
+    membershipId: string;
+  }): Promise<{
+    updatedMembership: TenantMembership;
+    updatedReward: Reward;
+    fanProgram: FanProgram;
+    pointTransaction: PointTransaction;
+    rewardRedemption: RewardRedemption;
+  }> {
+    // Use db.transaction for atomicity - all operations succeed or all fail
+    return await db.transaction(async (tx) => {
+      // Get fresh reward data with row lock to prevent race conditions
+      const [reward] = await tx.select().from(rewards)
+        .where(and(eq(rewards.id, data.rewardId), eq(rewards.isActive, true)));
+      
+      if (!reward) {
+        throw new Error('Reward not found or inactive');
+      }
+
+      // Calculate cost server-side - NEVER trust client
+      const totalCost = reward.pointsCost * data.entries;
+
+      // Get fresh membership data with row lock and validate ownership
+      const [membership] = await tx.select().from(tenantMemberships)
+        .where(and(
+          eq(tenantMemberships.id, data.membershipId),
+          eq(tenantMemberships.userId, data.userId),  // IDOR prevention
+          eq(tenantMemberships.tenantId, reward.tenantId) // Tenant scoping
+        ));
+      
+      if (!membership) {
+        throw new Error('Membership not found or access denied');
+      }
+
+      // Validate raffle max entries
+      if (reward.rewardType === 'raffle' && reward.rewardData?.raffleData?.maxEntries) {
+        if (data.entries > reward.rewardData.raffleData.maxEntries) {
+          throw new Error(`Maximum ${reward.rewardData.raffleData.maxEntries} entries allowed`);
+        }
+      }
+
+      // Atomic conditional updates to prevent race conditions
+      // 1. Update membership points with conditional check
+      const membershipUpdateResult = await tx.update(tenantMemberships)
+        .set({
+          memberData: {
+            ...membership.memberData,
+            points: (membership.memberData?.points || 0) - totalCost
+          }
+        } as any)
+        .where(and(
+          eq(tenantMemberships.id, data.membershipId),
+          // Conditional update - only succeed if sufficient points
+          sql`(${tenantMemberships.memberData}->>'points')::int >= ${totalCost}`
+        ))
+        .returning();
+
+      if (membershipUpdateResult.length === 0) {
+        throw new Error('Insufficient points');
+      }
+
+      // 2. Update reward stock with conditional check
+      const rewardUpdateResult = await tx.update(rewards)
+        .set({
+          currentRedemptions: sql`${rewards.currentRedemptions} + ${data.entries}`
+        } as any)
+        .where(and(
+          eq(rewards.id, data.rewardId),
+          // Conditional update - only succeed if stock available
+          reward.maxRedemptions 
+            ? sql`${rewards.currentRedemptions} + ${data.entries} <= ${reward.maxRedemptions}`
+            : sql`true`
+        ))
+        .returning();
+
+      if (rewardUpdateResult.length === 0) {
+        throw new Error('Reward no longer available');
+      }
+
+      // 3. Find or create fan program within transaction
+      let fanProgram = await tx.select().from(fanPrograms)
+        .where(and(eq(fanPrograms.fanId, data.userId), eq(fanPrograms.programId, reward.programId)))
+        .then(rows => rows[0]);
+
+      if (!fanProgram) {
+        const [newFanProgram] = await tx.insert(fanPrograms)
+          .values({
+            tenantId: reward.tenantId,
+            fanId: data.userId,
+            programId: reward.programId,
+            currentPoints: 0,
+            totalPointsEarned: 0
+          } as any)
+          .returning();
+        fanProgram = newFanProgram;
+      }
+
+      // 4. Create audit trail - reward redemption record
+      const [rewardRedemption] = await tx.insert(rewardRedemptions)
+        .values({
+          rewardId: reward.id,
+          fanId: data.userId,
+          pointsSpent: totalCost,
+          quantity: data.entries,
+          status: 'completed',
+          redeemedAt: new Date()
+        } as any)
+        .returning();
+
+      // 5. Create point transaction for audit trail
+      const [pointTransaction] = await tx.insert(pointTransactions)
+        .values({
+          tenantId: reward.tenantId,
+          fanProgramId: fanProgram.id,
+          points: -totalCost,
+          type: 'spent',
+          source: 'reward_redemption',
+          metadata: {
+            rewardId: reward.id,
+            redemptionId: rewardRedemption.id
+          }
+        } as any)
+        .returning();
+
+      return {
+        updatedMembership: membershipUpdateResult[0],
+        updatedReward: rewardUpdateResult[0],
+        fanProgram,
+        pointTransaction,
+        rewardRedemption
+      };
+    });
+  }
+
   // Fan program operations
   async getFanProgram(fanId: string, programId: string): Promise<FanProgram | undefined> {
     const [fanProgram] = await db.select().from(fanPrograms)
@@ -365,6 +522,14 @@ export class DatabaseStorage implements IStorage {
     const [membership] = await db.update(tenantMemberships)
       .set(updates as any)
       .where(and(eq(tenantMemberships.userId, userId), eq(tenantMemberships.tenantId, tenantId)))
+      .returning();
+    return membership;
+  }
+
+  async updateTenantMembership(id: string, updates: Partial<InsertTenantMembership>): Promise<TenantMembership> {
+    const [membership] = await db.update(tenantMemberships)
+      .set(updates as any)
+      .where(eq(tenantMemberships.id, id))
       .returning();
     return membership;
   }
