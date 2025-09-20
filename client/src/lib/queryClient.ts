@@ -1,6 +1,24 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
+// Helper to get current Dynamic user ID from local storage or current context
+function getDynamicUserId(): string | null {
+  // Try to get from the current Dynamic context if available
+  if (typeof window !== 'undefined') {
+    try {
+      // Dynamic stores user data in localStorage, we can access it directly
+      const dynamicState = localStorage.getItem('dynamic_authentication_state');
+      if (dynamicState) {
+        const parsed = JSON.parse(dynamicState);
+        return parsed?.user?.userId || null;
+      }
+    } catch (error) {
+      console.warn('Failed to get Dynamic user ID from localStorage:', error);
+    }
+  }
+  return null;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -20,6 +38,12 @@ export async function apiRequest(
   const authToken = getAuthToken();
   if (authToken) {
     headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  // Add Dynamic user ID header for backend authentication
+  const dynamicUserId = getDynamicUserId();
+  if (dynamicUserId) {
+    headers["x-dynamic-user-id"] = dynamicUserId;
   }
 
   const res = await fetch(url, {
@@ -51,6 +75,12 @@ export async function fetchApi(
     headers["Authorization"] = `Bearer ${authToken}`;
   }
 
+  // Add Dynamic user ID header for backend authentication
+  const dynamicUserId = getDynamicUserId();
+  if (dynamicUserId) {
+    headers["x-dynamic-user-id"] = dynamicUserId;
+  }
+
   const res = await fetch(url, {
     method,
     headers,
@@ -74,6 +104,12 @@ export const getQueryFn: <T>(options: {
     const authToken = getAuthToken();
     if (authToken) {
       headers["Authorization"] = `Bearer ${authToken}`;
+    }
+
+    // Add Dynamic user ID header for backend authentication
+    const dynamicUserId = getDynamicUserId();
+    if (dynamicUserId) {
+      headers["x-dynamic-user-id"] = dynamicUserId;
     }
 
     const res = await fetch(queryKey.join("/") as string, {
