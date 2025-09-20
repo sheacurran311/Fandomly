@@ -22,6 +22,7 @@ import CreatorFans from "@/pages/creator-dashboard/fans";
 import CreatorGrowth from "@/pages/creator-dashboard/growth";
 import CreatorRevenue from "@/pages/creator-dashboard/revenue";
 import CreatorRewards from "@/pages/creator-dashboard/rewards";
+import CreatorTasks from "@/pages/creator-dashboard/tasks";
 import CreatorNIL from "@/pages/creator-dashboard/nil";
 import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
 import CreatorSettings from "@/pages/creator-dashboard/settings";
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/creator-dashboard/growth" component={CreatorGrowth} />
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/rewards" component={CreatorRewards} />
+      <Route path="/creator-dashboard/tasks" component={CreatorTasks} />
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
