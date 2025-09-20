@@ -7,7 +7,8 @@ import { registerTenantRoutes } from "./tenant-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
-  insertCampaignSchema, insertCampaignRuleSchema
+  insertCampaignSchema, insertCampaignRuleSchema,
+  insertTaskSchema, insertTaskAssignmentSchema
 } from "@shared/schema";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
 import { z } from "zod";
@@ -682,6 +683,301 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(program);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch loyalty program" });
+    }
+  });
+
+  // =====================================
+  // TASK MANAGEMENT API ROUTES (New Workflow)
+  // =====================================
+
+  // Get all tasks for a creator (with tenant isolation)
+  app.get("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get creator profile to ensure they can access tasks
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required to access tasks" });
+      }
+
+      const tasks = await storage.getTasks(creator.id, creator.tenantId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Failed to fetch tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get specific task by ID (with tenant isolation)
+  app.get("/api/tasks/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const task = await storage.getTask(req.params.id, creator.tenantId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error("Failed to fetch task:", error);
+      res.status(500).json({ error: "Failed to fetch task" });
+    }
+  });
+
+  // Create new task (with input validation)
+  app.post("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required to create tasks" });
+      }
+
+      // Validate input using Zod schema
+      const taskData = insertTaskSchema.parse({
+        ...req.body,
+        creatorId: creator.id,
+        tenantId: creator.tenantId
+      });
+
+      const task = await storage.createTask(taskData);
+      res.json(task);
+    } catch (error) {
+      console.error("Task creation error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create task" });
+    }
+  });
+
+  // Update existing task (with tenant isolation)
+  app.put("/api/tasks/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      // Create secure update schema that omits immutable fields
+      const updateTaskSchema = insertTaskSchema.omit({ 
+        id: true, 
+        tenantId: true, 
+        creatorId: true,
+        totalCompletions: true,
+        createdAt: true,
+        updatedAt: true 
+      }).partial();
+      
+      const updates = updateTaskSchema.parse(req.body);
+      const task = await storage.updateTask(req.params.id, updates, creator.tenantId);
+      
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error("Task update error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update task" });
+    }
+  });
+
+  // Delete task (with tenant isolation)
+  app.delete("/api/tasks/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      await storage.deleteTask(req.params.id, creator.tenantId);
+      res.json({ success: true, message: "Task deleted successfully" });
+    } catch (error) {
+      console.error("Task deletion error:", error);
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Get tasks assigned to a campaign
+  app.get("/api/campaigns/:campaignId/assigned-tasks", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const tasks = await storage.getCampaignTasks(req.params.campaignId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Failed to fetch campaign tasks:", error);
+      res.status(500).json({ error: "Failed to fetch campaign tasks" });
+    }
+  });
+
+  // Assign task to campaign
+  app.post("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const { campaignId } = req.body;
+      if (!campaignId) {
+        return res.status(400).json({ error: "Campaign ID required" });
+      }
+
+      // Validate task and campaign exist and belong to same tenant
+      const task = await storage.getTask(req.params.taskId, creator.tenantId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Validate campaign belongs to same tenant/creator
+      const campaigns = await storage.getCampaignsByCreator(creator.id, creator.tenantId);
+      const campaign = campaigns.find(c => c.id === campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      const assignment = await storage.assignTaskToCampaign(
+        req.params.taskId, 
+        campaignId, 
+        creator.tenantId
+      );
+      res.json(assignment);
+    } catch (error) {
+      console.error("Task assignment error:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to assign task" });
+    }
+  });
+
+  // Unassign task from campaign
+  app.delete("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const { campaignId } = req.body;
+      if (!campaignId) {
+        return res.status(400).json({ error: "Campaign ID required" });
+      }
+
+      // Validate task and campaign exist and belong to same tenant
+      const task = await storage.getTask(req.params.taskId, creator.tenantId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Validate campaign belongs to same tenant/creator
+      const campaigns = await storage.getCampaignsByCreator(creator.id, creator.tenantId);
+      const campaign = campaigns.find(c => c.id === campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      await storage.unassignTaskFromCampaign(req.params.taskId, campaignId, creator.tenantId);
+      res.json({ success: true, message: "Task unassigned successfully" });
+    } catch (error) {
+      console.error("Task unassignment error:", error);
+      res.status(500).json({ error: "Failed to unassign task" });
+    }
+  });
+
+  // Publish campaign (with task validation)
+  app.post("/api/campaigns/:campaignId/publish", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      // Validate campaign belongs to creator before publishing
+      const campaigns = await storage.getCampaignsByCreator(creator.id, creator.tenantId);
+      const existingCampaign = campaigns.find(c => c.id === req.params.campaignId);
+      if (!existingCampaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      const campaign = await storage.publishCampaign(req.params.campaignId, creator.tenantId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      res.json({ 
+        campaign, 
+        message: "Campaign published successfully" 
+      });
+    } catch (error) {
+      console.error("Campaign publishing error:", error);
+      if (error instanceof Error && error.message.includes('at least 1 task')) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to publish campaign" });
+      }
+    }
+  });
+
+  // Get pending campaigns (campaigns waiting for tasks)
+  app.get("/api/campaigns/pending", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const campaigns = await storage.getPendingCampaigns(creator.id, creator.tenantId);
+      res.json(campaigns);
+    } catch (error) {
+      console.error("Failed to fetch pending campaigns:", error);
+      res.status(500).json({ error: "Failed to fetch pending campaigns" });
     }
   });
 
