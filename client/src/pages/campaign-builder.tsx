@@ -136,7 +136,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     // Step 1: Basics
     name: "",
     description: "",
-    type: [] as string[], // Points, Raffle, NFT, Badge (can be combined)
+    type: "campaign", // Simplified: all campaigns are just "campaigns"
     startDate: "",
     endDate: "",
     
@@ -156,9 +156,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     // Step 3: Tasks Configuration
     tasks: {} as Record<string, any[]>,
     
-    // Step 4: Rewards & Points
+    // Step 4: Rewards & Points  
     rewardStructure: {
-      campaignReward: { type: "", value: 0 },
+      campaignReward: { type: "points", value: 0 },
       taskRewards: true, // If false, only campaign reward applies
       defaultPoints: 50
     },
@@ -228,8 +228,14 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         if (!campaignData.description.trim()) {
           errors.description = "Campaign description is required";
         }
-        if (campaignData.type.length === 0) {
-          errors.type = "At least one campaign type is required";
+        if (!campaignData.startDate.trim()) {
+          errors.startDate = "Campaign start date is required";
+        }
+        if (!campaignData.endDate.trim()) {
+          errors.endDate = "Campaign end date is required";
+        }
+        if (campaignData.startDate && campaignData.endDate && new Date(campaignData.startDate) >= new Date(campaignData.endDate)) {
+          errors.endDate = "End date must be after start date";
         }
         break;
 
@@ -325,25 +331,11 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             </div>
 
             <div>
-              <Label className="text-white">Campaign Types (select multiple)</Label>
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                {['Points', 'Raffle', 'NFT', 'Badge'].map((type) => (
-                  <div key={type} className="flex items-center space-x-2">
-                    <Switch
-                      data-testid={`switch-type-${type.toLowerCase()}`}
-                      checked={campaignData.type.includes(type)}
-                      onCheckedChange={(checked) => {
-                        const newTypes = checked 
-                          ? [...campaignData.type, type]
-                          : campaignData.type.filter(t => t !== type);
-                        updateCampaignData('type', newTypes);
-                      }}
-                    />
-                    <Label className="text-gray-300">{type}</Label>
-                  </div>
-                ))}
+              <Label className="text-white">Campaign Type</Label>
+              <div className="mt-2 p-3 bg-white/10 border border-white/20 rounded-md">
+                <p className="text-white">Points-Based Campaign</p>
+                <p className="text-sm text-gray-400">Fans earn points by completing tasks, then convert points to rewards</p>
               </div>
-              <ErrorMessage error={validationErrors.type} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -357,6 +349,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   onChange={(e) => updateCampaignData('startDate', e.target.value)}
                   className="mt-2 bg-white/10 border-white/20 text-white"
                 />
+                <ErrorMessage error={validationErrors.startDate} />
               </div>
               <div>
                 <Label htmlFor="end-date" className="text-white">End Date & Time</Label>
@@ -368,6 +361,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   onChange={(e) => updateCampaignData('endDate', e.target.value)}
                   className="mt-2 bg-white/10 border-white/20 text-white"
                 />
+                <ErrorMessage error={validationErrors.endDate} />
               </div>
             </div>
           </div>
@@ -471,26 +465,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                         updateCampaignData(`tasks.${platform}`, updatedTasks);
                                       }}
                                     />
-                                    <Select
-                                      value={taskData?.rewardType || 'points'}
-                                      onValueChange={(value) => {
-                                        const tasks = campaignData.tasks[platform] || [];
-                                        const updatedTasks = tasks.map((t: any) =>
-                                          t.type === taskType.id ? { ...t, rewardType: value } : t
-                                        );
-                                        updateCampaignData(`tasks.${platform}`, updatedTasks);
-                                      }}
-                                    >
-                                      <SelectTrigger className="w-28 bg-white/10 border-white/20 text-white text-sm">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="points">Points</SelectItem>
-                                        <SelectItem value="raffle">Raffle</SelectItem>
-                                        <SelectItem value="nft">NFT</SelectItem>
-                                        <SelectItem value="badge">Badge</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                    <div className="w-28 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
+                                      Points
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -621,26 +598,15 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <Separator className="bg-white/20" />
 
                 <div>
-                  <Label className="text-white">Campaign Completion Reward</Label>
+                  <Label className="text-white">Campaign Completion Bonus</Label>
                   <div className="grid grid-cols-2 gap-4 mt-2">
-                    <Select
-                      value={campaignData.rewardStructure.campaignReward.type}
-                      onValueChange={(value) => updateCampaignData('rewardStructure.campaignReward.type', value)}
-                    >
-                      <SelectTrigger data-testid="select-campaign-reward-type" className="bg-white/10 border-white/20 text-white">
-                        <SelectValue placeholder="Reward Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="points">Points</SelectItem>
-                        <SelectItem value="raffle">Raffle Tickets</SelectItem>
-                        <SelectItem value="nft">NFT</SelectItem>
-                        <SelectItem value="badge">Badge</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white">
+                      Points
+                    </div>
                     <Input
                       data-testid="input-campaign-reward-value"
                       type="number"
-                      placeholder="Amount/Value"
+                      placeholder="Bonus Points"
                       value={campaignData.rewardStructure.campaignReward.value}
                       onChange={(e) => updateCampaignData('rewardStructure.campaignReward.value', parseInt(e.target.value) || 0)}
                       className="bg-white/10 border-white/20 text-white"
@@ -712,7 +678,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   </div>
                   <div>
                     <span className="text-gray-400">Types:</span>
-                    <p className="text-white font-medium">{campaignData.type.join(', ') || 'Points'}</p>
+                    <p className="text-white font-medium">Points-Based Campaign</p>
                   </div>
                   <div>
                     <span className="text-gray-400">Platforms:</span>
