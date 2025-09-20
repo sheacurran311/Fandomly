@@ -342,7 +342,7 @@ export const rewards = pgTable("rewards", {
   name: text("name").notNull(),
   description: text("description"),
   pointsCost: integer("points_cost").notNull(),
-  rewardType: text("reward_type").notNull(), // "traditional" | "nft" | "token" | "experience"
+  rewardType: text("reward_type").notNull(), // "traditional" | "nft" | "token" | "experience" | "raffle" | "physical" | "custom"
   rewardData: jsonb("reward_data").$type<{
     nftMetadata?: {
       name: string;
@@ -359,6 +359,32 @@ export const rewards = pgTable("rewards", {
     experienceDetails?: string;
     downloadLink?: string;
     couponCode?: string;
+    // New reward type data
+    raffleData?: {
+      prizeDescription: string;
+      prizeValue?: number;
+      entryPointsCost: number; // Points per entry (usually 1)
+      maxEntries?: number;
+      drawDate: string;
+      winnerSelectionMethod: "random" | "manual";
+    };
+    physicalData?: {
+      itemName: string;
+      itemDescription: string;
+      shippingRequired: boolean;
+      estimatedDeliveryDays?: number;
+      stockQuantity?: number;
+      weight?: number;
+      dimensions?: { length: number; width: number; height: number; };
+    };
+    customData?: {
+      serviceName: string;
+      serviceDescription: string;
+      deliveryMethod: "email" | "platform" | "video_call" | "physical";
+      estimatedFulfillmentDays?: number;
+      customInstructions?: string;
+      requiresPersonalization: boolean;
+    };
   }>(),
   maxRedemptions: integer("max_redemptions"),
   currentRedemptions: integer("current_redemptions").default(0),
