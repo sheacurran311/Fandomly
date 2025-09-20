@@ -671,8 +671,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-6xl h-[95vh] bg-brand-dark-bg border-white/20 overflow-hidden flex flex-col p-0">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-6xl h-[95vh] bg-brand-dark-bg border-white/20 overflow-hidden flex flex-col px-6 py-0">
+        <DialogHeader className="pt-6 pb-4">
           <DialogTitle className="text-white text-2xl">Create New Campaign</DialogTitle>
         </DialogHeader>
 
@@ -712,12 +712,12 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         </div>
 
         {/* Step Content */}
-        <div className="min-h-[400px] overflow-y-auto">
+        <div className="flex-1 overflow-y-auto mb-4">
           {renderStepContent()}
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between pt-6">
+        <div className="flex justify-between py-4 border-t border-white/10 bg-brand-dark-bg">
           <Button
             data-testid="button-prev-step"
             variant="outline"
