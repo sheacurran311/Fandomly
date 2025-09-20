@@ -19,8 +19,9 @@ import {
   TrendingUp, Heart, Share2, Trophy, Star, Coins,
   ArrowLeft, ArrowRight, Check, Plus, X, Settings,
   Facebook, Instagram, Twitter, Youtube, Music, MessageCircle,
-  AlertCircle
+  AlertCircle, Wallet
 } from "lucide-react";
+import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 
 // OpenLoyalty-style Campaign Templates
 const campaignTemplates = [
@@ -130,7 +131,7 @@ const categoryColors = {
 
 // Multi-step Campaign Creation Modal Component
 function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [campaignData, setCampaignData] = useState({
     // Step 1: Basics
@@ -169,6 +170,58 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       prerequisiteCampaigns: [] as string[]
     }
   });
+
+  // Authentication guard - show connect wallet prompt if not authenticated
+  if (!isAuthenticated && !isLoading) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Connect Your Wallet
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6">
+            <div className="text-center space-y-4">
+              <AlertCircle className="h-12 w-12 text-yellow-400 mx-auto" />
+              <h3 className="text-lg font-semibold text-white">
+                Authentication Required
+              </h3>
+              <p className="text-gray-300">
+                You need to connect your wallet to create campaigns and manage your loyalty programs.
+              </p>
+              <div className="pt-4">
+                <ConnectWalletButton 
+                  className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-3 rounded-xl"
+                  data-testid="button-connect-wallet-campaign"
+                >
+                  Connect Wallet to Continue
+                </ConnectWalletButton>
+              </div>
+              <p className="text-xs text-gray-400">
+                Secure wallet connection powered by Dynamic
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10">
+          <div className="py-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
+            <p className="text-gray-300 mt-4">Checking authentication...</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const steps = [
     { id: 1, title: "Campaign Basics", icon: Target },

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
@@ -54,9 +55,11 @@ interface PaymentResponse {
 
 // Subscription status component
 function SubscriptionStatus() {
+  const { isAuthenticated } = useAuth();
   const { data: subscription, isLoading } = useQuery<SubscriptionStatusResponse>({
     queryKey: ['/api/subscription-status'],
-    queryFn: () => apiRequest('GET', '/api/subscription-status')
+    queryFn: () => apiRequest('GET', '/api/subscription-status'),
+    enabled: isAuthenticated // Only run query when user is authenticated
   });
 
   if (isLoading) {
@@ -303,6 +306,7 @@ function CheckoutForm({ amount }: { amount: number }) {
 function SubscriptionWrapper() {
   const [clientSecret, setClientSecret] = useState<string>("");
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   const getSubscriptionSecret = async () => {
     try {
@@ -321,8 +325,10 @@ function SubscriptionWrapper() {
   };
 
   useEffect(() => {
-    getSubscriptionSecret();
-  }, []);
+    if (isAuthenticated) {
+      getSubscriptionSecret();
+    }
+  }, [isAuthenticated]);
 
   if (!clientSecret) {
     return (
@@ -353,9 +359,10 @@ function SubscriptionWrapper() {
 function CheckoutWrapper({ amount }: { amount: number }) {
   const [clientSecret, setClientSecret] = useState<string>("");
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (amount > 0) {
+    if (isAuthenticated && amount > 0) {
       const getPaymentSecret = async () => {
         try {
           const response = await apiRequest('POST', '/api/create-payment-intent', { amount });
@@ -373,7 +380,7 @@ function CheckoutWrapper({ amount }: { amount: number }) {
       };
       getPaymentSecret();
     }
-  }, [amount, toast]);
+  }, [isAuthenticated, amount, toast]);
 
   if (!clientSecret && amount > 0) {
     return (

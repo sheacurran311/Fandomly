@@ -1,0 +1,41 @@
+/api/campaigns/creat…98bd-b5800c6be81f:1 
+ Failed to load resource: the server responded with a status of 404 (Not Found)
+
+/api/subscription-status:1 
+ Failed to load resource: the server responded with a status of 401 (Unauthorized)
+2
+facebook.ts:337 [FB Manager] Successfully loaded 1 pages
+facebook.ts:106 [FB Manager] Ensuring FB ready for creator with App ID: 166538...
+facebook.ts:117 [FB Manager] Already initialized for creator
+facebook.ts:363 [FB Manager] Login status check: connected
+facebook.ts:337 [FB Manager] Successfully loaded 1 pages
+/api/campaigns/enhanced:1 
+ Failed to load resource: the server responded with a status of 401 (Unauthorized)
+campaign-builder.tsx:843 Campaign creation failed: Error: 401: {"error":"Authentication required"}
+    at throwIfResNotOk (queryClient.ts:25:11)
+    at async apiRequest (queryClient.ts:56:3)
+    at async onClick (campaign-builder.tsx:820:38)
+/api/campaigns/enhanced:1 
+ Failed to load resource: the server responded with a status of 401 (Unauthorized)
+campaign-builder.tsx:843 Campaign creation failed: Error: 401: {"error":"Authentication required"}
+    at throwIfResNotOk (queryClient.ts:25:11)
+    at async apiRequest (queryClient.ts:56:3)
+    at async onClick (campaign-builder.tsx:820:38)
+/api/campaigns/enhanced:1 
+ Failed to load resource: the server responded with a status of 401 (Unauthorized)
+campaign-builder.tsx:843 Campaign creation failed: Error: 401: {"error":"Authentication required"}
+    at throwIfResNotOk (queryClient.ts:25:11)
+    at async apiRequest (queryClient.ts:56:3)
+    at async onClick (campaign-builder.tsx:820:38)
+/api/campaigns/enhanced:1 
+ Failed to load resource: the server responded with a status of 401 (Unauthorized)
+campaign-builder.tsx:843 Campaign creation failed: Error: 401: {"error":"Authentication required"}
+    at throwIfResNotOk (queryClient.ts:25:11)
+    at async apiRequest (queryClient.ts:56:3)
+    at async onClick (campaign-builder.tsx:820:38)
+queryClient.ts:49 
+ POST https://87419467-71d9-4d4b-9975-abd023220799-00-bc8kcl9gz03j.spock.replit.dev/api/campaigns/enhanced 401 (Unauthorized)
+apiRequest	@	queryClient.ts:49
+onClick	@	campaign-builder.tsx:820
+campaign-builder.tsx:843 Campaign creation failed: 
+onClick	@	campaign-builder.tsx:843
