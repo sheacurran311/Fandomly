@@ -442,7 +442,7 @@ export const campaignTriggerEnum = pgEnum('campaign_trigger', [
   'purchase_transaction', 'return_transaction', 'internal_event', 'custom_event', 
   'achievement_earned', 'redemption_code'
 ]);
-export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive', 'draft', 'archived']);
+export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive', 'draft', 'archived', 'pending_tasks']);
 
 // Advanced Campaign Types & Rewards
 export const rewardTypeEnum = pgEnum('reward_type', ['points', 'raffle', 'nft', 'badge']);
@@ -589,6 +589,57 @@ export const socialCampaignTasks = pgTable("social_campaign_tasks", {
   verificationInstructions: text("verification_instructions"),
   
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Independent Tasks (for new workflow)
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  creatorId: varchar("creator_id").references(() => creators.id).notNull(),
+  
+  // Task Info
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  
+  // Task Configuration
+  taskType: taskTypeEnum("task_type").notNull(),
+  platform: socialPlatformEnum("platform").notNull(),
+  
+  // Task-specific Data
+  targetUrl: text("target_url"), // URL for posts/videos/playlists
+  hashtags: jsonb("hashtags").$type<string[]>(), // Required hashtags
+  inviteCode: text("invite_code"), // Discord/Telegram invites
+  customInstructions: text("custom_instructions"), // Additional instructions
+  
+  // Reward Configuration
+  rewardType: rewardTypeEnum("reward_type").notNull().default('points'),
+  rewardValue: integer("reward_value").notNull().default(50),
+  
+  // Status & Analytics
+  isActive: boolean("is_active").default(true),
+  totalCompletions: integer("total_completions").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Task Assignments (Many-to-Many: Tasks <-> Campaigns)
+export const taskAssignments = pgTable("task_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Assignment Configuration
+  displayOrder: integer("display_order").default(1),
+  isActive: boolean("is_active").default(true),
+  
+  // Assignment-specific Overrides (optional)
+  customRewardValue: integer("custom_reward_value"), // Override task's default reward
+  customInstructions: text("custom_instructions"), // Campaign-specific instructions
+  
+  assignedAt: timestamp("assigned_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -840,6 +891,20 @@ export const insertSocialCampaignTaskSchema = createInsertSchema(socialCampaignT
   updatedAt: true,
 });
 
+// Task Schemas
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  totalCompletions: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments).omit({
+  id: true,
+  assignedAt: true,
+  updatedAt: true,
+});
+
 export const insertCampaignParticipationSchema = createInsertSchema(campaignParticipations).omit({
   id: true,
   createdAt: true,
@@ -892,6 +957,12 @@ export type CampaignRule = typeof campaignRules.$inferSelect;
 export type InsertCampaignRule = z.infer<typeof insertCampaignRuleSchema>;
 export type CampaignParticipation = typeof campaignParticipations.$inferSelect;
 export type InsertCampaignParticipation = z.infer<typeof insertCampaignParticipationSchema>;
+
+// Task Types
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type TaskAssignment = typeof taskAssignments.$inferSelect;
+export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
 
 // Achievement System Tables
 export const achievements = pgTable("achievements", {

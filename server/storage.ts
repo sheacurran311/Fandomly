@@ -2,6 +2,7 @@ import {
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
+  tasks, taskAssignments,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -9,11 +10,12 @@ import {
   type RewardRedemption, type InsertRewardRedemption,
   type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership,
   type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
+  type Task, type InsertTask, type TaskAssignment, type InsertTaskAssignment,
   insertSocialCampaignTaskSchema,
   creatorFacebookPages
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -107,6 +109,23 @@ export interface IStorage {
   createCampaignParticipation(data: any): Promise<any>;
   getCampaignParticipation(campaignId: string, memberId: string): Promise<any>;
   updateCampaignParticipation(id: string, data: any): Promise<any>;
+
+  // Task operations (new workflow)
+  getTasks(creatorId: string, tenantId?: string): Promise<Task[]>;
+  getTask(id: string, tenantId?: string): Promise<Task | undefined>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: string, updates: Partial<InsertTask>, tenantId: string): Promise<Task | undefined>;
+  deleteTask(id: string, tenantId: string): Promise<void>;
+  
+  // Task Assignment operations
+  getTaskAssignments(campaignId: string): Promise<TaskAssignment[]>;
+  getCampaignTasks(campaignId: string): Promise<Task[]>;
+  assignTaskToCampaign(taskId: string, campaignId: string, tenantId: string): Promise<TaskAssignment>;
+  unassignTaskFromCampaign(taskId: string, campaignId: string, tenantId: string): Promise<void>;
+  
+  // Campaign Publishing operations
+  publishCampaign(campaignId: string, tenantId: string): Promise<Campaign | undefined>;
+  getPendingCampaigns(creatorId: string, tenantId?: string): Promise<Campaign[]>;
 
   // Creator Facebook Pages
   upsertCreatorFacebookPages(creatorId: string, pages: Array<{
@@ -664,6 +683,105 @@ export class DatabaseStorage implements IStorage {
       .where(eq(campaignParticipations.id, id))
       .returning();
     return participation;
+  }
+
+  // Task operations (new workflow)
+  async getTasks(creatorId: string, tenantId?: string): Promise<Task[]> {
+    const conditions = tenantId 
+      ? and(eq(tasks.creatorId, creatorId), eq(tasks.tenantId, tenantId))
+      : eq(tasks.creatorId, creatorId);
+    return await db.select().from(tasks).where(conditions).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTask(id: string, tenantId?: string): Promise<Task | undefined> {
+    const conditions = tenantId 
+      ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
+      : eq(tasks.id, id);
+    const [task] = await db.select().from(tasks).where(conditions);
+    return task;
+  }
+
+  async createTask(task: InsertTask): Promise<Task> {
+    const [newTask] = await db.insert(tasks).values(task).returning();
+    return newTask;
+  }
+
+  async updateTask(id: string, updates: Partial<InsertTask>, tenantId: string): Promise<Task | undefined> {
+    const [task] = await db.update(tasks)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)))
+      .returning();
+    return task;
+  }
+
+  async deleteTask(id: string, tenantId: string): Promise<void> {
+    await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)));
+  }
+
+  // Task Assignment operations
+  async getTaskAssignments(campaignId: string): Promise<TaskAssignment[]> {
+    return await db.select().from(taskAssignments)
+      .where(eq(taskAssignments.campaignId, campaignId))
+      .orderBy(taskAssignments.displayOrder);
+  }
+
+  async getCampaignTasks(campaignId: string): Promise<Task[]> {
+    const result = await db
+      .select({ 
+        task: tasks,
+        assignment: taskAssignments 
+      })
+      .from(taskAssignments)
+      .innerJoin(tasks, eq(taskAssignments.taskId, tasks.id))
+      .where(and(
+        eq(taskAssignments.campaignId, campaignId),
+        eq(taskAssignments.isActive, true)
+      ))
+      .orderBy(taskAssignments.displayOrder);
+    
+    return result.map(r => r.task);
+  }
+
+  async assignTaskToCampaign(taskId: string, campaignId: string, tenantId: string): Promise<TaskAssignment> {
+    const [assignment] = await db.insert(taskAssignments).values({
+      taskId,
+      campaignId,
+      tenantId,
+      displayOrder: 1,
+      isActive: true
+    }).returning();
+    return assignment;
+  }
+
+  async unassignTaskFromCampaign(taskId: string, campaignId: string, tenantId: string): Promise<void> {
+    await db.delete(taskAssignments)
+      .where(and(
+        eq(taskAssignments.taskId, taskId),
+        eq(taskAssignments.campaignId, campaignId),
+        eq(taskAssignments.tenantId, tenantId)
+      ));
+  }
+
+  // Campaign Publishing operations
+  async publishCampaign(campaignId: string, tenantId: string): Promise<Campaign | undefined> {
+    // Check if campaign has >1 tasks assigned
+    const assignedTasks = await this.getTaskAssignments(campaignId);
+    if (assignedTasks.length < 1) {
+      throw new Error('Campaign must have at least 1 task assigned before publishing');
+    }
+
+    const [campaign] = await db.update(campaigns)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(and(eq(campaigns.id, campaignId), eq(campaigns.tenantId, tenantId)))
+      .returning();
+    return campaign;
+  }
+
+  async getPendingCampaigns(creatorId: string, tenantId?: string): Promise<Campaign[]> {
+    const conditions = tenantId 
+      ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'pending_tasks'), eq(campaigns.tenantId, tenantId))
+      : and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'pending_tasks'));
+    return await db.select().from(campaigns).where(conditions).orderBy(desc(campaigns.createdAt));
   }
 }
 
