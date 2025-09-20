@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,8 +17,23 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye } from "lucide-react";
 import type { Reward } from "@shared/schema";
+import { insertRewardSchema } from "@shared/schema";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
+
+// Form schema extending insertRewardSchema with additional validation
+const rewardCreationFormSchema = insertRewardSchema.extend({
+  name: z.string().min(1, "Reward name is required").max(100, "Name too long"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  pointsCost: z.number().min(1, "Points cost must be at least 1"),
+  rewardType: z.enum(["raffle", "physical", "custom", "nft"], {
+    required_error: "Please select a reward type"
+  }),
+  maxRedemptions: z.number().min(1).optional().nullable(),
+  // Type-specific validation handled dynamically
+});
+
+type RewardFormData = z.infer<typeof rewardCreationFormSchema>;
 
 export default function RewardsManagement() {
   const { user } = useAuth();
@@ -300,233 +319,329 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
   );
 }
 
-// Reward Creation Form Component  
+// Reward Creation Form Component with react-hook-form + zodResolver
 function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void; onCancel: () => void }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    rewardType: '',
-    pointsCost: 50,
-    maxRedemptions: null as number | null,
-    // Type-specific data
-    raffleData: {
-      prizeDescription: '',
-      prizeValue: 0,
-      entryPointsCost: 1,
-      drawDate: '',
-      winnerSelectionMethod: 'random' as const
-    },
-    physicalData: {
-      itemName: '',
-      itemDescription: '',
-      shippingRequired: true,
-      stockQuantity: 0
-    },
-    customData: {
-      serviceName: '',
-      serviceDescription: '',
-      deliveryMethod: 'email' as const,
-      requiresPersonalization: false
+  const form = useForm<RewardFormData>({
+    resolver: zodResolver(rewardCreationFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      rewardType: undefined,
+      pointsCost: 50,
+      maxRedemptions: null,
+      rewardData: {
+        raffleData: {
+          prizeDescription: '',
+          prizeValue: 0,
+          entryPointsCost: 1,
+          drawDate: '',
+          winnerSelectionMethod: 'random'
+        },
+        physicalData: {
+          itemName: '',
+          itemDescription: '',
+          shippingRequired: true,
+          stockQuantity: 0
+        },
+        customData: {
+          serviceName: '',
+          serviceDescription: '',
+          deliveryMethod: 'email',
+          requiresPersonalization: false
+        }
+      }
     }
   });
 
-  const handleSubmit = () => {
-    const rewardData: any = {
-      name: formData.name,
-      description: formData.description,
-      rewardType: formData.rewardType,
-      pointsCost: formData.pointsCost,
-      maxRedemptions: formData.maxRedemptions,
-      rewardData: {} as any
+  const watchedRewardType = form.watch('rewardType');
+
+  const handleFormSubmit = (data: RewardFormData) => {
+    // Process form data based on reward type
+    const processedData = {
+      ...data,
+      // Ensure proper type-specific data structure
+      rewardData: watchedRewardType === 'raffle' ? { raffleData: data.rewardData?.raffleData } :
+                  watchedRewardType === 'physical' ? { physicalData: data.rewardData?.physicalData } :
+                  watchedRewardType === 'custom' ? { customData: data.rewardData?.customData } :
+                  {}
     };
-
-    // Add type-specific data
-    if (formData.rewardType === 'raffle') {
-      rewardData.rewardData.raffleData = formData.raffleData;
-    } else if (formData.rewardType === 'physical') {
-      rewardData.rewardData.physicalData = formData.physicalData;
-    } else if (formData.rewardType === 'custom') {
-      rewardData.rewardData.customData = formData.customData;
-    }
-
-    onSubmit(rewardData);
-  };
-
-  const updateFormData = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updateNestedData = (type: 'raffleData' | 'physicalData' | 'customData', field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [type]: { ...prev[type], [field]: value }
-    }));
+    onSubmit(processedData);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Basic Info */}
-      <div className="space-y-4">
-        <div>
-          <Label className="text-white">Reward Name</Label>
-          <Input
-            placeholder="e.g., Exclusive Video Call, Limited Edition NFT"
-            value={formData.name}
-            onChange={(e) => updateFormData('name', e.target.value)}
-            className="mt-2 bg-white/10 border-white/20 text-white"
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6" data-testid="form-reward-creation">
+        {/* Basic Info */}
+        <div className="space-y-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-white">Reward Name</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder="e.g., Exclusive Video Call, Limited Edition NFT"
+                    className="mt-2 bg-white/10 border-white/20 text-white"
+                    data-testid="input-reward-name"
+                  />
+                </FormControl>
+                <FormMessage className="text-red-400" />
+              </FormItem>
+            )}
           />
-        </div>
-        
-        <div>
-          <Label className="text-white">Description</Label>
-          <Textarea
-            placeholder="Describe what fans will receive..."
-            value={formData.description}
-            onChange={(e) => updateFormData('description', e.target.value)}
-            className="mt-2 bg-white/10 border-white/20 text-white"
-            rows={3}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label className="text-white">Reward Type</Label>
-            <Select value={formData.rewardType} onValueChange={(value) => updateFormData('rewardType', value)}>
-              <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Select reward type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="raffle">Raffle Entry</SelectItem>
-                <SelectItem value="physical">Physical Item</SelectItem>
-                <SelectItem value="custom">Custom Service</SelectItem>
-                <SelectItem value="nft">Digital NFT</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           
-          <div>
-            <Label className="text-white">Points Cost</Label>
-            <Input
-              type="number"
-              min="1"
-              placeholder="50"
-              value={formData.pointsCost}
-              onChange={(e) => updateFormData('pointsCost', parseInt(e.target.value) || 0)}
-              className="mt-2 bg-white/10 border-white/20 text-white"
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-white">Description</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    placeholder="Describe what fans will receive..."
+                    className="mt-2 bg-white/10 border-white/20 text-white"
+                    rows={3}
+                    data-testid="textarea-reward-description"
+                  />
+                </FormControl>
+                <FormMessage className="text-red-400" />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="rewardType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Reward Type</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange} data-testid="select-reward-type">
+                      <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Select reward type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="raffle">Raffle Entry</SelectItem>
+                        <SelectItem value="physical">Physical Item</SelectItem>
+                        <SelectItem value="custom">Custom Service</SelectItem>
+                        <SelectItem value="nft">Digital NFT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="pointsCost"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Points Cost</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      min="1"
+                      placeholder="50"
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      data-testid="input-points-cost"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
             />
           </div>
-        </div>
 
-        <div>
-          <Label className="text-white">Max Redemptions (optional)</Label>
-          <Input
-            type="number"
-            min="1"
-            placeholder="Leave empty for unlimited"
-            value={formData.maxRedemptions || ''}
-            onChange={(e) => updateFormData('maxRedemptions', e.target.value ? parseInt(e.target.value) : null)}
-            className="mt-2 bg-white/10 border-white/20 text-white"
+          <FormField
+            control={form.control}
+            name="maxRedemptions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-white">Max Redemptions (optional)</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="number"
+                    min="1"
+                    placeholder="Leave empty for unlimited"
+                    value={field.value || ''}
+                    onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                    className="mt-2 bg-white/10 border-white/20 text-white"
+                    data-testid="input-max-redemptions"
+                  />
+                </FormControl>
+                <FormMessage className="text-red-400" />
+              </FormItem>
+            )}
           />
         </div>
-      </div>
 
-      {/* Type-Specific Configuration */}
-      {formData.rewardType === 'raffle' && (
-        <div className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-          <h3 className="text-white font-medium">Raffle Configuration</h3>
-          <div>
-            <Label className="text-white">Prize Description</Label>
-            <Input
-              placeholder="e.g., Signed Poster, Video Call Session"
-              value={formData.raffleData.prizeDescription}
-              onChange={(e) => updateNestedData('raffleData', 'prizeDescription', e.target.value)}
-              className="mt-2 bg-white/10 border-white/20 text-white"
+        {/* Type-Specific Configuration */}
+        {watchedRewardType === 'raffle' && (
+          <div className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg" data-testid="section-raffle-config">
+            <h3 className="text-white font-medium">Raffle Configuration</h3>
+            <FormField
+              control={form.control}
+              name="rewardData.raffleData.prizeDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Prize Description</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="e.g., Signed Poster, Video Call Session"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      data-testid="input-raffle-prize"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="rewardData.raffleData.drawDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Draw Date</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="date"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      data-testid="input-raffle-date"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <p className="text-sm text-purple-300">1 point = 1 raffle entry</p>
+          </div>
+        )}
+
+        {watchedRewardType === 'physical' && (
+          <div className="space-y-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg" data-testid="section-physical-config">
+            <h3 className="text-white font-medium">Physical Item Configuration</h3>
+            <FormField
+              control={form.control}
+              name="rewardData.physicalData.itemName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Item Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="e.g., T-Shirt, Signed Poster, Merchandise"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      data-testid="input-physical-item"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="rewardData.physicalData.stockQuantity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Stock Quantity</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      min="0"
+                      placeholder="100"
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      data-testid="input-physical-stock"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
             />
           </div>
-          <div>
-            <Label className="text-white">Draw Date</Label>
-            <Input
-              type="date"
-              value={formData.raffleData.drawDate}
-              onChange={(e) => updateNestedData('raffleData', 'drawDate', e.target.value)}
-              className="mt-2 bg-white/10 border-white/20 text-white"
+        )}
+
+        {watchedRewardType === 'custom' && (
+          <div className="space-y-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg" data-testid="section-custom-config">
+            <h3 className="text-white font-medium">Custom Service Configuration</h3>
+            <FormField
+              control={form.control}
+              name="rewardData.customData.serviceName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Service Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="e.g., Personal Video Message, 1-on-1 Coaching Session"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      data-testid="input-custom-service"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="rewardData.customData.deliveryMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Delivery Method</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange} data-testid="select-custom-delivery">
+                      <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="video_call">Video Call</SelectItem>
+                        <SelectItem value="platform">In-Platform</SelectItem>
+                        <SelectItem value="physical">Physical Delivery</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
             />
           </div>
-          <p className="text-sm text-purple-300">1 point = 1 raffle entry</p>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            data-testid="button-cancel-reward"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit"
+            disabled={form.formState.isSubmitting || !form.formState.isValid}
+            className="bg-brand-primary hover:bg-brand-primary/80"
+            data-testid="button-create-reward"
+          >
+            {form.formState.isSubmitting ? 'Creating...' : 'Create Reward'}
+          </Button>
         </div>
-      )}
-
-      {formData.rewardType === 'physical' && (
-        <div className="space-y-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <h3 className="text-white font-medium">Physical Item Configuration</h3>
-          <div>
-            <Label className="text-white">Item Name</Label>
-            <Input
-              placeholder="e.g., T-Shirt, Signed Poster, Merchandise"
-              value={formData.physicalData.itemName}
-              onChange={(e) => updateNestedData('physicalData', 'itemName', e.target.value)}
-              className="mt-2 bg-white/10 border-white/20 text-white"
-            />
-          </div>
-          <div>
-            <Label className="text-white">Stock Quantity</Label>
-            <Input
-              type="number"
-              min="0"
-              placeholder="100"
-              value={formData.physicalData.stockQuantity}
-              onChange={(e) => updateNestedData('physicalData', 'stockQuantity', parseInt(e.target.value) || 0)}
-              className="mt-2 bg-white/10 border-white/20 text-white"
-            />
-          </div>
-        </div>
-      )}
-
-      {formData.rewardType === 'custom' && (
-        <div className="space-y-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-          <h3 className="text-white font-medium">Custom Service Configuration</h3>
-          <div>
-            <Label className="text-white">Service Name</Label>
-            <Input
-              placeholder="e.g., Personal Video Message, 1-on-1 Coaching Session"
-              value={formData.customData.serviceName}
-              onChange={(e) => updateNestedData('customData', 'serviceName', e.target.value)}
-              className="mt-2 bg-white/10 border-white/20 text-white"
-            />
-          </div>
-          <div>
-            <Label className="text-white">Delivery Method</Label>
-            <Select 
-              value={formData.customData.deliveryMethod} 
-              onValueChange={(value: any) => updateNestedData('customData', 'deliveryMethod', value)}
-            >
-              <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="video_call">Video Call</SelectItem>
-                <SelectItem value="platform">In-Platform</SelectItem>
-                <SelectItem value="physical">Physical Delivery</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleSubmit}
-          disabled={!formData.name || !formData.rewardType}
-          className="bg-brand-primary hover:bg-brand-primary/80"
-        >
-          Create Reward
-        </Button>
-      </div>
-    </div>
+      </form>
+    </Form>
   );
 }
