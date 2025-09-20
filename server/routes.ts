@@ -783,9 +783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: true, 
         tenantId: true, 
         creatorId: true,
-        totalCompletions: true,
-        createdAt: true,
-        updatedAt: true 
+        totalCompletions: true
       }).partial();
       
       const updates = updateTaskSchema.parse(req.body);

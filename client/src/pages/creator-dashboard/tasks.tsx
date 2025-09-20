@@ -96,67 +96,26 @@ export default function TasksManagement() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
-  // Fetch creator's tasks
-  const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useQuery({
+  // Fetch creator's tasks using real API
+  const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useQuery<Task[]>({
     queryKey: ['/api/tasks', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      // For now, return mock data until backend API is ready
-      return [
-        {
-          id: '1',
-          name: 'Follow on Instagram',
-          description: 'Follow our official Instagram account',
-          taskType: 'follow',
-          platform: 'instagram',
-          targetUrl: 'https://instagram.com/yourhandle',
-          points: 50,
-          isActive: true,
-          assignedCampaigns: 2,
-          totalCompletions: 145,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Share Latest Post',
-          description: 'Share our latest post on your story',
-          taskType: 'share',
-          platform: 'instagram',
-          points: 200,
-          isActive: true,
-          assignedCampaigns: 1,
-          totalCompletions: 67,
-          createdAt: new Date().toISOString()
-        }
-      ];
+    queryFn: async (): Promise<Task[]> => {
+      const response = await apiRequest('/api/tasks');
+      return response.json();
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Fetch pending campaigns for assignment
-  const { data: pendingCampaigns = [] } = useQuery({
-    queryKey: ['/api/campaigns', user?.id, 'pending'],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      // Mock data for pending campaigns
-      return [
-        {
-          id: '1',
-          name: 'Summer Engagement Drive',
-          status: 'pending_tasks',
-          assignedTasks: 0,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '2', 
-          name: 'New Album Promotion',
-          status: 'pending_tasks',
-          assignedTasks: 1,
-          createdAt: new Date().toISOString()
-        }
-      ];
+  // Fetch pending campaigns for assignment using real API  
+  const { data: pendingCampaigns = [] } = useQuery<any[]>({
+    queryKey: ['/api/campaigns/pending', user?.id],
+    queryFn: async (): Promise<any[]> => {
+      const response = await apiRequest('/api/campaigns/pending');
+      return response.json();
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Task stats
@@ -167,49 +126,68 @@ export default function TasksManagement() {
     totalCompletions: tasks.reduce((sum: number, t: Task) => sum + t.totalCompletions, 0),
   };
 
-  const handleCreateTask = async (taskData: any) => {
-    try {
-      // TODO: Implement actual API call
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: any) => {
+      const response = await apiRequest('/api/tasks', 'POST', taskData);
+      return response.json();
+    },
+    onSuccess: () => {
       toast({
         title: "Task Created",
         description: "Your new task has been created successfully!",
         duration: 3000
       });
-      
       setCreateModalOpen(false);
-      refetchTasks();
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', user?.id] });
+    },
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to create task. Please try again.",
+        description: error?.message || "Failed to create task. Please try again.",
         variant: "destructive",
         duration: 3000
       });
     }
+  });
+
+  const handleCreateTask = async (taskData: any) => {
+    createTaskMutation.mutate(taskData);
   };
+
+  // Task assignment mutation
+  const assignTaskMutation = useMutation({
+    mutationFn: async ({ taskId, campaignId }: { taskId: string; campaignId: string }) => {
+      const response = await apiRequest(`/api/tasks/${taskId}/assign`, 'POST', { campaignId });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Task Assigned",
+        description: `${selectedTask?.name} has been assigned to the campaign!`,
+        duration: 3000
+      });
+      setAssignModalOpen(false);
+      setSelectedTask(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns/pending', user?.id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to assign task. Please try again.",
+        variant: "destructive",
+        duration: 3000
+      });
+    }
+  });
 
   const handleAssignTask = async (campaignId: string) => {
     if (!selectedTask) return;
-
-    try {
-      // TODO: Implement actual API call
-      toast({
-        title: "Task Assigned",
-        description: `${selectedTask.name} has been assigned to the campaign!`,
-        duration: 3000
-      });
-      
-      setAssignModalOpen(false);
-      setSelectedTask(null);
-      refetchTasks();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to assign task. Please try again.",
-        variant: "destructive",
-        duration: 3000
-      });
-    }
+    assignTaskMutation.mutate({ 
+      taskId: selectedTask.id, 
+      campaignId 
+    });
   };
 
   return (
