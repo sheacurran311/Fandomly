@@ -35,6 +35,27 @@ const rewardCreationFormSchema = insertRewardSchema.extend({
 
 type RewardFormData = z.infer<typeof rewardCreationFormSchema>;
 
+// Utility functions for reward type icons and colors
+const getRewardTypeIcon = (type: string) => {
+  switch (type) {
+    case 'raffle': return <Ticket className="h-5 w-5" />;
+    case 'physical': return <Package className="h-5 w-5" />;
+    case 'custom': return <Star className="h-5 w-5" />;
+    case 'nft': return <Gift className="h-5 w-5" />;
+    default: return <Gift className="h-5 w-5" />;
+  }
+};
+
+const getRewardTypeBadgeColor = (type: string) => {
+  switch (type) {
+    case 'raffle': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    case 'physical': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';  
+    case 'custom': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    case 'nft': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  }
+};
+
 export default function RewardsManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -60,25 +81,6 @@ export default function RewardsManagement() {
     pointsAllocated: rewards.reduce((sum: number, r: Reward) => sum + (r.pointsCost * (r.currentRedemptions || 0)), 0),
   };
 
-  const getRewardTypeIcon = (type: string) => {
-    switch (type) {
-      case 'raffle': return <Ticket className="h-5 w-5" />;
-      case 'physical': return <Package className="h-5 w-5" />;
-      case 'custom': return <Star className="h-5 w-5" />;
-      case 'nft': return <Gift className="h-5 w-5" />;
-      default: return <Gift className="h-5 w-5" />;
-    }
-  };
-
-  const getRewardTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case 'raffle': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-      case 'physical': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';  
-      case 'custom': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'nft': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
 
   const handleCreateReward = async (rewardData: any) => {
     try {

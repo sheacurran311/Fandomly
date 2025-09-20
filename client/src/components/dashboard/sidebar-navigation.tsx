@@ -28,7 +28,8 @@ import {
   Shield,
   Facebook,
   Plus,
-  MoreHorizontal
+  MoreHorizontal,
+  CheckSquare
 } from "lucide-react";
 
 interface SidebarItem {
@@ -53,6 +54,7 @@ const creatorItems: SidebarItem[] = [
   { label: "Revenue", href: "/creator-dashboard/revenue", icon: DollarSign, color: "text-yellow-400" },
   { label: "Rewards", href: "/creator-dashboard/rewards", icon: Gift, color: "text-emerald-400" },
   { label: "Campaigns", href: "/creator-dashboard/campaigns", icon: Megaphone, color: "text-orange-400" },
+  { label: "Tasks", href: "/creator-dashboard/tasks", icon: CheckSquare, color: "text-indigo-400" },
   { label: "Social Accounts", href: "/creator-dashboard/social", icon: Instagram, color: "text-pink-400" },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/creator-dashboard/settings", icon: Settings },
