@@ -355,6 +355,20 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tenantMemberships).where(eq(tenantMemberships.userId, userId));
   }
 
+  async getUserTenantMembership(userId: string, tenantId: string): Promise<TenantMembership | undefined> {
+    const [membership] = await db.select().from(tenantMemberships)
+      .where(and(eq(tenantMemberships.userId, userId), eq(tenantMemberships.tenantId, tenantId)));
+    return membership || undefined;
+  }
+
+  async updateUserTenantMembership(userId: string, tenantId: string, updates: Partial<InsertTenantMembership>): Promise<TenantMembership> {
+    const [membership] = await db.update(tenantMemberships)
+      .set(updates as any)
+      .where(and(eq(tenantMemberships.userId, userId), eq(tenantMemberships.tenantId, tenantId)))
+      .returning();
+    return membership;
+  }
+
   // Campaign operations
   async getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]> {
     const conditions = tenantId 

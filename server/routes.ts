@@ -709,6 +709,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get rewards by creator (for fan dashboard)
+  app.get("/api/rewards/creator/:creatorId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const creator = await storage.getCreator(req.params.creatorId);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      // Get active rewards for this creator's tenant
+      const rewards = await storage.getAllRewards(creator.tenantId);
+      const activeRewards = rewards.filter(reward => reward.isActive);
+      res.json(activeRewards);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch rewards" });
+    }
+  });
+
+  // Create reward (creator-only)
+  app.post("/api/rewards", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify user is a creator
+      if (user.userType !== 'creator') {
+        return res.status(403).json({ error: "Access denied. Creator account required." });
+      }
+
+      const creator = await storage.getCreatorByUserId(user.id);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile not found" });
+      }
+
+      // Validate request body
+      const rewardData = insertRewardSchema.parse({
+        ...req.body,
+        tenantId: creator.tenantId, // Override client-supplied tenantId for security
+      });
+
+      const reward = await storage.createReward(rewardData);
+      res.status(201).json(reward);
+    } catch (error) {
+      console.error("Reward creation error:", error);
+      res.status(400).json({ 
+        error: error instanceof Error ? error.message : "Invalid reward data" 
+      });
+    }
+  });
+
+  // Update reward (creator-only)
+  app.put("/api/rewards/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify user is a creator
+      if (user.userType !== 'creator') {
+        return res.status(403).json({ error: "Access denied. Creator account required." });
+      }
+
+      const creator = await storage.getCreatorByUserId(user.id);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile not found" });
+      }
+
+      // Verify the reward belongs to this creator's tenant
+      const existingReward = await storage.getReward(req.params.id, creator.tenantId);
+      if (!existingReward) {
+        return res.status(404).json({ error: "Reward not found" });
+      }
+
+      // Validate update data (partial schema)
+      const updateData = insertRewardSchema.partial().parse(req.body);
+      
+      const updatedReward = await storage.updateReward(req.params.id, updateData);
+      res.json(updatedReward);
+    } catch (error) {
+      console.error("Reward update error:", error);
+      res.status(400).json({ 
+        error: error instanceof Error ? error.message : "Invalid reward data" 
+      });
+    }
+  });
+
+  // Delete reward (creator-only)
+  app.delete("/api/rewards/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify user is a creator
+      if (user.userType !== 'creator') {
+        return res.status(403).json({ error: "Access denied. Creator account required." });
+      }
+
+      const creator = await storage.getCreatorByUserId(user.id);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile not found" });
+      }
+
+      // Verify the reward belongs to this creator's tenant
+      const existingReward = await storage.getReward(req.params.id, creator.tenantId);
+      if (!existingReward) {
+        return res.status(404).json({ error: "Reward not found" });
+      }
+
+      // Soft delete by setting isActive to false
+      await storage.updateReward(req.params.id, { isActive: false });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Reward deletion error:", error);
+      res.status(500).json({ error: "Failed to delete reward" });
+    }
+  });
+
+  // Redeem reward (fan-only)
+  app.post("/api/rewards/:id/redeem", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get the reward details
+      const reward = await storage.getReward(req.params.id);
+      if (!reward || !reward.isActive) {
+        return res.status(404).json({ error: "Reward not found or inactive" });
+      }
+
+      // Get user's tenant membership for this reward's tenant
+      const membership = await storage.getUserTenantMembership(user.id, reward.tenantId);
+      if (!membership) {
+        return res.status(403).json({ error: "Not authorized to redeem from this creator" });
+      }
+
+      // Validate redemption request
+      const { entries = 1 } = req.body; // For raffles, allow multiple entries
+      const totalCost = reward.pointsCost * entries;
+
+      // Check if user has enough points
+      if ((membership.memberData?.points || 0) < totalCost) {
+        return res.status(400).json({ 
+          error: "Insufficient points", 
+          required: totalCost, 
+          available: (membership.memberData?.points || 0) 
+        });
+      }
+
+      // Check stock/max redemptions
+      if (reward.maxRedemptions && (reward.currentRedemptions || 0) >= reward.maxRedemptions) {
+        return res.status(400).json({ error: "Reward no longer available" });
+      }
+
+      // For raffle rewards, check max entries
+      if (reward.rewardType === 'raffle' && reward.rewardData?.raffleData?.maxEntries) {
+        const maxEntries = reward.rewardData.raffleData.maxEntries;
+        if (entries > maxEntries) {
+          return res.status(400).json({ 
+            error: `Maximum ${maxEntries} entries allowed per person` 
+          });
+        }
+      }
+
+      // Atomic transaction: deduct points and increment redemptions
+      const updatedMembership = await storage.updateUserTenantMembership(user.id, reward.tenantId, {
+        memberData: {
+          ...membership.memberData,
+          points: (membership.memberData?.points || 0) - totalCost
+        }
+      });
+
+      const updatedReward = await storage.updateReward(reward.id, {
+        currentRedemptions: (reward.currentRedemptions || 0) + entries
+      });
+
+      // Find or create user's fanProgram for this loyalty program
+      let fanProgram = await storage.getFanProgram(user.id, reward.programId);
+      if (!fanProgram) {
+        fanProgram = await storage.createFanProgram({
+          tenantId: reward.tenantId,
+          fanId: user.id,
+          programId: reward.programId,
+          currentPoints: membership.memberData?.points || 0,
+          totalPointsEarned: 0
+        });
+      }
+
+      // Create redemption record
+      await storage.createPointTransaction({
+        tenantId: reward.tenantId,
+        fanProgramId: fanProgram.id,
+        points: -totalCost,
+        type: 'spent',
+        source: 'reward_redemption',
+        metadata: {
+          rewardId: reward.id
+        }
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully redeemed ${reward.name}`,
+        pointsSpent: totalCost,
+        remainingPoints: updatedMembership.memberData?.points || 0,
+        entries: entries
+      });
+    } catch (error) {
+      console.error("Reward redemption error:", error);
+      res.status(500).json({ error: "Failed to redeem reward" });
+    }
+  });
+
   // Campaign routes
   app.get("/api/campaigns/creator/:creatorId", async (req, res) => {
     try {
