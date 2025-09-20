@@ -226,10 +226,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const steps = [
     { id: 1, title: "Campaign Basics", icon: Target },
     { id: 2, title: "Social Platforms", icon: Share2 },
-    { id: 3, title: "Tasks Configuration", icon: Settings },
-    { id: 4, title: "Rewards & Points", icon: Gift },
-    { id: 5, title: "Requirements", icon: Trophy },
-    { id: 6, title: "Review & Launch", icon: Check }
+    { id: 3, title: "Rewards & Points", icon: Gift },
+    { id: 4, title: "Requirements", icon: Trophy },
+    { id: 5, title: "Review & Launch", icon: Check }
   ];
 
   const platformIcons = {
@@ -299,22 +298,13 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         }
         break;
 
-      case 3: // Tasks
-        const hasTasks = Object.values(campaignData.tasks).some(platformTasks => 
-          platformTasks && Array.isArray(platformTasks) && platformTasks.length > 0
-        );
-        if (!hasTasks) {
-          errors.tasks = "At least one task must be configured";
-        }
-        break;
-
-      case 4: // Rewards
+      case 3: // Rewards
         if (!campaignData.rewardStructure.defaultPoints || campaignData.rewardStructure.defaultPoints <= 0) {
           errors.defaultPoints = "Default points must be greater than 0";
         }
         break;
 
-      case 5: // Requirements
+      case 4: // Requirements
         // Requirements are optional, but we could add validation here if needed
         break;
     }
@@ -455,180 +445,6 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       case 3:
         return (
           <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Configure Tasks</h3>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {taskTypes.map((taskType) => {
-                const applicablePlatforms = Object.keys(campaignData.platforms)
-                  .filter(p => campaignData.platforms[p as keyof typeof campaignData.platforms])
-                  .filter(p => taskType.platforms.includes(p) || taskType.platforms.includes('all'));
-                
-                if (applicablePlatforms.length === 0) return null;
-
-                return (
-                  <Card key={taskType.id} className="bg-white/5 border-white/20">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-white text-lg">{taskType.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {applicablePlatforms.map((platform) => {
-                          const isEnabled = campaignData.tasks[platform]?.some((t: any) => t.type === taskType.id);
-                          const taskData = campaignData.tasks[platform]?.find((t: any) => t.type === taskType.id);
-                          
-                          return (
-                            <div key={`${taskType.id}-${platform}`} className="border border-white/10 rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center space-x-3">
-                                  <Switch
-                                    data-testid={`task-${taskType.id}-${platform}`}
-                                    checked={isEnabled}
-                                    onCheckedChange={(checked) => {
-                                      const currentTasks = campaignData.tasks[platform] || [];
-                                      const newTasks = checked
-                                        ? [...currentTasks, { 
-                                            type: taskType.id, 
-                                            platform,
-                                            taskType: taskType.id,
-                                            rewardValue: campaignData.rewardStructure.defaultPoints,
-                                            rewardType: 'points',
-                                            targetUrl: '',
-                                            hashtags: [],
-                                            inviteCode: '',
-                                            customInstructions: ''
-                                          }]
-                                        : currentTasks.filter((t: any) => t.type !== taskType.id);
-                                      updateCampaignData(`tasks.${platform}`, newTasks);
-                                    }}
-                                  />
-                                  <span className="text-gray-300 capitalize font-medium">{platform}</span>
-                                </div>
-                                {isEnabled && (
-                                  <div className="flex items-center space-x-2">
-                                    <Input
-                                      data-testid={`input-task-points-${taskType.id}-${platform}`}
-                                      type="number"
-                                      placeholder="Points"
-                                      value={taskData?.rewardValue || campaignData.rewardStructure.defaultPoints}
-                                      className="w-20 bg-white/10 border-white/20 text-white text-sm"
-                                      onChange={(e) => {
-                                        const tasks = campaignData.tasks[platform] || [];
-                                        const updatedTasks = tasks.map((t: any) =>
-                                          t.type === taskType.id ? { ...t, rewardValue: parseInt(e.target.value) || 0 } : t
-                                        );
-                                        updateCampaignData(`tasks.${platform}`, updatedTasks);
-                                      }}
-                                    />
-                                    <div className="w-28 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
-                                      Points
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {isEnabled && (
-                                <div className="space-y-3 border-t border-white/10 pt-3">
-                                  {/* URL field for applicable task types */}
-                                  {(['like_post', 'repost', 'playlist', 'album'].includes(taskType.id)) && (
-                                    <div>
-                                      <Label className="text-gray-300 text-sm">
-                                        {taskType.id === 'playlist' ? 'Playlist URL' : 
-                                         taskType.id === 'album' ? 'Album URL' : 'Post/Content URL'}
-                                      </Label>
-                                      <Input
-                                        data-testid={`input-task-url-${taskType.id}-${platform}`}
-                                        placeholder={`Enter ${taskType.id === 'playlist' ? 'playlist' : taskType.id === 'album' ? 'album' : 'post'} URL...`}
-                                        value={taskData?.targetUrl || ''}
-                                        className="mt-1 bg-white/10 border-white/20 text-white text-sm"
-                                        onChange={(e) => {
-                                          const tasks = campaignData.tasks[platform] || [];
-                                          const updatedTasks = tasks.map((t: any) =>
-                                            t.type === taskType.id ? { ...t, targetUrl: e.target.value } : t
-                                          );
-                                          updateCampaignData(`tasks.${platform}`, updatedTasks);
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                  
-                                  {/* Hashtags field for hashtag_post tasks */}
-                                  {taskType.id === 'hashtag_post' && (
-                                    <div>
-                                      <Label className="text-gray-300 text-sm">Required Hashtags</Label>
-                                      <Input
-                                        data-testid={`input-task-hashtags-${taskType.id}-${platform}`}
-                                        placeholder="Enter hashtags separated by commas: #fanseason1, #loyalty"
-                                        value={(taskData?.hashtags || []).join(', ')}
-                                        className="mt-1 bg-white/10 border-white/20 text-white text-sm"
-                                        onChange={(e) => {
-                                          const hashtags = e.target.value.split(',').map(h => h.trim()).filter(Boolean);
-                                          const tasks = campaignData.tasks[platform] || [];
-                                          const updatedTasks = tasks.map((t: any) =>
-                                            t.type === taskType.id ? { ...t, hashtags } : t
-                                          );
-                                          updateCampaignData(`tasks.${platform}`, updatedTasks);
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                  
-                                  {/* Invite code for Discord/Telegram */}
-                                  {taskType.id === 'join' && ['discord', 'telegram'].includes(platform) && (
-                                    <div>
-                                      <Label className="text-gray-300 text-sm">
-                                        {platform === 'discord' ? 'Discord Server Invite' : 'Telegram Group Link'}
-                                      </Label>
-                                      <Input
-                                        data-testid={`input-task-invite-${taskType.id}-${platform}`}
-                                        placeholder={platform === 'discord' ? 'discord.gg/invitation' : 't.me/groupname'}
-                                        value={taskData?.inviteCode || ''}
-                                        className="mt-1 bg-white/10 border-white/20 text-white text-sm"
-                                        onChange={(e) => {
-                                          const tasks = campaignData.tasks[platform] || [];
-                                          const updatedTasks = tasks.map((t: any) =>
-                                            t.type === taskType.id ? { ...t, inviteCode: e.target.value } : t
-                                          );
-                                          updateCampaignData(`tasks.${platform}`, updatedTasks);
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                  
-                                  {/* Custom instructions */}
-                                  <div>
-                                    <Label className="text-gray-300 text-sm">Additional Instructions (Optional)</Label>
-                                    <Textarea
-                                      data-testid={`input-task-instructions-${taskType.id}-${platform}`}
-                                      placeholder="Any special instructions for fans completing this task..."
-                                      value={taskData?.customInstructions || ''}
-                                      className="mt-1 bg-white/10 border-white/20 text-white text-sm"
-                                      rows={2}
-                                      onChange={(e) => {
-                                        const tasks = campaignData.tasks[platform] || [];
-                                        const updatedTasks = tasks.map((t: any) =>
-                                          t.type === taskType.id ? { ...t, customInstructions: e.target.value } : t
-                                        );
-                                        updateCampaignData(`tasks.${platform}`, updatedTasks);
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-            <ErrorMessage error={validationErrors.tasks} />
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Rewards & Points Structure</h3>
             
             <Card className="bg-white/5 border-white/20">
@@ -672,7 +488,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Campaign Requirements</h3>
@@ -714,7 +530,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           </div>
         );
 
-      case 6:
+      case 5:
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Review & Launch</h3>
@@ -743,18 +559,16 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-400">Total Tasks:</span>
-                    <p className="text-white font-medium">
-                      {Object.values(campaignData.tasks).flat().length}
-                    </p>
+                    <span className="text-gray-400">Status:</span>
+                    <p className="text-white font-medium">Pending Tasks</p>
                   </div>
                 </div>
 
                 <Separator className="bg-white/20" />
 
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-                  <p className="text-amber-200 text-sm">
-                    <strong>Ready to launch:</strong> Your campaign will be created and made available to your fans immediately.
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <p className="text-blue-200 text-sm">
+                    <strong>Campaign Setup:</strong> Your campaign will be created in "Pending Tasks" status. Assign tasks from the Tasks page before publishing to fans.
                   </p>
                 </div>
               </CardContent>
@@ -828,7 +642,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           </Button>
           
           <div className="flex space-x-3">
-            {currentStep < 6 ? (
+            {currentStep < 5 ? (
               <Button
                 data-testid="button-next-step"
                 onClick={nextStep}
@@ -840,40 +654,25 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               </Button>
             ) : (
               <Button
-                data-testid="button-launch-campaign"
-                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-create-campaign"
+                className="bg-blue-600 hover:bg-blue-700"
                 onClick={async () => {
                   try {
-                    // Convert tasks data to the format expected by the API
-                    const socialTasks: any[] = [];
-                    Object.entries(campaignData.tasks).forEach(([platform, tasks]) => {
-                      (tasks as any[]).forEach((task, index) => {
-                        socialTasks.push({
-                          platform,
-                          taskType: task.type,
-                          targetUrl: task.targetUrl || null,
-                          hashtags: task.hashtags || [],
-                          inviteCode: task.inviteCode || null,
-                          customInstructions: task.customInstructions || null,
-                          rewardType: task.rewardType || 'points',
-                          rewardValue: task.rewardValue || campaignData.rewardStructure.defaultPoints,
-                          displayOrder: index + 1
-                        });
-                      });
-                    });
-
-                    // Prepare campaign data
-                    const enhancedCampaignData = {
-                      ...campaignData,
+                    // Prepare simplified campaign data for "Pending Tasks" status
+                    const simplifiedCampaignData = {
+                      name: campaignData.name,
+                      description: campaignData.description,
                       startDate: campaignData.startDate || new Date().toISOString(),
-                      endDate: campaignData.endDate || null
+                      endDate: campaignData.endDate || null,
+                      status: 'pending_tasks', // Key: Set default status to pending_tasks
+                      platforms: campaignData.platforms,
+                      rewardStructure: campaignData.rewardStructure,
+                      requirements: campaignData.requirements,
+                      creatorId: user?.id
                     };
 
-                    // Call the enhanced campaign creation API
-                    const response = await apiRequest("POST", "/api/campaigns/enhanced", {
-                      campaignData: enhancedCampaignData,
-                      socialTasks
-                    });
+                    // Call simplified campaign creation API (no tasks required)
+                    const response = await apiRequest("POST", "/api/campaigns", simplifiedCampaignData);
 
                     if (response.ok) {
                       const result = await response.json();
@@ -887,7 +686,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                       }
                       
                       // Show success message and close modal
-                      alert(`🎉 Campaign "${campaignData.name}" created successfully with ${socialTasks.length} tasks!`);
+                      alert(`🎉 Campaign "${campaignData.name}" created successfully! Assign tasks from the Tasks page before publishing.`);
                       onClose();
                     } else {
                       throw new Error('Failed to create campaign');
@@ -898,8 +697,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   }
                 }}
               >
-                <Trophy className="h-4 w-4 mr-2" />
-                Launch Campaign
+                <Plus className="h-4 w-4 mr-2" />
+                Create Campaign
               </Button>
             )}
           </div>
