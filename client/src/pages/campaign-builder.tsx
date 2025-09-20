@@ -18,7 +18,8 @@ import {
   Calendar, Clock, Users, Target, Gift, Zap, 
   TrendingUp, Heart, Share2, Trophy, Star, Coins,
   ArrowLeft, ArrowRight, Check, Plus, X, Settings,
-  Facebook, Instagram, Twitter, Youtube, Music, MessageCircle
+  Facebook, Instagram, Twitter, Youtube, Music, MessageCircle,
+  AlertCircle
 } from "lucide-react";
 
 // OpenLoyalty-style Campaign Templates
@@ -201,8 +202,80 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     { id: 'referral', name: 'Referral (1 point each)', platforms: ['all'] }
   ];
 
-  const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 6));
-  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+  // Error display component
+  const ErrorMessage = ({ error }: { error?: string }) => {
+    if (!error) return null;
+    return (
+      <div className="flex items-center space-x-2 text-red-400 text-sm mt-1">
+        <AlertCircle className="h-4 w-4" />
+        <span>{error}</span>
+      </div>
+    );
+  };
+
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Validation functions for each step
+  const validateStep = (step: number): { isValid: boolean; errors: Record<string, string> } => {
+    const errors: Record<string, string> = {};
+
+    switch (step) {
+      case 1: // Basics
+        if (!campaignData.name.trim()) {
+          errors.name = "Campaign name is required";
+        }
+        if (!campaignData.description.trim()) {
+          errors.description = "Campaign description is required";
+        }
+        if (campaignData.type.length === 0) {
+          errors.type = "At least one campaign type is required";
+        }
+        break;
+
+      case 2: // Platforms
+        const selectedPlatforms = Object.values(campaignData.platforms).filter(Boolean);
+        if (selectedPlatforms.length === 0) {
+          errors.platforms = "At least one platform must be selected";
+        }
+        break;
+
+      case 3: // Tasks
+        const hasTasks = Object.values(campaignData.tasks).some(platformTasks => 
+          platformTasks && Array.isArray(platformTasks) && platformTasks.length > 0
+        );
+        if (!hasTasks) {
+          errors.tasks = "At least one task must be configured";
+        }
+        break;
+
+      case 4: // Rewards
+        if (!campaignData.rewardStructure.defaultPoints || campaignData.rewardStructure.defaultPoints <= 0) {
+          errors.defaultPoints = "Default points must be greater than 0";
+        }
+        break;
+
+      case 5: // Requirements
+        // Requirements are optional, but we could add validation here if needed
+        break;
+    }
+
+    return { isValid: Object.keys(errors).length === 0, errors };
+  };
+
+  const nextStep = () => {
+    const validation = validateStep(currentStep);
+    setValidationErrors(validation.errors);
+    
+    if (validation.isValid) {
+      setCurrentStep(prev => Math.min(prev + 1, 6));
+    }
+  };
+
+  const prevStep = () => {
+    setValidationErrors({}); // Clear errors when going back
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
 
   const updateCampaignData = (path: string, value: any) => {
     setCampaignData(prev => {
@@ -234,6 +307,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 onChange={(e) => updateCampaignData('name', e.target.value)}
                 className="mt-2 bg-white/10 border-white/20 text-white"
               />
+              <ErrorMessage error={validationErrors.name} />
             </div>
             
             <div>
@@ -247,6 +321,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 className="mt-2 bg-white/10 border-white/20 text-white"
                 rows={3}
               />
+              <ErrorMessage error={validationErrors.description} />
             </div>
 
             <div>
@@ -268,6 +343,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   </div>
                 ))}
               </div>
+              <ErrorMessage error={validationErrors.type} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -324,6 +400,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   );
                 })}
               </div>
+              <ErrorMessage error={validationErrors.platforms} />
             </div>
           </div>
         );
@@ -515,6 +592,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 );
               })}
             </div>
+            <ErrorMessage error={validationErrors.tasks} />
           </div>
         );
 
@@ -571,6 +649,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 </div>
               </CardContent>
             </Card>
+            <ErrorMessage error={validationErrors.defaultPoints} />
           </div>
         );
 
@@ -734,7 +813,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <Button
                 data-testid="button-next-step"
                 onClick={nextStep}
-                className="bg-brand-primary hover:bg-brand-primary/80"
+                disabled={!validateStep(currentStep).isValid}
+                className="bg-brand-primary hover:bg-brand-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
                 <ArrowRight className="h-4 w-4 ml-2" />
