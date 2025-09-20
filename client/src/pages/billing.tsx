@@ -12,6 +12,14 @@ import { CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-r
 
 // Initialize Stripe with testing keys in development, production keys in production
 const getStripePublicKey = () => {
+  // Debug: Log available env vars
+  console.log('Stripe env debug:', {
+    DEV: import.meta.env.DEV,
+    MODE: import.meta.env.MODE,
+    TESTING_VITE_STRIPE_PUBLIC_KEY: import.meta.env.TESTING_VITE_STRIPE_PUBLIC_KEY,
+    VITE_STRIPE_PUBLIC_KEY: import.meta.env.VITE_STRIPE_PUBLIC_KEY
+  });
+  
   // In development, prefer testing keys
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
     return import.meta.env.TESTING_VITE_STRIPE_PUBLIC_KEY || import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -22,10 +30,11 @@ const getStripePublicKey = () => {
 
 const stripePublicKey = getStripePublicKey();
 if (!stripePublicKey) {
-  throw new Error('Missing required Stripe key. Please set VITE_STRIPE_PUBLIC_KEY for production or TESTING_VITE_STRIPE_PUBLIC_KEY for development.');
+  console.warn('Stripe key not configured. Billing features will be unavailable.');
+  // Don't throw error in development to allow testing of other features
 }
 
-const stripePromise = loadStripe(stripePublicKey);
+const stripePromise = stripePublicKey ? loadStripe(stripePublicKey) : Promise.resolve(null);
 
 // Type definitions for API responses
 interface SubscriptionStatusResponse {
