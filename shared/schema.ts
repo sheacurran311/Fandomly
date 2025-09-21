@@ -450,8 +450,22 @@ export const socialPlatformEnum = pgEnum('social_platform', [
   'facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify', 
   'apple_music', 'discord', 'telegram'
 ]);
+// Enhanced task type enum with consistent platform-specific naming
 export const taskTypeEnum = pgEnum('task_type', [
-  'follow', 'playlist', 'album', 'join', 'like_post', 'repost', 'hashtag_post', 'referral'
+  // Twitter/X tasks (consistent prefixing)
+  'twitter_follow', 'twitter_mention', 'twitter_retweet', 'twitter_like', 'twitter_include_name', 'twitter_include_bio', 'twitter_hashtag_post',
+  // Facebook tasks  
+  'facebook_like_page', 'facebook_like_photo', 'facebook_like_post', 'facebook_share_post', 'facebook_share_page', 'facebook_comment_post', 'facebook_comment_photo',
+  // Instagram tasks
+  'instagram_follow', 'instagram_like_post',
+  // YouTube tasks
+  'youtube_like', 'youtube_subscribe', 'youtube_share',
+  // TikTok tasks
+  'tiktok_follow', 'tiktok_like', 'tiktok_share',
+  // Spotify tasks  
+  'spotify_follow', 'spotify_playlist', 'spotify_album',
+  // Generic tasks (legacy)
+  'follow', 'join', 'repost', 'referral'
 ]);
 
 export const campaigns = pgTable("campaigns", {
@@ -620,6 +634,37 @@ export const tasks = pgTable("tasks", {
   isActive: boolean("is_active").default(true),
   totalCompletions: integer("total_completions").default(0),
   
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Task Templates Table - Platform-specific task templates
+export const taskTemplates = pgTable("task_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Template Identity
+  name: text("name").notNull(), // e.g., "Follow on Twitter", "Like Facebook Page"
+  description: text("description").notNull(),
+  category: text("category").notNull().default('social'), // 'social', 'onboarding', etc.
+  
+  // Platform & Task Configuration
+  platform: socialPlatformEnum("platform").notNull(),
+  taskType: taskTypeEnum("task_type").notNull(),
+  
+  // Template Configuration - Flexible config for all platform-specific fields
+  defaultConfig: jsonb("default_config").$type<Record<string, any>>(),
+  
+  // Removed defaultPoints - using defaultConfig.points as canonical source
+  
+  // Template Scope & Permissions
+  isGlobal: boolean("is_global").notNull().default(true), // Global vs tenant-specific
+  tenantId: varchar("tenant_id").references(() => tenants.id), // Null for global templates
+  creatorId: varchar("creator_id").references(() => creators.id), // Creator who created custom template
+  
+  // Template Status
+  isActive: boolean("is_active").notNull().default(true),
+  
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -958,9 +1003,18 @@ export type InsertCampaignRule = z.infer<typeof insertCampaignRuleSchema>;
 export type CampaignParticipation = typeof campaignParticipations.$inferSelect;
 export type InsertCampaignParticipation = z.infer<typeof insertCampaignParticipationSchema>;
 
+// Task Template Schemas
+export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Task Types
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type TaskTemplate = typeof taskTemplates.$inferSelect;
+export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
 
