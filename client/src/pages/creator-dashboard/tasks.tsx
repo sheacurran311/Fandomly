@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
+import { TemplatePicker } from "@/components/templates/TemplatePicker";
 
 // Task types configuration
 const taskTypes = [
@@ -208,23 +209,23 @@ export default function TasksManagement() {
                 </p>
               </div>
               
-              <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="bg-brand-primary hover:bg-brand-primary/80"
-                    data-testid="button-create-task"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Task
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-2xl bg-brand-dark-bg border-white/10">
-                  <DialogHeader>
-                    <DialogTitle className="text-white">Create New Task</DialogTitle>
-                  </DialogHeader>
-                  <TaskCreationForm onSubmit={handleCreateTask} onCancel={() => setCreateModalOpen(false)} />
-                </DialogContent>
-              </Dialog>
+              <Button 
+                onClick={() => setCreateModalOpen(true)}
+                className="bg-brand-primary hover:bg-brand-primary/80"
+                data-testid="button-create-task"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Task
+              </Button>
+              
+              {/* Template Picker Modal */}
+              <TemplatePicker
+                open={createModalOpen}
+                onOpenChange={setCreateModalOpen}
+                onTaskCreated={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/tasks', user?.id] });
+                }}
+              />
             </div>
           </div>
 
