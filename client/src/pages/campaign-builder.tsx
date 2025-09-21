@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { type Task } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -718,6 +719,11 @@ export function CampaignBuilderModal({ isOpen, onClose }: { isOpen: boolean; onC
 export default function CampaignBuilder() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // Task assignment modal state
+  const [showTaskAssignModal, setShowTaskAssignModal] = useState(false);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const { user: dynamicUser } = useDynamicContext();
   const { data: userData } = useQuery<User>({ queryKey: ["/api/auth/user", dynamicUser?.userId], enabled: !!dynamicUser?.userId });
   const { data: creator } = useQuery<Creator>({ queryKey: ["/api/creators/user", userData?.id], enabled: !!userData?.id });
@@ -728,6 +734,16 @@ export default function CampaignBuilder() {
   const [likePost, setLikePost] = useState(false);
   const [retweet, setRetweet] = useState(false);
   const [points, setPoints] = useState(50);
+
+  // Fetch available tasks for assignment
+  const { data: availableTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ['/api/tasks', userData?.id],
+    queryFn: async (): Promise<Task[]> => {
+      const response = await apiRequest('/api/tasks', 'GET');
+      return response.json();
+    },
+    enabled: !!userData?.id && showTaskAssignModal,
+  });
 
   const createCampaign = useMutation({
     mutationFn: async () => {
@@ -766,7 +782,9 @@ export default function CampaignBuilder() {
       if (likePost) selectedActions.push('Like Post');
       if (retweet) selectedActions.push('Retweet');
 
-      alert(`🎉 Quick Social Campaign created successfully!\n\n📋 Selected Actions: ${selectedActions.join(', ')}\n💰 Points per action: ${points}\n\n➡️ Next Step: Go to Tasks page to create and assign tasks before publishing.`);
+      // Show task assignment modal for bidirectional workflow  
+      setCreatedCampaignId(campaign.id);
+      setShowTaskAssignModal(true);
       
       // Invalidate campaigns cache to refresh list
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
@@ -777,6 +795,39 @@ export default function CampaignBuilder() {
       setFollowFacebook(false);
       setLikePost(false);
       setRetweet(false);
+    },
+  });
+
+  // Task assignment mutation for bidirectional workflow
+  const assignTasksMutation = useMutation({
+    mutationFn: async ({ campaignId, taskIds }: { campaignId: string; taskIds: string[] }) => {
+      // Assign each selected task to the campaign
+      const assignments = await Promise.all(
+        taskIds.map(taskId => 
+          apiRequest(`/api/tasks/${taskId}/assign`, 'POST', { campaignId }).then(r => r.json())
+        )
+      );
+      return assignments;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', userData?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns/pending'] });
+    },
+  });
+
+  // Publish campaign mutation for bidirectional workflow
+  const publishCampaignMutation = useMutation({
+    mutationFn: async (campaignId: string) => {
+      const response = await apiRequest(`/api/campaigns/${campaignId}/publish`, 'POST');
+      return response.json();
+    },
+    onSuccess: () => {
+      setShowTaskAssignModal(false);
+      setCreatedCampaignId(null);
+      setSelectedTaskIds([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns/pending'] });
     },
   });
 
@@ -879,6 +930,134 @@ export default function CampaignBuilder() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Task Assignment Modal for Bidirectional Workflow */}
+        <Dialog open={showTaskAssignModal} onOpenChange={setShowTaskAssignModal}>
+          <DialogContent className="w-[95vw] max-w-4xl bg-brand-dark-bg border-white/20">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl">Assign Tasks & Publish Campaign</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              <div>
+                <p className="text-gray-300 mb-4">
+                  Select tasks to assign to your campaign. You need at least 1 task to publish.
+                </p>
+                
+                {tasksLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
+                    <p className="text-gray-400 mt-2">Loading available tasks...</p>
+                  </div>
+                ) : availableTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-300 mb-2">No tasks available</p>
+                    <p className="text-gray-400 text-sm">Create tasks first, then assign them to campaigns</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 max-h-96 overflow-y-auto">
+                    {availableTasks.map((task) => (
+                      <Card 
+                        key={task.id}
+                        className={`cursor-pointer transition-all border ${
+                          selectedTaskIds.includes(task.id) 
+                            ? 'bg-brand-primary/20 border-brand-primary' 
+                            : 'bg-white/10 border-white/20 hover:border-brand-primary/50'
+                        }`}
+                        onClick={() => {
+                          setSelectedTaskIds(prev => 
+                            prev.includes(task.id)
+                              ? prev.filter(id => id !== task.id)
+                              : [...prev, task.id]
+                          );
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h3 className="text-white font-medium">{task.name}</h3>
+                              <p className="text-gray-400 text-sm mt-1">{task.description}</p>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                <span>Type: {task.taskType}</span>
+                                <span>Completions: {task.totalCompletions || 0}</span>
+                                <span className={`px-2 py-1 rounded ${task.isActive ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'}`}>
+                                  {task.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                            </div>
+                            {selectedTaskIds.includes(task.id) && (
+                              <Check className="h-5 w-5 text-brand-primary flex-shrink-0 ml-3" />
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                <div className="text-sm text-gray-400">
+                  {selectedTaskIds.length} task{selectedTaskIds.length !== 1 ? 's' : ''} selected
+                  {selectedTaskIds.length >= 1 && (
+                    <span className="text-green-400 ml-2">✓ Ready to publish</span>
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowTaskAssignModal(false)}
+                    className="border-white/20 text-white"
+                  >
+                    Skip for Now
+                  </Button>
+                  
+                  {selectedTaskIds.length > 0 && (
+                    <>
+                      <Button
+                        onClick={async () => {
+                          if (createdCampaignId) {
+                            await assignTasksMutation.mutateAsync({
+                              campaignId: createdCampaignId,
+                              taskIds: selectedTaskIds
+                            });
+                            alert(`✅ ${selectedTaskIds.length} task${selectedTaskIds.length !== 1 ? 's' : ''} assigned successfully!`);
+                          }
+                        }}
+                        disabled={assignTasksMutation.isPending}
+                        className="bg-brand-secondary hover:bg-brand-secondary/80"
+                      >
+                        {assignTasksMutation.isPending ? 'Assigning...' : `Assign ${selectedTaskIds.length} Task${selectedTaskIds.length !== 1 ? 's' : ''}`}
+                      </Button>
+                      
+                      <Button
+                        onClick={async () => {
+                          if (createdCampaignId) {
+                            // First assign tasks, then publish
+                            await assignTasksMutation.mutateAsync({
+                              campaignId: createdCampaignId,
+                              taskIds: selectedTaskIds
+                            });
+                            await publishCampaignMutation.mutateAsync(createdCampaignId);
+                          }
+                        }}
+                        disabled={assignTasksMutation.isPending || publishCampaignMutation.isPending}
+                        className="bg-brand-primary hover:bg-brand-primary/80"
+                      >
+                        {assignTasksMutation.isPending || publishCampaignMutation.isPending 
+                          ? 'Publishing...' 
+                          : 'Assign & Publish Campaign'
+                        }
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Campaign Templates */}
         <div className="mb-8">
