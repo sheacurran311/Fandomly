@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useAuth } from "@/hooks/use-auth";
 import { TaskConfigurationForm } from "@/components/templates/TaskConfigurationForm";
+import { PLATFORM_TASK_TYPES } from "@shared/taskTemplates";
 
 interface TemplatePickerProps {
   open: boolean;
@@ -77,16 +78,17 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   const { user } = useAuth();
   const { user: dynamicUser } = useDynamicContext();
 
-  // Fetch task types for selected platform with authentication guards
-  const { data: taskTypes, isLoading: taskTypesLoading } = useQuery({
-    queryKey: ["platform-task-types", selectedPlatform],
-    queryFn: async () => {
-      const response = await apiRequest("GET", `/api/platforms/${selectedPlatform}/task-types`);
-      return response.json();
-    },
-    enabled: !!(dynamicUser && user?.id && selectedPlatform && currentStep === "taskType"), // Require authentication
-    select: (data: TaskType[]) => data || []
-  });
+  // Use local platform task types (like Snag - no API needed)
+  const taskTypes = selectedPlatform && currentStep === "taskType" 
+    ? PLATFORM_TASK_TYPES[selectedPlatform]?.map(taskType => ({
+        value: taskType.value,
+        label: taskType.label,
+        description: `Fans ${taskType.label.toLowerCase()} to earn points`,
+        points: taskType.value.includes('follow') ? 50 : taskType.value.includes('like') ? 25 : taskType.value.includes('share') ? 100 : 75,
+        icon: taskType.icon
+      })) || []
+    : [];
+  const taskTypesLoading = false;
 
   // Create task mutation
   const createTaskMutation = useMutation({
