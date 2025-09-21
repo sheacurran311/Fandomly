@@ -11,8 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Edit, Twitter, Facebook, Instagram, Youtube, Music, Zap, Settings } from "lucide-react";
+import { Edit, Twitter, Facebook, Instagram, Youtube, Music, Zap, Settings, Plus, Play } from "lucide-react";
 import { SiTiktok, SiSpotify } from "react-icons/si";
+import { CORE_TASK_TEMPLATES } from "@shared/taskTemplates";
 
 interface TaskTemplate {
   id: string;
@@ -54,15 +55,15 @@ export function TaskTemplateManagement({ onCreateTask }: TaskTemplateManagementP
   const [editModalOpen, setEditModalOpen] = useState(false);
   const { toast } = useToast();
 
-  // Fetch task templates
-  const { data: templates = [], isLoading } = useQuery<TaskTemplate[]>({
-    queryKey: ["/api/task-templates"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/task-templates");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000
-  });
+  // Use core templates locally (Snag-style, no API required)
+  const templates = CORE_TASK_TEMPLATES.map(template => ({
+    ...template,
+    points: template.defaultPoints,
+    readOnly: true, // Core templates are read-only
+    isGlobal: true,
+    isActive: true
+  }));
+  const isLoading = false;
 
   // Update template mutation
   const updateTemplateMutation = useMutation({
@@ -219,7 +220,7 @@ export function TaskTemplateManagement({ onCreateTask }: TaskTemplateManagementP
                       <span>{template.points || template.defaultConfig.points} points</span>
                     </div>
                     <div className="text-gray-400">
-                      {template.defaultConfig.verification_method || 'manual'} verification
+                      {template.defaultConfig.verificationMethod || 'manual'} verification
                     </div>
                   </div>
 

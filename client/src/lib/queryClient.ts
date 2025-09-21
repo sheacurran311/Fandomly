@@ -3,17 +3,44 @@ import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
 // Helper to get current Dynamic user ID from local storage or current context
 function getDynamicUserId(): string | null {
-  // Try to get from the current Dynamic context if available
   if (typeof window !== 'undefined') {
     try {
-      // Dynamic stores user data in localStorage, we can access it directly
-      const dynamicState = localStorage.getItem('dynamic_authentication_state');
-      if (dynamicState) {
-        const parsed = JSON.parse(dynamicState);
-        return parsed?.user?.userId || null;
+      // Try multiple localStorage keys that Dynamic might use
+      const possibleKeys = [
+        'dynamic_authentication_state',
+        'dynamic-labs-sdk-auth',
+        'dynamic_user',
+        'dynamic_auth_token'
+      ];
+      
+      for (const key of possibleKeys) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            
+            // Try different user ID paths
+            const userId = parsed?.user?.userId || 
+                          parsed?.user?.id || 
+                          parsed?.userId || 
+                          parsed?.id ||
+                          parsed?.user?.sub ||
+                          parsed?.sub;
+                          
+            if (userId) {
+              console.log(`[Auth] Found Dynamic user ID: ${userId} from key: ${key}`);
+              return userId;
+            }
+          } catch (parseError) {
+            // Skip invalid JSON
+            continue;
+          }
+        }
       }
+      
+      console.warn('[Auth] No Dynamic user ID found in localStorage');
     } catch (error) {
-      console.warn('Failed to get Dynamic user ID from localStorage:', error);
+      console.warn('[Auth] Failed to get Dynamic user ID:', error);
     }
   }
   return null;
@@ -44,6 +71,9 @@ export async function apiRequest(
   const dynamicUserId = getDynamicUserId();
   if (dynamicUserId) {
     headers["x-dynamic-user-id"] = dynamicUserId;
+    console.log(`[Auth] Adding user ID header: ${dynamicUserId} for ${method} ${url}`);
+  } else {
+    console.warn(`[Auth] No Dynamic user ID available for ${method} ${url}`);
   }
 
   const res = await fetch(url, {
@@ -79,6 +109,9 @@ export async function fetchApi(
   const dynamicUserId = getDynamicUserId();
   if (dynamicUserId) {
     headers["x-dynamic-user-id"] = dynamicUserId;
+    console.log(`[Auth] Adding user ID header: ${dynamicUserId} for ${method} ${url}`);
+  } else {
+    console.warn(`[Auth] No Dynamic user ID available for ${method} ${url}`);
   }
 
   const res = await fetch(url, {
