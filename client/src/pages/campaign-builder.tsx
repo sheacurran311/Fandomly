@@ -741,27 +741,42 @@ export default function CampaignBuilder() {
         campaignType: "direct",
         trigger: "custom_event",
         startDate: now,
-        status: "active",
+        status: "pending_tasks", // Use new workflow: Create -> Assign Tasks -> Publish
       });
       const campaign = await newCampaignRes.json();
 
-      const effects: any[] = [];
-      const add = (type: string) => effects.push({ type: 'add_units', value: points, notificationTemplate: type });
-      if (followX) add('follow_x');
-      if (followInstagram) add('follow_instagram');
-      if (followFacebook) add('follow_facebook');
-      if (likePost) add('like_post');
-      if (retweet) add('retweet');
+      // Store selected social actions for task assignment
+      const selectedActions = [];
+      if (followX) selectedActions.push('Follow on X');
+      if (followInstagram) selectedActions.push('Follow on Instagram');  
+      if (followFacebook) selectedActions.push('Follow on Facebook');
+      if (likePost) selectedActions.push('Like Post');
+      if (retweet) selectedActions.push('Retweet');
 
-      if (effects.length > 0) {
-        await apiRequest("POST", "/api/campaign-rules", {
-          campaignId: campaign.id,
-          ruleOrder: 1,
-          conditions: [],
-          effects,
-        });
-      }
+      console.log(`🎯 Quick Social Campaign created! Selected actions: ${selectedActions.join(', ')}. Points: ${points} each. Assign tasks from the Tasks page to publish.`);
+      
       return campaign;
+    },
+    onSuccess: (campaign) => {
+      // Show success message with guidance
+      const selectedActions = [];
+      if (followX) selectedActions.push('Follow on X');
+      if (followInstagram) selectedActions.push('Follow on Instagram');  
+      if (followFacebook) selectedActions.push('Follow on Facebook');
+      if (likePost) selectedActions.push('Like Post');
+      if (retweet) selectedActions.push('Retweet');
+
+      alert(`🎉 Quick Social Campaign created successfully!\n\n📋 Selected Actions: ${selectedActions.join(', ')}\n💰 Points per action: ${points}\n\n➡️ Next Step: Go to Tasks page to create and assign tasks before publishing.`);
+      
+      // Invalidate campaigns cache to refresh list
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
+      
+      // Reset form
+      setFollowX(false);
+      setFollowInstagram(false);
+      setFollowFacebook(false);
+      setLikePost(false);
+      setRetweet(false);
     },
   });
 
