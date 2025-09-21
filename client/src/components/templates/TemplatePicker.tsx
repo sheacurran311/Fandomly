@@ -162,7 +162,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            <span>
+            <span className="text-[#101636]">
               {currentStep === "platform" && "Choose Platform"}
               {currentStep === "taskType" && `Select ${PLATFORM_CONFIG[selectedPlatform!]?.name} Task`}
               {currentStep === "configuration" && `Configure ${selectedTaskType?.label} Task`}
@@ -186,8 +186,8 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                     <div className={`w-16 h-16 rounded-full ${platform.color} flex items-center justify-center mx-auto mb-4`}>
                       <IconComponent className="h-8 w-8 text-white" />
                     </div>
-                    <CardTitle className="text-lg mb-2 text-[#101636]">{platform.name}</CardTitle>
-                    <CardDescription className="text-sm text-[#101636]">
+                    <CardTitle className="text-lg mb-2 text-white">{platform.name}</CardTitle>
+                    <CardDescription className="text-sm text-white">
                       {platform.description}
                     </CardDescription>
                   </CardContent>
@@ -203,7 +203,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
             {taskTypesLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-3 text-[#101636]">Loading task types...</span>
+                <span className="ml-3 text-white">Loading task types...</span>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -219,12 +219,12 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="h-4 w-4 text-primary" />
-                            <CardTitle className="text-base text-[#101636]">{taskType.label}</CardTitle>
+                            <CardTitle className="text-base text-white">{taskType.label}</CardTitle>
                             <Badge variant="secondary" className="ml-auto">
                               {taskType.points} pts
                             </Badge>
                           </div>
-                          <CardDescription className="text-sm text-[#101636]">
+                          <CardDescription className="text-sm text-white">
                             {taskType.description}
                           </CardDescription>
                         </div>

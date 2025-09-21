@@ -15,9 +15,25 @@ export default function AuthRouter({ children }: AuthRouterProps) {
   useEffect(() => {
     console.log("AuthRouter - Dynamic user:", !!dynamicUser, "User data:", !!userData, "Loading:", isLoading);
     
+    // Get current path and define routes at the top
+    const currentPath = window.location.pathname;
+    const protectedRoutes = ['/creator-dashboard', '/fan-dashboard'];
+    const legacyOnboardingRoutes = ['/creator-onboarding'];
+    const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
+    const publicRoutes = ['/privacy-policy', '/data-deletion'];
+    
+    // Check if current path is a protected route (including sub-routes)
+    const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+    
     if (!dynamicUser) {
-      // User not connected to Dynamic - stay on current page
-      console.log("AuthRouter - No Dynamic user, staying on current page");
+      // User not connected to Dynamic
+      console.log("AuthRouter - No Dynamic user, checking if accessing protected route");
+      
+      // If trying to access protected route without authentication, redirect to home
+      if (isProtectedRoute) {
+        console.log("AuthRouter - Unauthenticated user trying to access protected route, redirecting to home");
+        setLocation('/');
+      }
       return;
     }
 
@@ -29,10 +45,13 @@ export default function AuthRouter({ children }: AuthRouterProps) {
 
     if (!userData) {
       // User connected to Dynamic but not registered in our system
-      // Redirect to user type selection instead of auto-registration
-      const currentPath = window.location.pathname;
       console.log("AuthRouter - User not registered, current path:", currentPath);
-      if (currentPath !== '/user-type-selection') {
+      
+      // If trying to access protected route, redirect to user type selection
+      if (isProtectedRoute) {
+        console.log('AuthRouter - Unregistered user accessing protected route, redirecting to user type selection');
+        setLocation('/user-type-selection');
+      } else if (currentPath !== '/user-type-selection' && currentPath !== '/') {
         console.log('AuthRouter - Redirecting to user type selection');
         setLocation('/user-type-selection');
       }
@@ -40,13 +59,6 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     }
 
     // User is authenticated and registered
-    const currentPath = window.location.pathname;
-    
-    // Define routes behavior
-    const protectedRoutes = ['/creator-dashboard', '/fan-dashboard'];
-    const legacyOnboardingRoutes = ['/creator-onboarding'];
-    const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
-    const publicRoutes = ['/privacy-policy', '/data-deletion'];
     
     // Redirect legacy RBAC dashboard routes to appropriate user dashboards
     if (currentPath === '/rbac-dashboard' || currentPath === '/dashboard') {
