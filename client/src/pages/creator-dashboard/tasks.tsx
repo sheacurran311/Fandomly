@@ -20,6 +20,7 @@ import {
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
+import { TaskTemplateManagement } from "@/components/templates/TaskTemplateManagement";
 
 // Task types configuration
 const taskTypes = [
@@ -257,9 +258,19 @@ export default function TasksManagement() {
             />
           </div>
 
+          {/* Task Templates Section */}
+          <div className="space-y-6">
+            <TaskTemplateManagement 
+              onCreateTask={(templateId) => {
+                // Future: Could prefill template picker with selected template
+                setCreateModalOpen(true);
+              }}
+            />
+          </div>
+
           {/* Tasks Grid */}
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-white">Your Tasks</h2>
+            <h2 className="text-xl font-semibold text-white">Your Custom Tasks</h2>
             
             {tasksLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

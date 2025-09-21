@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Twitter, Facebook, Instagram, Youtube, Music2, Zap } from "lucide-react";
 import { SiTiktok, SiSpotify } from "react-icons/si";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TaskConfigurationForm } from "@/components/templates/TaskConfigurationForm";
 
@@ -76,6 +76,10 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   // Fetch task types for selected platform
   const { data: taskTypes, isLoading: taskTypesLoading } = useQuery({
     queryKey: ["platform-task-types", selectedPlatform],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/platforms/${selectedPlatform}/task-types`);
+      return response.json();
+    },
     enabled: !!selectedPlatform && currentStep === "taskType",
     select: (data: TaskType[]) => data || []
   });
@@ -83,12 +87,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: any) => {
-      const response = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(taskData)
-      });
-      if (!response.ok) throw new Error("Failed to create task");
+      const response = await apiRequest("POST", "/api/tasks", taskData);
       return response.json();
     },
     onSuccess: () => {
@@ -187,8 +186,8 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                     <div className={`w-16 h-16 rounded-full ${platform.color} flex items-center justify-center mx-auto mb-4`}>
                       <IconComponent className="h-8 w-8 text-white" />
                     </div>
-                    <CardTitle className="text-lg mb-2">{platform.name}</CardTitle>
-                    <CardDescription className="text-sm">
+                    <CardTitle className="text-lg mb-2 text-[#101636]">{platform.name}</CardTitle>
+                    <CardDescription className="text-sm text-[#101636]">
                       {platform.description}
                     </CardDescription>
                   </CardContent>
@@ -204,7 +203,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
             {taskTypesLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-3">Loading task types...</span>
+                <span className="ml-3 text-[#101636]">Loading task types...</span>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -220,12 +219,12 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="h-4 w-4 text-primary" />
-                            <CardTitle className="text-base">{taskType.label}</CardTitle>
+                            <CardTitle className="text-base text-[#101636]">{taskType.label}</CardTitle>
                             <Badge variant="secondary" className="ml-auto">
                               {taskType.points} pts
                             </Badge>
                           </div>
-                          <CardDescription className="text-sm">
+                          <CardDescription className="text-sm text-[#101636]">
                             {taskType.description}
                           </CardDescription>
                         </div>
