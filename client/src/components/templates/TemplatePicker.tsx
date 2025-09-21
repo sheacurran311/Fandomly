@@ -8,6 +8,8 @@ import { SiTiktok, SiSpotify } from "react-icons/si";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
 import { TaskConfigurationForm } from "@/components/templates/TaskConfigurationForm";
 
 interface TemplatePickerProps {
@@ -72,15 +74,17 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [selectedTaskType, setSelectedTaskType] = useState<TaskType | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { user: dynamicUser } = useDynamicContext();
 
-  // Fetch task types for selected platform
+  // Fetch task types for selected platform with authentication guards
   const { data: taskTypes, isLoading: taskTypesLoading } = useQuery({
     queryKey: ["platform-task-types", selectedPlatform],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/platforms/${selectedPlatform}/task-types`);
       return response.json();
     },
-    enabled: !!selectedPlatform && currentStep === "taskType",
+    enabled: !!(dynamicUser && user?.id && selectedPlatform && currentStep === "taskType"), // Require authentication
     select: (data: TaskType[]) => data || []
   });
 

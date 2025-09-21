@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Plus, Settings, Target, Share2, Heart, MessageCircle, 
@@ -93,30 +94,31 @@ interface Task {
 
 export default function TasksManagement() {
   const { user } = useAuth();
+  const { user: dynamicUser } = useDynamicContext();
   const { toast } = useToast();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
-  // Fetch creator's tasks using real API
+  // Fetch creator's tasks using real API with authentication guards
   const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useQuery<Task[]>({
     queryKey: ['/api/tasks', user?.id],
     queryFn: async (): Promise<Task[]> => {
       const response = await apiRequest('/api/tasks');
       return response.json();
     },
-    enabled: !!user?.id,
+    enabled: !!(dynamicUser && user?.id), // Require both Dynamic auth and user data
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Fetch pending campaigns for assignment using real API  
+  // Fetch pending campaigns for assignment using real API with authentication guards
   const { data: pendingCampaigns = [] } = useQuery<any[]>({
     queryKey: ['/api/campaigns/pending', user?.id],
     queryFn: async (): Promise<any[]> => {
       const response = await apiRequest('/api/campaigns/pending');
       return response.json();
     },
-    enabled: !!user?.id,
+    enabled: !!(dynamicUser && user?.id), // Require both Dynamic auth and user data
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 

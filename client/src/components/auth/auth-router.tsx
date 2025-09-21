@@ -12,18 +12,18 @@ export default function AuthRouter({ children }: AuthRouterProps) {
   const [, setLocation] = useLocation();
   const { user: userData, isLoading } = useAuth();
 
+  // Get current path and define routes (moved outside useEffect for render-gating)
+  const currentPath = window.location.pathname;
+  const protectedRoutes = ['/creator-dashboard', '/fan-dashboard'];
+  const legacyOnboardingRoutes = ['/creator-onboarding'];
+  const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
+  const publicRoutes = ['/privacy-policy', '/data-deletion'];
+  
+  // Check if current path is a protected route (including sub-routes)
+  const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+
   useEffect(() => {
     console.log("AuthRouter - Dynamic user:", !!dynamicUser, "User data:", !!userData, "Loading:", isLoading);
-    
-    // Get current path and define routes at the top
-    const currentPath = window.location.pathname;
-    const protectedRoutes = ['/creator-dashboard', '/fan-dashboard'];
-    const legacyOnboardingRoutes = ['/creator-onboarding'];
-    const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
-    const publicRoutes = ['/privacy-policy', '/data-deletion'];
-    
-    // Check if current path is a protected route (including sub-routes)
-    const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
     
     if (!dynamicUser) {
       // User not connected to Dynamic
@@ -160,6 +160,19 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     // Allow access to public routes like privacy policy
     
   }, [dynamicUser, userData, isLoading, setLocation]);
+
+  // Render-gate protected content to prevent 401 API calls before redirects
+  if (isProtectedRoute && (!dynamicUser || isLoading || !userData)) {
+    // Show loading spinner while authentication is being checked or redirecting
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-white">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }
