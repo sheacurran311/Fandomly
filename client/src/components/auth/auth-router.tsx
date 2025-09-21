@@ -25,6 +25,15 @@ export default function AuthRouter({ children }: AuthRouterProps) {
   useEffect(() => {
     console.log("AuthRouter - Dynamic user:", !!dynamicUser, "User data:", !!userData, "Loading:", isLoading);
     
+    // Set Dynamic user ID in window for API requests (secure approach)
+    if (dynamicUser?.userId) {
+      (window as any).__dynamicUserId = dynamicUser.userId;
+      console.log(`[Auth] Set Dynamic user ID: ${dynamicUser.userId}`);
+    } else {
+      (window as any).__dynamicUserId = null;
+      console.log('[Auth] Cleared Dynamic user ID');
+    }
+    
     if (!dynamicUser) {
       // User not connected to Dynamic
       console.log("AuthRouter - No Dynamic user, checking if accessing protected route");

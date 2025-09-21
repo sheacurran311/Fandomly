@@ -1,49 +1,10 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
-// Helper to get current Dynamic user ID from local storage or current context
+// Helper to get current Dynamic user ID using SDK context (not localStorage)
 function getDynamicUserId(): string | null {
-  if (typeof window !== 'undefined') {
-    try {
-      // Try multiple localStorage keys that Dynamic might use
-      const possibleKeys = [
-        'dynamic_authentication_state',
-        'dynamic-labs-sdk-auth',
-        'dynamic_user',
-        'dynamic_auth_token'
-      ];
-      
-      for (const key of possibleKeys) {
-        const data = localStorage.getItem(key);
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            
-            // Try different user ID paths
-            const userId = parsed?.user?.userId || 
-                          parsed?.user?.id || 
-                          parsed?.userId || 
-                          parsed?.id ||
-                          parsed?.user?.sub ||
-                          parsed?.sub;
-                          
-            if (userId) {
-              console.log(`[Auth] Found Dynamic user ID: ${userId} from key: ${key}`);
-              return userId;
-            }
-          } catch (parseError) {
-            // Skip invalid JSON
-            continue;
-          }
-        }
-      }
-      
-      console.warn('[Auth] No Dynamic user ID found in localStorage');
-    } catch (error) {
-      console.warn('[Auth] Failed to get Dynamic user ID:', error);
-    }
-  }
-  return null;
+  // This will be set by components that have access to Dynamic context
+  return (window as any).__dynamicUserId || null;
 }
 
 async function throwIfResNotOk(res: Response) {
