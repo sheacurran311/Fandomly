@@ -1,27 +1,14 @@
 # 📋 Fandomly Comprehensive TODO Analysis
 
-## 🚨 CRITICAL AUTHENTICATION LESSON LEARNED
+## 🚨 CRITICAL AUTHENTICATION STATUS
 
-### ✅ **AUTHENTICATION ARCHITECTURE - RESOLVED**
-**Date Resolved**: September 19, 2025
+### 🟡 **AUTHENTICATION ARCHITECTURE - IN PROGRESS**
+**Current Status**: Template browsing works with local data; task creation needs wallet connection and server-side verification
 
-**CRITICAL LESSON**: Dynamic SDK handles ALL authentication natively - NO custom JWT verification, middleware, or adapters should EVER be implemented.
-
-**What Was Fixed**:
-- [x] Removed custom JWT verification middleware (`verifyDynamicAuth`)
-- [x] Removed server-side JWT token parsing and validation
-- [x] Restored Dynamic's native authentication flow
-- [x] Fixed all undefined `dynamicUserId` variable references
-- [x] Updated `authenticateUser` middleware to use headers/body approach instead of JWT parsing
-
-**Architecture Principle**: 
-- **Layer 1**: Dynamic SDK handles wallet authentication completely
-- **Layer 2**: Our backend receives user identity via headers/body and manages business logic
-- **NEVER implement**: Custom JWT middleware, token verification, or authentication adapters
-
-**Future Development Rule**: 
-🚫 **FORBIDDEN**: Custom JWT/auth middleware, Dynamic SDK modifications, server-side token verification
-✅ **APPROVED**: Trust Dynamic's client-side authentication, use standard middleware for user lookup
+**Architecture Approach**: 
+- **Layer 1**: Dynamic SDK handles wallet authentication on frontend
+- **Layer 2**: Server needs proper authentication middleware for protected endpoints like POST /api/tasks
+- **Current State**: Template browsing uses local data (no auth required), task creation requires authenticated user
 
 ---
 
@@ -35,14 +22,40 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 - [x] Button design system established and implemented
 - [x] Basic onboarding flows created (fan and creator)
 - [x] Database schema properly defined with migrations
+- [x] **Task Template System Mostly Complete**: 3-step Snag/Kazm-style template picker with 12 core templates (browsing works locally, creation requires wallet)
+- [x] **Template Browsing Fix**: Dynamic user ID handling via SDK context for authenticated operations
+- [x] **Local Template Data**: Template browsing works without authentication (fixed 401 errors in steps 1-2)
+- [x] **Template Configuration Forms**: Basic customization interface with platform-specific fields
+
+### 🟡 **NEW PROGRESS: TASK TEMPLATE SYSTEM**
+
+#### **Recent Implementation: Snag/Kazm-Style Template System ✅**
+**Location**: `client/src/components/templates/` directory
+**Achievement**: Complete 3-step template picker workflow with 12 core templates
+**Status**: ✅ **MOSTLY COMPLETE** - Core functionality working, requires wallet connection for final step
+
+**What's Working:**
+- ✅ 12 core templates display without authentication
+- ✅ 3-step wizard flow (Platform → Task Type → Configuration)  
+- ✅ Template configuration forms with platform-specific fields
+- ✅ Authentication fix using Dynamic SDK context instead of localStorage
+- ✅ Local template data (no more 401 errors on step 2)
+
+**Final Requirement:**
+- [ ] Task creation needs wallet connection (currently gets 401 without authentication)
+- [ ] Add "Connect Wallet" flow prompt for unauthenticated users
+
+**Design Inspiration Sources:**
+- `attached_assets/snag1-6.png` - Snag's organized rule selection interface
+- `attached_assets/kazm1-3.png` - Kazm's quest creation flow with detailed configuration
 
 ### 🔴 **CRITICAL ISSUES TO FIX IMMEDIATELY**
 
-#### **Issue 1: Security Vulnerability - JWT Verification Disabled**
-**Location**: `/server/routes.ts` lines 23-26
-**Problem**: Authentication completely bypassed
-**Priority**: 🔴 CRITICAL - SECURITY
-**Status**: ✅ **RESOLVED** - Dynamic's native authentication restored, custom JWT middleware removed
+#### **Issue 1: Authentication Architecture - Partially Resolved**
+**Location**: `/server/routes.ts` and authentication middleware
+**Problem**: Task creation requires proper authentication flow
+**Priority**: 🔴 CRITICAL - SECURITY  
+**Status**: 🟡 **PARTIALLY RESOLVED** - Dynamic auth browsing works, task creation needs wallet connection and proper server-side verification
 
 #### **Issue 2: Hardcoded Data Instead of Real API Calls**
 **Locations**: 
@@ -81,7 +94,7 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 - [x] Dynamic authentication integration
 
 ### ❌ **NEEDS FIXING**
-- [ ] JWT verification implementation
+- [ ] Task creation authentication flow (wallet connection required)
 - [ ] RBAC middleware consistently applied
 - [ ] Tenant isolation in queries
 - [ ] File upload endpoints missing
