@@ -2,7 +2,7 @@ import {
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
-  tasks, taskAssignments,
+  tasks, taskAssignments, taskTemplates,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -10,7 +10,7 @@ import {
   type RewardRedemption, type InsertRewardRedemption,
   type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership,
   type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
-  type Task, type InsertTask, type TaskAssignment, type InsertTaskAssignment,
+  type Task, type InsertTask, type TaskTemplate, type InsertTaskTemplate, type TaskAssignment, type InsertTaskAssignment,
   insertSocialCampaignTaskSchema,
   creatorFacebookPages
 } from "@shared/schema";
@@ -116,6 +116,13 @@ export interface IStorage {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>, tenantId: string): Promise<Task | undefined>;
   deleteTask(id: string, tenantId: string): Promise<void>;
+  
+  // Task Template operations
+  getTaskTemplates(tenantId?: string): Promise<TaskTemplate[]>;
+  getTaskTemplate(id: string, tenantId?: string): Promise<TaskTemplate | undefined>;
+  createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate>;
+  updateTaskTemplate(id: string, updates: Partial<InsertTaskTemplate>, tenantId?: string): Promise<TaskTemplate | undefined>;
+  deleteTaskTemplate(id: string, tenantId?: string): Promise<void>;
   
   // Task Assignment operations
   getTaskAssignments(campaignId: string): Promise<TaskAssignment[]>;
@@ -716,6 +723,58 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTask(id: string, tenantId: string): Promise<void> {
     await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)));
+  }
+
+  // Task Template operations
+  async getTaskTemplates(tenantId?: string): Promise<TaskTemplate[]> {
+    // Get both global templates and tenant-specific templates
+    const conditions = tenantId 
+      ? sql`${taskTemplates.isGlobal} = true OR ${taskTemplates.tenantId} = ${tenantId}`
+      : sql`${taskTemplates.isGlobal} = true`;
+    
+    return await db.select()
+      .from(taskTemplates)
+      .where(conditions)
+      .orderBy(desc(taskTemplates.createdAt));
+  }
+
+  async getTaskTemplate(id: string, tenantId?: string): Promise<TaskTemplate | undefined> {
+    const conditions = tenantId 
+      ? and(
+          eq(taskTemplates.id, id), 
+          sql`${taskTemplates.isGlobal} = true OR ${taskTemplates.tenantId} = ${tenantId}`
+        )
+      : and(eq(taskTemplates.id, id), eq(taskTemplates.isGlobal, true));
+    
+    const [template] = await db.select().from(taskTemplates).where(conditions);
+    return template;
+  }
+
+  async createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate> {
+    const [newTemplate] = await db.insert(taskTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updateTaskTemplate(id: string, updates: Partial<InsertTaskTemplate>, tenantId?: string): Promise<TaskTemplate | undefined> {
+    // Only allow updates to templates the user owns (global templates if admin, tenant templates if tenant admin)
+    const conditions = tenantId 
+      ? and(eq(taskTemplates.id, id), eq(taskTemplates.tenantId, tenantId))
+      : and(eq(taskTemplates.id, id), eq(taskTemplates.isGlobal, true));
+    
+    const [template] = await db.update(taskTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(conditions)
+      .returning();
+    return template;
+  }
+
+  async deleteTaskTemplate(id: string, tenantId?: string): Promise<void> {
+    // Only allow deletion of templates the user owns
+    const conditions = tenantId 
+      ? and(eq(taskTemplates.id, id), eq(taskTemplates.tenantId, tenantId))
+      : and(eq(taskTemplates.id, id), eq(taskTemplates.isGlobal, true));
+    
+    await db.delete(taskTemplates).where(conditions);
   }
 
   // Task Assignment operations
