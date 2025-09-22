@@ -22,6 +22,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByDynamicId(dynamicUserId: string): Promise<User | undefined>;
+  getUsersByFacebookId(facebookId: string): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   createUser(user: any): Promise<User>;
   updateUser(id: string, updates: any): Promise<User | undefined>;
@@ -162,6 +163,18 @@ export class DatabaseStorage implements IStorage {
   async getUserByDynamicId(dynamicUserId: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.dynamicUserId, dynamicUserId));
     return user || undefined;
+  }
+
+  async getUsersByFacebookId(facebookId: string): Promise<User[]> {
+    // Query users where profileData contains Facebook data with the given ID
+    // This uses PostgreSQL JSON operators to search within the profileData field
+    const usersWithFacebookId = await db
+      .select()
+      .from(users)
+      .where(sql`${users.profileData}->>'facebookData' IS NOT NULL AND ${users.profileData}->'facebookData'->>'id' = ${facebookId}`)
+      .orderBy(desc(users.createdAt));
+    
+    return usersWithFacebookId || [];
   }
 
   async getAllUsers(): Promise<User[]> {

@@ -8,10 +8,9 @@
 - **Never use**: Light text on light backgrounds or dark text on dark backgrounds
 
 ### **Brand Color Consistency**
-- **Primary Brand**: `hsl(315, 76%, 49%)` - Hot pink
-- **Secondary Brand**: `hsl(78, 94%, 51%)` - Bright lime
-- **Accent Brand**: `hsl(195, 98%, 50%)` - Cyan blue
-- **Background**: `hsl(278, 8%, 11%)` - Very dark purple
+- **Primary Brand**: `#e10698` (RGB 225,6,152)
+- **Secondary Brand / Accent**: `#14feee` (RGB 20,254,238)
+- **Background**: `#101636`
 
 ## 🔧 Button Variants & Usage
 
@@ -24,7 +23,7 @@ className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium tra
 ### **2. Secondary Action Buttons**
 **Use for**: Secondary actions, alternative options
 ```tsx
-className="bg-brand-secondary hover:bg-brand-secondary/80 text-black font-medium transition-all duration-200 hover:scale-[1.02]"
+className="bg-brand-secondary hover:bg-brand-secondary/80 text-[#0e1430] font-medium transition-all duration-200 hover:scale-[1.02]"
 ```
 
 ### **3. Outline Buttons**
@@ -43,6 +42,16 @@ className="text-gray-300 hover:text-white hover:bg-brand-primary/20 transition-a
 **Use for**: Delete actions, dangerous operations
 ```tsx
 className="bg-red-500 hover:bg-red-600 text-white font-medium transition-all duration-200"
+```
+
+### **6. Neon/Glow Buttons**
+**Use for**: High-impact CTAs on hero/marketing surfaces
+```tsx
+// Pink primary neon
+className="relative bg-brand-primary text-white hover:bg-brand-primary/90 hover:scale-[1.03] shadow-[0_0_12px_rgba(225,6,152,0.65),_0_0_32px_rgba(225,6,152,0.35)] after:content-[''] after:absolute after:inset-0 after:rounded-lg after:blur after:opacity-70 after:bg-[radial-gradient(ellipse_at_center,rgba(225,6,152,0.55),transparent_60%)]"
+
+// Cyan accent neon
+className="relative bg-brand-accent text-[#0e1430] hover:bg-brand-accent/90 hover:scale-[1.03] shadow-[0_0_12px_rgba(20,254,238,0.65),_0_0_32px_rgba(20,254,238,0.35)] after:content-[''] after:absolute after:inset-0 after:rounded-lg after:blur after:opacity-70 after:bg-[radial-gradient(ellipse_at_center,rgba(20,254,238,0.55),transparent_60%)]"
 ```
 
 ### **6. Disabled State**
@@ -98,7 +107,7 @@ focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary
 ## ✅ Correct Patterns
 
 ✅ **Do use**: `text-white` on `bg-brand-primary` (excellent contrast)
-✅ **Do use**: `text-black` on `bg-brand-secondary` (excellent contrast)
+✅ **Do use**: `text-[#0e1430]` on `bg-brand-secondary` (excellent contrast)
 ✅ **Do use**: Consistent hover patterns across all buttons
 ✅ **Do use**: Appropriate semantic button variants for actions
 ✅ **Do use**: Smooth transitions for all interactive states

@@ -259,8 +259,13 @@ export default function CreatorOnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="relative min-h-screen bg-brand-dark-bg p-6 overflow-hidden">
+      {/* Background layers */}
+      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.14),transparent_60%),radial-gradient(40%_40%_at_80%_20%,rgba(20,254,238,0.12),transparent_60%)]" />
+      <div className="absolute inset-0 gradient-primary opacity-[0.04]" />
+      <img src="/fandomly-logo-with-text.png" alt="" className="absolute -bottom-8 -right-8 w-[480px] opacity-[0.05] pointer-events-none select-none" />
+
+      <div className="relative z-10 max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold gradient-text mb-4">

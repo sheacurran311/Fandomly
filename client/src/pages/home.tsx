@@ -45,7 +45,7 @@ export default function Home() {
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-32">
           <div className="text-center max-w-5xl mx-auto">
             {/* Badge */}
-            <div className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 mb-6 bg-white/10 backdrop-blur-lg rounded-full border border-white/20">
+            <div className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 mb-6 bg-white/10 backdrop-blur-lg rounded-full border border-brand-primary/30">
               <span className="text-xs sm:text-sm font-medium text-brand-secondary mr-2">🏆</span>
               <span className="text-xs sm:text-sm font-medium text-white">Trusted by 10,000+ Athletes & Creators</span>
             </div>
@@ -61,14 +61,15 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-stretch sm:items-center mb-12 sm:mb-16 px-4">
               <ConnectWalletButton 
-                className="w-full sm:w-auto gradient-primary text-[#101636] px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-brand-primary/25 min-h-[48px] sm:min-h-[56px]"
+                className="w-full sm:w-auto bg-brand-accent text-[#0e1430] px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 hover:scale-105 shadow-[0_0_18px_rgba(20,254,238,0.5),_0_0_42px_rgba(20,254,238,0.3)] min-h-[48px] sm:min-h-[56px]"
               >
                 Start Now
               </ConnectWalletButton>
               <Button 
                 onClick={() => window.location.href = "/marketplace"}
                 size="lg"
-                className="w-full sm:w-auto bg-brand-primary hover:bg-brand-primary/80 text-white hover:scale-105 px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
+                variant="neon"
+                className="w-full sm:w-auto px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
               >
                 Explore Creators
               </Button>
@@ -233,8 +234,11 @@ export default function Home() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
             {/* Athletes */}
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-amber-500/50 transition-all duration-300 hover:scale-105 group">
-              <CardContent className="p-6 lg:p-8">
+            <Card className="relative bg-white/5 backdrop-blur-lg border-white/10 hover:border-amber-500/50 transition-all duration-300 hover:scale-105 group overflow-hidden">
+              {/* Background Image with Overlay */}
+              <div className="absolute inset-0 bg-[url('/images/athletes-night-game.jpg')] bg-cover bg-center"></div>
+              <div className="absolute inset-0 bg-[#101636] bg-opacity-80"></div>
+              <CardContent className="relative z-10 p-6 lg:p-8">
                 <div className="text-center mb-6 lg:mb-8">
                   <div className="w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
                     <Trophy className="h-8 w-8 lg:h-10 lg:w-10 text-white" />
@@ -282,11 +286,14 @@ export default function Home() {
             </Card>
             
             {/* Content Creators */}
-            <Card className="bg-white/5 backdrop-blur-lg border-2 border-blue-500 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold">
+            <Card className="relative bg-white/5 backdrop-blur-lg border-2 border-blue-500 overflow-hidden">
+              {/* Background Image with Overlay */}
+              <div className="absolute inset-0 bg-[url('/images/content-creators-podcast.jpg')] bg-cover bg-center"></div>
+              <div className="absolute inset-0 bg-[#101636] bg-opacity-80"></div>
+              <div className="absolute top-0 right-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold z-20">
                 Popular
               </div>
-              <CardContent className="p-8">
+              <CardContent className="relative z-10 p-8">
                 <div className="text-center mb-8">
                   <div className="w-20 h-20 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                     <Camera className="h-10 w-10 text-white" />
@@ -334,8 +341,11 @@ export default function Home() {
             </Card>
             
             {/* Musicians */}
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105">
-              <CardContent className="p-8">
+            <Card className="relative bg-white/5 backdrop-blur-lg border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 group overflow-hidden">
+              {/* Background Image with Overlay */}
+              <div className="absolute inset-0 bg-[url('/images/musicians-concert.jpg')] bg-cover bg-center"></div>
+              <div className="absolute inset-0 bg-[#101636] bg-opacity-80"></div>
+              <CardContent className="relative z-10 p-8">
                 <div className="text-center mb-8">
                   <div className="w-20 h-20 bg-gradient-to-r from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                     <Music className="h-10 w-10 text-white" />

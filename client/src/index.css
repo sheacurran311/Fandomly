@@ -3,66 +3,66 @@
 @tailwind utilities;
 
 :root {
-  --background: hsl(27, 9%, 98%);
-  --foreground: hsl(280, 65%, 90%);
-  --muted: hsl(280, 20%, 15%);
-  --muted-foreground: hsl(280, 30%, 60%);
-  --popover: hsl(280, 20%, 15%);
-  --popover-foreground: hsl(280, 65%, 90%);
-  --card: hsl(280, 20%, 15%);
-  --card-foreground: hsl(280, 65%, 90%);
-  --border: hsl(280, 30%, 25%);
-  --input: hsl(280, 30%, 25%);
-  --primary: hsl(315, 76%, 49%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(78, 94%, 51%);
-  --secondary-foreground: hsl(280, 20%, 15%);
-  --accent: hsl(195, 98%, 50%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --ring: hsl(315, 76%, 49%);
+  --background: #101636;
+  --foreground: #ffffff;
+  --muted: #0e1430;
+  --muted-foreground: #9aa4d6;
+  --popover: #0e1430;
+  --popover-foreground: #ffffff;
+  --card: #0f1738;
+  --card-foreground: #ffffff;
+  --border: #1e2450;
+  --input: #1e2450;
+  --primary: #e10698;
+  --primary-foreground: #ffffff;
+  --secondary: #14feee;
+  --secondary-foreground: #0e1430;
+  --accent: #14feee;
+  --accent-foreground: #0e1430;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --ring: #e10698;
   --radius: 0.75rem;
   
   /* Custom brand colors - Can be overridden by tenant branding */
-  --brand-primary: hsl(315, 76%, 49%);
-  --brand-secondary: hsl(78, 94%, 51%);
-  --brand-accent: hsl(195, 98%, 50%);
-  --brand-dark-purple: hsl(280, 65%, 16%);
-  --brand-blue: hsl(195, 98%, 50%);
-  --brand-dark-bg: hsl(278, 8%, 11%);
+  --brand-primary: #e10698;
+  --brand-secondary: #14feee;
+  --brand-accent: #14feee;
+  --brand-dark-purple: #101636;
+  --brand-blue: #14feee;
+  --brand-dark-bg: #101636;
   
   /* Brand Color Variations for Dynamic Theming */
-  --brand-primary-rgb: 233, 63, 193;
-  --brand-secondary-rgb: 181, 238, 52;
-  --brand-accent-rgb: 12, 194, 255;
+  --brand-primary-rgb: 225, 6, 152;
+  --brand-secondary-rgb: 20, 254, 238;
+  --brand-accent-rgb: 20, 254, 238;
   
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, hsl(315, 76%, 49%), hsl(78, 94%, 51%));
-  --gradient-secondary: linear-gradient(135deg, hsl(78, 94%, 51%), hsl(195, 98%, 50%));
-  --gradient-accent: linear-gradient(135deg, hsl(195, 98%, 50%), hsl(315, 76%, 49%));
+  --gradient-primary: linear-gradient(135deg, #e10698, #14feee);
+  --gradient-secondary: linear-gradient(135deg, #14feee, #e10698);
+  --gradient-accent: linear-gradient(135deg, #14feee, #e10698);
 }
 
 .dark {
-  --background: hsl(278, 8%, 11%);
-  --foreground: hsl(280, 65%, 90%);
-  --muted: hsl(280, 20%, 15%);
-  --muted-foreground: hsl(280, 30%, 60%);
-  --popover: hsl(280, 20%, 15%);
-  --popover-foreground: hsl(280, 65%, 90%);
-  --card: hsl(280, 20%, 15%);
-  --card-foreground: hsl(280, 65%, 90%);
-  --border: hsl(280, 30%, 25%);
-  --input: hsl(280, 30%, 25%);
-  --primary: hsl(315, 76%, 49%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(78, 94%, 51%);
-  --secondary-foreground: hsl(280, 20%, 15%);
-  --accent: hsl(195, 98%, 50%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --ring: hsl(315, 76%, 49%);
+  --background: #101636;
+  --foreground: #ffffff;
+  --muted: #0e1430;
+  --muted-foreground: #9aa4d6;
+  --popover: #0e1430;
+  --popover-foreground: #ffffff;
+  --card: #0f1738;
+  --card-foreground: #ffffff;
+  --border: #1e2450;
+  --input: #1e2450;
+  --primary: #e10698;
+  --primary-foreground: #ffffff;
+  --secondary: #14feee;
+  --secondary-foreground: #0e1430;
+  --accent: #14feee;
+  --accent-foreground: #0e1430;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --ring: #e10698;
 }
 
 @layer base {
@@ -72,8 +72,8 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    background: hsl(278, 8%, 11%);
-    color: hsl(280, 65%, 90%);
+    background: #101636;
+    color: #ffffff;
   }
 
   html {
@@ -139,71 +139,37 @@
     border-color: var(--brand-accent);
   }
   
-  .brand-secondary {
-    color: hsl(78, 94%, 51%);
-  }
-  
-  .brand-accent {
-    color: hsl(195, 98%, 50%);
-  }
-  
-  .bg-brand-primary {
-    background-color: hsl(315, 76%, 49%);
-  }
-  
-  .bg-brand-secondary {
-    background-color: hsl(78, 94%, 51%);
-  }
-  
-  .bg-brand-accent {
-    background-color: hsl(195, 98%, 50%);
-  }
-  
-  .bg-brand-dark-purple {
-    background-color: hsl(280, 65%, 16%);
-  }
-  
-  .bg-brand-dark-bg {
-    background-color: hsl(278, 8%, 11%);
-  }
-  
-  .border-brand-primary {
-    border-color: hsl(315, 76%, 49%);
-  }
-  
-  .border-brand-secondary {
-    border-color: hsl(78, 94%, 51%);
-  }
-  
-  .border-brand-accent {
-    border-color: hsl(195, 98%, 50%);
-  }
-  
-  .text-brand-primary {
-    color: hsl(315, 76%, 49%);
-  }
-  
-  .text-brand-secondary {
-    color: hsl(78, 94%, 51%);
-  }
-  
-  .text-brand-accent {
-    color: hsl(195, 98%, 50%);
-  }
+  .brand-secondary { color: var(--brand-secondary); }
+  .brand-accent { color: var(--brand-accent); }
+  .bg-brand-primary { background-color: var(--brand-primary); }
+  .bg-brand-secondary { background-color: var(--brand-secondary); }
+  .bg-brand-accent { background-color: var(--brand-accent); }
+  .bg-brand-dark-purple { background-color: #0f1738; }
+  .bg-brand-dark-bg { background-color: #101636; }
+  .border-brand-primary { border-color: var(--brand-primary); }
+  .border-brand-secondary { border-color: var(--brand-secondary); }
+  .border-brand-accent { border-color: var(--brand-accent); }
+  .text-brand-primary { color: var(--brand-primary); }
+  .text-brand-secondary { color: var(--brand-secondary); }
+  .text-brand-accent { color: var(--brand-accent); }
 
-  .gradient-primary {
-    background: linear-gradient(135deg, hsl(315, 76%, 49%) 0%, hsl(78, 94%, 51%) 100%);
-  }
+  .gradient-primary { background: var(--gradient-primary); }
 
-  .gradient-accent {
-    background: linear-gradient(135deg, hsl(195, 98%, 50%) 0%, hsl(315, 76%, 49%) 100%);
-  }
+  .gradient-accent { background: var(--gradient-accent); }
 
   .gradient-text {
-    background: linear-gradient(135deg, hsl(315, 76%, 49%) 0%, hsl(78, 94%, 51%) 100%);
+    background: var(--gradient-primary);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  /* Neon glow helpers for tech/AI/web3 aesthetic */
+  .neon-glow-primary {
+    box-shadow: 0 0 0.5rem rgba(var(--brand-primary-rgb), 0.5), 0 0 1.5rem rgba(var(--brand-primary-rgb), 0.35), 0 0 3rem rgba(var(--brand-primary-rgb), 0.2);
+  }
+  .neon-glow-accent {
+    box-shadow: 0 0 0.5rem rgba(var(--brand-accent-rgb), 0.5), 0 0 1.5rem rgba(var(--brand-accent-rgb), 0.35), 0 0 3rem rgba(var(--brand-accent-rgb), 0.2);
   }
 
 

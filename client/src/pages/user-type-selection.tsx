@@ -65,10 +65,12 @@ export default function UserTypeSelection() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-dark-purple/20 via-brand-dark-bg to-brand-dark-green/20" />
-      
+    <div className="relative min-h-screen bg-brand-dark-bg overflow-hidden">
+      {/* Background: layered radials and subtle gradient */}
+      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.18),transparent_60%),radial-gradient(40%_40%_at_80%_20%,rgba(20,254,238,0.15),transparent_60%),radial-gradient(30%_35%_at_10%_70%,rgba(20,254,238,0.08),transparent_60%)]" />
+      <div className="absolute inset-0 gradient-primary opacity-[0.05]" />
+      <img src="/fandomly-logo-with-text.png" alt="" className="absolute -bottom-10 -right-10 w-[520px] opacity-[0.06] pointer-events-none select-none" />
+
       <div className="relative z-10 container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
@@ -136,7 +138,8 @@ export default function UserTypeSelection() {
                 </div>
                 
                 <Button 
-                  className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white"
+                  variant="neon"
+                  className="w-full"
                   disabled={isRegistering}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -198,7 +201,8 @@ export default function UserTypeSelection() {
                 </div>
                 
                 <Button 
-                  className="w-full bg-brand-secondary hover:bg-brand-secondary/80 text-[#101636] font-bold"
+                  variant="neon-accent"
+                  className="w-full font-bold"
                   disabled={isRegistering}
                   onClick={(e) => {
                     e.stopPropagation();

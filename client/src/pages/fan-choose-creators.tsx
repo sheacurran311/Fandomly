@@ -80,8 +80,12 @@ export default function FanChooseCreators() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="relative min-h-screen bg-brand-dark-bg overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.14),transparent_60%),radial-gradient(40%_40%_at_80%_20%,rgba(20,254,238,0.12),transparent_60%)]" />
+      <div className="absolute inset-0 gradient-primary opacity-[0.04]" />
+      <img src="/fandomly-logo-with-text.png" alt="" className="absolute -bottom-8 -right-8 w-[420px] opacity-[0.06] pointer-events-none select-none" />
+
+      <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-5xl mx-auto space-y-6">
           <Card className="bg-white/5 border-white/10">
             <CardHeader>
@@ -116,7 +120,7 @@ export default function FanChooseCreators() {
                         )}
                       </div>
                       <div className="mt-3">
-                        <Button className="w-full bg-brand-primary" onClick={() => toggle(c.id)}>
+                        <Button variant="neon" className="w-full" onClick={() => toggle(c.id)}>
                           {selected[c.id] ? "Selected" : c.hasActiveCampaign ? "Join" : "Follow"}
                         </Button>
                       </div>
@@ -126,7 +130,7 @@ export default function FanChooseCreators() {
               </div>
 
               <div className="mt-6 flex justify-end">
-                <Button className="bg-brand-primary" onClick={joinSelected}>
+                <Button variant="neon" onClick={joinSelected}>
                   Continue to Dashboard
                 </Button>
               </div>

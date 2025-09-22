@@ -18,6 +18,8 @@ const buttonVariants = cva(
         "outline-destructive": "border-2 border-red-500 text-red-400 hover:bg-red-500 hover:text-white focus-visible:ring-red-500",
         ghost: "text-gray-300 hover:text-white hover:bg-brand-primary/20 focus-visible:ring-brand-primary",
         link: "text-brand-primary underline-offset-4 hover:underline focus-visible:ring-brand-primary",
+        neon: "relative bg-brand-primary text-white hover:bg-brand-primary/90 hover:scale-[1.03] focus-visible:ring-brand-primary shadow-[0_0_12px_rgba(225,6,152,0.65),_0_0_32px_rgba(225,6,152,0.35)] after:content-[''] after:absolute after:inset-0 after:rounded-lg after:blur after:opacity-70 after:bg-[radial-gradient(ellipse_at_center,rgba(225,6,152,0.55),transparent_60%)]",
+        "neon-accent": "relative bg-brand-accent text-[#0e1430] hover:bg-brand-accent/90 hover:scale-[1.03] focus-visible:ring-brand-accent shadow-[0_0_12px_rgba(20,254,238,0.65),_0_0_32px_rgba(20,254,238,0.35)] after:content-[''] after:absolute after:inset-0 after:rounded-lg after:blur after:opacity-70 after:bg-[radial-gradient(ellipse_at_center,rgba(20,254,238,0.55),transparent_60%)]",
       },
       size: {
         sm: "h-8 px-3 text-sm",

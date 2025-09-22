@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 import { URLSearchParams } from "url";
 
@@ -117,6 +118,60 @@ async function getTwitterUser(accessToken: string) {
 }
 
 export function registerSocialRoutes(app: Express) {
+  // ===== Facebook deauthorization callback =====
+  app.post('/api/facebook/deauthorize', express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+      console.log('Facebook deauthorization callback received');
+      
+      // Parse the request body
+      const body = JSON.parse(req.body.toString());
+      const { user_id, app_id } = body;
+      
+      // Verify this is for our app
+      const expectedAppId = process.env.FACEBOOK_APP_ID;
+      if (app_id !== expectedAppId) {
+        console.warn('Deauthorization callback for wrong app ID:', app_id);
+        return res.status(400).json({ error: 'Invalid app ID' });
+      }
+      
+      console.log('Processing deauthorization for Facebook user:', user_id);
+      
+      // Find all users with this Facebook ID and clean up their data
+      const users = await storage.getUsersByFacebookId(user_id);
+      
+      for (const user of users) {
+        console.log('Cleaning up Facebook data for user:', user.id);
+        
+        // Remove Facebook data from user profile
+        const updatedProfileData = { ...user.profileData };
+        if (updatedProfileData?.facebookData) {
+          delete updatedProfileData.facebookData;
+        }
+        if (updatedProfileData?.socialConnections?.facebook) {
+          delete updatedProfileData.socialConnections.facebook;
+        }
+        
+        // Update user with cleaned profile data
+        await storage.updateUser(user.id, { 
+          profileData: updatedProfileData
+        });
+        
+        // Log the deauthorization event
+        console.log('Facebook data removed for user:', user.id, 'Facebook ID:', user_id);
+      }
+      
+      // Facebook expects a 200 OK response with specific format
+      res.status(200).json({
+        url: `${process.env.FRONTEND_URL || 'https://fandomly.ai'}/data-deletion`,
+        confirmation_code: `deauth_${user_id}_${Date.now()}`
+      });
+      
+    } catch (error) {
+      console.error('Facebook deauthorization callback error:', error);
+      res.status(500).json({ error: 'Failed to process deauthorization' });
+    }
+  });
+
   // ===== Facebook Graph API helpers and debug proxy =====
   const FB_API_VERSION = process.env.FACEBOOK_API_VERSION || 'v23.0';
   const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
