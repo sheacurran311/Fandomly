@@ -323,7 +323,7 @@ class FacebookSDKManager {
   /**
    * Get user pages with error handling
    */
-  static async getUserPages(): Promise<FacebookPage[]> {
+  static async getUserPages(_accessToken?: string): Promise<FacebookPage[]> {
     if (!window.FB || !this.isInitialized) {
       console.error('[FB Manager] SDK not initialized for getUserPages');
       return [];
@@ -352,6 +352,7 @@ class FacebookSDKManager {
     isLoggedIn: boolean; 
     userID?: string; 
     status?: string; 
+    accessToken?: string;
   }> {
     if (!window.FB || !this.isInitialized) {
       return { isLoggedIn: false, status: 'sdk_not_ready' };
@@ -366,7 +367,8 @@ class FacebookSDKManager {
           resolve({ 
             isLoggedIn: true, 
             userID: response.authResponse.userID,
-            status: response.status 
+            status: response.status,
+            accessToken: response.authResponse.accessToken
           });
         } else {
           resolve({ 
@@ -393,6 +395,115 @@ class FacebookSDKManager {
         resolve();
       });
     });
+  }
+
+  /**
+   * Back-compat: Simple login with arbitrary scopes.
+   * Returns a shape expected by existing contexts: { success, accessToken, userID, status }
+   */
+  static async login(scopes: string): Promise<{ success: boolean; accessToken?: string; userID?: string; status?: string; }> {
+    // Default to fan app for simple login unless already initialized
+    if (!this.isInitialized) {
+      await this.ensureFBReady('fan');
+    }
+
+    return new Promise((resolve) => {
+      window.FB.login((response) => {
+        console.log('[FB Manager] login() status:', response?.status);
+        if (response?.status === 'connected' && response.authResponse) {
+          resolve({
+            success: true,
+            accessToken: response.authResponse.accessToken,
+            userID: response.authResponse.userID,
+            status: response.status
+          });
+        } else {
+          resolve({ success: false, status: response?.status });
+        }
+      }, { scope: scopes });
+    });
+  }
+
+  /**
+   * Back-compat: logout alias expected by some contexts
+   */
+  static async logout(): Promise<void> {
+    return this.secureLogout();
+  }
+
+  /**
+   * Back-compat: get basic user info
+   */
+  static async getUserInfo(_accessToken?: string): Promise<FacebookUser | null> {
+    if (!window.FB || !this.isInitialized) {
+      return null;
+    }
+    return new Promise((resolve) => {
+      window.FB.api('/me', 'GET', { fields: 'id,name,email,picture.width(200).height(200)' }, (response: any) => {
+        if (response && !response.error) {
+          resolve({
+            id: response.id,
+            name: response.name,
+            email: response.email,
+            picture: response.picture
+          } as FacebookUser);
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  /**
+   * Back-compat: get page follower count using page access token
+   */
+  static async getPageFollowerCount(pageId: string, pageAccessToken: string): Promise<number | null> {
+    try {
+      return await new Promise<number | null>((resolve) => {
+        window.FB.api(
+          `/${pageId}`,
+          'GET',
+          { fields: 'followers_count,fan_count', access_token: pageAccessToken },
+          (resp: any) => {
+            if (resp && !resp.error) {
+              resolve(resp.followers_count ?? resp.fan_count ?? null);
+            } else {
+              console.error('[FB Manager] getPageFollowerCount error:', resp?.error?.message);
+              resolve(null);
+            }
+          }
+        );
+      });
+    } catch (e) {
+      console.error('[FB Manager] getPageFollowerCount exception:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Back-compat: get simple engagement data for a page
+   */
+  static async getPageEngagementData(pageId: string, pageAccessToken: string): Promise<any> {
+    try {
+      return await new Promise<any>((resolve) => {
+        window.FB.api(
+          `/${pageId}/insights`,
+          'GET',
+          { metric: 'page_impressions_unique,page_engaged_users', period: 'day', access_token: pageAccessToken },
+          (resp: any) => {
+            if (resp && !resp.error) {
+              resolve(resp.data ?? []);
+            } else {
+              console.error('[FB Manager] getPageEngagementData error:', resp?.error?.message);
+              resolve([]);
+            }
+          }
+        );
+      });
+    } catch (e) {
+      console.error('[FB Manager] getPageEngagementData exception:', e);
+      return [];
+    }
   }
 
   /**

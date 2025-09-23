@@ -124,13 +124,35 @@ class InstagramSDKManager {
       code_length: code.length
     });
     
+    // Propagate auth to backend: Authorization + x-dynamic-user-id
+    let authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      // Dynamic auth token (optional)
+      const maybeGetAuthToken = (await import('@dynamic-labs/sdk-react-core')).getAuthToken;
+      const token = maybeGetAuthToken?.();
+      if (token) {
+        authHeaders['Authorization'] = `Bearer ${token}`;
+      }
+    } catch {}
+
+    // Dynamic user ID from parent (popup) or current window
+    const openerDynId = typeof window !== 'undefined' && (window as any).opener ? (window as any).opener.__dynamicUserId : null;
+    const currentDynId = (window as any).__dynamicUserId || null;
+    const dynamicUserId = openerDynId || currentDynId || null;
+    if (dynamicUserId) {
+      authHeaders['x-dynamic-user-id'] = dynamicUserId;
+    } else {
+      console.warn('[Instagram Manager] No dynamicUserId available for token exchange');
+    }
+
     const response = await fetch('/api/social/instagram/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({ 
         code, 
         redirect_uri: config.redirectUri,
-        user_type: userType
+        user_type: userType,
+        dynamicUserId
       })
     });
     
@@ -313,21 +335,71 @@ class InstagramSDKManager {
    */
   private static async loginViaDirect(userType: UserType): Promise<InstagramLoginResult> {
     try {
-      const authUrl = this.getAuthUrl(userType, `instagram_${userType}_${Date.now()}`);
+      // Generate a unique state parameter for CSRF protection
+      const stateValue = `instagram_${userType}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       
-      console.log('[Instagram Manager] Redirecting to Instagram OAuth:', authUrl);
+      // Store the state in localStorage for validation (works across popup/parent)
+      localStorage.setItem('instagram_oauth_state', stateValue);
+      console.log('[Instagram Manager] Stored OAuth state:', stateValue);
       
-      // Redirect to Instagram OAuth
-      window.location.href = authUrl;
+      const authUrl = this.getAuthUrl(userType, stateValue);
       
-      // This will redirect away, so we return a pending state
-      // The actual token exchange happens in the callback handler
-      return {
-        success: false,
-        error: 'Redirecting to Instagram...'
-      };
+      console.log('[Instagram Manager] Opening Instagram OAuth popup:', authUrl);
+      
+      // Use popup instead of full redirect (similar to Facebook pattern)
+      return new Promise((resolve) => {
+        const popup = window.open(
+          authUrl,
+          'instagram-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({
+            success: false,
+            error: 'Popup blocked. Please allow popups for this site and try again.'
+          });
+          return;
+        }
+
+        // Poll for popup completion
+        const pollTimer = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              // Check if we have callback data in the global handler
+              const callbackData = (window as any).instagramCallbackData;
+              if (callbackData) {
+                delete (window as any).instagramCallbackData;
+                resolve(callbackData);
+              } else {
+                resolve({
+                  success: false,
+                  error: 'Instagram authorization was cancelled or failed'
+                });
+              }
+            }
+          } catch (error) {
+            // Cross-origin error means popup is still open
+          }
+        }, 1000);
+
+        // Set up message listener for popup communication
+        const messageListener = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          
+          if (event.data.type === 'instagram-oauth-result') {
+            clearInterval(pollTimer);
+            window.removeEventListener('message', messageListener);
+            popup.close();
+            resolve(event.data.result);
+          }
+        };
+
+        window.addEventListener('message', messageListener);
+      });
     } catch (error) {
-      console.error('[Instagram Manager] Login redirect error:', error);
+      console.error('[Instagram Manager] Login popup error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to initiate Instagram login'
@@ -341,6 +413,25 @@ class InstagramSDKManager {
   static async handleCallback(code: string, state: string): Promise<InstagramLoginResult> {
     try {
       console.log('[Instagram Manager] Handling OAuth callback with code:', code.substring(0, 10) + '...', 'state:', state);
+      
+      // Validate state parameter for CSRF protection
+      const storedState = localStorage.getItem('instagram_oauth_state');
+      console.log('[Instagram Manager] State validation:', {
+        received: state,
+        stored: storedState,
+        matches: state === storedState
+      });
+      
+      if (!storedState || state !== storedState) {
+        console.error('[Instagram Manager] State validation failed - possible CSRF attack');
+        return {
+          success: false,
+          error: 'Invalid state parameter - security validation failed'
+        };
+      }
+      
+      // Clear the stored state after successful validation
+      localStorage.removeItem('instagram_oauth_state');
       
       // Determine user type from state
       const userType: UserType = state.includes('creator') ? 'creator' : 'fan';

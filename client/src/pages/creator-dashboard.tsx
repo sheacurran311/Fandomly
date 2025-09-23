@@ -31,34 +31,110 @@ export default function CreatorDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
   const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
-  const { completeConnection } = useInstagramConnection();
+  
+  // Only use Instagram connection for creators
+  const instagramConnection = user?.userType === 'creator' ? useInstagramConnection() : null;
+  const { completeConnection } = instagramConnection || { completeConnection: async () => {} };
 
-  // Handle Instagram OAuth callback
+  // Immediate callback detection (before useEffect)
+  if (user?.userType === 'creator') {
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const hasInstagramCallback = code && state?.includes('instagram');
+    
+    if (hasInstagramCallback) {
+      console.log('[Creator Dashboard] 🚀 IMMEDIATE Instagram callback detected:', {
+        codeLength: code?.length,
+        state: state,
+        fullUrl: window.location.href
+      });
+    }
+  }
+
+  // Handle Instagram OAuth callback (only for creators)
   useEffect(() => {
     const handleInstagramCallback = async () => {
-      console.log('[Creator Dashboard] Checking for Instagram callback params in URL:', window.location.search);
-      
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      const error = urlParams.get('error');
+      // Only process Instagram callbacks for creators
+      if (user?.userType !== 'creator') {
+        console.log('[Creator Dashboard] Not a creator user, skipping Instagram callback processing');
+        return;
+      }
 
-      console.log('[Creator Dashboard] URL params found:', {
-        hasCode: !!code,
-        hasState: !!state,
-        hasError: !!error,
-        state: state,
-        codeLength: code?.length
+      // Add a small delay to ensure URL is fully loaded
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      console.log('[Creator Dashboard] 🔍 FULL URL ANALYSIS:');
+      console.log('- Full URL:', window.location.href);
+      console.log('- Pathname:', window.location.pathname);
+      console.log('- Search:', window.location.search);
+      console.log('- Hash:', window.location.hash);
+      console.log('- Is popup:', !!window.opener);
+      
+      // Check for parameters in both search and hash (some OAuth flows use hash)
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      
+      const code = searchParams.get('code') || hashParams.get('code');
+      const state = searchParams.get('state') || hashParams.get('state');
+      const error = searchParams.get('error') || hashParams.get('error');
+
+      console.log('[Creator Dashboard] 🔍 PARAMETER DETECTION:');
+      console.log('- Code (search):', searchParams.get('code') ? 'FOUND' : 'NOT_FOUND');
+      console.log('- Code (hash):', hashParams.get('code') ? 'FOUND' : 'NOT_FOUND');
+      console.log('- State (search):', searchParams.get('state') ? 'FOUND' : 'NOT_FOUND');
+      console.log('- State (hash):', hashParams.get('state') ? 'FOUND' : 'NOT_FOUND');
+      console.log('- Final code:', code ? code.substring(0, 10) + '...' : 'NONE');
+      console.log('- Final state:', state || 'NONE');
+
+      // Check if this looks like an Instagram callback URL structure
+      const hasInstagramIndicators = 
+        window.location.href.includes('code=') || 
+        window.location.href.includes('error=') ||
+        (state && state.includes('instagram'));
+
+      console.log('[Creator Dashboard] Instagram callback indicators:', {
+        hasCodeInURL: window.location.href.includes('code='),
+        hasErrorInURL: window.location.href.includes('error='),
+        hasInstagramState: state?.includes('instagram'),
+        overallDetection: hasInstagramIndicators
       });
 
       // Only process if we have Instagram callback parameters
-      if (!code && !error) {
+      if (!code && !error && !hasInstagramIndicators) {
         console.log('[Creator Dashboard] No Instagram callback parameters found, skipping');
         return;
       }
 
+      // Process Instagram callbacks (even if state is missing for debugging)
+      if (code || error || hasInstagramIndicators) {
+        console.log('[Creator Dashboard] 🎯 PROCESSING INSTAGRAM CALLBACK');
+      }
+
       if (error) {
-        const errorDescription = urlParams.get('error_description');
+        const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
+        
+        // If opened in popup, communicate result to parent
+        if (window.opener) {
+          console.log('[Creator Dashboard] Communicating error to parent window');
+          window.opener.postMessage({
+            type: 'instagram-oauth-result',
+            result: {
+              success: false,
+              error: errorDescription || error
+            }
+          }, window.location.origin);
+          
+          // Store result in parent window for fallback
+          (window.opener as any).instagramCallbackData = {
+            success: false,
+            error: errorDescription || error
+          };
+          
+          window.close();
+          return;
+        }
+        
         toast({
           title: "Instagram Connection Failed",
           description: errorDescription || "Authorization was cancelled or failed",
@@ -78,9 +154,32 @@ export default function CreatorDashboard() {
           console.log('[Creator Dashboard] handleCallback result:', result);
           
           if (result.success) {
-            console.log('[Creator Dashboard] Callback successful, calling completeConnection...');
-            await completeConnection(result);
-            console.log('[Creator Dashboard] completeConnection finished');
+            console.log('[Creator Dashboard] Callback successful, calling global handler...');
+            
+            // Use the global callback handler (similar to Facebook pattern)
+            if ((window as any).handleInstagramConnectionResult) {
+              (window as any).handleInstagramConnectionResult(result);
+            } else {
+              // Fallback to direct completeConnection
+              await completeConnection(result);
+            }
+            
+            console.log('[Creator Dashboard] Instagram connection processing finished');
+            
+            // If opened in popup, communicate result to parent and close
+            if (window.opener) {
+              console.log('[Creator Dashboard] Communicating success to parent window');
+              window.opener.postMessage({
+                type: 'instagram-oauth-result',
+                result: result
+              }, window.location.origin);
+              
+              // Store result in parent window for fallback
+              (window.opener as any).instagramCallbackData = result;
+              
+              window.close();
+              return;
+            }
             
             toast({
               title: "Instagram Connected! 📸",
@@ -89,6 +188,21 @@ export default function CreatorDashboard() {
             });
           } else {
             console.error('[Creator Dashboard] Callback failed:', result.error);
+            
+            // If opened in popup, communicate result to parent
+            if (window.opener) {
+              window.opener.postMessage({
+                type: 'instagram-oauth-result',
+                result: result
+              }, window.location.origin);
+              
+              // Store result in parent window for fallback
+              (window.opener as any).instagramCallbackData = result;
+              
+              window.close();
+              return;
+            }
+            
             toast({
               title: "Instagram Connection Failed",
               description: result.error || "Failed to complete connection",
@@ -97,6 +211,27 @@ export default function CreatorDashboard() {
           }
         } catch (error) {
           console.error('[Creator Dashboard] Instagram callback error:', error);
+          
+          // If opened in popup, communicate result to parent
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'instagram-oauth-result',
+              result: {
+                success: false,
+                error: error instanceof Error ? error.message : "An error occurred while connecting Instagram"
+              }
+            }, window.location.origin);
+            
+            // Store result in parent window for fallback
+            (window.opener as any).instagramCallbackData = {
+              success: false,
+              error: error instanceof Error ? error.message : "An error occurred while connecting Instagram"
+            };
+            
+            window.close();
+            return;
+          }
+          
           toast({
             title: "Instagram Connection Error",
             description: "An error occurred while connecting Instagram",
@@ -104,14 +239,16 @@ export default function CreatorDashboard() {
           });
         }
         
-        // Clean up URL after processing
-        console.log('[Creator Dashboard] Cleaning up URL parameters');
-        window.history.replaceState({}, document.title, '/creator-dashboard');
+        // Clean up URL after processing (only if not in popup)
+        if (!window.opener) {
+          console.log('[Creator Dashboard] Cleaning up URL parameters');
+          window.history.replaceState({}, document.title, '/creator-dashboard');
+        }
       }
     };
 
     handleInstagramCallback();
-  }, [completeConnection]);
+  }, [user?.userType, completeConnection]);
 
   if (isLoading) {
     return (

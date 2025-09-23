@@ -23,6 +23,13 @@ export default defineConfig({
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },
+  define: {
+    global: 'globalThis',
+    'process.env': {}
+  },
+  optimizeDeps: {
+    include: ['buffer']
+  },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),

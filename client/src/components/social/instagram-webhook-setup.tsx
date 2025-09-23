@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useInstagramConnection } from '@/contexts/instagram-connection-context';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
+import { fetchApi } from '@/lib/queryClient';
 import { 
   Webhook, 
   CheckCircle, 
@@ -26,6 +27,9 @@ interface WebhookStatus {
 export default function InstagramWebhookSetup() {
   const { user } = useAuth();
   const { isConnected, userInfo, accessToken } = useInstagramConnection();
+  const initCheckRef = useRef<string | null>(null);
+  const checkingRef = useRef(false);
+  const lastCheckTsRef = useRef<number>(0);
   const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>({
     subscribed: false,
     fields: [],
@@ -45,33 +49,34 @@ export default function InstagramWebhookSetup() {
   ];
 
   const checkWebhookStatus = async () => {
-    if (!accessToken || !userInfo.id) return;
+    if (!accessToken || !userInfo?.id) return;
+    if (checkingRef.current) return;
+    const now = Date.now();
+    if (now - lastCheckTsRef.current < 15000) return; // throttle to 15s
 
+    checkingRef.current = true;
+    lastCheckTsRef.current = now;
     setWebhookStatus(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      const response = await fetch(`/api/instagram/webhook-status?access_token=${accessToken}&instagram_account_id=${userInfo.id}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to check webhook status');
-      }
-
-      const data = await response.json();
-      
+      const data = await fetchApi(`/api/instagram/webhook-status?access_token=${accessToken}&instagram_account_id=${userInfo.id}`);
       setWebhookStatus(prev => ({
         ...prev,
         subscribed: data.data && data.data.length > 0,
         fields: data.data ? data.data.map((item: any) => item.subscribed_fields).flat() : [],
         loading: false
       }));
-
-    } catch (error) {
+    } catch (error: any) {
+      const msg = (error?.message as string) || 'Failed to check webhook status';
+      // Handle rate limit gracefully
+      if (msg.includes('429') || msg.toLowerCase().includes('rate')) {
+        toast({ title: 'Rate Limited', description: 'Too many requests. Cooling down for 1 minute.' });
+        lastCheckTsRef.current = Date.now() + 60000; // backoff 60s
+      }
       console.error('[Instagram Webhooks] Status check error:', error);
-      setWebhookStatus(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to check webhook status'
-      }));
+      setWebhookStatus(prev => ({ ...prev, loading: false, error: msg }));
+    } finally {
+      checkingRef.current = false;
     }
   };
 
@@ -81,22 +86,14 @@ export default function InstagramWebhookSetup() {
     setWebhookStatus(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      const response = await fetch('/api/instagram/subscribe-webhooks', {
+      const result = await fetchApi('/api/instagram/subscribe-webhooks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           access_token: accessToken,
           instagram_account_id: userInfo.id,
           fields: ['messages', 'message_reactions', 'comments']
         })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to subscribe to webhooks');
-      }
-
-      const result = await response.json();
       
       setWebhookStatus(prev => ({
         ...prev,
@@ -129,10 +126,15 @@ export default function InstagramWebhookSetup() {
     }
   };
 
-  // Check webhook status on component mount
+  // Check webhook status on account change (one-shot per account id)
   useEffect(() => {
-    checkWebhookStatus();
-  }, [accessToken, userInfo.id]);
+    if (!accessToken || !userInfo?.id) return;
+    if (initCheckRef.current !== userInfo.id) {
+      initCheckRef.current = userInfo.id;
+      lastCheckTsRef.current = 0; // reset throttle for new account
+      checkWebhookStatus();
+    }
+  }, [accessToken, userInfo?.id]);
 
   return (
     <Card className="w-full max-w-2xl">

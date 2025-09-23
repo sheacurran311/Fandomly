@@ -39,6 +39,19 @@ export default function InstagramCallback() {
           setStatus('error');
           setError(`Authorization failed: ${errorDescription || error}`);
           
+          // If opened in popup, communicate result to parent
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'instagram-oauth-result',
+              result: {
+                success: false,
+                error: errorDescription || error
+              }
+            }, window.location.origin);
+            window.close();
+            return;
+          }
+          
           toast({
             title: "Instagram Authorization Failed",
             description: errorDescription || "The authorization was cancelled or failed.",
@@ -51,6 +64,19 @@ export default function InstagramCallback() {
         if (!code || !state) {
           setStatus('error');
           setError('Missing authorization code or state parameter');
+          
+          // If opened in popup, communicate result to parent
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'instagram-oauth-result',
+              result: {
+                success: false,
+                error: 'Missing authorization code or state parameter'
+              }
+            }, window.location.origin);
+            window.close();
+            return;
+          }
           return;
         }
 
@@ -63,8 +89,34 @@ export default function InstagramCallback() {
           setUserInfo(result.user);
           setStatus('success');
 
-          // Save the connection data to context/localStorage
-          // This will be handled by the InstagramConnectionContext
+          // Use the global callback handler to update the Instagram connection context
+          if ((window as any).handleInstagramConnectionResult) {
+            console.log('[Instagram Callback] Using global callback handler');
+            (window as any).handleInstagramConnectionResult(result);
+          } else {
+            console.log('[Instagram Callback] Global callback handler not available, using direct connection');
+            // Fallback: try to update context directly if available
+            try {
+              await connectInstagram();
+            } catch (error) {
+              console.error('[Instagram Callback] Direct connection failed:', error);
+            }
+          }
+
+          // If opened in popup, communicate result to parent and close
+          if (window.opener) {
+            console.log('[Instagram Callback] Communicating result to parent window');
+            window.opener.postMessage({
+              type: 'instagram-oauth-result',
+              result: result
+            }, window.location.origin);
+            
+            // Store result in parent window for fallback
+            (window.opener as any).instagramCallbackData = result;
+            
+            window.close();
+            return;
+          }
           
           toast({
             title: "Instagram Connected! 📸",
@@ -72,7 +124,7 @@ export default function InstagramCallback() {
             duration: 4000
           });
 
-          // Redirect to creator dashboard after a short delay
+          // Redirect to creator dashboard after a short delay (only if not in popup)
           setTimeout(() => {
             setLocation('/creator-dashboard');
           }, 2000);
@@ -80,6 +132,16 @@ export default function InstagramCallback() {
         } else {
           setStatus('error');
           setError(result.error || 'Failed to complete Instagram connection');
+          
+          // If opened in popup, communicate result to parent
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'instagram-oauth-result',
+              result: result
+            }, window.location.origin);
+            window.close();
+            return;
+          }
           
           toast({
             title: "Instagram Connection Failed",
@@ -92,6 +154,19 @@ export default function InstagramCallback() {
         console.error('[Instagram Callback] Error:', error);
         setStatus('error');
         setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+        
+        // If opened in popup, communicate result to parent
+        if (window.opener) {
+          window.opener.postMessage({
+            type: 'instagram-oauth-result',
+            result: {
+              success: false,
+              error: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }
+          }, window.location.origin);
+          window.close();
+          return;
+        }
         
         toast({
           title: "Instagram Connection Error",

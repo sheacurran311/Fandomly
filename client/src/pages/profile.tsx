@@ -38,14 +38,15 @@ export default function Profile() {
   const [isImporting, setIsImporting] = useState(false);
   const [isConnectedToFacebook, setIsConnectedToFacebook] = useState(false);
   
-  // Instagram connection state
+  // Instagram connection state (only for creators)
+  const instagramConnection = user?.userType === 'creator' ? useInstagramConnection() : null;
   const { 
-    isConnected: instagramConnected, 
-    isConnecting: instagramConnecting,
-    userInfo: instagramUserInfo,
-    connectInstagram,
-    disconnectInstagram
-  } = useInstagramConnection();
+    isConnected: instagramConnected = false, 
+    isConnecting: instagramConnecting = false,
+    userInfo: instagramUserInfo = null,
+    connectInstagram = async () => {},
+    disconnectInstagram = async () => {}
+  } = instagramConnection || {};
   
   // Check Facebook connection status
   useEffect(() => {
@@ -378,49 +379,52 @@ export default function Profile() {
                     </Button>
                   </div>
                   
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Instagram className="h-5 w-5 text-pink-400" />
-                      <div>
-                        <div className="text-white font-medium">Instagram</div>
-                        <div className="text-xs text-gray-400">
-                          {instagramConnected && instagramUserInfo ? 
-                            `Connected as @${instagramUserInfo.username}` : 
-                            "Connect your Instagram Business account"
-                          }
+                  {/* Instagram integration - only show for creators */}
+                  {user?.userType === 'creator' && (
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Instagram className="h-5 w-5 text-pink-400" />
+                        <div>
+                          <div className="text-white font-medium">Instagram</div>
+                          <div className="text-xs text-gray-400">
+                            {instagramConnected && instagramUserInfo ? 
+                              `Connected as @${instagramUserInfo.username}` : 
+                              "Connect your Instagram Business account"
+                            }
+                          </div>
                         </div>
                       </div>
+                      {instagramConnected ? (
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => window.open(`https://instagram.com/${instagramUserInfo?.username}`, '_blank')}
+                          >
+                            View Profile
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={disconnectInstagram}
+                            data-testid="button-disconnect-instagram"
+                          >
+                            <Unlink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white"
+                          size="sm" 
+                          onClick={connectInstagram}
+                          disabled={instagramConnecting}
+                          data-testid="button-connect-instagram"
+                        >
+                          {instagramConnecting ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
                     </div>
-                    {instagramConnected ? (
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => window.open(`https://instagram.com/${instagramUserInfo?.username}`, '_blank')}
-                        >
-                          View Profile
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={disconnectInstagram}
-                          data-testid="button-disconnect-instagram"
-                        >
-                          <Unlink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button 
-                        className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white"
-                        size="sm" 
-                        onClick={connectInstagram}
-                        disabled={instagramConnecting}
-                        data-testid="button-connect-instagram"
-                      >
-                        {instagramConnecting ? 'Connecting...' : 'Connect'}
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 

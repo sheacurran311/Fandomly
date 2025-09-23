@@ -24,7 +24,29 @@ export default function AuthRouter({ children }: AuthRouterProps) {
   const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
 
   useEffect(() => {
+    const isPopup = typeof window !== 'undefined' && !!(window as any).opener;
+    const isOAuthRoute = currentPath === '/creator-dashboard' || currentPath === '/instagram-callback';
+
+    // Critical: When handling OAuth inside a popup, do NOT redirect.
+    // Redirects here can strip query params (code/state) and prevent the popup from posting back to parent.
+    if (isPopup && isOAuthRoute) {
+      console.log('AuthRouter - Popup OAuth context detected; skipping redirects');
+      return;
+    }
+
     console.log("AuthRouter - Dynamic user:", !!dynamicUser, "User data:", !!userData, "Loading:", isLoading);
+    console.log("AuthRouter - Current path:", currentPath);
+    console.log("AuthRouter - Dynamic user details:", {
+      userId: dynamicUser?.userId,
+      firstName: dynamicUser?.firstName,
+      alias: dynamicUser?.alias,
+      hasVerifiedCredentials: !!dynamicUser?.verifiedCredentials?.length
+    });
+    console.log("AuthRouter - User data details:", {
+      userType: userData?.userType,
+      onboardingCompleted: userData?.onboardingState?.isCompleted,
+      hasCompletedOnboarding: userData?.hasCompletedOnboarding
+    });
     
     // Set Dynamic user ID in window for API requests (secure approach)
     if (dynamicUser?.userId) {
@@ -56,13 +78,17 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (!userData) {
       // User connected to Dynamic but not registered in our system
       console.log("AuthRouter - User not registered, current path:", currentPath);
+      console.log("AuthRouter - Dynamic user exists but no userData - checking if API call failed");
       
       // If trying to access protected route, redirect to user type selection
       if (isProtectedRoute) {
         console.log('AuthRouter - Unregistered user accessing protected route, redirecting to user type selection');
         setLocation('/user-type-selection');
-      } else if (currentPath !== '/user-type-selection' && currentPath !== '/') {
-        console.log('AuthRouter - Redirecting to user type selection');
+      } else if (currentPath === '/') {
+        console.log('AuthRouter - Unregistered user on homepage, redirecting to user type selection');
+        setLocation('/user-type-selection');
+      } else if (currentPath !== '/user-type-selection' && !publicRoutes.includes(currentPath)) {
+        console.log('AuthRouter - Redirecting unregistered user to user type selection from:', currentPath);
         setLocation('/user-type-selection');
       }
       return;
@@ -134,22 +160,35 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     
     // Redirect authenticated users away from homepage to their appropriate dashboard
     if (currentPath === '/') {
+      console.log('AuthRouter - Authenticated user on homepage, determining redirect...');
+      console.log('AuthRouter - User type:', userData?.userType, 'Onboarding completed:', userData?.onboardingState?.isCompleted);
+      
+      // Check if we have Instagram callback parameters to preserve
+      const hasInstagramCallback = window.location.search.includes('code=') || window.location.search.includes('state=instagram_');
+      console.log('AuthRouter - Has Instagram callback params:', hasInstagramCallback, 'Search:', window.location.search);
+      
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Creator needs onboarding, redirecting to creator type selection');
+          console.log('AuthRouter - Creator needs onboarding, redirecting to creator type selection');
           setLocation('/creator-type-selection');
         } else {
-          console.log('Authenticated creator on homepage, redirecting to creator dashboard');
-          setLocation('/creator-dashboard');
+          console.log('AuthRouter - Authenticated creator on homepage, redirecting to creator dashboard');
+          // Preserve Instagram callback parameters if present
+          const redirectUrl = hasInstagramCallback ? `/creator-dashboard${window.location.search}` : '/creator-dashboard';
+          console.log('AuthRouter - Redirecting to:', redirectUrl);
+          setLocation(redirectUrl);
         }
-      } else {
+      } else if (userData?.userType === 'fan') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Fan needs onboarding, redirecting to fan onboarding');
+          console.log('AuthRouter - Fan needs onboarding, redirecting to fan onboarding');
           setLocation('/fan-onboarding/profile');
         } else {
-          console.log('Authenticated fan on homepage, redirecting to fan dashboard');
+          console.log('AuthRouter - Authenticated fan on homepage, redirecting to fan dashboard');
           setLocation('/fan-dashboard');
         }
+      } else {
+        console.log('AuthRouter - User has no userType, redirecting to user type selection');
+        setLocation('/user-type-selection');
       }
       return;
     }

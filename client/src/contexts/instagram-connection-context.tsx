@@ -41,11 +41,45 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     error: null,
   });
 
-  // Load saved Instagram connection on mount
+  // Initialize and check connection status (similar to Facebook pattern)
   useEffect(() => {
-    const loadSavedConnection = () => {
-      if (!user) return;
+    // Only initialize Instagram for authenticated creator users
+    if (!user || user.userType !== 'creator') {
+      console.log('[Instagram] Not a creator user - skipping Instagram initialization');
+      return;
+    }
 
+    console.log('[Instagram] Creator user detected - Instagram provider ready');
+    
+    // Register a global callback handler for Instagram OAuth results (similar to Facebook pattern)
+    const instagramStatusCallback = (result: InstagramLoginResult) => {
+      try {
+        console.log('[Instagram] statusCallback ->', result.success ? 'SUCCESS' : 'FAILED');
+        if (result.success && result.user && result.accessToken) {
+          loadUserDataFromResult(result).catch((error) => {
+            console.error('[Instagram] statusCallback load error:', error);
+            setState(prev => ({ ...prev, isConnected: false }));
+          });
+        } else {
+          setState(prev => ({ 
+            ...prev, 
+            isConnected: false, 
+            userInfo: null, 
+            businessAccountId: null,
+            accessToken: null,
+            error: result.error || 'Connection failed'
+          }));
+        }
+      } catch (error) {
+        console.error('[Instagram] statusCallback error:', error);
+        setState(prev => ({ ...prev, isConnected: false }));
+      }
+    };
+
+    (window as any).handleInstagramConnectionResult = instagramStatusCallback;
+    
+    // Load saved connection data
+    const loadSavedConnection = () => {
       try {
         const savedData = localStorage.getItem(`instagram_connection_${user.id}`);
         if (savedData) {
@@ -57,6 +91,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
             businessAccountId: parsed.businessAccountId,
             accessToken: parsed.accessToken,
           }));
+          console.log('[Instagram] Loaded saved connection for user:', parsed.userInfo?.username);
         }
       } catch (error) {
         console.error('[Instagram] Error loading saved connection:', error);
@@ -106,13 +141,19 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
       }
 
       console.log('[Instagram Context] Calling InstagramSDKManager.secureLogin...');
-      // This will redirect to Instagram OAuth, so we don't wait for the result here
+      // With popup flow, this resolves with the result
       const result: InstagramLoginResult = await InstagramSDKManager.secureLogin('creator');
       
       console.log('[Instagram Context] secureLogin result:', result);
       
-      // If we get here, it means there was an error (since successful login redirects)
-      if (!result.success) {
+      if (result.success && result.user && result.accessToken) {
+        await loadUserDataFromResult(result);
+        toast({
+          title: "Instagram Connected! 📸",
+          description: `Successfully connected @${result.user.username}`,
+          duration: 4000
+        });
+      } else {
         const errorMessage = result.error || 'Instagram connection failed. Please try again.';
         console.log('[Instagram Context] Login failed:', errorMessage);
         setState(prev => ({ ...prev, error: errorMessage }));
@@ -139,9 +180,9 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     }
   }, [state.isConnecting, user]);
 
-  // Function to complete connection after OAuth callback
-  const completeConnection = useCallback(async (result: InstagramLoginResult) => {
-    console.log('[Instagram Context] completeConnection called with result:', {
+  // Load user data from Instagram result (similar to Facebook's loadUserDataFromToken)
+  const loadUserDataFromResult = useCallback(async (result: InstagramLoginResult) => {
+    console.log('[Instagram] loadUserDataFromResult start with result:', {
       success: result.success,
       hasUser: !!result.user,
       hasAccessToken: !!result.accessToken,
@@ -149,24 +190,22 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     });
 
     if (!result.success || !result.user || !result.accessToken) {
-      console.log('[Instagram Context] completeConnection - invalid result, skipping');
-      return;
+      console.log('[Instagram] loadUserDataFromResult - invalid result, skipping');
+      setState(prev => ({ ...prev, isConnected: false, userInfo: null, error: 'Invalid connection result' }));
+      return false;
     }
 
-    const connectionData = {
-      userInfo: result.user,
-      businessAccountId: result.user.id,
-      accessToken: result.accessToken,
-    };
-
-    console.log('[Instagram Context] Updating state with connection data');
-    setState(prev => {
-      console.log('[Instagram Context] Previous state:', {
-        isConnected: prev.isConnected,
-        hasUserInfo: !!prev.userInfo
-      });
+    try {
+      console.log('[Instagram] user OK ->', result.user.id);
       
-      const newState = {
+      const connectionData = {
+        userInfo: result.user,
+        businessAccountId: result.user.id,
+        accessToken: result.accessToken,
+      };
+
+      console.log('[Instagram] setting state with connected=true');
+      setState(prev => ({
         ...prev,
         isConnected: true,
         userInfo: result.user!,
@@ -174,44 +213,50 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
         accessToken: result.accessToken!,
         error: null,
         isConnecting: false,
-      };
-      
-      console.log('[Instagram Context] New state:', {
-        isConnected: newState.isConnected,
-        hasUserInfo: !!newState.userInfo,
-        username: newState.userInfo?.username
-      });
-      
-      return newState;
-    });
+      }));
 
-    saveConnection(connectionData);
-    console.log('[Instagram Context] Connection data saved to localStorage');
+      saveConnection(connectionData);
+      console.log('[Instagram] Connection data saved to localStorage');
 
-    // Save Instagram Business Account to database
-    try {
-      console.log('[Instagram Context] Saving to database...');
-      const response = await fetch('/api/creators/instagram-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instagramUserId: result.user.id,
-          username: result.user.username,
-          accessToken: result.accessToken,
-          accountType: result.user.account_type || 'BUSINESS'
-        })
-      });
-      
-      if (response.ok) {
-        console.log('[Instagram Context] Successfully saved to database');
-      } else {
-        console.error('[Instagram Context] Database save failed:', response.status);
+      // Save Instagram Business Account to database
+      try {
+        console.log('[Instagram] Saving to database...');
+        const response = await fetch('/api/creators/instagram-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instagramUserId: result.user.id,
+            username: result.user.username,
+            accessToken: result.accessToken,
+            accountType: result.user.account_type || 'BUSINESS'
+          })
+        });
+        
+        if (response.ok) {
+          console.log('[Instagram] Successfully saved to database');
+        } else {
+          console.error('[Instagram] Database save failed:', response.status);
+        }
+      } catch (dbError) {
+        console.error('[Instagram] Error saving to database:', dbError);
+        // Don't fail the connection for DB errors
       }
-    } catch (dbError) {
-      console.error('[Instagram Context] Error saving to database:', dbError);
-      // Don't fail the connection for DB errors
+
+      console.log('[Instagram] loadUserDataFromResult COMPLETE');
+      return true;
+    } catch (error) {
+      console.error('[Instagram] loadUserDataFromResult error:', error);
+      setState(prev => ({ ...prev, isConnected: false, error: 'Failed to process connection' }));
+      return false;
     }
   }, [saveConnection]);
+
+  // Function to complete connection after OAuth callback
+  const completeConnection = useCallback(async (result: InstagramLoginResult) => {
+    console.log('[Instagram] completeConnection called, delegating to loadUserDataFromResult');
+    await loadUserDataFromResult(result);
+    // Don't return the boolean result since this function should return void
+  }, [loadUserDataFromResult]);
 
   const disconnectInstagram = useCallback(async () => {
     try {
