@@ -35,7 +35,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/20 via-brand-dark-bg to-brand-accent/20"></div>
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080')] bg-cover bg-center opacity-10"></div>
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080')] bg-cover bg-center opacity-20"></div>
         
         {/* Floating Elements for Visual Interest */}
         <div className="absolute top-20 left-4 md:left-10 w-20 md:w-32 h-20 md:h-32 bg-brand-primary/10 rounded-full blur-3xl animate-pulse" />
@@ -47,7 +47,7 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 mb-6 bg-white/10 backdrop-blur-lg rounded-full border border-brand-primary/30">
               <span className="text-xs sm:text-sm font-medium text-brand-secondary mr-2">🏆</span>
-              <span className="text-xs sm:text-sm font-medium text-white">Trusted by 10,000+ Athletes & Creators</span>
+              <span className="text-xs sm:text-sm font-medium text-white">Trusted by Top Athletes & Creators</span>
             </div>
             
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6 sm:mb-8 leading-tight tracking-tight">
@@ -103,10 +103,10 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
             <h2 className="text-4xl lg:text-5xl font-bold mb-6 gradient-text">
-              Everything You Need to Engage Your Fans
+              Everything You Need to Engage Your Fans and Monetize Your Brand
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Built for NIL athletes, content creators, and musicians who want to build lasting relationships with their audience and monetize their personal brand through innovative loyalty programs.
+              Built for NIL athletes, content creators, and musicians who want to build and scale lasting relationships with their audience and monetize their personal brand through innovative loyalty programs. Powered by AI and Web3 technology.
             </p>
           </div>
           
@@ -130,7 +130,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl lg:text-2xl font-bold mb-4 text-white">Social Integration</h3>
                 <p className="text-gray-300 leading-relaxed text-sm lg:text-base">
-                  Connect Instagram, TikTok, X, and Facebook. Reward fans for engagement, shares, and user-generated content automatically.
+                  Connect Facebook Instagram, TikTok, X, YouTube, Spotify, and more. Reward fans for engagement, shares, and user-generated content automatically.
                 </p>
               </CardContent>
             </Card>
@@ -142,7 +142,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl lg:text-2xl font-bold mb-4 text-white">Web3 Rewards</h3>
                 <p className="text-gray-300 leading-relaxed text-sm lg:text-base">
-                  Issue NFTs, tokens, and digital collectibles. Multi-chain support for Bitcoin, Ethereum, Solana, and more through Dynamic.xyz integration.
+                  Issue NFTs and other digital collectibles from our no-code interface. Reward fans with unique digital assets and exclusive experiences. 
                 </p>
               </CardContent>
             </Card>
@@ -154,7 +154,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl lg:text-2xl font-bold mb-4 text-white">Analytics Dashboard</h3>
                 <p className="text-gray-300 leading-relaxed text-sm lg:text-base">
-                  Track fan engagement, reward redemption rates, and program performance with real-time analytics and actionable insights.
+                  Track fan engagement, reward redemption rates, and program performance with real-time analytics and actionable AI-powered insights.
                 </p>
               </CardContent>
             </Card>
@@ -166,7 +166,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl lg:text-2xl font-bold mb-4 text-white">Tiered Programs</h3>
                 <p className="text-gray-300 leading-relaxed text-sm lg:text-base">
-                  Create multiple reward tiers with exclusive perks. VIP access, early releases, meet-and-greets, and personalized experiences.
+                  Create multiple reward tiers with exclusive perks. Token-gated VIP access, early releases, meet-and-greets, and personalized experiences.
                 </p>
               </CardContent>
             </Card>
@@ -228,7 +228,7 @@ export default function Home() {
               Who Fandomly Is For
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Built specifically for NIL athletes, content creators, and musicians who want to monetize their personal brand and build lasting relationships with their fans through innovative Web3 loyalty programs.
+              Built specifically for NIL athletes, content creators, and musicians who want to monetize their personal brand and build lasting relationships with their fans through innovative AI and blockchainf-powered loyalty programs.
             </p>
           </div>
           
@@ -252,7 +252,7 @@ export default function Home() {
                 <div className="space-y-3 mb-8">
                   <div className="flex items-center text-gray-300">
                     <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
-                    <span className="text-sm">Professional & Olympic Athletes</span>
+                    <span className="text-sm">Amateur Athletes</span>
                   </div>
                   <div className="flex items-center text-gray-300">
                     <CheckCircle className="h-4 w-4 text-amber-400 mr-3 flex-shrink-0" />
@@ -319,7 +319,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center text-gray-300">
                     <CheckCircle className="h-4 w-4 text-blue-400 mr-3 flex-shrink-0" />
-                    <span className="text-sm">Videographers & Filmmakers</span>
+                    <span className="text-sm">Models & Actors</span>
                   </div>
                 </div>
                 
@@ -400,8 +400,8 @@ export default function Home() {
                 <div className="text-left">
                   <h4 className="font-semibold text-brand-accent mb-2">No matter your level or niche</h4>
                   <p className="text-gray-300">
-                    Whether you're a college athlete exploring NIL opportunities, an indie creator, or a global superstar, Fandomly scales with you. 
-                    Our platform provides the tools you need to monetize your personal brand and build meaningful relationships with your audience through Web3 rewards.
+                    Whether you're a high-school or college athlete exploring NIL opportunities, an indie creator, or a global superstar, Fandomly scales with you. 
+                    Our platform provides the tools you need to monetize your personal brand and build meaningful relationships with your audience through traditional and blockchain-enabled rewards.
                   </p>
                 </div>
               </div>
@@ -413,40 +413,6 @@ export default function Home() {
       {/* NIL Features Sections */}
       <NILAthleteSpotlight />
       <NILValueCalculator />
-      
-      {/* Privacy Notice for Protected Features */}
-      <section className="py-16 bg-gradient-to-b from-brand-dark-bg to-brand-dark-purple/20">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-4xl mx-auto">
-            <CardContent className="p-8">
-              <div className="flex items-center justify-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-brand-primary to-brand-secondary rounded-2xl flex items-center justify-center">
-                  <Shield className="h-8 w-8 text-white" />
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                Advanced NIL Tools & Compliance Monitoring
-              </h3>
-              <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-                Access personalized social media tracking, earnings analytics, and automated compliance monitoring. 
-                Your data is protected and encrypted for your privacy and NCAA eligibility.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/auth">
-                  <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-8">
-                    Connect Wallet to Access
-                  </Button>
-                </Link>
-                <Link href="/nil-dashboard">
-                  <Button variant="outline" className="border-2 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
-                    View Dashboard
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
     </div>
   );
 }

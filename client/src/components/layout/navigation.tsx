@@ -39,7 +39,7 @@ export default function Navigation() {
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-4">
               <Link href="/" className="flex items-center">
-                <img src="/fandomly2.png" alt="Fandomly" className="h-12 w-auto" />
+                <img src="/fandomly2.png" alt="Fandomly" className="h-20 w-auto" />
               </Link>
             </div>
             
@@ -51,7 +51,7 @@ export default function Navigation() {
                     Features
                   </Link>
                   <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                    Marketplace
+                    Rewards Store
                   </Link>
                   <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
                     Who It's For
@@ -61,19 +61,19 @@ export default function Navigation() {
                 // Authenticated users see simplified navigation
                 <>
                   <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                    Marketplace
+                    Rewards Store
                   </Link>
                   {userData?.userType === 'creator' ? (
-                    <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                      Dashboard
-                    </Link>
-                  ) : (
-                    <Link href="/fan-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                      Dashboard
-                    </Link>
+                        <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                          Dashboard
+                        </Link>
+                      ) : (
+                        <Link href="/fan-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                          Dashboard
+                        </Link>
+                      )}
+                    </>
                   )}
-                </>
-              )}
               {dynamicUser ? (
                 <div className="flex items-center space-x-4">
                   {userData?.userType === 'creator' ? (

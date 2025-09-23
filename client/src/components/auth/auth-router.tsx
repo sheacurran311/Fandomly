@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useAuth } from "@/hooks/use-auth";
+import { SocialProviders } from '@/contexts/social-providers';
 
 interface AuthRouterProps {
   children: React.ReactNode;
@@ -183,5 +184,9 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <SocialProviders>
+      {children}
+    </SocialProviders>
+  );
 }

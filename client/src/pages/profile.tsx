@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useInstagramConnection } from "@/contexts/instagram-connection-context";
 import { 
   User, 
   Mail, 
@@ -36,6 +37,15 @@ export default function Profile() {
   // Facebook import state
   const [isImporting, setIsImporting] = useState(false);
   const [isConnectedToFacebook, setIsConnectedToFacebook] = useState(false);
+  
+  // Instagram connection state
+  const { 
+    isConnected: instagramConnected, 
+    isConnecting: instagramConnecting,
+    userInfo: instagramUserInfo,
+    connectInstagram,
+    disconnectInstagram
+  } = useInstagramConnection();
   
   // Check Facebook connection status
   useEffect(() => {
@@ -373,12 +383,43 @@ export default function Profile() {
                       <Instagram className="h-5 w-5 text-pink-400" />
                       <div>
                         <div className="text-white font-medium">Instagram</div>
-                        <div className="text-xs text-gray-400">Connect your Instagram account</div>
+                        <div className="text-xs text-gray-400">
+                          {instagramConnected && instagramUserInfo ? 
+                            `Connected as @${instagramUserInfo.username}` : 
+                            "Connect your Instagram Business account"
+                          }
+                        </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" data-testid="button-connect-instagram">
-                      Connect
-                    </Button>
+                    {instagramConnected ? (
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => window.open(`https://instagram.com/${instagramUserInfo?.username}`, '_blank')}
+                        >
+                          View Profile
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={disconnectInstagram}
+                          data-testid="button-disconnect-instagram"
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white"
+                        size="sm" 
+                        onClick={connectInstagram}
+                        disabled={instagramConnecting}
+                        data-testid="button-connect-instagram"
+                      >
+                        {instagramConnecting ? 'Connecting...' : 'Connect'}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

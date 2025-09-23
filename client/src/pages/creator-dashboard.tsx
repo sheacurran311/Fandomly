@@ -3,6 +3,11 @@ import { useCreatorStats, useCreatorActivity } from "@/hooks/use-creator-dashboa
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
+import CreatorInstagramWidget from "@/components/social/creator-instagram-widget";
+import { useInstagramConnection } from "@/contexts/instagram-connection-context";
+import InstagramSDKManager from "@/lib/instagram";
+import { useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 // Removed unused FacebookSDK.getCreatorData reference
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +23,7 @@ import {
   Plus,
   BarChart3,
   Facebook,
+  Instagram,
   Loader2
 } from "lucide-react";
 
@@ -25,6 +31,87 @@ export default function CreatorDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
   const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
+  const { completeConnection } = useInstagramConnection();
+
+  // Handle Instagram OAuth callback
+  useEffect(() => {
+    const handleInstagramCallback = async () => {
+      console.log('[Creator Dashboard] Checking for Instagram callback params in URL:', window.location.search);
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const error = urlParams.get('error');
+
+      console.log('[Creator Dashboard] URL params found:', {
+        hasCode: !!code,
+        hasState: !!state,
+        hasError: !!error,
+        state: state,
+        codeLength: code?.length
+      });
+
+      // Only process if we have Instagram callback parameters
+      if (!code && !error) {
+        console.log('[Creator Dashboard] No Instagram callback parameters found, skipping');
+        return;
+      }
+
+      if (error) {
+        const errorDescription = urlParams.get('error_description');
+        toast({
+          title: "Instagram Connection Failed",
+          description: errorDescription || "Authorization was cancelled or failed",
+          variant: "destructive"
+        });
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, '/creator-dashboard');
+        return;
+      }
+
+      if (code && state) {
+        try {
+          console.log('[Creator Dashboard] Processing Instagram OAuth callback');
+          console.log('[Creator Dashboard] About to call InstagramSDKManager.handleCallback...');
+          const result = await InstagramSDKManager.handleCallback(code, state);
+          console.log('[Creator Dashboard] handleCallback result:', result);
+          
+          if (result.success) {
+            console.log('[Creator Dashboard] Callback successful, calling completeConnection...');
+            await completeConnection(result);
+            console.log('[Creator Dashboard] completeConnection finished');
+            
+            toast({
+              title: "Instagram Connected! 📸",
+              description: `Successfully connected @${result.user?.username}`,
+              duration: 4000
+            });
+          } else {
+            console.error('[Creator Dashboard] Callback failed:', result.error);
+            toast({
+              title: "Instagram Connection Failed",
+              description: result.error || "Failed to complete connection",
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('[Creator Dashboard] Instagram callback error:', error);
+          toast({
+            title: "Instagram Connection Error",
+            description: "An error occurred while connecting Instagram",
+            variant: "destructive"
+          });
+        }
+        
+        // Clean up URL after processing
+        console.log('[Creator Dashboard] Cleaning up URL parameters');
+        window.history.replaceState({}, document.title, '/creator-dashboard');
+      }
+    };
+
+    handleInstagramCallback();
+  }, [completeConnection]);
 
   if (isLoading) {
     return (
@@ -154,8 +241,9 @@ export default function CreatorDashboard() {
 
             {/* Quick Actions & Stats */}
             <div className="space-y-6">
-              {/* Facebook Integration */}
+              {/* Social Media Integrations */}
               <CreatorFacebookConnect />
+              <CreatorInstagramWidget />
 
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
@@ -181,6 +269,17 @@ export default function CreatorDashboard() {
                   >
                     <Facebook className="h-4 w-4 mr-2" />
                     Facebook Campaign
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-pink-400/30 text-pink-400 hover:bg-pink-400/10 justify-start"
+                    onClick={() => {
+                      window.location.href = '/creator-dashboard/social';
+                    }}
+                    data-testid="button-instagram-campaign"
+                  >
+                    <Instagram className="h-4 w-4 mr-2" />
+                    Instagram Campaign
                   </Button>
                   <Button 
                     variant="outline" 

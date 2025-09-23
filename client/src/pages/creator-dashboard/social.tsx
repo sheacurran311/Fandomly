@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
+import CreatorInstagramConnect from "@/components/social/creator-instagram-connect";
+import InstagramMessageTest from "@/components/social/instagram-message-test";
+import InstagramWebhookSetup from "@/components/social/instagram-webhook-setup";
 import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useInstagramConnection } from "@/contexts/instagram-connection-context";
 import { 
   Instagram, 
   Twitter, 
@@ -33,6 +37,15 @@ import {
 export default function CreatorSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  
+  // Instagram connection state
+  const { 
+    isConnected: instagramConnected, 
+    isConnecting: instagramConnecting,
+    userInfo: instagramUserInfo,
+    connectInstagram,
+    disconnectInstagram
+  } = useInstagramConnection();
   
   // Facebook connection state
   const [facebookConnected, setFacebookConnected] = useState(false);
@@ -199,15 +212,17 @@ export default function CreatorSocial() {
     );
   }
 
-  // Get real Facebook data and static data for other platforms
+  // Get real Facebook and Instagram data, static data for other platforms
   const socialAccounts = [
     {
       platform: "Instagram",
       icon: Instagram,
-      handle: "@aerialace_athletics",
-      followers: "12.4K",
+      handle: instagramUserInfo ? `@${instagramUserInfo.username}` : "@aerialace_athletics",
+      followers: instagramUserInfo ? 
+        (instagramUserInfo.followers_count ? `${(instagramUserInfo.followers_count / 1000).toFixed(1)}K` : "0") : 
+        "12.4K",
       engagement: "8.2%",
-      connected: true,
+      connected: instagramConnected,
       color: "text-pink-400",
       bgColor: "bg-pink-400/20"
     },
@@ -408,6 +423,39 @@ export default function CreatorSocial() {
                               {facebookConnecting ? 'Connecting...' : 'Connect'}
                             </Button>
                           )
+                        ) : account.platform === "Instagram" ? (
+                          // Instagram-specific buttons using real state
+                          account.connected ? (
+                            <>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="border-white/20 text-gray-300 hover:bg-white/10"
+                                onClick={disconnectInstagram}
+                                data-testid="button-disconnect-instagram-social"
+                              >
+                                <Unlink className="h-4 w-4 mr-1" />
+                                Disconnect
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="border-white/20 text-gray-300 hover:bg-white/10"
+                                onClick={() => window.open(`https://instagram.com/${instagramUserInfo?.username}`, '_blank')}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button 
+                              className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600"
+                              onClick={connectInstagram}
+                              disabled={instagramConnecting}
+                              data-testid="button-connect-instagram-social"
+                            >
+                              {instagramConnecting ? 'Connecting...' : 'Connect'}
+                            </Button>
+                          )
                         ) : (
                           // Other platform buttons (static for now)
                           account.connected ? (
@@ -500,13 +548,24 @@ export default function CreatorSocial() {
             </Card>
           </div>
 
-          {/* Simplified Facebook Integration */}
+          {/* Social Media Integrations */}
           <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
             <CardHeader>
               <CardTitle className="text-white">Facebook Integration</CardTitle>
             </CardHeader>
             <CardContent>
               <CreatorFacebookConnect />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Instagram Integration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CreatorInstagramConnect />
+              <InstagramWebhookSetup />
+              <InstagramMessageTest />
             </CardContent>
           </Card>
 
