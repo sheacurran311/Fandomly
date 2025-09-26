@@ -5,13 +5,22 @@ export default function XCallback() {
   useEffect(() => {
     let mounted = true;
     const run = async () => {
+      console.log('[X-Callback] Starting Twitter OAuth callback processing...');
+      console.log('[X-Callback] URL search params:', window.location.search);
+      console.log('[X-Callback] Has opener window:', !!(window as any).opener);
+      
       const result = await TwitterSDKManager.handleCallbackFromWindow();
+      console.log('[X-Callback] handleCallbackFromWindow result:', result);
 
       if ((window as any).opener) {
         try {
+          console.log('[X-Callback] Posting result to opener:', result);
           (window as any).opener.postMessage({ type: "twitter-oauth-result", result }, window.location.origin);
           (window as any).opener.twitterCallbackData = result; // fallback
-        } catch {}
+          console.log('[X-Callback] Posted to opener, closing popup...');
+        } catch (error) {
+          console.error('[X-Callback] Error posting to opener:', error);
+        }
         window.close();
         return;
       }
