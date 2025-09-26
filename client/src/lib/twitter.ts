@@ -110,10 +110,11 @@ export class TwitterSDKManager {
     params.set("response_type", "code");
     params.set("client_id", clientId);
     params.set("redirect_uri", redirectUri);
-    params.set("scope", scope); // URLSearchParams will %20-encode spaces
+    params.set("scope", scope);
     params.set("state", state || `twitter_${userType}_${Date.now()}`);
 
-    const url = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+    // Force %20 encoding for spaces instead of + (Twitter prefers this)
+    const url = `https://twitter.com/i/oauth2/authorize?${params.toString().replace(/\+/g, '%20')}`;
     try {
       console.log("[Twitter] CLIENT_ID fingerprint:", clientId.slice(0,6), "...", clientId.slice(-6));
       console.log("[Twitter] FINAL redirectUri:", redirectUri);
