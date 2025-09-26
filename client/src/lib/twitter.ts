@@ -440,20 +440,10 @@ export class TwitterSDKManager {
 
       console.log(`[Twitter] Token exchange API response:`, data);
 
-      // Handle different response structures - the backend may return the token directly or wrapped
-      let accessToken: string | undefined;
-      let refreshToken: string | undefined;
-      
-      // Try direct access first (most common case)
-      if (data?.access_token) {
-        accessToken = data.access_token;
-        refreshToken = data.refresh_token;
-      }
-      // Fallback: check if wrapped in body property
-      else if (data?.body?.access_token) {
-        accessToken = data.body.access_token;
-        refreshToken = data.body.refresh_token;
-      }
+      // Backend returns the token response directly (not wrapped)
+      // The server route does: return res.json(result.body);
+      const accessToken = data?.access_token;
+      const refreshToken = data?.refresh_token;
       
       if (accessToken) {
         console.log(`[Twitter] Successfully received access token: ${accessToken.substring(0, 10)}...`);
@@ -461,12 +451,7 @@ export class TwitterSDKManager {
         return accessToken;
       }
       
-      console.error(`[Twitter] No access token in response. Response structure:`, {
-        hasDirectToken: !!data?.access_token,
-        hasBodyToken: !!data?.body?.access_token,
-        responseKeys: data ? Object.keys(data) : [],
-        bodyKeys: data?.body ? Object.keys(data.body) : []
-      });
+      console.error(`[Twitter] No access token in response. Full response:`, data);
       return null;
     } catch (error) {
       console.error("[Twitter] Token exchange error:", error);
