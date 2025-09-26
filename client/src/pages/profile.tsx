@@ -54,13 +54,13 @@ export default function Profile() {
     disconnectInstagram = async () => {}
   } = instagramConnection || {};
   
-  // Check social connections status
+  // Check social connections status when user becomes available
   useEffect(() => {
-    if (user) {
+    if (user?.dynamicUserId) {
       checkFacebookStatus();
       checkTwitterStatus();
     }
-  }, [user]);
+  }, [user?.dynamicUserId]);
 
   const checkTwitterStatus = async () => {
     try {

@@ -951,7 +951,7 @@ export class DatabaseStorage implements IStorage {
         socialConnections: updatedConnections
       };
 
-      await this.updateUserProfile(user.id, { profileData: updatedProfileData });
+      await this.updateUser(user.id, { profileData: updatedProfileData } as any);
       
       console.log(`[Storage] Successfully removed ${platform} connection for user ${user.id}`);
       return true;

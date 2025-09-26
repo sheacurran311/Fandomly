@@ -39,11 +39,13 @@ export default function FanSocial() {
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
   const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
   
-  // Check social connections status
+  // Check social connections status when user becomes available
   useEffect(() => {
-    checkFacebookStatus();
-    checkTwitterStatus();
-  }, []);
+    if (user?.dynamicUserId) {
+      checkFacebookStatus();
+      checkTwitterStatus();
+    }
+  }, [user?.dynamicUserId]);
 
   const checkTwitterStatus = async () => {
     try {

@@ -58,18 +58,21 @@ export default function CreatorSocial() {
   const [twitterConnected, setTwitterConnected] = useState(false);
   const [twitterConnecting, setTwitterConnecting] = useState(false);
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
+  const [twitterFollowers, setTwitterFollowers] = useState<number>(0);
   const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
 
-  // Check Facebook status on mount and load saved active page
+  // Check Facebook status and Twitter status when user becomes available
   useEffect(() => {
-    checkFacebookStatus();
-    checkTwitterStatus();
-    // Load saved active page ID from localStorage
-    const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
-    if (savedActivePageId) {
-      // We'll set this after pages are loaded in loadFacebookPages
+    if (user?.dynamicUserId) {
+      checkFacebookStatus();
+      checkTwitterStatus();
+      // Load saved active page ID from localStorage
+      const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
+      if (savedActivePageId) {
+        // We'll set this after pages are loaded in loadFacebookPages
+      }
     }
-  }, []);
+  }, [user?.dynamicUserId]);
 
   const checkTwitterStatus = async () => {
     try {
@@ -94,10 +97,12 @@ export default function CreatorSocial() {
           console.log('[Creator Social] Found existing Twitter connection:', twitterConnection);
           setTwitterConnected(true);
           setTwitterHandle(twitterConnection.username || twitterConnection.displayName);
+          setTwitterFollowers(twitterConnection.followers || 0);
         } else {
           console.log('[Creator Social] No Twitter connection found');
           setTwitterConnected(false);
           setTwitterHandle(null);
+          setTwitterFollowers(0);
         }
       } else {
         console.warn('[Creator Social] Failed to fetch connections:', response.statusText);
@@ -143,6 +148,9 @@ export default function CreatorSocial() {
       if (result.success && result.user) {
         setTwitterConnected(true);
         setTwitterHandle(result.user.username);
+        setTwitterFollowers(result.user.followersCount || 0);
+        // Refresh connections to get latest data
+        await checkTwitterStatus();
         toast({
           title: "X Connected! 🐦",
           description: `Connected @${result.user.username}`,
@@ -177,6 +185,7 @@ export default function CreatorSocial() {
       if (response.ok) {
         setTwitterConnected(false);
         setTwitterHandle(null);
+        setTwitterFollowers(0);
         toast({
           title: "X Disconnected",
           description: "Successfully disconnected from X",
@@ -319,6 +328,32 @@ export default function CreatorSocial() {
     );
   }
 
+  // Calculate dynamic stats
+  const getConnectedPlatformsCount = () => {
+    let count = 0;
+    if (instagramConnected) count++;
+    if (twitterConnected) count++;
+    if (facebookConnected) count++;
+    return count;
+  };
+
+  const getTotalFollowers = () => {
+    let total = 0;
+    if (instagramConnected && instagramUserInfo?.followers_count) {
+      total += instagramUserInfo.followers_count;
+    }
+    if (twitterConnected) {
+      total += twitterFollowers;
+    }
+    // Facebook page followers would be added here when available
+    return total;
+  };
+
+  const getAverageEngagement = () => {
+    if (!twitterConnected && !instagramConnected) return "0%";
+    return "Active"; // For now, show Active when any platform is connected
+  };
+
   // Get real Facebook and Instagram data, static data for other platforms
   const socialAccounts = [
     {
@@ -337,7 +372,7 @@ export default function CreatorSocial() {
       platform: "Twitter",
       icon: Twitter,
       handle: twitterConnected && twitterHandle ? `@${twitterHandle}` : '@yourhandle',
-      followers: twitterConnected ? "—" : "0",
+      followers: twitterConnected ? `${(twitterFollowers / 1000).toFixed(1)}K` : "0",
       engagement: twitterConnected ? "Active" : "—",
       connected: twitterConnected,
       color: "text-blue-400",
@@ -431,7 +466,7 @@ export default function CreatorSocial() {
                 <div className="w-12 h-12 bg-brand-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <LinkIcon className="h-6 w-6 text-brand-primary" />
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">3</div>
+                <div className="text-2xl font-bold text-white mb-1">{getConnectedPlatformsCount()}</div>
                 <div className="text-sm text-gray-400">Connected Platforms</div>
               </CardContent>
             </Card>
@@ -440,7 +475,9 @@ export default function CreatorSocial() {
                 <div className="w-12 h-12 bg-brand-secondary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="h-6 w-6 text-brand-secondary" />
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">72.2K</div>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {getTotalFollowers() > 0 ? `${(getTotalFollowers() / 1000).toFixed(1)}K` : '0'}
+                </div>
                 <div className="text-sm text-gray-400">Total Followers</div>
               </CardContent>
             </Card>
@@ -449,7 +486,7 @@ export default function CreatorSocial() {
                 <div className="w-12 h-12 bg-brand-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <TrendingUp className="h-6 w-6 text-brand-accent" />
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">8.7%</div>
+                <div className="text-2xl font-bold text-white mb-1">{getAverageEngagement()}</div>
                 <div className="text-sm text-gray-400">Avg Engagement</div>
               </CardContent>
             </Card>
