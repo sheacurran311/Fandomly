@@ -785,12 +785,11 @@ export function registerSocialRoutes(app: Express) {
   // Get user's connected social accounts (no custom auth middleware)
   app.get('/api/social/accounts', async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
-      
-      // TODO: Get from database
-      // const accounts = await storage.getSocialAccounts(userId);
-      const accounts: any[] = []; // Placeholder
-      
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
+      if (!dynamicUserId) {
+        return res.json([]);
+      }
+      const accounts = await storage.getSocialAccounts(dynamicUserId);
       res.json(accounts);
     } catch (error) {
       console.error('Get social accounts error:', error);

@@ -880,12 +880,25 @@ export class DatabaseStorage implements IStorage {
       };
 
       console.log(`[Storage] Saving social account for user ${user.id}:`, { platform, username: socialAccountData.username });
-
-      // For now, we'll store it in a simple way - you may want to create a dedicated social_accounts table
-      // This is a temporary implementation that stores in user metadata or a simple structure
-      
-      // TODO: Create proper social_accounts table if needed
-      // For now, just log success
+      // Persist under users.profileData.socialConnections
+      const profileData: any = (user as any).profileData || {};
+      const socialConnections = Array.isArray(profileData.socialConnections)
+        ? profileData.socialConnections
+        : [];
+      const filtered = socialConnections.filter((acc: any) => acc.platform !== platform);
+      const updatedConnections = [...filtered, {
+        platform: socialAccountData.platform,
+        platformUserId: socialAccountData.platformUserId,
+        username: socialAccountData.username,
+        displayName: socialAccountData.displayName,
+        profileUrl: socialAccountData.profileUrl,
+        followers: socialAccountData.followers,
+        metadata: socialAccountData.metadata,
+        connectedAt: socialAccountData.connectedAt,
+        isActive: socialAccountData.isActive
+      }];
+      const nextProfileData = { ...profileData, socialConnections: updatedConnections };
+      await this.updateUser(user.id, { profileData: nextProfileData } as any);
       console.log(`[Storage] Social account saved successfully:`, socialAccountData);
       
     } catch (error) {
@@ -901,10 +914,12 @@ export class DatabaseStorage implements IStorage {
         return [];
       }
 
-      // TODO: Implement proper social accounts retrieval
-      // For now, return empty array
-      console.log(`[Storage] Getting social accounts for user ${user.id}`);
-      return [];
+      const profileData: any = (user as any).profileData || {};
+      const connections = Array.isArray(profileData.socialConnections)
+        ? profileData.socialConnections
+        : [];
+      console.log(`[Storage] Getting social accounts for user ${user.id} -> ${connections.length} found`);
+      return connections;
       
     } catch (error) {
       console.error(`[Storage] Failed to get social accounts:`, error);

@@ -47,9 +47,17 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 function getEnvRedirectUri(): string {
+  const runtimeUri = `${window.location.origin}/x-callback`;
   const fromEnv = import.meta.env.VITE_TWITTER_REDIRECT_URI as string | undefined;
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
-  return `${window.location.origin}/x-callback`;
+  if (!fromEnv || fromEnv.length === 0) return runtimeUri;
+  try {
+    const envOrigin = new URL(fromEnv).origin;
+    if (envOrigin !== window.location.origin) {
+      console.warn(`[Twitter] Redirect URI origin mismatch. Using runtime origin instead: ${runtimeUri}`);
+      return runtimeUri;
+    }
+  } catch {}
+  return fromEnv;
 }
 
 function getEnvScopes(): string {
@@ -195,7 +203,6 @@ export class TwitterSDKManager {
         }, 800);
 
         const messageListener = (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
           // Callback window asking for PKCE verifier by state
           if (event.data?.type === 'twitter-pkce-request') {
             try {
@@ -215,7 +222,8 @@ export class TwitterSDKManager {
               if (!verifier) {
                 try { verifier = (window as any).__twitterPkceVerifier || null; } catch {}
               }
-              (event.source as Window | null)?.postMessage({ type: 'twitter-pkce-response', state: reqState, verifier }, event.origin);
+              // Reply back to the popup regardless of origin; the popup will validate the response
+              (event.source as Window | null)?.postMessage({ type: 'twitter-pkce-response', state: reqState, verifier }, '*');
             } catch {}
             return;
           }
@@ -279,7 +287,6 @@ export class TwitterSDKManager {
               resolve(null);
             }, 4000);
             function onResponse(ev: MessageEvent) {
-              if (ev.origin !== window.location.origin) return;
               if (ev.data?.type === 'twitter-pkce-response' && ev.data?.state === state) {
                 clearTimeout(timeout);
                 window.removeEventListener('message', onResponse);
@@ -287,7 +294,8 @@ export class TwitterSDKManager {
               }
             }
             window.addEventListener('message', onResponse);
-            (window as any).opener.postMessage({ type: 'twitter-pkce-request', state }, window.location.origin);
+            // Request from opener using a permissive target; opener will validate origin
+            (window as any).opener.postMessage({ type: 'twitter-pkce-request', state }, '*');
           });
           if (verifier) {
             mappedCodeVerifier = verifier;

@@ -96,6 +96,31 @@ export default function SocialMediaConnect({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  // Load persisted social accounts on mount
+  useEffect(() => {
+    const loadAccounts = async () => {
+      try {
+        const res = await fetch('/api/social/accounts', { credentials: 'include' });
+        const accounts = await res.json();
+        const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+          platform: a.platform,
+          username: a.username,
+          displayName: a.displayName,
+          followers: Number(a.followers || 0),
+          verified: Boolean(a.verified || false),
+          profileUrl: a.profileUrl || (a.username ? `https://twitter.com/${a.username}` : '#'),
+          lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+          status: a.isActive === false ? 'expired' : 'connected'
+        }));
+        setConnectedAccounts(mapped);
+        onAccountsChange?.(mapped);
+      } catch (e) {
+        console.warn('Failed to load social accounts:', e);
+      }
+    };
+    loadAccounts();
+  }, [onAccountsChange]);
+
   // Check for OAuth callbacks
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -206,6 +231,15 @@ export default function SocialMediaConnect({
             onAccountsChange?.(updated);
             return updated;
           });
+          // Persist in case background save failed
+          try {
+            await fetch('/api/social/connect', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ platform: 'twitter', accountData: { user: userInfo, connectedAt: new Date().toISOString() } })
+            });
+          } catch {}
         } else if (!result.success) {
           throw new Error(result.error || 'Twitter connect failed');
         }
