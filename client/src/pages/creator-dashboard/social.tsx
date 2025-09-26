@@ -58,16 +58,60 @@ export default function CreatorSocial() {
   const [twitterConnected, setTwitterConnected] = useState(false);
   const [twitterConnecting, setTwitterConnecting] = useState(false);
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
+  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
 
   // Check Facebook status on mount and load saved active page
   useEffect(() => {
     checkFacebookStatus();
+    checkTwitterStatus();
     // Load saved active page ID from localStorage
     const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
     if (savedActivePageId) {
       // We'll set this after pages are loaded in loadFacebookPages
     }
   }, []);
+
+  const checkTwitterStatus = async () => {
+    try {
+      setIsCheckingTwitterStatus(true);
+      
+      // Fetch existing social connections from backend
+      const response = await fetch('/api/social/accounts', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const connections = await response.json();
+        console.log('[Creator Social] Existing connections:', connections);
+        
+        // Check if Twitter connection exists
+        const twitterConnection = connections.find((conn: any) => conn.platform === 'twitter');
+        if (twitterConnection) {
+          console.log('[Creator Social] Found existing Twitter connection:', twitterConnection);
+          setTwitterConnected(true);
+          setTwitterHandle(twitterConnection.username || twitterConnection.displayName);
+        } else {
+          console.log('[Creator Social] No Twitter connection found');
+          setTwitterConnected(false);
+          setTwitterHandle(null);
+        }
+      } else {
+        console.warn('[Creator Social] Failed to fetch connections:', response.statusText);
+        setTwitterConnected(false);
+        setTwitterHandle(null);
+      }
+    } catch (error) {
+      console.error('[Creator Social] Error checking Twitter status:', error);
+      setTwitterConnected(false);
+      setTwitterHandle(null);
+    } finally {
+      setIsCheckingTwitterStatus(false);
+    }
+  };
 
   const checkFacebookStatus = async () => {
     try {

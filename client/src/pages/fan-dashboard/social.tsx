@@ -37,11 +37,55 @@ export default function FanSocial() {
   const [twitterConnected, setTwitterConnected] = useState(false);
   const [twitterConnecting, setTwitterConnecting] = useState(false);
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
+  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
   
-  // Check Facebook connection status
+  // Check social connections status
   useEffect(() => {
     checkFacebookStatus();
+    checkTwitterStatus();
   }, []);
+
+  const checkTwitterStatus = async () => {
+    try {
+      setIsCheckingTwitterStatus(true);
+      
+      // Fetch existing social connections from backend
+      const response = await fetch('/api/social/accounts', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const connections = await response.json();
+        console.log('[Fan Social] Existing connections:', connections);
+        
+        // Check if Twitter connection exists
+        const twitterConnection = connections.find((conn: any) => conn.platform === 'twitter');
+        if (twitterConnection) {
+          console.log('[Fan Social] Found existing Twitter connection:', twitterConnection);
+          setTwitterConnected(true);
+          setTwitterHandle(twitterConnection.username || twitterConnection.displayName);
+        } else {
+          console.log('[Fan Social] No Twitter connection found');
+          setTwitterConnected(false);
+          setTwitterHandle(null);
+        }
+      } else {
+        console.warn('[Fan Social] Failed to fetch connections:', response.statusText);
+        setTwitterConnected(false);
+        setTwitterHandle(null);
+      }
+    } catch (error) {
+      console.error('[Fan Social] Error checking Twitter status:', error);
+      setTwitterConnected(false);
+      setTwitterHandle(null);
+    } finally {
+      setIsCheckingTwitterStatus(false);
+    }
+  };
 
   const checkFacebookStatus = async () => {
     try {
