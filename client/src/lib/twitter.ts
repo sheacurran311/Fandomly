@@ -433,12 +433,18 @@ export class TwitterSDKManager {
         final: dynamicUserId
       });
 
+      console.log(`[Twitter] Making token exchange request to server...`);
+      
       const data = await fetchApi("/api/social/twitter/token", {
         method: "POST",
         body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier, dynamicUserId })
       });
 
       console.log(`[Twitter] Token exchange API response:`, data);
+      console.log(`[Twitter] Response type:`, typeof data);
+      console.log(`[Twitter] Response keys:`, Object.keys(data || {}));
+      console.log(`[Twitter] access_token exists:`, !!data?.access_token);
+      console.log(`[Twitter] Raw response for inspection:`, JSON.stringify(data));
 
       // Backend returns the token response directly (not wrapped)
       // The server route does: return res.json(result.body);

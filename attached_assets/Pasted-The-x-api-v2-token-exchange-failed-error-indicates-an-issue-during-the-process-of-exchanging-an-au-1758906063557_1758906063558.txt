@@ -1,0 +1,18 @@
+The "x api v2 token exchange failed error" indicates an issue during the process of exchanging an authorization code or refresh token for an access token with the X API v2. This failure can stem from several common causes:
+1. Invalid or Expired Authorization Grant:
+Authorization Code: The authorization code used in the exchange might be incorrect, expired, or already used. Authorization codes are typically short-lived and single-use.
+Refresh Token: If refreshing an access token, the refresh token might be invalid, expired, revoked, or already used (as refresh tokens for X API v2 are generally single-use).
+2. Mismatch in OAuth2.0 Parameters:
+Redirect URI: The redirect URI provided in the token exchange request must exactly match the one registered in your X Developer Portal.
+Client ID and Secret: Ensure the client ID and client secret used in the request are correct and match the values from your X Developer App.
+Code Verifier (PKCE): If using the Proof Key for Code Exchange (PKCE) flow, verify that the code_verifier sent in the token exchange request matches the one used to generate the code_challenge in the initial authorization request.
+3. Timing Issues:
+Server Time Skew: Significant time differences between your server and X's servers can lead to token validation failures. Ensure your server's time is synchronized.
+4. API-Specific Limitations or Changes:
+API Version Updates: Transitions or updates in the X API (e.g., from v1.1 to v2) might require adjustments in your application's token handling logic or stored data.
+Rate Limits: While less common for token exchange itself, exceeding rate limits on other endpoints could indirectly impact token generation if related processes are affected.
+Troubleshooting Steps:
+Verify all OAuth2.0 parameters: Double-check the client_id, client_secret, redirect_uri, authorization_code, and code_verifier (if applicable) for accuracy and consistency.
+Ensure correct token usage: Confirm that you are using the correct type of token (authorization code or refresh token) and that it has not expired or been used previously.
+Synchronize server time: Verify that your server's time is accurate and synchronized with a reliable time source.
+Review X API documentation: Consult the official X API v2 documentation for specific requirements or known issues related to token exchange.
