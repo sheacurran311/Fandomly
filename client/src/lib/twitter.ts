@@ -160,8 +160,8 @@ export class TwitterSDKManager {
 
       const redirectUri = "https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/x-callback";
       console.log("[Twitter] Using redirectUri:", redirectUri);
-      const authUrl = this.getAuthUrl(userType, stateValue, codeChallenge);
-      console.log(`[Twitter] FINAL redirectUri: ${getEnvRedirectUri()}`);
+      const authUrl = this.getAuthUrl(userType, stateValue, redirectUri);
+      console.log(`[Twitter] FINAL redirectUri: ${redirectUri}`);
       console.log(`[Twitter] FINAL authorize URL: ${authUrl}`);
 
       return new Promise<TwitterLoginResult>((resolve) => {
