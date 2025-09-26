@@ -926,6 +926,41 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
   }
+
+  async removeSocialAccount(dynamicUserId: string, platform: string): Promise<boolean> {
+    try {
+      const user = await this.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        console.log(`[Storage] User not found for dynamicUserId: ${dynamicUserId}`);
+        return false;
+      }
+
+      const profileData: any = (user as any).profileData || {};
+      const connections = Array.isArray(profileData.socialConnections)
+        ? profileData.socialConnections
+        : [];
+
+      // Remove the connection for this platform
+      const updatedConnections = connections.filter((conn: any) => conn.platform !== platform);
+      
+      console.log(`[Storage] Removing ${platform} connection for user ${user.id}. Before: ${connections.length}, After: ${updatedConnections.length}`);
+
+      // Update user with new connections
+      const updatedProfileData = {
+        ...profileData,
+        socialConnections: updatedConnections
+      };
+
+      await this.updateUserProfile(user.id, { profileData: updatedProfileData });
+      
+      console.log(`[Storage] Successfully removed ${platform} connection for user ${user.id}`);
+      return true;
+      
+    } catch (error) {
+      console.error(`[Storage] Failed to remove social account:`, error);
+      return false;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

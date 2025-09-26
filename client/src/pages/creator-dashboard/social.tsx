@@ -162,6 +162,39 @@ export default function CreatorSocial() {
     }
   };
 
+  const disconnectTwitter = async () => {
+    try {
+      // Call backend to remove connection
+      const response = await fetch('/api/social/twitter', {
+        method: 'DELETE',
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setTwitterConnected(false);
+        setTwitterHandle(null);
+        toast({
+          title: "X Disconnected",
+          description: "Successfully disconnected from X",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Twitter disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from X. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+
   const loadFacebookPages = async () => {
     try {
       const pages = await FacebookSDKManager.getUserPages();
@@ -534,16 +567,32 @@ export default function CreatorSocial() {
                           account.platform === 'Twitter' ? (
                             account.connected ? (
                               <>
-                                <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
-                                  <Settings className="h-4 w-4 mr-1" />
-                                  Settings
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  onClick={disconnectTwitter}
+                                  data-testid="button-disconnect-twitter-social"
+                                >
+                                  <Unlink className="h-4 w-4 mr-1" />
+                                  Disconnect
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10" onClick={() => window.open(`https://twitter.com/${twitterHandle}`, '_blank')}>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-gray-300 hover:bg-white/10" 
+                                  onClick={() => window.open(`https://twitter.com/${twitterHandle}`, '_blank')}
+                                >
                                   <ExternalLink className="h-4 w-4" />
                                 </Button>
                               </>
                             ) : (
-                              <Button className="bg-brand-primary hover:bg-brand-primary/80" onClick={connectTwitter} disabled={twitterConnecting}>
+                              <Button 
+                                className="bg-brand-primary hover:bg-brand-primary/80" 
+                                onClick={connectTwitter} 
+                                disabled={twitterConnecting}
+                                data-testid="button-connect-twitter-social"
+                              >
                                 {twitterConnecting ? 'Connecting...' : 'Connect'}
                               </Button>
                             )

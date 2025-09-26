@@ -800,13 +800,25 @@ export function registerSocialRoutes(app: Express) {
   // Disconnect social account (no custom auth middleware)
   app.delete('/api/social/:platform', async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
       const { platform } = req.params;
       
-      // TODO: Remove from database
-      // await storage.removeSocialAccount(userId, platform);
+      console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${dynamicUserId}`);
       
-      res.json({ success: true, message: `${platform} account disconnected` });
+      if (!dynamicUserId) {
+        return res.status(400).json({ error: 'dynamicUserId required' });
+      }
+      
+      // Remove from database
+      const success = await storage.removeSocialAccount(dynamicUserId, platform);
+      
+      if (success) {
+        console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);
+        res.json({ success: true, message: `${platform} account disconnected successfully` });
+      } else {
+        console.log(`[Social Disconnect] Failed to disconnect ${platform} for user ${dynamicUserId}`);
+        res.status(500).json({ error: `Failed to disconnect ${platform} account` });
+      }
     } catch (error) {
       console.error('Social disconnect error:', error);
       res.status(500).json({ error: 'Failed to disconnect social account' });

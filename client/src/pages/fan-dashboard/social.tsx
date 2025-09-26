@@ -110,6 +110,27 @@ export default function FanSocial() {
       setTwitterConnecting(false);
     }
   };
+
+  const disconnectTwitter = async () => {
+    try {
+      // Call backend to remove connection
+      const response = await fetch('/api/social/twitter', {
+        method: 'DELETE',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setTwitterConnected(false);
+        setTwitterHandle(null);
+      }
+    } catch (error) {
+      console.error('Twitter disconnect error:', error);
+    }
+  };
   
   // For now, we'll use the simple Facebook connect component in the sidebar
   // The social accounts display will show placeholder data except Facebook
@@ -288,16 +309,28 @@ export default function FanSocial() {
                         ) : (
                           account.platform === 'Twitter' ? (
                             account.connected ? (
-                              <Badge className="bg-green-500/20 text-green-400 text-xs">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Connected
-                              </Badge>
+                              <div className="flex gap-2">
+                                <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Connected
+                                </Badge>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  onClick={disconnectTwitter}
+                                  data-testid="button-disconnect-twitter-fan"
+                                >
+                                  <Unlink className="h-3 w-3" />
+                                </Button>
+                              </div>
                             ) : (
                               <Button 
                                 variant="outline" 
                                 className="border-brand-primary/30 text-brand-primary"
                                 onClick={connectTwitter}
                                 disabled={twitterConnecting}
+                                data-testid="button-connect-twitter-fan"
                               >
                                 {twitterConnecting ? 'Connecting…' : 'Connect'}
                               </Button>

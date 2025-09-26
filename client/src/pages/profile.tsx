@@ -38,6 +38,7 @@ export default function Profile() {
   const [twitterConnecting, setTwitterConnecting] = useState(false);
   const [twitterConnected, setTwitterConnected] = useState(false);
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
+  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
   
   // Facebook import state
   const [isImporting, setIsImporting] = useState(false);
@@ -53,10 +54,55 @@ export default function Profile() {
     disconnectInstagram = async () => {}
   } = instagramConnection || {};
   
-  // Check Facebook connection status
+  // Check social connections status
   useEffect(() => {
-    checkFacebookStatus();
-  }, []);
+    if (user) {
+      checkFacebookStatus();
+      checkTwitterStatus();
+    }
+  }, [user]);
+
+  const checkTwitterStatus = async () => {
+    try {
+      setIsCheckingTwitterStatus(true);
+      
+      // Fetch existing social connections from backend
+      const response = await fetch('/api/social/accounts', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const connections = await response.json();
+        console.log('[Profile] Existing connections:', connections);
+        
+        // Check if Twitter connection exists
+        const twitterConnection = connections.find((conn: any) => conn.platform === 'twitter');
+        if (twitterConnection) {
+          console.log('[Profile] Found existing Twitter connection:', twitterConnection);
+          setTwitterConnected(true);
+          setTwitterHandle(twitterConnection.username || twitterConnection.displayName);
+        } else {
+          console.log('[Profile] No Twitter connection found');
+          setTwitterConnected(false);
+          setTwitterHandle(null);
+        }
+      } else {
+        console.warn('[Profile] Failed to fetch connections:', response.statusText);
+        setTwitterConnected(false);
+        setTwitterHandle(null);
+      }
+    } catch (error) {
+      console.error('[Profile] Error checking Twitter status:', error);
+      setTwitterConnected(false);
+      setTwitterHandle(null);
+    } finally {
+      setIsCheckingTwitterStatus(false);
+    }
+  };
   
   const checkFacebookStatus = async () => {
     try {
@@ -148,6 +194,39 @@ export default function Profile() {
       }
     } finally {
       setTwitterConnecting(false);
+    }
+  };
+
+  const disconnectTwitter = async () => {
+    try {
+      // Call backend to remove connection
+      const response = await fetch('/api/social/twitter', {
+        method: 'DELETE',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setTwitterConnected(false);
+        setTwitterHandle(null);
+        toast({
+          title: "X Disconnected",
+          description: "Successfully disconnected from X",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Twitter disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from X. Please try again.",
+        variant: 'destructive',
+      });
     }
   };
   
@@ -411,13 +490,24 @@ export default function Profile() {
                       </div>
                     </div>
                     {twitterConnected ? (
-                      <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={disconnectTwitter}
+                          data-testid="button-disconnect-twitter-profile"
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ) : (
                       <Button 
                         variant="outline" 
                         size="sm" 
                         onClick={connectTwitter}
                         disabled={twitterConnecting}
+                        data-testid="button-connect-twitter-profile"
                       >
                         {twitterConnecting ? 'Connecting…' : 'Connect'}
                       </Button>
