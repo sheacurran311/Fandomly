@@ -2233,17 +2233,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get subscription status for authenticated user
-  app.get('/api/subscription-status', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Get subscription status (no custom auth middleware)
+  app.get('/api/subscription-status', async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
+      if (!dynamicUserId) return res.json({ status: 'no_subscription' });
 
-      const user = await storage.getUser(userId);
+      const user = await storage.getUserByDynamicId(dynamicUserId);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.json({ status: 'no_subscription' });
       }
 
       const userTenants = await storage.getUserTenants(user.id);

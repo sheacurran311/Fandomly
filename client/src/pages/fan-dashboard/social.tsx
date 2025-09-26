@@ -29,10 +29,14 @@ import {
   Share,
   Award
 } from "lucide-react";
+import { TwitterSDKManager } from "@/lib/twitter";
 
 export default function FanSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [facebookConnected, setFacebookConnected] = useState(false);
+  const [twitterConnected, setTwitterConnected] = useState(false);
+  const [twitterConnecting, setTwitterConnecting] = useState(false);
+  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
   
   // Check Facebook connection status
   useEffect(() => {
@@ -47,6 +51,19 @@ export default function FanSocial() {
     } catch (error) {
       console.error('[Fan Social] Error checking Facebook status:', error);
       setFacebookConnected(false);
+    }
+  };
+
+  const connectTwitter = async () => {
+    try {
+      setTwitterConnecting(true);
+      const result = await TwitterSDKManager.secureLogin('fan', (user as any)?.dynamicUserId || user?.id);
+      if (result.success && result.user) {
+        setTwitterConnected(true);
+        setTwitterHandle(result.user.username);
+      }
+    } finally {
+      setTwitterConnecting(false);
     }
   };
   
@@ -83,8 +100,8 @@ export default function FanSocial() {
     {
       platform: "Twitter",
       icon: Twitter,
-      handle: "@yourhandle",
-      connected: false,
+      handle: twitterConnected && twitterHandle ? `@${twitterHandle}` : "@yourhandle",
+      connected: twitterConnected,
       color: "text-blue-400",
       bgColor: "bg-blue-400/20",
       description: "Connect to participate in Twitter campaigns"
@@ -225,14 +242,32 @@ export default function FanSocial() {
                             )}
                           </div>
                         ) : (
-                          // Other platform buttons (coming soon)
-                          <Button 
-                            variant="outline" 
-                            className="border-gray-500/30 text-gray-400"
-                            disabled
-                          >
-                            Coming Soon
-                          </Button>
+                          account.platform === 'Twitter' ? (
+                            account.connected ? (
+                              <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Connected
+                              </Badge>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                className="border-brand-primary/30 text-brand-primary"
+                                onClick={connectTwitter}
+                                disabled={twitterConnecting}
+                              >
+                                {twitterConnecting ? 'Connecting…' : 'Connect'}
+                              </Button>
+                            )
+                          ) : (
+                            // Other platform buttons (coming soon)
+                            <Button 
+                              variant="outline" 
+                              className="border-gray-500/30 text-gray-400"
+                              disabled
+                            >
+                              Coming Soon
+                            </Button>
+                          )
                         )}
                       </div>
                     </div>

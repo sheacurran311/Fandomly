@@ -2,13 +2,13 @@
 
 ## 🚨 CRITICAL AUTHENTICATION STATUS
 
-### 🟡 **AUTHENTICATION ARCHITECTURE - IN PROGRESS**
-**Current Status**: Template browsing works with local data; task creation needs wallet connection and server-side verification
+### ✅ **AUTHENTICATION ARCHITECTURE - RESOLVED**
+**Current Status**: Dynamic handles auth natively; server relies on `x-dynamic-user-id` and DB lookups. No custom JWT verification.
 
 **Architecture Approach**: 
 - **Layer 1**: Dynamic SDK handles wallet authentication on frontend
-- **Layer 2**: Server needs proper authentication middleware for protected endpoints like POST /api/tasks
-- **Current State**: Template browsing uses local data (no auth required), task creation requires authenticated user
+- **Layer 2**: Server RBAC via `authenticateUser` using `x-dynamic-user-id` → DB user + role/tenant context
+- **Current State**: Templates/tasks/campaigns use authenticated API routes where required
 
 ---
 
@@ -51,11 +51,11 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 
 ### 🔴 **CRITICAL ISSUES TO FIX IMMEDIATELY**
 
-#### **Issue 1: Authentication Architecture - Partially Resolved**
-**Location**: `/server/routes.ts` and authentication middleware
-**Problem**: Task creation requires proper authentication flow
+#### **Issue 1: Security Hardening**
+**Location**: `/server/routes.ts` and `/server/middleware/rbac.ts`
+**Problem**: Ensure RBAC applied consistently, tenant isolation enforced, Zod validation across inputs
 **Priority**: 🔴 CRITICAL - SECURITY  
-**Status**: 🟡 **PARTIALLY RESOLVED** - Dynamic auth browsing works, task creation needs wallet connection and proper server-side verification
+**Status**: 🟡 **IN PROGRESS** - Auth pattern set; continue RBAC/tenant/validation hardening
 
 #### **Issue 2: Hardcoded Data Instead of Real API Calls**
 **Locations**: 
@@ -94,11 +94,10 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 - [x] Dynamic authentication integration
 
 ### ❌ **NEEDS FIXING**
-- [ ] Task creation authentication flow (wallet connection required)
 - [ ] RBAC middleware consistently applied
 - [ ] Tenant isolation in queries
-- [ ] File upload endpoints missing
-- [ ] Payment integration endpoints missing
+- [ ] File upload UX (server endpoints exist)
+- [ ] Payment webhooks/endpoints (server partially complete)
 
 ## 🎨 UI/UX ONBOARDING ANALYSIS
 
@@ -178,11 +177,11 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 
 ### **PHASE 1: CRITICAL FIXES (Week 1)**
 
-#### **Task 1.1: Security Critical**
-- [ ] Implement proper JWT verification in `server/routes.ts`
+#### **Task 1.1: Security Hardening**
 - [ ] Apply RBAC middleware consistently
 - [ ] Add tenant context validation
 - [ ] Implement Zod schema validation
+- [ ] Remove any unused JWT verification code
 
 #### **Task 1.2: Data Flow Fixes**
 - [ ] Replace hardcoded dashboard data with real API calls
@@ -190,17 +189,16 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 - [ ] Add React Query cache invalidation
 - [ ] Connect all dashboard metrics to backend
 
-#### **Task 1.3: Campaign System**
-- [ ] Wire campaign builder to `POST /api/campaigns`
-- [ ] Implement campaign participation tracking
-- [ ] Add real-time progress updates
+#### **Task 1.3: Campaign & Task System**
+- [ ] Wire `TemplatePicker`/`TaskConfigurationForm` to `POST /api/tasks`
+- [ ] Implement Create → Assign → Publish flow
+- [ ] Add tasks list/toggle/edit UI connected to `/api/tasks`
 - [ ] Connect social actions to point accrual
 
 ### **PHASE 2: INFRASTRUCTURE (Week 2)**
 
 #### **Task 2.1: File Upload System**
-- [ ] Create `server/upload-routes.ts`
-- [ ] Implement presigned URL generation
+- [ ] Implement presigned URL option (S3) in addition to existing disk uploads
 - [ ] Add profile picture upload
 - [ ] Add branding asset uploads
 - [ ] Create `client/src/hooks/use-file-upload.ts`
@@ -242,9 +240,8 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 ### **Backend Files**
 
 #### **`server/routes.ts`**
-- [ ] **CRITICAL**: Remove JWT bypass and implement proper verification
+- [ ] **CRITICAL**: Enforce RBAC + tenant isolation on all protected endpoints
 - [ ] Add proper error handling for all endpoints
-- [ ] Implement tenant isolation for all queries
 - [ ] Add Zod validation schemas
 
 #### **`server/storage.ts`**
@@ -262,8 +259,8 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 - [ ] Connect social actions to point tracking
 
 #### **`client/src/pages/creator-dashboard.tsx`**
-- [ ] Replace static metrics with real data
-- [ ] Connect campaign creation to backend
+- [ ] Replace static metrics with real data (use `/api/campaigns/creator/:creatorId`, rewards, participation)
+- [ ] Connect campaign creation to backend (Create → Assign → Publish)
 - [ ] Add analytics integration
 - [ ] Implement subscription status display
 
@@ -303,9 +300,9 @@ Based on analysis of `DEVELOPMENT_PRIORITIES.md` and current codebase, here's ou
 ## 🚀 IMMEDIATE ACTION PLAN
 
 ### **TODAY (Priority 1)**:
-1. Fix JWT verification security vulnerability
-2. Connect fan dashboard to real API data
-3. Make campaign builder save to database
+1. Connect fan dashboard to real API data
+2. Make campaign builder Create → Assign → Publish flow functional
+3. Wire tasks UI to `/api/tasks` (create/edit/toggle)
 4. Fix profile edit functionality
 
 ### **THIS WEEK (Priority 2)**:

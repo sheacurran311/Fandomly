@@ -22,6 +22,8 @@ import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { TaskTemplateManagement } from "@/components/templates/TaskTemplateManagement";
+import { useInstagramConnection } from "@/contexts/instagram-connection-context";
+import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 
 // Task types configuration
 const taskTypes = [
@@ -85,7 +87,8 @@ interface Task {
   platform: string;
   targetUrl?: string;
   hashtags?: string[];
-  points: number;
+  rewardValue?: number;
+  points?: number; // legacy
   isActive: boolean;
   assignedCampaigns: number;
   totalCompletions: number;
@@ -99,6 +102,8 @@ export default function TasksManagement() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const instagram = useInstagramConnection?.();
+  const facebook = useFacebookConnection?.();
 
   // Fetch creator's tasks using real API with authentication guards
   const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useQuery<Task[]>({
@@ -374,10 +379,29 @@ function TaskCard({ task, onAssign, onUpdate }: {
   const taskTypeConfig = taskTypes.find(t => t.id === task.taskType);
   const PlatformIcon = platformIcons[task.platform as keyof typeof platformIcons];
   const TaskIcon = taskTypeConfig?.icon || Settings;
+  const instagram = useInstagramConnection?.();
+  const facebook = useFacebookConnection?.();
+
+  const isPlatformConnected = (p: string): boolean => {
+    if (p === 'instagram') return !!instagram?.isConnected;
+    if (p === 'facebook') return !!facebook?.isConnected;
+    return false;
+  };
+  const connected = isPlatformConnected(task.platform);
+  const platformTitle = task.platform.charAt(0).toUpperCase() + task.platform.slice(1);
 
   const toggleTaskStatus = async () => {
     try {
-      // TODO: Implement actual API call
+      // Prevent activation if platform is not connected
+      if (!task.isActive && !connected) {
+        toast({
+          title: "Cannot Activate",
+          description: `Connect your ${task.platform} account to publish this task.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      // TODO: Implement actual API call to update isActive
       toast({
         title: task.isActive ? "Task Deactivated" : "Task Activated",
         description: `${task.name} has been ${task.isActive ? 'deactivated' : 'activated'}.`,
@@ -410,13 +434,19 @@ function TaskCard({ task, onAssign, onUpdate }: {
                   {taskTypeConfig?.name}
                 </Badge>
                 <PlatformIcon className="h-4 w-4 text-gray-400" />
+                {!connected && (
+                  <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                    Pending: Connect {task.platform}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
           <div className="flex items-center space-x-1">
             <Switch
-              checked={task.isActive}
+              checked={task.isActive && connected}
               onCheckedChange={toggleTaskStatus}
+              disabled={!connected}
               className="data-[state=checked]:bg-brand-primary"
             />
           </div>
@@ -430,7 +460,7 @@ function TaskCard({ task, onAssign, onUpdate }: {
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-1 text-emerald-400">
               <Target className="h-4 w-4" />
-              <span>{task.points} points</span>
+              <span>{task.rewardValue ?? task.points ?? 0} points</span>
             </div>
             <div className="text-gray-400">
               {task.totalCompletions} completions
@@ -452,11 +482,28 @@ function TaskCard({ task, onAssign, onUpdate }: {
               onClick={() => onAssign(task)}
               variant="outline" 
               size="sm"
-              className="w-full border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+              className="w-full border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 disabled:opacity-60"
+              disabled={!connected}
               data-testid={`button-assign-task-${task.id}`}
             >
-              Assign to Campaign
+              {connected ? 'Assign to Campaign' : `Connect ${task.platform} to Assign`}
             </Button>
+            {!connected && (
+              <p className="mt-2 text-xs text-yellow-400">
+                This task is in Pending mode. Connect your {task.platform} account to publish. Visible on mobile.
+              </p>
+            )}
+            {!connected && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                onClick={() => { window.location.href = '/creator-dashboard/social'; }}
+                data-testid={`button-connect-${task.platform}`}
+              >
+                Connect {platformTitle} Account
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

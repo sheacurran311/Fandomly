@@ -18,6 +18,7 @@ export interface AuthenticatedRequest extends Request {
     customerTier?: 'basic' | 'premium' | 'vip' | null;
     adminPermissions?: any;
     customerAdminData?: any;
+    dynamicUserId?: string;  // Add dynamicUserId to user object
   };
   dynamicUser?: {
     id: string;
@@ -62,6 +63,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     req.user = {
       ...user,
       customerTier: user.customerTier || undefined,
+      dynamicUserId: dynamicUserId,  // Store the Dynamic user ID
     };
     next();
   } catch (error) {

@@ -1,10 +1,37 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
-// Helper to get current Dynamic user ID using SDK context (not localStorage)
+// Helper to get current Dynamic user ID from multiple sources
 function getDynamicUserId(): string | null {
-  // This will be set by components that have access to Dynamic context
-  return (window as any).__dynamicUserId || null;
+  try {
+    // 1. Current window (for parent window)
+    if ((window as any).__dynamicUserId) {
+      return (window as any).__dynamicUserId;
+    }
+    
+    // 2. localStorage (for popup window - Twitter OAuth)
+    const fromStorage = localStorage.getItem("twitter_dynamic_user_id");
+    if (fromStorage) {
+      return fromStorage;
+    }
+    
+    // 3. Opener window (for popup window)
+    if ((window as any).opener && (window as any).opener.__dynamicUserId) {
+      return (window as any).opener.__dynamicUserId;
+    }
+    
+    // 4. Opener's localStorage (for popup window)
+    if ((window as any).opener && (window as any).opener.localStorage) {
+      const fromOpenerStorage = (window as any).opener.localStorage.getItem("twitter_dynamic_user_id");
+      if (fromOpenerStorage) {
+        return fromOpenerStorage;
+      }
+    }
+  } catch (e) {
+    console.warn('[Auth] Error accessing Dynamic user ID:', e);
+  }
+  
+  return null;
 }
 
 async function throwIfResNotOk(res: Response) {
@@ -73,6 +100,12 @@ export async function fetchApi(
     console.log(`[Auth] Adding user ID header: ${dynamicUserId} for ${method} ${url}`);
   } else {
     console.warn(`[Auth] No Dynamic user ID available for ${method} ${url}`);
+    console.log(`[Auth] Dynamic user ID debug for ${method} ${url}:`, {
+      fromWindow: (window as any).__dynamicUserId || null,
+      fromStorage: localStorage.getItem("twitter_dynamic_user_id") || null,
+      fromOpener: ((window as any).opener && (window as any).opener.__dynamicUserId) || null,
+      fromOpenerStorage: ((window as any).opener && (window as any).opener.localStorage?.getItem("twitter_dynamic_user_id")) || null
+    });
   }
 
   const res = await fetch(url, {

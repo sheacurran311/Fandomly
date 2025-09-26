@@ -13,6 +13,38 @@ export default function AuthRouter({ children }: AuthRouterProps) {
   const [, setLocation] = useLocation();
   const { user: userData, isLoading } = useAuth();
 
+  // Global PKCE handshake listener for Twitter OAuth popups
+  useEffect(() => {
+    function messageListener(event: MessageEvent) {
+      try {
+        if (event.origin !== window.location.origin) return;
+        if (event.data?.type === 'twitter-pkce-request') {
+          const reqState = (event.data && (event.data as any).state) as string | undefined;
+          let verifier: string | null = null;
+          try {
+            const rawMap = localStorage.getItem('twitter_pkce_map');
+            const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
+            verifier = (reqState && map[reqState]) || null;
+          } catch {}
+          if (!verifier) {
+            try { verifier = localStorage.getItem('twitter_pkce_verifier'); } catch {}
+          }
+          if (!verifier) {
+            try { verifier = (window as any).__twitterPkceVerifier || null; } catch {}
+          }
+          try {
+            (event.source as Window | null)?.postMessage({ type: 'twitter-pkce-response', state: reqState, verifier }, event.origin);
+          } catch {}
+        }
+      } catch {}
+    }
+
+    window.addEventListener('message', messageListener);
+    return () => {
+      window.removeEventListener('message', messageListener);
+    };
+  }, []);
+
   // Get current path and define routes (moved outside useEffect for render-gating)
   const currentPath = window.location.pathname;
   const protectedRoutes = ['/creator-dashboard', '/fan-dashboard'];
@@ -25,7 +57,7 @@ export default function AuthRouter({ children }: AuthRouterProps) {
 
   useEffect(() => {
     const isPopup = typeof window !== 'undefined' && !!(window as any).opener;
-    const isOAuthRoute = currentPath === '/creator-dashboard' || currentPath === '/instagram-callback';
+    const isOAuthRoute = currentPath === '/creator-dashboard' || currentPath === '/instagram-callback' || currentPath === '/x-callback';
 
     // Critical: When handling OAuth inside a popup, do NOT redirect.
     // Redirects here can strip query params (code/state) and prevent the popup from posting back to parent.
@@ -52,10 +84,17 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (dynamicUser?.userId) {
       (window as any).__dynamicUserId = dynamicUser.userId;
       console.log(`[Auth] Set Dynamic user ID: ${dynamicUser.userId}`);
-    } else {
+    } else if (!isLoading && dynamicUser === null) {
+      // Only clear if we're not loading and Dynamic user is explicitly null (logged out)
       (window as any).__dynamicUserId = null;
-      console.log('[Auth] Cleared Dynamic user ID');
+      console.log('[Auth] Cleared Dynamic user ID - user logged out');
     }
+    // Don't clear during loading states or temporary undefined states
+
+    // Expose current app user type for popup OAuth state tagging
+    try {
+      (window as any).__userType = userData?.userType || null;
+    } catch {}
     
     if (!dynamicUser) {
       // User not connected to Dynamic

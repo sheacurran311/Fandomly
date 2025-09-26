@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { FaTiktok, FaSpotify } from "react-icons/fa";
 import { socialManager, type SocialMediaAccount } from "@/lib/social-integrations";
+import { TwitterSDKManager } from "@/lib/twitter";
 import { useToast } from "@/hooks/use-toast";
 
 interface SocialPlatform {
@@ -88,6 +90,7 @@ export default function SocialMediaConnect({
   showMetrics = true,
   requiredPlatforms = []
 }: SocialMediaConnectProps) {
+  const { user } = useAuth();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,10 +115,11 @@ export default function SocialMediaConnect({
 
       if (code && state) {
         const platform = state.replace('_auth', '');
-        await handleOAuthSuccess(platform, code);
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        // Skip Twitter - it uses popup flow via TwitterSDKManager, not redirect
+        if (platform !== 'twitter') {
+          await handleOAuthSuccess(platform, code);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
     };
 
@@ -123,12 +127,27 @@ export default function SocialMediaConnect({
   }, []);
 
   const handleOAuthSuccess = async (platform: string, code: string) => {
+    // Skip Twitter - it uses popup flow via TwitterSDKManager, not redirect
+    if (platform === 'twitter') {
+      console.log('[Social Connect] Skipping Twitter redirect callback - uses popup flow');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const account = await socialManager.connectAccount(platform, code);
       
+      if (!account) {
+        throw new Error('Failed to connect account - no account data received');
+      }
+      
       const connectedAccount: ConnectedAccount = {
-        ...account,
+        platform: account.platform,
+        username: account.username,
+        displayName: account.displayName,
+        followers: account.followers,
+        verified: account.verified,
+        profileUrl: account.profileUrl,
         lastSync: new Date(),
         status: 'connected'
       };
@@ -163,8 +182,37 @@ export default function SocialMediaConnect({
     
     setConnectingPlatform(platformId);
     try {
-      const authUrl = socialManager.getAuthUrl(platformId);
-      window.location.href = authUrl;
+      if (platformId === 'twitter') {
+        // Use popup PKCE flow via TwitterSDKManager
+        const userType = (window as any).__userType || 'fan';
+        const result = await TwitterSDKManager.secureLogin(userType, (user as any)?.dynamicUserId || user?.id);
+        if (result.success && result.accessToken) {
+          // Fetch profile directly using the token
+          const userInfo = await TwitterSDKManager.fetchUserInfo(result.accessToken);
+          if (!userInfo) throw new Error('Failed to load X profile');
+          const connectedAccount: ConnectedAccount = {
+            platform: 'twitter',
+            username: userInfo.username,
+            displayName: userInfo.name,
+            followers: userInfo.followersCount || 0,
+            verified: false,
+            profileUrl: `https://twitter.com/${userInfo.username}`,
+            lastSync: new Date(),
+            status: 'connected',
+          };
+          setConnectedAccounts(prev => {
+            const filtered = prev.filter(acc => acc.platform !== 'twitter');
+            const updated = [...filtered, connectedAccount];
+            onAccountsChange?.(updated);
+            return updated;
+          });
+        } else if (!result.success) {
+          throw new Error(result.error || 'Twitter connect failed');
+        }
+      } else {
+        const authUrl = socialManager.getAuthUrl(platformId);
+        window.location.href = authUrl;
+      }
     } catch (error) {
       console.error('Connect platform error:', error);
       toast({

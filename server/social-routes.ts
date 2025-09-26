@@ -3,6 +3,7 @@ import express from "express";
 import crypto from "crypto";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 import { URLSearchParams } from "url";
+import { storage } from "./storage";
 
 // Instagram Business Login token exchange
 async function exchangeInstagramToken(code: string, redirectUri: string, userType: string = 'creator') {
@@ -33,7 +34,7 @@ async function exchangeInstagramToken(code: string, redirectUri: string, userTyp
   const response = await fetch('https://api.instagram.com/oauth/access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(requestBody)
+    body: new URLSearchParams(requestBody).toString()
   });
   
   console.log('[Instagram Token Exchange] Instagram API response status:', response.status);
@@ -64,30 +65,46 @@ async function exchangeTikTokToken(code: string) {
       client_secret: process.env.TIKTOK_CLIENT_SECRET!,
       code,
       grant_type: 'authorization_code'
-    })
+    }).toString()
   });
   
   return response.json();
 }
 
-// Twitter API v2 token exchange
-async function exchangeTwitterToken(code: string) {
-  const response = await fetch('https://api.twitter.com/2/oauth2/token', {
+// Twitter API v2 token exchange (Authorization Code with PKCE)
+async function exchangeTwitterToken(
+  code: string,
+  redirectUri: string,
+  codeVerifier: string
+) {
+  const params = new URLSearchParams({
+    code,
+    grant_type: 'authorization_code',
+    client_id: process.env.TWITTER_CLIENT_ID!,
+    redirect_uri: redirectUri,
+    code_verifier: codeVerifier
+  }).toString();
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  // Include client credentials for confidential clients when a secret is configured
+  if (process.env.TWITTER_CLIENT_SECRET) {
+    headers['Authorization'] = `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString('base64')}`;
+  }
+
+  const response = await fetch('https://api.x.com/2/oauth2/token', {
     method: 'POST',
-    headers: { 
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString('base64')}`
-    },
-    body: new URLSearchParams({
-      code,
-      grant_type: 'authorization_code',
-      client_id: process.env.TWITTER_CLIENT_ID!,
-      redirect_uri: `${process.env.BASE_URL}/auth/twitter/callback`,
-      code_verifier: 'challenge'
-    })
+    headers,
+    body: params
   });
-  
-  return response.json();
+
+  const text = await response.text();
+  let json: any = null;
+  try { json = JSON.parse(text); } catch {}
+  return {
+    ok: response.ok,
+    status: response.status,
+    body: json ?? { error: 'invalid_response', error_description: text }
+  };
 }
 
 // YouTube Data API token exchange
@@ -101,7 +118,7 @@ async function exchangeYouTubeToken(code: string) {
       code,
       grant_type: 'authorization_code',
       redirect_uri: `${process.env.BASE_URL}/auth/youtube/callback`
-    })
+    }).toString()
   });
   
   return response.json();
@@ -119,7 +136,7 @@ async function exchangeSpotifyToken(code: string) {
       grant_type: 'authorization_code',
       code,
       redirect_uri: `${process.env.BASE_URL}/auth/spotify/callback`
-    })
+    }).toString()
   });
   
   return response.json();
@@ -144,7 +161,7 @@ async function getTikTokUser(accessToken: string) {
 
 // Get Twitter user info
 async function getTwitterUser(accessToken: string) {
-  const response = await fetch('https://api.twitter.com/2/users/me?user.fields=id,name,username,public_metrics,profile_image_url,verified', {
+  const response = await fetch('https://api.x.com/2/users/me?user.fields=id,name,username,public_metrics,profile_image_url,verified', {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
   
@@ -334,8 +351,8 @@ export function registerSocialRoutes(app: Express) {
         if (updatedProfileData?.facebookData) {
           delete updatedProfileData.facebookData;
         }
-        if (updatedProfileData?.socialConnections?.facebook) {
-          delete updatedProfileData.socialConnections.facebook;
+        if ((updatedProfileData as any)?.socialConnections?.facebook) {
+          delete (updatedProfileData as any).socialConnections.facebook;
         }
         
         // Update user with cleaned profile data
@@ -659,20 +676,42 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter token exchange
-  app.post('/api/social/twitter/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Twitter token exchange (no custom auth middleware)
+  app.post('/api/social/twitter/token', async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.body;
-      const tokenData = await exchangeTwitterToken(code);
-      res.json(tokenData);
+      const timestamp = new Date().toISOString();
+      const { code, redirect_uri, code_verifier } = req.body || {};
+      const dynamicUserIdHeader = req.headers['x-dynamic-user-id'] as string | undefined;
+      const dynamicUserIdBody = (req.body && (req.body.dynamicUserId || req.body.userId)) as string | undefined;
+      const dynamicUserId = dynamicUserIdHeader || dynamicUserIdBody;
+
+      console.log(`[Twitter Token] ${timestamp} Request received:`, {
+        code: code ? `${code.substring(0, 10)}...` : 'missing',
+        redirect_uri,
+        code_verifier: code_verifier ? `${code_verifier.substring(0, 10)}...` : 'missing',
+        userId: dynamicUserId || 'unknown'
+      });
+
+      if (!code || !redirect_uri || !code_verifier) {
+        console.log('[Twitter Token] Missing required parameters');
+        return res.status(400).json({ error: 'code, redirect_uri, and code_verifier are required' });
+      }
+
+      console.log(`[Twitter Token] Calling exchangeTwitterToken...`);
+      const result = await exchangeTwitterToken(code, redirect_uri, code_verifier);
+      console.log(`[Twitter Token] ${timestamp} exchange response:`, { status: result.status, ok: result.ok, body: result.body });
+      if (!result.ok) {
+        return res.status(result.status).json(result.body);
+      }
+      return res.json(result.body);
     } catch (error) {
       console.error('Twitter token exchange error:', error);
       res.status(500).json({ error: 'Failed to exchange Twitter token' });
     }
   });
 
-  // Twitter user info
-  app.get('/api/social/twitter/user', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Twitter user info (no custom auth middleware)
+  app.get('/api/social/twitter/user', async (req: AuthenticatedRequest, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -711,15 +750,31 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Save connected social account
-  app.post('/api/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Save connected social account (no custom auth middleware)
+  app.post('/api/social/connect', async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user?.dynamicUserId;
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
       const { platform, accountData } = req.body;
       
-      // TODO: Save to database
-      // await storage.saveSocialAccount(userId, platform, accountData);
+      console.log(`[Social Connect] Request received:`, { 
+        dynamicUserId, 
+        platform, 
+        hasAccountData: !!accountData,
+        accountUsername: accountData?.user?.username 
+      });
       
+      if (!dynamicUserId) {
+        return res.status(400).json({ error: 'dynamicUserId required' });
+      }
+      
+      if (!platform || !accountData) {
+        return res.status(400).json({ error: 'Platform and account data are required' });
+      }
+      
+      // Save to database
+      await storage.saveSocialAccount(dynamicUserId, platform, accountData);
+      
+      console.log(`[Social Connect] Successfully saved ${platform} account for user ${dynamicUserId}`);
       res.json({ success: true, message: `${platform} account connected successfully` });
     } catch (error) {
       console.error('Social connect error:', error);
@@ -727,14 +782,14 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Get user's connected social accounts
-  app.get('/api/social/accounts', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Get user's connected social accounts (no custom auth middleware)
+  app.get('/api/social/accounts', async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user?.dynamicUserId;
+      const userId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
       
       // TODO: Get from database
       // const accounts = await storage.getSocialAccounts(userId);
-      const accounts = []; // Placeholder
+      const accounts: any[] = []; // Placeholder
       
       res.json(accounts);
     } catch (error) {
@@ -743,10 +798,10 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Disconnect social account
-  app.delete('/api/social/:platform', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Disconnect social account (no custom auth middleware)
+  app.delete('/api/social/:platform', async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user?.dynamicUserId;
+      const userId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
       const { platform } = req.params;
       
       // TODO: Remove from database

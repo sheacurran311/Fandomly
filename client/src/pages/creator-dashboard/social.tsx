@@ -33,6 +33,7 @@ import {
   Zap,
   Unlink
 } from "lucide-react";
+import { TwitterSDKManager } from "@/lib/twitter";
 
 export default function CreatorSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -54,6 +55,9 @@ export default function CreatorSocial() {
   const [activePage, setActivePage] = useState<FacebookPage | null>(null);
   const [isCheckingFacebookStatus, setIsCheckingFacebookStatus] = useState(true);
   const [showPageModal, setShowPageModal] = useState(false);
+  const [twitterConnected, setTwitterConnected] = useState(false);
+  const [twitterConnecting, setTwitterConnecting] = useState(false);
+  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
 
   // Check Facebook status on mount and load saved active page
   useEffect(() => {
@@ -85,6 +89,32 @@ export default function CreatorSocial() {
       setFacebookPages([]);
     } finally {
       setIsCheckingFacebookStatus(false);
+    }
+  };
+
+  const connectTwitter = async () => {
+    try {
+      setTwitterConnecting(true);
+      const result = await TwitterSDKManager.secureLogin('creator', user?.dynamicUserId || user?.id);
+      if (result.success && result.user) {
+        setTwitterConnected(true);
+        setTwitterHandle(result.user.username);
+        toast({
+          title: "X Connected! 🐦",
+          description: `Connected @${result.user.username}`,
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Twitter login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (e: any) {
+      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect X', variant: 'destructive' });
+    } finally {
+      setTwitterConnecting(false);
     }
   };
 
@@ -229,10 +259,10 @@ export default function CreatorSocial() {
     {
       platform: "Twitter",
       icon: Twitter,
-      handle: "@aerialace",
-      followers: "8.9K",
-      engagement: "5.7%",
-      connected: true,
+      handle: twitterConnected && twitterHandle ? `@${twitterHandle}` : '@yourhandle',
+      followers: twitterConnected ? "—" : "0",
+      engagement: twitterConnected ? "Active" : "—",
+      connected: twitterConnected,
       color: "text-blue-400",
       bgColor: "bg-blue-400/20"
     },
@@ -404,7 +434,7 @@ export default function CreatorSocial() {
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
-                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  className="border-white/20 text-gray-300 hover:bg_white/10"
                                   onClick={() => setShowPageModal(true)}
                                   data-testid="button-switch-facebook-page"
                                 >
@@ -430,7 +460,7 @@ export default function CreatorSocial() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="border-white/20 text-gray-300 hover:bg-white/10"
+                                className="border-white/20 text_gray-300 hover:bg-white/10"
                                 onClick={disconnectInstagram}
                                 data-testid="button-disconnect-instagram-social"
                               >
@@ -448,7 +478,7 @@ export default function CreatorSocial() {
                             </>
                           ) : (
                             <Button 
-                              className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600"
+                              className="bg-gradient_to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600"
                               onClick={connectInstagram}
                               disabled={instagramConnecting}
                               data-testid="button-connect-instagram-social"
@@ -457,8 +487,25 @@ export default function CreatorSocial() {
                             </Button>
                           )
                         ) : (
-                          // Other platform buttons (static for now)
-                          account.connected ? (
+                          account.platform === 'Twitter' ? (
+                            account.connected ? (
+                              <>
+                                <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
+                                  <Settings className="h-4 w-4 mr-1" />
+                                  Settings
+                                </Button>
+                                <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10" onClick={() => window.open(`https://twitter.com/${twitterHandle}`, '_blank')}>
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button className="bg-brand-primary hover:bg-brand-primary/80" onClick={connectTwitter} disabled={twitterConnecting}>
+                                {twitterConnecting ? 'Connecting...' : 'Connect'}
+                              </Button>
+                            )
+                          ) : (
+                            // Other platform buttons (static for now)
+                            account.connected ? (
                             <>
                               <Button variant="outline" size="sm" className="border-white/20 text-gray-300 hover:bg-white/10">
                                 <Settings className="h-4 w-4 mr-1" />
@@ -468,10 +515,11 @@ export default function CreatorSocial() {
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
                             </>
-                          ) : (
-                            <Button className="bg-brand-primary hover:bg-brand-primary/80">
-                              Connect
-                            </Button>
+                            ) : (
+                              <Button className="bg-brand-primary hover:bg-brand-primary/80">
+                                Connect
+                              </Button>
+                            )
                           )
                         )}
                       </div>
@@ -486,7 +534,7 @@ export default function CreatorSocial() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
               <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
+                <CardTitle className="text-white flex items_center justify-between">
                   <span>Automation Rules</span>
                   <Button variant="outline" size="sm" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
                     <Plus className="h-4 w-4 mr-1" />
@@ -504,13 +552,8 @@ export default function CreatorSocial() {
                       </div>
                       <p className="text-sm text-gray-400 mb-3">{rule.description}</p>
                       <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <Zap className="h-4 w-4 text-brand-secondary" />
-                          <span className="text-sm text-white">{rule.triggered} triggered</span>
-                        </div>
-                        <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                          <Settings className="h-4 w-4" />
-                        </Button>
+                        <Zap className="h-4 w-4 text-brand-secondary" />
+                        <span className="text-sm text-white">{rule.triggered} triggered</span>
                       </div>
                     </div>
                   ))}
@@ -549,7 +592,7 @@ export default function CreatorSocial() {
           </div>
 
           {/* Social Media Integrations */}
-          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+          <Card className="bg-white/5 backdrop_blur-lg border border-white/10">
             <CardHeader>
               <CardTitle className="text-white">Facebook Integration</CardTitle>
             </CardHeader>
@@ -558,7 +601,7 @@ export default function CreatorSocial() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+          <Card className="bg-white/5 backdrop_blur-lg border border-white/10">
             <CardHeader>
               <CardTitle className="text-white">Instagram Integration</CardTitle>
             </CardHeader>

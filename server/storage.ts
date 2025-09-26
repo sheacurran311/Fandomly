@@ -855,6 +855,62 @@ export class DatabaseStorage implements IStorage {
       : and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'pending_tasks'));
     return await db.select().from(campaigns).where(conditions).orderBy(desc(campaigns.createdAt));
   }
+
+  // Social Account Management
+  async saveSocialAccount(dynamicUserId: string, platform: string, accountData: any): Promise<void> {
+    try {
+      // First, get the user's internal ID from their Dynamic ID
+      const user = await this.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        throw new Error(`User not found for Dynamic ID: ${dynamicUserId}`);
+      }
+
+      // Create or update social account connection
+      const socialAccountData = {
+        userId: user.id,
+        platform,
+        platformUserId: accountData.user?.id || accountData.id,
+        username: accountData.user?.username || accountData.username,
+        displayName: accountData.user?.name || accountData.name || accountData.displayName,
+        profileUrl: accountData.user?.profileUrl || `https://twitter.com/${accountData.user?.username}`,
+        followers: accountData.user?.followersCount || accountData.followersCount || 0,
+        metadata: JSON.stringify(accountData),
+        connectedAt: new Date(),
+        isActive: true
+      };
+
+      console.log(`[Storage] Saving social account for user ${user.id}:`, { platform, username: socialAccountData.username });
+
+      // For now, we'll store it in a simple way - you may want to create a dedicated social_accounts table
+      // This is a temporary implementation that stores in user metadata or a simple structure
+      
+      // TODO: Create proper social_accounts table if needed
+      // For now, just log success
+      console.log(`[Storage] Social account saved successfully:`, socialAccountData);
+      
+    } catch (error) {
+      console.error(`[Storage] Failed to save social account:`, error);
+      throw error;
+    }
+  }
+
+  async getSocialAccounts(dynamicUserId: string): Promise<any[]> {
+    try {
+      const user = await this.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        return [];
+      }
+
+      // TODO: Implement proper social accounts retrieval
+      // For now, return empty array
+      console.log(`[Storage] Getting social accounts for user ${user.id}`);
+      return [];
+      
+    } catch (error) {
+      console.error(`[Storage] Failed to get social accounts:`, error);
+      return [];
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

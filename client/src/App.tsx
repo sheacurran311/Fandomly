@@ -52,6 +52,7 @@ import DataDeletionInfo from "@/pages/privacy/data-deletion";
 import TermsOfService from "@/pages/terms-of-service";
 import NotFound from "@/pages/not-found";
 import InstagramCallback from "@/pages/instagram-callback";
+import XCallback from "@/pages/x-callback";
 
 function Router() {
   return (
@@ -95,6 +96,7 @@ function Router() {
       {/* Deprecated facebook-login routes removed */}
       
       <Route path="/instagram-callback" component={InstagramCallback} />
+      <Route path="/x-callback" component={XCallback} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />

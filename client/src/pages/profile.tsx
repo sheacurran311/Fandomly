@@ -28,11 +28,16 @@ import {
   Unlink,
   Plus
 } from "lucide-react";
+import { Twitter } from "lucide-react";
+import { TwitterSDKManager } from "@/lib/twitter";
 
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [twitterConnecting, setTwitterConnecting] = useState(false);
+  const [twitterConnected, setTwitterConnected] = useState(false);
+  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
   
   // Facebook import state
   const [isImporting, setIsImporting] = useState(false);
@@ -127,6 +132,22 @@ export default function Profile() {
       await importFacebookProfile.mutateAsync();
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const connectTwitter = async () => {
+    try {
+      setTwitterConnecting(true);
+      const result = await TwitterSDKManager.secureLogin('creator', (user as any)?.dynamicUserId || user?.id);
+      if (result.success && result.user) {
+        setTwitterConnected(true);
+        setTwitterHandle(result.user.username);
+        toast({ title: 'X Connected', description: `@${result.user.username}` });
+      } else if (!result.success) {
+        toast({ title: 'X Connect Failed', description: result.error || 'Try again', variant: 'destructive' });
+      }
+    } finally {
+      setTwitterConnecting(false);
     }
   };
   
@@ -379,6 +400,30 @@ export default function Profile() {
                     </Button>
                   </div>
                   
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Twitter className="h-5 w-5 text-blue-400" />
+                      <div>
+                        <div className="text-white font-medium">X (Twitter)</div>
+                        <div className="text-xs text-gray-400">
+                          {twitterConnected && twitterHandle ? `Connected as @${twitterHandle}` : 'Connect your X account'}
+                        </div>
+                      </div>
+                    </div>
+                    {twitterConnected ? (
+                      <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={connectTwitter}
+                        disabled={twitterConnecting}
+                      >
+                        {twitterConnecting ? 'Connecting…' : 'Connect'}
+                      </Button>
+                    )}
+                  </div>
+
                   {/* Instagram integration - only show for creators */}
                   {user?.userType === 'creator' && (
                     <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">

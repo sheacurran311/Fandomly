@@ -42,8 +42,39 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
           StarknetWalletConnectors,
           SuiWalletConnectors,
         ],
-        // Ensure Dynamic uses only wallet authentication
-        // All other customizations should be done in Dynamic admin dashboard
+        // Dynamic SDK owns authentication. We only mirror the userId for our API headers.
+        events: {
+          onAuthSuccess: (args: any) => {
+            try {
+              const user = args?.user || args;
+              const userId = user?.userId || user?.id;
+              if (userId) {
+                (window as any).__dynamicUserId = userId;
+                try { localStorage.setItem('twitter_dynamic_user_id', userId); } catch {}
+                // eslint-disable-next-line no-console
+                console.log('[Dynamic Events] onAuthSuccess - set Dynamic user ID:', userId);
+              }
+            } catch {}
+          },
+          onLogout: () => {
+            try { (window as any).__dynamicUserId = null; } catch {}
+            try { localStorage.removeItem('twitter_dynamic_user_id'); } catch {}
+            // eslint-disable-next-line no-console
+            console.log('[Dynamic Events] onLogout - cleared Dynamic user ID');
+          },
+          onUserProfileUpdate: (args: any) => {
+            try {
+              const user = args?.user || args;
+              const userId = user?.userId || user?.id;
+              if (userId) {
+                (window as any).__dynamicUserId = userId;
+                try { localStorage.setItem('twitter_dynamic_user_id', userId); } catch {}
+                // eslint-disable-next-line no-console
+                console.log('[Dynamic Events] onUserProfileUpdate - refreshed Dynamic user ID:', userId);
+              }
+            } catch {}
+          }
+        }
       }}
     >
       {children}

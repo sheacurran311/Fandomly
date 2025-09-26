@@ -8,6 +8,8 @@ import { SiTiktok, SiSpotify } from "react-icons/si";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useInstagramConnection } from "@/contexts/instagram-connection-context";
+import { useFacebookConnection } from "@/contexts/facebook-connection-context";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useAuth } from "@/hooks/use-auth";
 import { TaskConfigurationForm } from "@/components/templates/TaskConfigurationForm";
@@ -77,6 +79,8 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   const { toast } = useToast();
   const { user } = useAuth();
   const { user: dynamicUser } = useDynamicContext();
+  const instagram = useInstagramConnection?.() as any;
+  const facebook = useFacebookConnection?.() as any;
 
   // Use local platform task types (like Snag - no API needed)
   const taskTypes = selectedPlatform && currentStep === "taskType" 
@@ -145,15 +149,56 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   const handleConfigurationSubmit = (config: any) => {
     if (!selectedPlatform || !selectedTaskType) return;
 
-    const taskData = {
-      title: `${selectedTaskType.label} on ${PLATFORM_CONFIG[selectedPlatform].name}`,
-      description: `Complete ${selectedTaskType.label.toLowerCase()} action on ${PLATFORM_CONFIG[selectedPlatform].name}`,
-      platform: selectedPlatform,
-      taskType: selectedTaskType.value,
-      config,
-      points: config.points || selectedTaskType.points,
-      campaignId: campaignId || null
+    const platform = selectedPlatform;
+    const rawTaskType = selectedTaskType.value as string;
+    const canonicalTaskType = rawTaskType.includes('_') && rawTaskType.startsWith(platform)
+      ? rawTaskType
+      : `${platform}_${rawTaskType}`;
+
+    // Connectivity gate: determine if this platform is connected
+    const isPlatformConnected = (p: Platform): boolean => {
+      if (p === 'instagram') return !!instagram?.isConnected;
+      if (p === 'facebook') return !!facebook?.isConnected;
+      // Other platforms not yet integrated → treat as not connected
+      return false;
     };
+    const connected = isPlatformConnected(platform);
+
+    // Map config fields to task columns
+    let targetUrl: string | undefined;
+    if (config.page_url) targetUrl = config.page_url;
+    if (config.channel_url) targetUrl = config.channel_url;
+    if (config.artist_url) targetUrl = config.artist_url;
+
+    // Fold misc inputs into customInstructions for now
+    const customBits: string[] = [];
+    if (config.handle) {
+      const handle = String(config.handle).replace(/^@/, '');
+      customBits.push(`Handle: @${handle}`);
+    }
+    if (config.include_name) customBits.push('Include name');
+    if (config.include_bio) customBits.push('Include bio');
+    if (config.verification_method) customBits.push(`Verification: ${config.verification_method}`);
+    const customInstructions = customBits.length ? customBits.join(' | ') : undefined;
+
+    const taskData = {
+      name: `${selectedTaskType.label} on ${PLATFORM_CONFIG[platform].name}`,
+      description: `Complete ${selectedTaskType.label.toLowerCase()} action on ${PLATFORM_CONFIG[platform].name}`,
+      platform,
+      taskType: canonicalTaskType,
+      targetUrl,
+      customInstructions,
+      rewardType: 'points' as const,
+      rewardValue: Number(config.points || selectedTaskType.points) || 0,
+      isActive: connected,
+    };
+
+    if (!connected) {
+      toast({
+        title: "Task saved in Pending",
+        description: `Connect your ${PLATFORM_CONFIG[platform].name} account to publish this task.`,
+      });
+    }
 
     createTaskMutation.mutate(taskData);
   };

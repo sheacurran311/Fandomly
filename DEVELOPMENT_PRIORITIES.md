@@ -71,17 +71,16 @@ Replace hardcoded data with `useQuery` calls to actual API endpoints
 - Campaign creation/update endpoints properly wired
 - Profile update endpoints with proper validation
 
-### **Issue 3: Security Critical Issues**
+### **Issue 3: Security Hardening**
 
-**MAJOR SECURITY VULNERABILITY** in `server/routes.ts` - ✅ **RESOLVED**:
-- Custom JWT verification removed (was causing errors)
-- Dynamic's native authentication restored
-- All authentication now flows through Dynamic SDK properly
+**Authentication** - ✅ **RESOLVED**:
+- Custom JWT verification removed; Dynamic's native authentication is used end-to-end
+- Server trusts Dynamic via `x-dynamic-user-id` (lookup in DB), no server-side JWT verification
 
-**Remaining Security Issues:**
-- No proper tenant isolation in queries
-- RBAC middleware exists but not consistently applied  
-- Client-side data trusted without server validation
+**Remaining Work:**
+- Ensure tenant isolation across all queries
+- Apply RBAC middleware consistently
+- Validate all inputs with Zod on server routes
 
 ## 🎯 **PRIORITIZED DEVELOPMENT TASKS**
 
@@ -104,17 +103,17 @@ Replace hardcoded data with `useQuery` calls to actual API endpoints
 
 **Expected Outcome**: Users see real data instead of fake numbers
 
-#### **Task A2: Campaign System Integration**
+#### **Task A2: Campaign & Task System Integration (Snag/Kazm UX)**
 **Priority**: 🔴 CRITICAL
 **Files to Update:**
 - `client/src/pages/campaign-builder.tsx`
 - `server/routes.ts` (campaign endpoints)
 
 **Actions:**
-1. Wire campaign builder form to `POST /api/campaigns`
-2. Implement campaign participation tracking
-3. Add real-time progress updates
-4. Connect campaign templates to actual database operations
+1. Wire `TemplatePicker`/`TaskConfigurationForm` to `POST /api/tasks` with Zod-validated payloads
+2. Finish end-to-end campaign flow: Create → Assign tasks → Publish (`/api/campaigns`, `/api/tasks/:taskId/assign`, `/api/campaigns/:campaignId/publish`)
+3. Build Tasks management UI (list/toggle/edit) backed by `/api/tasks`
+4. Add loading/error states and React Query cache invalidation
 
 **Expected Outcome**: Campaign creation and participation works end-to-end
 
@@ -133,16 +132,16 @@ Replace hardcoded data with `useQuery` calls to actual API endpoints
 
 **Expected Outcome**: Profile editing works completely
 
-#### **Task A4: Security Critical Fixes** 
+#### **Task A4: Security Hardening (RBAC/Tenant/Validation)** 
 **Priority**: 🔴 CRITICAL - SECURITY
 **Files to Update:**
 - `server/routes.ts`
 - `server/middleware/rbac.ts`
 
 **Actions:**
-1. **IMMEDIATE**: Implement proper JWT verification
+1. Ensure no custom JWT verification; rely on Dynamic SDK headers/user context
 2. Apply RBAC middleware consistently across all protected routes
-3. Add tenant context validation
+3. Add tenant context validation; never trust client-supplied tenant/creator IDs
 4. Implement proper request validation using Zod schemas
 
 **Expected Outcome**: Application is secure for production use
@@ -467,18 +466,48 @@ POST /api/auth/switch-user-type
 GET /api/auth/user/:dynamicUserId
 POST /api/auth/profile
 POST /api/auth/facebook-profile-import
+GET /api/auth/role
+POST /api/auth/complete-onboarding
+POST /api/auth/update-onboarding
 
 CREATORS:
 POST /api/creators
 GET /api/creators
 GET /api/creators/:id
 GET /api/creators/user/:userId
+POST /api/creators/:creatorId/facebook-pages
+GET /api/creators/:creatorId/facebook-pages
 
 CAMPAIGNS:
 GET /api/campaigns/creator/:creatorId
 POST /api/campaigns
+GET /api/campaigns/active
+GET /api/campaigns/pending
+POST /api/campaigns/:campaignId/publish
+GET /api/campaigns/:campaignId/tasks
+POST /api/campaigns/:campaignId/tasks
+PUT /api/campaigns/tasks/:taskId
+DELETE /api/campaigns/tasks/:taskId
 GET /api/campaign-rules/:campaignId
 POST /api/campaign-rules
+
+TASKS:
+GET /api/tasks
+GET /api/tasks/:id
+POST /api/tasks
+PUT /api/tasks/:id
+DELETE /api/tasks/:id
+GET /api/campaigns/:campaignId/assigned-tasks
+POST /api/tasks/:taskId/assign
+DELETE /api/tasks/:taskId/assign
+
+TASK TEMPLATES:
+GET /api/task-templates
+GET /api/task-templates/:id
+POST /api/task-templates
+PUT /api/task-templates/:id
+DELETE /api/task-templates/:id
+GET /api/platforms/:platform/task-types
 
 LOYALTY:
 POST /api/loyalty-programs
@@ -488,7 +517,11 @@ GET /api/loyalty-programs/:id
 REWARDS:
 POST /api/rewards
 GET /api/rewards
+GET /api/rewards/creator/:creatorId
 GET /api/rewards/program/:programId
+POST /api/rewards/:id/redeem
+PUT /api/rewards/:id
+DELETE /api/rewards/:id
 
 FANS:
 POST /api/fan-programs
@@ -498,20 +531,40 @@ GET /api/reward-redemptions/user/:fanId
 
 TENANTS:
 POST /api/tenants/:tenantId/follow
+
+UPLOADS:
+POST /api/upload/image
+POST /api/upload/avatar
+POST /api/upload/branding
+
+PAYMENTS:
+POST /api/create-payment-intent
+POST /api/get-or-create-subscription
+GET /api/subscription-status
+
+SOCIAL/FACEBOOK:
+POST /api/facebook/graph
+GET /api/facebook/debug-token
+GET /api/facebook/me
+GET /api/facebook/accounts
+GET /api/facebook/pages/:pageId
+GET /api/facebook/pages/:pageId/insights
+POST /api/facebook/deauthorize
+
+SOCIAL/INSTAGRAM:
+POST /api/social/instagram/token
+GET /api/social/instagram/business-account
+POST /api/social/instagram/send-message
+GET /webhooks/instagram
+POST /webhooks/instagram
+GET /webhooks/instagram/test
+GET /api/instagram/webhook-status
+POST /api/instagram/subscribe-webhooks
 ```
 
 ### **Missing API Endpoints Needed:**
 ```
-FILE UPLOADS:
-POST /api/upload/image
-POST /api/upload/avatar
-POST /api/upload/branding
-POST /api/upload/banner
-
-PAYMENTS: (✅ PARTIALLY COMPLETED - Stripe integration active in server/routes.ts)
-POST /api/create-payment-intent ✅
-POST /api/get-or-create-subscription ✅  
-POST /api/subscription-status ✅
+PAYMENTS:
 POST /api/stripe/webhook (needed)
 POST /api/billing/cancel (needed)
 
@@ -687,7 +740,7 @@ curl -H "Authorization: Bearer invalid_token" http://localhost:5000/api/auth/use
 ### **Security Requirements:**
 - Never trust client-provided data
 - Always validate input with Zod schemas
-- Implement proper JWT verification
+- Do not implement custom JWT verification; rely on Dynamic auth and `x-dynamic-user-id`
 - Use RBAC middleware on all protected routes
 - Implement tenant isolation for all queries
 
@@ -712,6 +765,28 @@ curl -H "Authorization: Bearer invalid_token" http://localhost:5000/api/auth/use
 - [ ] Modify "All Campaigns" to display campaigns from followed creators only
 - [ ] Add "Creator Campaign Directory" redirect button for discovering all campaigns
 - [ ] Implement campaign hierarchy display (prerequisite campaigns)
+
+### **Mobile-First Responsiveness (Phase 1 must-haves):**
+- Breakpoints to test: 320, 360, 390, 414, 430, 480, 576, 640, 768, 900px
+- Navigation
+  - Collapse sidebar into bottom tab bar or top drawer on < 768px
+  - Avoid hover-only interactions; ensure tap targets ≥ 44x44px
+  - Persistent primary actions accessible at bottom on mobile
+- Layout & Components
+  - Use single-column forms on mobile; defer multi-column to ≥ 768px
+  - Convert wide tables to stacked card lists with key metadata
+  - Use full-screen modals/sheets on mobile; avoid nested dialogs
+- Forms & Inputs
+  - Set proper inputMode and autoComplete; prevent viewport jump with safe-area padding
+  - Handle iOS keyboard overlays (env(safe-area-inset-bottom)); keep CTAs visible
+- Media & Performance
+  - Responsive images (srcset/sizes), lazy-load below the fold, compress assets
+  - Code-split heavy widgets; prefer CSS transforms over layout thrash; reduce motion on mobile
+- WebView & OAuth
+  - Provide redirect fallback where popups are blocked (in-app browsers)
+  - Verify flows in Instagram/Facebook in-app browsers and Safari iOS
+- Accessibility
+  - Maintain contrast, visible focus, scalable text; respect prefers-reduced-motion
 
 ## 🚨 **Critical Business Logic Requirements**
 
@@ -739,9 +814,9 @@ curl -H "Authorization: Bearer invalid_token" http://localhost:5000/api/auth/use
 
 ---
 
-**Last Updated**: September 18, 2025
+**Last Updated**: September 23, 2025
 **Status**: ✅ Comprehensive TODO list integrated from user requirements, 25+ new API endpoints identified for implementation
-**Priority Update**: Added extensive fan experience improvements, creator monetization features, and NIL compliance requirements
-**Next Action**: Begin Priority 1 Task A4 (Security Fixes) → A1 (Dashboard Data Flow) → A2 (Campaign System)
+**Priority Update**: Added Instagram integration status, file upload endpoints, and campaign/task endpoint inventory
+**Next Action**: Execute Priority 1 A1 (Dashboard Data Flow) → A2 (Campaign & Task UX) → A3 (Profile Management)
 **Estimated Timeline**: 5-6 weeks for Priority 1-4 completion (expanded scope)
-**Security Alert**: 🚨 JWT verification currently disabled - IMMEDIATE fix required before production
+**Security Alert**: Enforce RBAC and tenant isolation across APIs. Do NOT implement custom JWT verification; rely on Dynamic.

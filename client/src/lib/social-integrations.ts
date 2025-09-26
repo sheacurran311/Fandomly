@@ -193,10 +193,12 @@ export class TikTokAPI {
 export class TwitterAPI {
   private clientId: string;
   private redirectUri: string;
+  private scopes: string;
 
   constructor() {
     this.clientId = import.meta.env.VITE_TWITTER_CLIENT_ID || '';
-    this.redirectUri = `${window.location.origin}/auth/twitter/callback`;
+    this.redirectUri = (import.meta.env.VITE_TWITTER_REDIRECT_URI as string) || `${window.location.origin}/x-callback`;
+    this.scopes = (import.meta.env.VITE_TWITTER_SCOPES as string) || 'tweet.read tweet.write users.read follows.read offline.access';
   }
 
   getAuthUrl(): string {
@@ -204,20 +206,21 @@ export class TwitterAPI {
       response_type: 'code',
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
-      scope: 'tweet.read users.read follows.read',
+      scope: this.scopes,
       state: 'twitter_auth',
-      code_challenge: 'challenge',
-      code_challenge_method: 'plain'
+      code_challenge: 'placeholder',
+      code_challenge_method: 'S256'
     });
     
     return `https://twitter.com/i/oauth2/authorize?${params}`;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
+    // This fallback method does NOT send code_verifier; primary flow uses twitter.ts
     const response = await fetch('/api/social/twitter/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri, code_verifier: 'placeholder' })
     });
     
     const data = await response.json();
@@ -398,9 +401,8 @@ export class SocialIntegrationManager {
         accessToken = await this.tiktok.exchangeCodeForToken(code);
         return this.tiktok.getUserProfile(accessToken);
       case 'twitter':
-        if (!code) throw new Error('Code required for Twitter');
-        accessToken = await this.twitter.exchangeCodeForToken(code);
-        return this.twitter.getUserProfile(accessToken);
+        // Twitter uses dedicated popup flow via TwitterSDKManager - this path should not be called
+        throw new Error('Twitter integration uses popup flow via TwitterSDKManager, not redirect flow');
       case 'youtube':
         if (!code) throw new Error('Code required for YouTube');
         accessToken = await this.youtube.exchangeCodeForToken(code);
