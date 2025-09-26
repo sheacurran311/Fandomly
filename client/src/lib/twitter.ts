@@ -57,7 +57,7 @@ function getEnvRedirectUri(): string {
 function getEnvScopes(): string {
   const fromEnv = import.meta.env.VITE_TWITTER_SCOPES as string | undefined;
   if (fromEnv && fromEnv.trim().length > 0) return fromEnv.trim();
-  return "tweet.read tweet.write users.read follows.read offline.access";
+  return "users.read tweet.read tweet.write offline.access";
 }
 
 function getClientId(): string {
@@ -104,15 +104,14 @@ export class TwitterSDKManager {
   static getAuthUrl(userType: UserType, state?: string, forcedRedirectUri?: string): string {
     const clientId = getClientId();
     const redirectUri = forcedRedirectUri || getEnvRedirectUri();
-    const scopes = getEnvScopes();
+    const scope = "users.read tweet.read tweet.write offline.access";
 
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      scope: scopes,
-      state: state || `twitter_${userType}_${Date.now()}`,
-    });
+    const params = new URLSearchParams();
+    params.set("response_type", "code");
+    params.set("client_id", clientId);
+    params.set("redirect_uri", redirectUri);
+    params.set("scope", scope); // URLSearchParams will %20-encode spaces
+    params.set("state", state || `twitter_${userType}_${Date.now()}`);
 
     const url = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
     try {
