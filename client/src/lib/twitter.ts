@@ -63,6 +63,7 @@ function getEnvScopes(): string {
 function getClientId(): string {
   const clientId = import.meta.env.VITE_TWITTER_CLIENT_ID as string | undefined;
   if (!clientId) throw new Error("VITE_TWITTER_CLIENT_ID is not set");
+  console.log(`[Twitter] CLIENT_ID fingerprint: ${clientId.substring(0, 6)} ... ${clientId.substring(clientId.length - 6)}`);
   return clientId;
 }
 
