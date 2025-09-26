@@ -47,17 +47,11 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 function getEnvRedirectUri(): string {
-  const runtimeUri = `${window.location.origin}/x-callback`;
   const fromEnv = import.meta.env.VITE_TWITTER_REDIRECT_URI as string | undefined;
-  if (!fromEnv || fromEnv.length === 0) return runtimeUri;
-  try {
-    const envOrigin = new URL(fromEnv).origin;
-    if (envOrigin !== window.location.origin) {
-      console.warn(`[Twitter] Redirect URI origin mismatch. Using runtime origin instead: ${runtimeUri}`);
-      return runtimeUri;
-    }
-  } catch {}
-  return fromEnv;
+  const fallback = `${window.location.origin}/x-callback`;
+  // Do not swap origins silently; prefer explicit env when present
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  return fallback;
 }
 
 function getEnvScopes(): string {
@@ -106,9 +100,9 @@ function getDynamicUserId(): string | null {
 }
 
 export class TwitterSDKManager {
-  static getAuthUrl(userType: UserType, state?: string, codeChallenge?: string): string {
+  static getAuthUrl(userType: UserType, state?: string, forcedRedirectUri?: string): string {
     const clientId = getClientId();
-    const redirectUri = getEnvRedirectUri();
+    const redirectUri = forcedRedirectUri || getEnvRedirectUri();
     const scopes = getEnvScopes();
 
     const params = new URLSearchParams({
@@ -117,11 +111,15 @@ export class TwitterSDKManager {
       redirect_uri: redirectUri,
       scope: scopes,
       state: state || `twitter_${userType}_${Date.now()}`,
-      code_challenge: codeChallenge || "",
-      code_challenge_method: "S256",
     });
 
-    return `https://x.com/i/oauth2/authorize?${params.toString()}`;
+    const url = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+    try {
+      console.log("[Twitter] CLIENT_ID fingerprint:", clientId.slice(0,6), "...", clientId.slice(-6));
+      console.log("[Twitter] FINAL redirectUri:", redirectUri);
+      console.log("[Twitter] FINAL authorize URL:", url);
+    } catch {}
+    return url;
   }
 
   static async secureLogin(userType: UserType, dynamicUserIdParam?: string): Promise<TwitterLoginResult> {
@@ -159,21 +157,9 @@ export class TwitterSDKManager {
         console.warn('[Twitter] No Dynamic user ID available - connection may fail');
       }
 
-      // PKCE setup
-      const codeVerifier = generateRandomString(64);
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
-      localStorage.setItem("twitter_pkce_verifier", codeVerifier);
-      try { (window as any).__twitterPkceVerifier = codeVerifier; } catch {}
-
-      // Map state -> code_verifier to support multiple concurrent attempts and robust validation
-      try {
-        const rawMap = localStorage.getItem('twitter_pkce_map');
-        const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
-        map[stateValue] = codeVerifier;
-        localStorage.setItem('twitter_pkce_map', JSON.stringify(map));
-      } catch {}
-
-      const authUrl = this.getAuthUrl(userType, stateValue, codeChallenge);
+      const redirectUri = "https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/x-callback";
+      console.log("[Twitter] Using redirectUri:", redirectUri);
+      const authUrl = this.getAuthUrl(userType, stateValue, redirectUri);
 
       return new Promise<TwitterLoginResult>((resolve) => {
         const popup = window.open(
@@ -203,30 +189,6 @@ export class TwitterSDKManager {
         }, 800);
 
         const messageListener = (event: MessageEvent) => {
-          // Callback window asking for PKCE verifier by state
-          if (event.data?.type === 'twitter-pkce-request') {
-            try {
-              const reqState = event.data?.state as string | undefined;
-              let verifier: string | null = null;
-              // Prefer state->verifier map
-              try {
-                const rawMap = localStorage.getItem('twitter_pkce_map');
-                const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
-                verifier = (reqState && map[reqState]) || null;
-              } catch {}
-              // Fallback to stored verifier
-              if (!verifier) {
-                verifier = localStorage.getItem('twitter_pkce_verifier');
-              }
-              // Final fallback: in-memory
-              if (!verifier) {
-                try { verifier = (window as any).__twitterPkceVerifier || null; } catch {}
-              }
-              // Reply back to the popup regardless of origin; the popup will validate the response
-              (event.source as Window | null)?.postMessage({ type: 'twitter-pkce-response', state: reqState, verifier }, '*');
-            } catch {}
-            return;
-          }
           if (event.data?.type === "twitter-oauth-result") {
             clearInterval(pollTimer);
             window.removeEventListener("message", messageListener);
@@ -261,74 +223,13 @@ export class TwitterSDKManager {
         return { success: false, error: "Missing code/state in callback" };
       }
 
-      // Verify state using state->code_verifier mapping (supports concurrent popups)
-      let expectedState: string | null = null;
-      let mappedCodeVerifier: string | null = null;
-      try {
-        expectedState = localStorage.getItem('twitter_oauth_state');
-        if (!expectedState && (window as any).opener) {
-          expectedState = (window as any).opener.localStorage?.getItem('twitter_oauth_state') || (window as any).opener.__twitterState || null;
-        }
-
-        // Load pkce map from current or opener and extract code_verifier by returned state
-        const rawMapCurrent = localStorage.getItem('twitter_pkce_map');
-        const mapCurrent: Record<string, string> | null = rawMapCurrent ? JSON.parse(rawMapCurrent) : null;
-        const rawMapOpener = (window as any).opener?.localStorage?.getItem('twitter_pkce_map');
-        const mapOpener: Record<string, string> | null = rawMapOpener ? JSON.parse(rawMapOpener) : null;
-        mappedCodeVerifier = (state && (mapCurrent?.[state] || mapOpener?.[state])) || null;
-      } catch {}
-
-      // If no mapping, proactively request PKCE from opener FIRST, then fallback to storage
-      if (!mappedCodeVerifier && (window as any).opener) {
-        try {
-          const verifier = await new Promise<string | null>((resolve) => {
-            const timeout = setTimeout(() => {
-              window.removeEventListener('message', onResponse);
-              resolve(null);
-            }, 4000);
-            function onResponse(ev: MessageEvent) {
-              if (ev.data?.type === 'twitter-pkce-response' && ev.data?.state === state) {
-                clearTimeout(timeout);
-                window.removeEventListener('message', onResponse);
-                resolve(ev.data?.verifier || null);
-              }
-            }
-            window.addEventListener('message', onResponse);
-            // Request from opener using a permissive target; opener will validate origin
-            (window as any).opener.postMessage({ type: 'twitter-pkce-request', state }, '*');
-          });
-          if (verifier) {
-            mappedCodeVerifier = verifier;
-          }
-        } catch {}
-      }
-
-      // Fallback: if still missing, use local storage verifier only when state matches expected
-      if (!mappedCodeVerifier) {
-        let fallbackVerifier: string | null = null;
-        try {
-          if (expectedState && expectedState === state) {
-            fallbackVerifier = localStorage.getItem('twitter_pkce_verifier') || null;
-            if (!fallbackVerifier && (window as any).opener) {
-              fallbackVerifier = (window as any).opener.__twitterPkceVerifier || (window as any).opener.localStorage?.getItem('twitter_pkce_verifier') || null;
-            }
-          }
-        } catch {}
-        if (!fallbackVerifier) {
-          try { console.error('[Twitter] Invalid state: no PKCE mapping or fallback verifier found', { state, expectedState }); } catch {}
-          return { success: false, error: "Invalid state parameter" };
-        }
-        mappedCodeVerifier = fallbackVerifier;
-      }
-
       try { console.log('[Twitter] Callback detected, exchanging code for token...'); } catch {}
       console.log(`[Twitter] About to call exchangeCodeForToken with:`, {
         code: code.substring(0, 10) + '...',
-        codeVerifier: mappedCodeVerifier ? mappedCodeVerifier.substring(0, 10) + '...' : 'missing',
         state
       });
-      
-      const token = await this.exchangeCodeForToken(code, mappedCodeVerifier || undefined);
+
+      const token = await this.exchangeCodeForToken(code);
       
       console.log(`[Twitter] exchangeCodeForToken returned:`, token ? `token (${token.substring(0, 10)}...)` : 'null');
       
@@ -340,16 +241,7 @@ export class TwitterSDKManager {
       try { if ((window as any).opener) (window as any).opener.__twitterState = null; } catch {}
       // Do NOT clear parent's __dynamicUserId; Dynamic SDK owns auth state
 
-      try {
-        const rawMap = localStorage.getItem('twitter_pkce_map');
-        const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
-        if (state && map[state]) { delete map[state]; localStorage.setItem('twitter_pkce_map', JSON.stringify(map)); }
-      } catch {}
-      try {
-        const openerRawMap = (window as any).opener?.localStorage?.getItem('twitter_pkce_map');
-        const openerMap: Record<string, string> = openerRawMap ? JSON.parse(openerRawMap) : {};
-        if (state && openerMap[state]) { delete openerMap[state]; (window as any).opener?.localStorage?.setItem('twitter_pkce_map', JSON.stringify(openerMap)); }
-      } catch {}
+      // No PKCE mapping to clear for confidential clients
       
       if (!token) {
         console.error('[Twitter] Token exchange returned null - failing callback');
@@ -398,11 +290,10 @@ export class TwitterSDKManager {
   // Track used codes to prevent reuse
   private static usedCodes = new Set<string>();
 
-  static async exchangeCodeForToken(code: string, providedCodeVerifier?: string): Promise<string | null> {
+  static async exchangeCodeForToken(code: string): Promise<string | null> {
     try {
       const timestamp = new Date().toISOString();
       console.log(`[Twitter] ${timestamp} exchangeCodeForToken called with code: ${code.substring(0, 10)}...`);
-      console.log(`[Twitter] providedCodeVerifier: ${providedCodeVerifier ? 'provided' : 'not provided'}`);
       console.trace('[Twitter] exchangeCodeForToken call stack');
       
       // Prevent duplicate use of the same authorization code
@@ -412,16 +303,7 @@ export class TwitterSDKManager {
       }
       TwitterSDKManager.usedCodes.add(code);
       
-      let codeVerifier = providedCodeVerifier || localStorage.getItem("twitter_pkce_verifier") || "";
-      if (!codeVerifier) {
-        try {
-          codeVerifier = (window as any).opener?.__twitterPkceVerifier || '';
-        } catch {}
-      }
-      
-      console.log(`[Twitter] Using codeVerifier: ${codeVerifier ? codeVerifier.substring(0, 10) + '...' : 'EMPTY'}`);
-      
-      const redirectUri = getEnvRedirectUri();
+      const redirectUri = "https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/x-callback";
       const dynamicUserId = getDynamicUserId();
       
       console.log(`[Twitter] Request params: redirectUri=${redirectUri}, dynamicUserId=${dynamicUserId ? 'present' : 'missing'}`);
@@ -437,7 +319,7 @@ export class TwitterSDKManager {
       
       const data = await fetchApi("/api/social/twitter/token", {
         method: "POST",
-        body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier, dynamicUserId })
+        body: JSON.stringify({ code, redirect_uri: redirectUri, dynamicUserId })
       });
 
       console.log(`[Twitter] Token exchange API response:`, data);
@@ -463,9 +345,6 @@ export class TwitterSDKManager {
       console.error("[Twitter] Token exchange error:", error);
       return null;
     } finally {
-      // One-time use - clean up
-      try { localStorage.removeItem("twitter_pkce_verifier"); } catch {}
-      try { if ((window as any).opener) (window as any).opener.__twitterPkceVerifier = null; } catch {}
       // Clean up used codes after 5 minutes to prevent memory leaks
       setTimeout(() => {
         TwitterSDKManager.usedCodes.delete(code);

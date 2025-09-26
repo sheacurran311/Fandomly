@@ -208,19 +208,17 @@ export class TwitterAPI {
       redirect_uri: this.redirectUri,
       scope: this.scopes,
       state: 'twitter_auth',
-      code_challenge: 'placeholder',
-      code_challenge_method: 'S256'
     });
     
     return `https://twitter.com/i/oauth2/authorize?${params}`;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
-    // This fallback method does NOT send code_verifier; primary flow uses twitter.ts
+    // Confidential client: no PKCE
     const response = await fetch('/api/social/twitter/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri, code_verifier: 'placeholder' })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
     });
     
     const data = await response.json();

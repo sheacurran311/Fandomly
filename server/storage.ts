@@ -146,6 +146,10 @@ export interface IStorage {
     connectedInstagramAccountId?: string;
   }>): Promise<number>;
   getCreatorFacebookPages(creatorId: string): Promise<any[]>;
+
+  // Social OAuth token storage
+  saveSocialTokenBundle(dynamicUserId: string, platform: string, tokenBundle: any): Promise<void>;
+  getSocialTokenBundle(dynamicUserId: string, platform: string): Promise<any | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -959,6 +963,44 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`[Storage] Failed to remove social account:`, error);
       return false;
+    }
+  }
+
+  async saveSocialTokenBundle(dynamicUserId: string, platform: string, tokenBundle: any): Promise<void> {
+    try {
+      const user = await this.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        throw new Error(`User not found for Dynamic ID: ${dynamicUserId}`);
+      }
+
+      const profileData: any = (user as any).profileData || {};
+      const socialTokens = profileData.socialTokens && typeof profileData.socialTokens === 'object'
+        ? profileData.socialTokens
+        : {};
+
+      socialTokens[platform] = tokenBundle;
+
+      const nextProfileData = { ...profileData, socialTokens };
+      await this.updateUser(user.id, { profileData: nextProfileData } as any);
+      console.log(`[Storage] Saved ${platform} token bundle for user ${user.id}`);
+    } catch (error) {
+      console.error(`[Storage] Failed to save ${platform} token bundle:`, error);
+      throw error;
+    }
+  }
+
+  async getSocialTokenBundle(dynamicUserId: string, platform: string): Promise<any | undefined> {
+    try {
+      const user = await this.getUserByDynamicId(dynamicUserId);
+      if (!user) return undefined;
+      const profileData: any = (user as any).profileData || {};
+      const socialTokens = profileData.socialTokens && typeof profileData.socialTokens === 'object'
+        ? profileData.socialTokens
+        : {};
+      return socialTokens[platform];
+    } catch (error) {
+      console.error(`[Storage] Failed to get ${platform} token bundle:`, error);
+      return undefined;
     }
   }
 }
