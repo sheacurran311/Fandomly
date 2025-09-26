@@ -322,7 +322,15 @@ export class TwitterSDKManager {
       }
 
       try { console.log('[Twitter] Callback detected, exchanging code for token...'); } catch {}
+      console.log(`[Twitter] About to call exchangeCodeForToken with:`, {
+        code: code.substring(0, 10) + '...',
+        codeVerifier: mappedCodeVerifier ? mappedCodeVerifier.substring(0, 10) + '...' : 'missing',
+        state
+      });
+      
       const token = await this.exchangeCodeForToken(code, mappedCodeVerifier || undefined);
+      
+      console.log(`[Twitter] exchangeCodeForToken returned:`, token ? `token (${token.substring(0, 10)}...)` : 'null');
       
       // Clean up state and pkce map entries AFTER token exchange
       try { localStorage.removeItem('twitter_oauth_state'); } catch {}
@@ -342,7 +350,11 @@ export class TwitterSDKManager {
         const openerMap: Record<string, string> = openerRawMap ? JSON.parse(openerRawMap) : {};
         if (state && openerMap[state]) { delete openerMap[state]; (window as any).opener?.localStorage?.setItem('twitter_pkce_map', JSON.stringify(openerMap)); }
       } catch {}
-      if (!token) return { success: false, error: "Token exchange failed" };
+      
+      if (!token) {
+        console.error('[Twitter] Token exchange returned null - failing callback');
+        return { success: false, error: "Token exchange failed" };
+      }
 
       const user = await this.fetchUserInfo(token);
       const userType = state.includes("_creator_") ? "creator" : state.includes("_fan_") ? "fan" : undefined;
@@ -428,13 +440,33 @@ export class TwitterSDKManager {
 
       console.log(`[Twitter] Token exchange API response:`, data);
 
-      // Twitter returns access_token and refresh_token when scopes include offline.access
-      const accessToken: string | undefined = data?.access_token;
+      // Handle different response structures - the backend may return the token directly or wrapped
+      let accessToken: string | undefined;
+      let refreshToken: string | undefined;
+      
+      // Try direct access first (most common case)
+      if (data?.access_token) {
+        accessToken = data.access_token;
+        refreshToken = data.refresh_token;
+      }
+      // Fallback: check if wrapped in body property
+      else if (data?.body?.access_token) {
+        accessToken = data.body.access_token;
+        refreshToken = data.body.refresh_token;
+      }
+      
       if (accessToken) {
         console.log(`[Twitter] Successfully received access token: ${accessToken.substring(0, 10)}...`);
+        console.log(`[Twitter] Refresh token present: ${!!refreshToken}`);
         return accessToken;
       }
-      console.error(`[Twitter] No access token in response:`, data);
+      
+      console.error(`[Twitter] No access token in response. Response structure:`, {
+        hasDirectToken: !!data?.access_token,
+        hasBodyToken: !!data?.body?.access_token,
+        responseKeys: data ? Object.keys(data) : [],
+        bodyKeys: data?.body ? Object.keys(data.body) : []
+      });
       return null;
     } catch (error) {
       console.error("[Twitter] Token exchange error:", error);
