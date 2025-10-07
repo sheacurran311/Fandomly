@@ -41,7 +41,6 @@ export default function FloatingCreateButton({ userType }: FloatingCreateButtonP
         className={cn(
           "fixed bottom-20 right-6 z-50",
           "w-14 h-14 rounded-full",
-          "bg-gradient-to-br from-brand-primary via-brand-secondary to-brand-accent",
           "shadow-2xl shadow-brand-primary/50",
           "flex items-center justify-center",
           "transition-all duration-300 ease-out",
@@ -49,6 +48,9 @@ export default function FloatingCreateButton({ userType }: FloatingCreateButtonP
           "active:scale-95",
           "group"
         )}
+        style={{
+          background: "radial-gradient(circle, #14feee, #e10698)"
+        }}
         data-testid="floating-create-button"
         aria-label="Create new item"
       >
@@ -57,7 +59,7 @@ export default function FloatingCreateButton({ userType }: FloatingCreateButtonP
 
       {/* Create Options Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10">
+        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10 mx-4 max-w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Create New</DialogTitle>
             <DialogDescription className="text-gray-400">
