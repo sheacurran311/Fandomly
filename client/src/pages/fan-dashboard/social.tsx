@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect } from "react";
 import { FacebookSDKManager } from "@/lib/facebook";
+import { useToast } from "@/hooks/use-toast";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,31 +28,41 @@ import {
   ThumbsUp,
   MessageSquare,
   Share,
-  Award
+  Award,
+  Video
 } from "lucide-react";
 import { TwitterSDKManager } from "@/lib/twitter";
+import { socialManager } from "@/lib/social-integrations";
 
 export default function FanSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [facebookConnected, setFacebookConnected] = useState(false);
+  const [facebookConnecting, setFacebookConnecting] = useState(false);
   const [twitterConnected, setTwitterConnected] = useState(false);
   const [twitterConnecting, setTwitterConnecting] = useState(false);
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
   const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  
+  // TikTok connection state
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
+  const [tiktokHandle, setTiktokHandle] = useState<string | null>(null);
+  const [tiktokFollowers, setTiktokFollowers] = useState<number>(0);
+  const [isCheckingTiktokStatus, setIsCheckingTiktokStatus] = useState(true);
   
   // Check social connections status when user becomes available
   useEffect(() => {
     if (user?.dynamicUserId) {
       checkFacebookStatus();
       checkTwitterStatus();
+      checkTiktokStatus();
     }
   }, [user?.dynamicUserId]);
 
   const checkTwitterStatus = async () => {
     try {
       setIsCheckingTwitterStatus(true);
-      
-      // Fetch existing social connections from backend
       const response = await fetch('/api/social/accounts', {
         headers: {
           'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
@@ -62,21 +73,15 @@ export default function FanSocial() {
       
       if (response.ok) {
         const connections = await response.json();
-        console.log('[Fan Social] Existing connections:', connections);
-        
-        // Check if Twitter connection exists
-        const twitterConnection = connections.find((conn: any) => conn.platform === 'twitter');
-        if (twitterConnection) {
-          console.log('[Fan Social] Found existing Twitter connection:', twitterConnection);
+        const tw = connections.find((c: any) => c.platform === 'twitter');
+        if (tw) {
           setTwitterConnected(true);
-          setTwitterHandle(twitterConnection.username || twitterConnection.displayName);
+          setTwitterHandle(tw.username);
         } else {
-          console.log('[Fan Social] No Twitter connection found');
           setTwitterConnected(false);
           setTwitterHandle(null);
         }
       } else {
-        console.warn('[Fan Social] Failed to fetch connections:', response.statusText);
         setTwitterConnected(false);
         setTwitterHandle(null);
       }
@@ -89,6 +94,58 @@ export default function FanSocial() {
     }
   };
 
+  const checkTiktokStatus = async () => {
+    try {
+      setIsCheckingTiktokStatus(true);
+      // Check TikTok connection from database
+      const { getSocialConnection } = await import('@/lib/social-connection-api');
+      const { connected, connection } = await getSocialConnection('tiktok');
+      
+      if (connected && connection) {
+        setTiktokConnected(true);
+        setTiktokHandle(connection.platformUsername || null);
+        setTiktokFollowers(connection.profileData?.followers || 0);
+      } else {
+        setTiktokConnected(false);
+        setTiktokHandle(null);
+        setTiktokFollowers(0);
+      }
+    } catch (error) {
+      console.error('Error checking TikTok status:', error);
+      setTiktokConnected(false);
+    } finally {
+      setIsCheckingTiktokStatus(false);
+    }
+  };
+
+  const connectTiktok = async () => {
+    try {
+      setTiktokConnecting(true);
+      const authUrl = socialManager.getAuthUrl('tiktok');
+      window.location.href = authUrl;
+    } catch (error: any) {
+      console.error('TikTok connection error:', error);
+      setTiktokConnecting(false);
+    }
+  };
+
+  const disconnectTiktok = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('tiktok');
+      
+      if (result.success) {
+        setTiktokConnected(false);
+        setTiktokHandle(null);
+        setTiktokFollowers(0);
+      } else {
+        console.error('Failed to disconnect TikTok:', result.error);
+      }
+    } catch (error) {
+      console.error('Error disconnecting TikTok:', error);
+    }
+  };
+
   const checkFacebookStatus = async () => {
     try {
       await FacebookSDKManager.ensureFBReady('fan');
@@ -97,6 +154,54 @@ export default function FanSocial() {
     } catch (error) {
       console.error('[Fan Social] Error checking Facebook status:', error);
       setFacebookConnected(false);
+    }
+  };
+
+  const connectFacebook = async () => {
+    try {
+      setFacebookConnecting(true);
+      await FacebookSDKManager.ensureFBReady('fan');
+      const result = await FacebookSDKManager.secureLogin('fan');
+      if (result.success) {
+        setFacebookConnected(true);
+        toast({
+          title: "Facebook Connected! 🎉",
+          description: "Successfully connected to Facebook for fan campaigns.",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Facebook login was cancelled or failed.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Facebook connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: "An error occurred while connecting to Facebook.",
+        variant: "destructive"
+      });
+    } finally {
+      setFacebookConnecting(false);
+    }
+  };
+
+  const disconnectFacebook = async () => {
+    try {
+      await FacebookSDKManager.secureLogout();
+      setFacebookConnected(false);
+      toast({
+        title: "Facebook Disconnected",
+        description: "Successfully disconnected from Facebook.",
+      });
+    } catch (error) {
+      console.error('Error during Facebook logout:', error);
+      toast({
+        title: "Logout Error", 
+        description: "Error occurred while disconnecting. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -175,9 +280,9 @@ export default function FanSocial() {
     },
     {
       platform: "TikTok",
-      icon: Music,
-      handle: "@yourhandle",
-      connected: false,
+      icon: Video,
+      handle: tiktokConnected && tiktokHandle ? `@${tiktokHandle}` : "@yourhandle",
+      connected: tiktokConnected,
       color: "text-purple-400",
       bgColor: "bg-purple-400/20",
       description: "Connect to participate in TikTok campaigns"
@@ -298,14 +403,31 @@ export default function FanSocial() {
                           // Facebook - show connection status
                           <div className="flex items-center space-x-2">
                             {facebookConnected ? (
-                              <Badge className="bg-green-500/20 text-green-400 text-xs">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Connected
-                              </Badge>
+                              <div className="flex gap-2">
+                                <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Connected
+                                </Badge>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  onClick={disconnectFacebook}
+                                  data-testid="button-disconnect-facebook-fan"
+                                >
+                                  <Unlink className="h-3 w-3" />
+                                </Button>
+                              </div>
                             ) : (
-                              <Badge variant="outline" className="border-brand-primary/30 text-brand-primary text-xs">
-                                Connect in Profile →
-                              </Badge>
+                              <Button 
+                                variant="outline" 
+                                className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                                onClick={connectFacebook}
+                                disabled={facebookConnecting}
+                                data-testid="button-connect-facebook-fan"
+                              >
+                                {facebookConnecting ? 'Connecting…' : 'Connect'}
+                              </Button>
                             )}
                           </div>
                         ) : (
@@ -335,6 +457,34 @@ export default function FanSocial() {
                                 data-testid="button-connect-twitter-fan"
                               >
                                 {twitterConnecting ? 'Connecting…' : 'Connect'}
+                              </Button>
+                            )
+                          ) : account.platform === 'TikTok' ? (
+                            account.connected ? (
+                              <div className="flex gap-2">
+                                <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Connected
+                                </Badge>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  onClick={disconnectTiktok}
+                                  data-testid="button-disconnect-tiktok-fan"
+                                >
+                                  <Unlink className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                className="border-purple-600/30 text-purple-400 hover:bg-purple-600/10"
+                                onClick={connectTiktok}
+                                disabled={tiktokConnecting}
+                                data-testid="button-connect-tiktok-fan"
+                              >
+                                {tiktokConnecting ? 'Connecting…' : 'Connect'}
                               </Button>
                             )
                           ) : (

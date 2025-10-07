@@ -4,6 +4,12 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerSocialRoutes } from "./social-routes";
 import { registerTenantRoutes } from "./tenant-routes";
+import { registerAdminRoutes } from "./admin-routes";
+import { registerDynamicAnalyticsRoutes } from "./dynamic-analytics-routes";
+import { registerTwitterVerificationRoutes } from "./twitter-verification-routes";
+import { registerReferralRoutes } from "./referral-routes";
+import { registerPointsRoutes } from "./points-routes";
+import { registerAdminPlatformTasksRoutes } from "./admin-platform-tasks-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -61,10 +67,64 @@ const upload = multer({
   }
 });
 
+// Import upload routes
+import uploadRoutes from "./upload-routes";
+import socialConnectionRoutes from "./social-connection-routes";
+import creatorVerificationRoutes from "./creator-verification-routes";
+
 export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve static files for uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  
+  // Register image upload routes
+  app.use('/api/upload', uploadRoutes);
+  
+  // Register social connection routes
+  app.use('/api/social-connections', socialConnectionRoutes);
+  
+  // Register creator verification routes
+  app.use('/api/creator-verification', creatorVerificationRoutes);
+
+  // Check username availability
+  app.get('/api/auth/check-username/:username', async (req, res) => {
+    try {
+      const { username } = req.params;
+      
+      // Validate username format
+      if (!username || username.length < 3 || username.length > 30) {
+        return res.status(400).json({ 
+          available: false, 
+          error: 'Username must be between 3 and 30 characters' 
+        });
+      }
+      
+      // Check for invalid characters
+      if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+        return res.status(400).json({ 
+          available: false, 
+          error: 'Username can only contain letters, numbers, underscores, dots, and hyphens' 
+        });
+      }
+      
+      // Check if username exists
+      const existingUser = await storage.getUserByUsername(username);
+      
+      res.json({ 
+        available: !existingUser,
+        username,
+        suggestions: existingUser ? [
+          `${username}1`,
+          `${username}_official`,
+          `${username}.creator`,
+          `${username}2025`
+        ] : []
+      });
+    } catch (error) {
+      console.error('Username check error:', error);
+      res.status(500).json({ available: false, error: 'Server error checking username' });
+    }
+  });
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -92,22 +152,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // New Dynamic-based registration
       console.log("Registering user with Dynamic auth:", dynamicUser);
       
+      const dynamicUserId = dynamicUser.userId || dynamicUser.id;
+      const proposedUsername = dynamicUser.alias || dynamicUser.firstName || "User";
+      const email = dynamicUser.email;
+      
+      // Check if user already exists by Dynamic ID
+      let existingUser = await storage.getUserByDynamicId(dynamicUserId);
+      if (existingUser) {
+        console.log("User found by Dynamic ID, returning:", existingUser.id);
+        return res.json(existingUser);
+      }
+
+      // Check if user exists by email (for admin accounts created via script)
+      if (email) {
+        const userByEmail = await storage.getUserByEmail(email);
+        
+        if (userByEmail) {
+          console.log("User found by email, linking Dynamic ID:", userByEmail.id);
+          // Update existing user with Dynamic ID
+          await storage.updateUser(userByEmail.id, {
+            dynamicUserId,
+            walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || userByEmail.walletAddress || "",
+            walletChain: dynamicUser.verifiedCredentials?.[0]?.chain || userByEmail.walletChain || "",
+            avatar: dynamicUser.avatar || userByEmail.avatar,
+          });
+          
+          const updatedUser = await storage.getUser(userByEmail.id);
+          console.log("Linked existing user to Dynamic account");
+          return res.json(updatedUser);
+        }
+      }
+
+      // Check if username is taken, and make it unique if necessary
+      let username = proposedUsername;
+      const existingUsername = await storage.getUserByUsername(username);
+      
+      if (existingUsername) {
+        // Make username unique by appending random suffix
+        username = `${proposedUsername}_${Math.random().toString(36).substring(2, 8)}`;
+        console.log("Username taken, using unique username:", username);
+      }
+      
       const userData = {
-        dynamicUserId: dynamicUser.userId || dynamicUser.id,
-        username: dynamicUser.alias || dynamicUser.firstName || "User",
+        dynamicUserId,
+        username,
+        email: email || undefined,
         avatar: dynamicUser.avatar || null,
         walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || "",
         walletChain: dynamicUser.verifiedCredentials?.[0]?.chain || "",
         userType: userType === "creator" ? "creator" : "fan",
         role: (userType === "creator" ? "customer_admin" : "customer_end_user") as "customer_admin" | "customer_end_user",
       };
-
-      // Check if user already exists
-      const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId);
-      if (existingUser) {
-        console.log("Returning existing user:", existingUser.id);
-        return res.json(existingUser);
-      }
 
       const user = await storage.createUser(userData);
       console.log("Created new user:", user.id);
@@ -194,6 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const {
+        username, // New required field
         creatorType,
         displayName,
         bio,
@@ -203,6 +299,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sport,
         ageRange,
         education,
+        grade, // New education subcategory
+        graduationYear, // New field
         position,
         school,
         currentSponsors,
@@ -219,11 +317,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         primaryColor,
         secondaryColor,
         accentColor,
-        instagram,
-        twitter,
-        tiktok,
+        bannerImage, // New field replacing social links
         subscriptionTier
       } = req.body;
+
+      // Validate and update username if provided
+      if (username && username !== user.username) {
+        // Validate username format
+        if (username.length < 3 || username.length > 30) {
+          return res.status(400).json({ error: 'Username must be between 3 and 30 characters' });
+        }
+        
+        if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+          return res.status(400).json({ error: 'Username can only contain letters, numbers, underscores, dots, and hyphens' });
+        }
+        
+        // Check if username is already taken
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: 'Username is already taken' });
+        }
+      }
 
       // Build type-specific data based on creator type
       let typeSpecificData = {};
@@ -233,9 +347,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           athlete: {
             sport: sport || '',
             ageRange: ageRange || 'unknown',
-            education: education || 'other',
+            education: {
+              level: education || 'other',
+              grade: grade || undefined,
+              school: school || '',
+              graduationYear: graduationYear ? parseInt(graduationYear) : undefined
+            },
             position: position || '',
-            school: school || '',
             currentSponsors: currentSponsors ? currentSponsors.split(',').map((s: string) => s.trim()) : [],
             nilCompliant: nilCompliant || false
           }
@@ -265,12 +383,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let stripeCustomerId = null;
       let stripeSubscriptionId = null;
       
-      if (subscriptionTier && subscriptionTier !== 'starter') {
+      // Only process Stripe if configured and on paid plan
+      if (subscriptionTier && subscriptionTier !== 'starter' && process.env.STRIPE_SECRET_KEY) {
         // Create Stripe customer and subscription for paid plans
         try {
           const Stripe = (await import('stripe')).default;
-          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-            apiVersion: "2024-06-20",
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+            apiVersion: "2024-06-20" as any,
           });
           
           // Create Stripe customer
@@ -278,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: user.email || `${user.dynamicUserId}@wallet.user`,
             name: displayName || name || 'Creator',
             metadata: {
-              dynamicUserId: user.dynamicUserId,
+              dynamicUserId: user.dynamicUserId || '',
               userId: user.id,
               creatorType: creatorType
             }
@@ -294,10 +413,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Stripe customer creation error:', stripeError);
           // Continue with onboarding even if Stripe fails
         }
+      } else if (subscriptionTier && subscriptionTier !== 'starter') {
+        console.log('⚠️  Stripe not configured, skipping payment processing for subscription tier:', subscriptionTier);
       }
 
-      // Update user onboarding state
+      // Update user onboarding state and profile data
       const updatedUser = await storage.updateUser(user.id, {
+        username: username || user.username, // Update username
+        profileData: {
+          ...(user.profileData || {}),
+          name: displayName || name,
+          bio: bio || '',
+          bannerImage: bannerImage || undefined,
+          sport: sport || undefined,
+          position: position || undefined,
+          education: (creatorType === 'athlete' && (typeSpecificData as any).athlete) ? (typeSpecificData as any).athlete.education : undefined,
+          musicGenre: musicGenre || undefined,
+          artistType: artistType || undefined,
+          contentType: contentType || undefined,
+          platforms: platforms || undefined,
+          topicsOfFocus: topicsOfFocus ? topicsOfFocus.split(',').map((t: string) => t.trim()) : undefined
+        },
         onboardingState: {
           currentStep: 5,
           totalSteps: 5, 
@@ -323,12 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               accentColor: accentColor || '#10B981'
             },
             businessInfo: {
-              businessType: creatorType || 'athlete',
-              socialLinks: {
-                instagram,
-                twitter,
-                tiktok
-              }
+              businessType: creatorType || 'athlete'
             },
             billingInfo: {
               stripeCustomerId,
@@ -368,14 +499,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               secondary: secondaryColor || '#06B6D4',
               accent: accentColor || '#10B981'
             },
-            socialLinks: {
-              instagram,
-              twitter,
-              tiktok
-            }
+            socialLinks: {}
           });
-        } else {
-          // Create creator profile if it doesn't exist
+        } else if (tenant) {
+          // Create creator profile if it doesn't exist (only if tenant exists)
           await storage.createCreator({
             userId: user.id,
             tenantId: tenant.id,
@@ -389,12 +516,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               secondary: secondaryColor || '#06B6D4',
               accent: accentColor || '#10B981'
             },
-            socialLinks: {
-              instagram,
-              twitter,
-              tiktok
-            }
+            socialLinks: {}
           });
+        } else {
+          console.error('⚠️  Cannot create creator profile: no tenant found for user', user.id);
         }
       }
 
@@ -419,9 +544,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let creator = null;
       let tenant = null;
       if (user.userType === 'creator') {
-        creator = await storage.getCreatorByUserId(user.id);
-        if (creator) {
-          tenant = await storage.getTenant(creator.tenantId);
+        try {
+          creator = await storage.getCreatorByUserId(user.id);
+          if (creator && creator.tenantId) {
+            try {
+              tenant = await storage.getTenant(creator.tenantId);
+            } catch (tenantError) {
+              console.error("Error fetching tenant for creator:", creator.id, tenantError);
+              // Continue without tenant - it might not exist yet during onboarding
+            }
+          }
+        } catch (creatorError) {
+          console.error("Error fetching creator for user:", user.id, creatorError);
+          // Continue without creator - it might not exist yet during onboarding
         }
       }
       
@@ -441,7 +576,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      res.status(500).json({ error: "Failed to fetch user" });
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ error: "Failed to fetch user", details: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -646,6 +782,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update creator profile (authenticated)
+  app.put("/api/creators/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User ID required" });
+      }
+      
+      // Verify the creator belongs to this user
+      const creator = await storage.getCreator(id);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      if (creator.userId !== userId) {
+        return res.status(403).json({ error: "Unauthorized to update this creator" });
+      }
+      
+      // Extract update fields
+      const {
+        displayName,
+        bio,
+        bannerImage,
+        storeColors,
+        typeSpecificData,
+        publicFields
+      } = req.body;
+      
+      const updates: any = {};
+      
+      if (displayName !== undefined) updates.displayName = displayName;
+      if (bio !== undefined) updates.bio = bio;
+      if (bannerImage !== undefined) updates.bannerImage = bannerImage;
+      if (storeColors !== undefined) updates.storeColors = storeColors;
+      if (typeSpecificData !== undefined) updates.typeSpecificData = typeSpecificData;
+      if (publicFields !== undefined) updates.publicFields = publicFields;
+      
+      const updatedCreator = await storage.updateCreator(id, updates);
+      res.json(updatedCreator);
+    } catch (error) {
+      console.error('Creator update error:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update creator" });
+    }
+  });
+
   app.get("/api/creators/user/:userId", async (req, res) => {
     try {
       const creator = await storage.getCreatorByUserId(req.params.userId);
@@ -784,12 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create secure update schema that omits immutable fields
-      const updateTaskSchema = insertTaskSchema.omit({ 
-        id: true, 
-        tenantId: true, 
-        creatorId: true,
-        totalCompletions: true
-      }).partial();
+      const updateTaskSchema = insertTaskSchema.partial();
       
       const updates = updateTaskSchema.parse(req.body);
       const task = await storage.updateTask(req.params.id, updates, creator.tenantId);
@@ -1055,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantId: creator.tenantId,
         creatorId: creator.id,
         isGlobal: false, // Regular users cannot create global templates
-        defaultConfig: configValidation
+        defaultConfig: configValidation as any
       };
 
       const template = await storage.createTaskTemplate(templateWithContext);
@@ -1797,7 +1975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get the creator for this user
-      const creator = await storage.getCreatorByUserId(req.user.id);
+      const creator = await storage.getCreatorByUserId(req.user?.id || '');
       if (!creator) {
         return res.status(404).json({ error: 'Creator not found' });
       }
@@ -1851,14 +2029,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update user profile data (fan onboarding info)
+  // Update user profile data (fan onboarding info and enhanced fields)
+  // Supports: Basic info, marketing fields (phone, creatorTypeInterests, interestSubcategories), social links, preferences
   app.post("/api/auth/profile", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const { userId, profileData } = req.body;
+      const { userId, username, profileData } = req.body;
       if (!userId) return res.status(400).json({ error: "userId required" });
-      const updated = await storage.updateUser(userId, { profileData });
+      
+      const updates: any = {};
+      
+      // Handle username update with validation
+      if (username) {
+        // Validate username format
+        if (username.length < 3 || username.length > 30) {
+          return res.status(400).json({ error: 'Username must be between 3 and 30 characters' });
+        }
+        
+        if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+          return res.status(400).json({ error: 'Username can only contain letters, numbers, underscores, dots, and hyphens' });
+        }
+        
+        // Check if username is already taken by another user
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: 'Username is already taken' });
+        }
+        
+        updates.username = username;
+      }
+      
+      // Handle profile data updates (supports enhanced schema)
+      if (profileData) {
+        // Optional: International phone number validation (if provided)
+        if (profileData.phone && profileData.phone.length > 0) {
+          // Check for country code prefix (+ followed by digits)
+          const phoneRegex = /^\+\d{1,4}\s?[\d\s\-\(\)]{7,15}$/;
+          if (!phoneRegex.test(profileData.phone.trim())) {
+            return res.status(400).json({ 
+              error: 'Phone number must include country code (e.g., +1 555-123-4567)' 
+            });
+          }
+          // Remove all non-digit characters (except +) for length validation
+          const digitsOnly = profileData.phone.replace(/[^\d+]/g, '');
+          if (digitsOnly.length < 11 || digitsOnly.length > 18) {
+            return res.status(400).json({ 
+              error: 'Phone number must be between 11-18 characters (including country code)' 
+            });
+          }
+        }
+        
+        updates.profileData = profileData;
+      }
+      
+      const updated = await storage.updateUser(userId, updates);
       res.json(updated);
     } catch (error) {
+      console.error('Profile update error:', error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update profile" });
     }
   });
@@ -2106,7 +2332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const Stripe = (await import('stripe')).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-        apiVersion: "2025-08-27.basil",
+        apiVersion: "2024-06-20" as any,
       });
 
       const paymentIntent = await stripe.paymentIntents.create({
@@ -2146,7 +2372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const Stripe = (await import('stripe')).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-        apiVersion: "2025-08-27.basil",
+        apiVersion: "2024-06-20" as any,
       });
 
       // Get user's tenant to check existing billing info
@@ -2160,7 +2386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (subscription.status === 'active' || subscription.status === 'trialing') {
             const latestInvoice = subscription.latest_invoice;
-            const paymentIntent = typeof latestInvoice === 'object' && latestInvoice ? latestInvoice.payment_intent : null;
+            const paymentIntent = typeof latestInvoice === 'object' && latestInvoice ? (latestInvoice as any).payment_intent : null;
             return res.json({
               subscriptionId: subscription.id,
               clientSecret: typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null,
@@ -2217,7 +2443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const latestInvoice = subscription.latest_invoice;
-      const paymentIntent = typeof latestInvoice === 'object' && latestInvoice ? latestInvoice.payment_intent : null;
+      const paymentIntent = typeof latestInvoice === 'object' && latestInvoice ? (latestInvoice as any).payment_intent : null;
       res.json({
         subscriptionId: subscription.id,
         clientSecret: typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null,
@@ -2253,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const Stripe = (await import('stripe')).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-        apiVersion: "2025-08-27.basil",
+        apiVersion: "2024-06-20" as any,
       });
 
       const subscription = await stripe.subscriptions.retrieve(tenant.billingInfo.subscriptionId);
@@ -2261,7 +2487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         subscriptionId: subscription.id,
         status: subscription.status,
-        currentPeriodEnd: subscription.current_period_end,
+        currentPeriodEnd: (subscription as any).current_period_end,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         plan: subscription.items.data[0]?.price?.nickname || 'Unknown Plan'
       });
@@ -2280,6 +2506,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register tenant routes
   registerTenantRoutes(app);
+
+  // Register admin routes
+  registerAdminRoutes(app);
+  
+  // Register Dynamic Analytics routes
+  registerDynamicAnalyticsRoutes(app);
+  
+  // Register Twitter verification routes
+  registerTwitterVerificationRoutes(app);
+
+  // Register referral routes
+  registerReferralRoutes(app);
+
+  // Register points routes
+  registerPointsRoutes(app);
+
+  // Register task routes
+  const { registerTaskRoutes } = await import("./task-routes");
+  registerTaskRoutes(app);
+
+  // Task Completion Routes
+  const { createTaskCompletionRoutes } = await import("./task-completion-routes");
+  app.use("/api/task-completions", createTaskCompletionRoutes(storage));
+
+  // Creator Store Public API
+  app.get("/api/store/:creatorUrl", async (req, res) => {
+    try {
+      const { creatorUrl } = req.params;
+
+      // Skip reserved routes
+      if (creatorUrl === 'admin-dashboard' || creatorUrl.startsWith('admin-')) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      // Find creator by username (slug)
+      const user = await storage.getUserByUsername(creatorUrl);
+      if (!user || user.userType !== 'creator') {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+
+      // Get creator data
+      const creator = await storage.getCreatorByUserId(user.id);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+
+      // Get tenant data
+      const tenant = await storage.getTenant(creator.tenantId);
+
+      // Get published campaigns only
+      const allCampaigns = await storage.getCampaignsByCreator(creator.id);
+      const campaigns = allCampaigns.filter((c: any) => c.status === 'active');
+
+      // Get rewards (future implementation)
+      const rewards: any[] = [];
+
+      // Get fan count - count unique fans following this creator
+      // For now, we'll use a placeholder. TODO: Add proper fan counting method
+      const fanCount = 0; // Placeholder until we implement proper fan counting
+
+      // Calculate total rewards distributed (mock for now)
+      const totalRewards = fanCount * 10; // Placeholder calculation
+
+      res.json({
+        creator: {
+          ...creator,
+          user: {
+            username: user.username,
+            displayName: user.displayName,
+            profileData: user.profileData,
+          },
+          tenant: {
+            slug: tenant.slug,
+            branding: tenant.branding,
+          },
+        },
+        campaigns,
+        rewards,
+        fanCount,
+        totalRewards,
+      });
+    } catch (error: any) {
+      console.error('Error fetching creator store:', error);
+      res.status(500).json({ 
+        error: "Error fetching creator store", 
+        message: error.message 
+      });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

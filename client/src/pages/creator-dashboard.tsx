@@ -4,10 +4,14 @@ import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
 import CreatorInstagramWidget from "@/components/social/creator-instagram-widget";
+import CreatorTwitterWidget from "@/components/social/creator-twitter-widget";
 import { useInstagramConnection } from "@/contexts/instagram-connection-context";
 import InstagramSDKManager from "@/lib/instagram";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useCreatorVerification } from "@/hooks/useCreatorVerification";
+import { CreatorVerificationProgress } from "@/components/creator/CreatorVerificationProgress";
+import { calculateCreatorVerification } from "@shared/creatorVerificationSchema";
 // Removed unused FacebookSDK.getCreatorData reference
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +35,7 @@ export default function CreatorDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
   const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
+  const { creator, verificationData, isLoading: verificationLoading } = useCreatorVerification();
   
   // Only use Instagram connection for creators
   const instagramConnection = user?.userType === 'creator' ? useInstagramConnection() : null;
@@ -378,9 +383,20 @@ export default function CreatorDashboard() {
 
             {/* Quick Actions & Stats */}
             <div className="space-y-6">
+              {/* Creator Verification Status */}
+              {!verificationLoading && creator && verificationData && (
+                <CreatorVerificationProgress
+                  creator={creator}
+                  verificationData={verificationData}
+                  onStartWizard={() => window.location.href = '/creator-dashboard/profile'}
+                  compact={true}
+                />
+              )}
+              
               {/* Social Media Integrations */}
               <CreatorFacebookConnect />
               <CreatorInstagramWidget />
+              <CreatorTwitterWidget />
 
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">

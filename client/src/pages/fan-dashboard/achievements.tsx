@@ -40,21 +40,67 @@ export default function FanAchievements() {
     );
   }
 
-  // Mock data for achievements
-  const mockUserLevel = {
-    id: "1",
-    userId: user.id || "user1",
-    tenantId: "tenant1",
-    currentLevel: 12,
-    totalPoints: 14250,
-    levelPoints: 250,
-    nextLevelThreshold: 1000,
-    achievementsUnlocked: 18,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  // Fetch real user level data  
+  const { data: userLevel, isLoading: levelLoading } = useQuery({
+    queryKey: ['/api/user-levels', user?.id],
+    queryFn: async () => {
+      try {
+        const response = await fetch(`/api/user-levels/${user?.id}`);
+        return response.json();
+      } catch (error) {
+        // Fallback: calculate from fan programs
+        const fanProgramsResponse = await fetch(`/api/fan-programs/user/${user?.id}`);
+        const fanPrograms = await fanProgramsResponse.json();
+        
+        let totalPoints = 0;
+        for (const program of fanPrograms) {
+          const pointsResponse = await fetch(`/api/point-transactions/fan-program/${program.id}`);
+          const transactions = await pointsResponse.json();
+          totalPoints += transactions.reduce((sum: number, tx: any) => sum + tx.pointsAwarded, 0);
+        }
 
-  const mockAchievements = [
+        const currentLevel = Math.floor(totalPoints / 1000) + 1;
+        const levelPoints = totalPoints % 1000;
+
+        return {
+          id: `${user?.id}-level`,
+          userId: user?.id,
+          currentLevel,
+          totalPoints,
+          levelPoints,
+          nextLevelThreshold: 1000,
+          achievementsUnlocked: Math.floor(totalPoints / 500),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000
+  });
+
+  // Fetch real achievements data
+  const { data: achievements = [], isLoading: achievementsLoading } = useQuery({
+    queryKey: ['/api/achievements/user', user?.id],
+    queryFn: async () => {
+      try {
+        const response = await fetch(`/api/achievements/user/${user?.id}`);
+        return response.json();
+      } catch (error) {
+        console.error('Failed to fetch achievements:', error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000
+  });
+
+  // Calculate level progress
+  const levelProgress = userLevel ? 
+    Math.min((userLevel.levelPoints / userLevel.nextLevelThreshold) * 100, 100) : 0;
+
+  // Remove mock achievements - now using real data from API
+  const mockAchievementsOld = [
     {
       id: "1",
       tenantId: "tenant1",
@@ -210,20 +256,14 @@ export default function FanAchievements() {
     return { achievement, userAchievement };
   };
 
-  const completedAchievements = mockAchievements.filter(achievement => {
-    const userAchievement = mockUserAchievements.find(ua => ua.achievementId === achievement.id);
-    return userAchievement?.completed;
-  });
-
-  const inProgressAchievements = mockAchievements.filter(achievement => {
-    const userAchievement = mockUserAchievements.find(ua => ua.achievementId === achievement.id);
-    return userAchievement && !userAchievement.completed && userAchievement.progress > 0;
-  });
-
-  const availableAchievements = mockAchievements.filter(achievement => {
-    const userAchievement = mockUserAchievements.find(ua => ua.achievementId === achievement.id);
-    return !userAchievement || userAchievement.progress === 0;
-  });
+  // Filter achievements by status using real data
+  const completedAchievements = achievements.filter(achievement => achievement.isUnlocked);
+  const inProgressAchievements = achievements.filter(achievement => 
+    !achievement.isUnlocked && (achievement.progress || 0) > 0
+  );
+  const availableAchievements = achievements.filter(achievement => 
+    !achievement.isUnlocked && (achievement.progress || 0) === 0
+  );
 
   return (
     <div className="min-h-screen bg-brand-dark-bg flex">
@@ -241,7 +281,23 @@ export default function FanAchievements() {
 
           {/* Level Progress */}
           <div className="mb-8">
-            <LevelProgress userLevel={mockUserLevel} size="lg" showDetails />
+            {levelLoading ? (
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-center h-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : userLevel ? (
+              <LevelProgress userLevel={userLevel} size="lg" showDetails />
+            ) : (
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <CardContent className="p-6 text-center">
+                  <p className="text-gray-400">No level data available</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Achievement Stats */}
@@ -306,7 +362,7 @@ export default function FanAchievements() {
             <TabsList className="bg-white/10 border-white/20">
               <TabsTrigger value="all" className="data-[state=active]:bg-brand-primary">
                 <Trophy className="h-4 w-4 mr-2" />
-                All ({mockAchievements.length})
+                All ({achievements.length})
               </TabsTrigger>
               <TabsTrigger value="completed" className="data-[state=active]:bg-brand-primary">
                 <Star className="h-4 w-4 mr-2" />

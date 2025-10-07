@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,44 +15,88 @@ import {
   Star,
   MoreVertical,
   UserPlus,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from "lucide-react";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 
+interface Fan {
+  id: string;
+  name: string;
+  email: string;
+  joinDate: string;
+  totalPoints: number;
+  tier: string;
+  lastActive: string;
+  campaigns: number;
+  username?: string;
+}
+
 export default function CreatorFans() {
-  // Mock fan data - in production this would come from API
-  const fans = [
-    {
-      id: "1",
-      name: "Alex Johnson",
-      email: "alex@example.com",
-      joinDate: "2024-01-15",
-      totalPoints: 2450,
-      tier: "Gold",
-      lastActive: "2 hours ago",
-      campaigns: 5
+  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Get creator's tenant to fetch fans
+  const { data: creator } = useQuery({
+    queryKey: ['/api/creators/user', user?.id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/creators/user/${user?.id}`);
+      return response.json();
     },
-    {
-      id: "2", 
-      name: "Sarah Chen",
-      email: "sarah@example.com",
-      joinDate: "2024-02-03",
-      totalPoints: 1890,
-      tier: "Silver",
-      lastActive: "1 day ago",
-      campaigns: 3
+    enabled: !!user?.id
+  });
+
+  // Fetch real fan data from tenant memberships
+  const { data: fans = [], isLoading: fansLoading, error: fansError } = useQuery<Fan[]>({
+    queryKey: ['/api/tenant-memberships', creator?.tenantId],
+    queryFn: async (): Promise<Fan[]> => {
+      if (!creator?.tenantId) return [];
+      
+      const response = await apiRequest('GET', `/api/tenant-memberships/${creator.tenantId}`);
+      const memberships = await response.json();
+      
+      // Transform membership data into fan format
+      return memberships.map((membership: any) => {
+        const memberData = membership.memberData || {};
+        const user = membership.user || {};
+        
+        return {
+          id: membership.id,
+          name: memberData.displayName || user.username || user.email || 'Fan',
+          email: user.email || 'No email',
+          joinDate: new Date(membership.joinedAt).toLocaleDateString(),
+          totalPoints: memberData.points || 0,
+          tier: memberData.tier || 'Bronze',
+          lastActive: membership.lastActiveAt ? 
+            getRelativeTime(new Date(membership.lastActiveAt)) : 'Unknown',
+          campaigns: 0, // TODO: Calculate from campaign participations
+          username: user.username
+        };
+      });
     },
-    {
-      id: "3",
-      name: "Mike Rodriguez",
-      email: "mike@example.com", 
-      joinDate: "2024-01-28",
-      totalPoints: 3200,
-      tier: "Platinum",
-      lastActive: "30 minutes ago",
-      campaigns: 8
-    }
-  ];
+    enabled: !!creator?.tenantId,
+    staleTime: 5 * 60 * 1000 // 5 minutes
+  });
+
+  // Helper function to get relative time
+  const getRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return '1 day ago';
+    return `${diffDays} days ago`;
+  };
+
+  // Filter fans based on search term
+  const filteredFans = fans.filter(fan => 
+    fan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    fan.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (fan.username && fan.username.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const getTierColor = (tier: string) => {
     switch (tier) {
@@ -83,7 +131,7 @@ export default function CreatorFans() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-400">Total Fans</p>
-                    <p className="text-2xl font-bold text-white">2,847</p>
+                    <p className="text-2xl font-bold text-white">{fans.length.toLocaleString()}</p>
                   </div>
                   <Users className="h-8 w-8 text-brand-primary" />
                 </div>
@@ -100,12 +148,16 @@ export default function CreatorFans() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-400">Active Fans</p>
-                    <p className="text-2xl font-bold text-white">1,923</p>
+                    <p className="text-2xl font-bold text-white">
+                      {fans.filter(fan => fan.totalPoints > 0).length.toLocaleString()}
+                    </p>
                   </div>
                   <Heart className="h-8 w-8 text-red-400" />
                 </div>
                 <div className="mt-2">
-                  <p className="text-xs text-gray-400">67% engagement rate</p>
+                  <p className="text-xs text-gray-400">
+                    {fans.length > 0 ? Math.round((fans.filter(fan => fan.totalPoints > 0).length / fans.length) * 100) : 0}% engagement rate
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -115,12 +167,14 @@ export default function CreatorFans() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-400">Top Tier Fans</p>
-                    <p className="text-2xl font-bold text-white">156</p>
+                    <p className="text-2xl font-bold text-white">
+                      {fans.filter(fan => fan.tier === 'Platinum' || fan.tier === 'Gold').length}
+                    </p>
                   </div>
                   <Star className="h-8 w-8 text-yellow-400" />
                 </div>
                 <div className="mt-2">
-                  <p className="text-xs text-gray-400">Platinum & Gold</p>
+                  <p className="text-xs text-gray-400">Platinum & Gold members</p>
                 </div>
               </CardContent>
             </Card>
@@ -129,13 +183,15 @@ export default function CreatorFans() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">New This Week</p>
-                    <p className="text-2xl font-bold text-white">47</p>
+                    <p className="text-sm text-gray-400">Total Points</p>
+                    <p className="text-2xl font-bold text-white">
+                      {fans.reduce((sum, fan) => sum + fan.totalPoints, 0).toLocaleString()}
+                    </p>
                   </div>
                   <UserPlus className="h-8 w-8 text-brand-secondary" />
                 </div>
                 <div className="mt-2">
-                  <p className="text-xs text-gray-400">+8% vs last week</p>
+                  <p className="text-xs text-gray-400">Points distributed</p>
                 </div>
               </CardContent>
             </Card>
@@ -151,6 +207,8 @@ export default function CreatorFans() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       placeholder="Search fans..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 bg-white/10 border-white/20 text-white w-64"
                     />
                   </div>
@@ -163,7 +221,37 @@ export default function CreatorFans() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {fans.map((fan) => (
+                {fansLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="p-4 rounded-lg bg-white/5 border border-white/10">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-gray-300/20 rounded-full animate-pulse"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-300/20 rounded animate-pulse mb-2"></div>
+                          <div className="h-3 bg-gray-300/20 rounded animate-pulse w-2/3"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : fansError ? (
+                  <div className="text-center py-8">
+                    <p className="text-red-400 mb-4">Failed to load fans</p>
+                    <Button variant="outline" onClick={() => window.location.reload()}>
+                      Retry
+                    </Button>
+                  </div>
+                ) : filteredFans.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-400 mb-4">
+                      {searchTerm ? 'No fans found matching your search' : 'No fans have joined yet'}
+                    </p>
+                    <Button variant="outline" className="border-brand-primary/30 text-brand-primary">
+                      Share Your Profile
+                    </Button>
+                  </div>
+                ) : (
+                  filteredFans.map((fan) => (
                   <div key={fan.id} className="p-4 rounded-lg bg-white/5 border border-white/10">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
@@ -200,7 +288,8 @@ export default function CreatorFans() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

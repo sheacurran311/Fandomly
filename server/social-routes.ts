@@ -5,6 +5,18 @@ import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 import { URLSearchParams } from "url";
 import { storage } from "./storage";
 
+// Server-side code idempotency
+const usedCodeCache = new Map<string, number>(); // code -> expiryMillis
+const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function pruneUsedCodes() {
+  const now = Date.now();
+  for (const [k, v] of usedCodeCache.entries()) {
+    if (v < now) usedCodeCache.delete(k);
+  }
+}
+setInterval(pruneUsedCodes, 60 * 1000).unref();
+
 // Instagram Business Login token exchange
 async function exchangeInstagramToken(code: string, redirectUri: string, userType: string = 'creator') {
   const clientId = userType === 'creator' ? process.env.INSTAGRAM_CREATOR_APP_ID : process.env.INSTAGRAM_CLIENT_ID;
@@ -56,42 +68,84 @@ async function exchangeInstagramToken(code: string, redirectUri: string, userTyp
 }
 
 // TikTok Login Kit token exchange
-async function exchangeTikTokToken(code: string) {
+async function exchangeTikTokToken(code: string, redirectUri?: string) {
+  console.log('[TikTok Token Exchange] Request details:', {
+    hasClientKey: !!process.env.TIKTOK_CLIENT_KEY,
+    hasClientSecret: !!process.env.TIKTOK_CLIENT_SECRET,
+    redirectUri,
+    codeLength: code.length
+  });
+
+  if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) {
+    throw new Error('TikTok client credentials not configured');
+  }
+
+  const requestBody = {
+    client_key: process.env.TIKTOK_CLIENT_KEY,
+    client_secret: process.env.TIKTOK_CLIENT_SECRET,
+    code,
+    grant_type: 'authorization_code',
+    ...(redirectUri ? { redirect_uri: redirectUri } : {})
+  };
+
+  console.log('[TikTok Token Exchange] Making request to TikTok API...');
   const response = await fetch('https://open-api.tiktok.com/oauth/access_token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_key: process.env.TIKTOK_CLIENT_KEY!,
-      client_secret: process.env.TIKTOK_CLIENT_SECRET!,
-      code,
-      grant_type: 'authorization_code'
-    }).toString()
+    body: new URLSearchParams(requestBody).toString()
   });
   
-  return response.json();
+  console.log('[TikTok Token Exchange] TikTok API response status:', response.status);
+  
+  const result = await response.json();
+  
+  console.log('[TikTok Token Exchange] Response:', {
+    hasAccessToken: !!result.access_token,
+    hasError: !!result.error,
+    errorCode: result.error,
+    errorMessage: result.error_description
+  });
+
+  if (!response.ok || result.error) {
+    const errorMessage = result.error_description || result.error || `HTTP ${response.status}`;
+    console.error('[TikTok Token Exchange] TikTok API error:', errorMessage);
+    throw new Error(`TikTok token exchange failed: ${errorMessage}`);
+  }
+  
+  return result;
 }
 
-// Twitter API v2 token exchange (Confidential Client - no PKCE)
+// Twitter API v2 token exchange (PKCE + confidential client)
 async function exchangeTwitterToken(
   code: string,
   redirectUri: string,
+  codeVerifier: string
 ) {
-  const useBasic = !!(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET);
+  const clientId = process.env.TWITTER_CLIENT_ID!;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
+  
   try {
-    console.log('[Twitter Server] CLIENT_ID fingerprint:', (process.env.TWITTER_CLIENT_ID || '').slice(0,6), '...', (process.env.TWITTER_CLIENT_ID || '').slice(-6));
+    console.log('[Twitter Server] CLIENT_ID fingerprint:', clientId.slice(0,6), '...', clientId.slice(-6));
     console.log('[Twitter Server] Using redirect_uri for exchange:', redirectUri);
-    console.log('[Twitter Server] Auth mode:', useBasic ? 'Basic' : 'Body client creds');
+    console.log('[Twitter Server] Auth mode: PKCE + confidential (Basic auth)');
   } catch {}
+  
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
-    ...(useBasic ? {} : { client_id: process.env.TWITTER_CLIENT_ID! , client_secret: process.env.TWITTER_CLIENT_SECRET! })
+    code_verifier: codeVerifier
+    // Using Basic auth instead of client_id/client_secret in body
   }).toString();
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
-  if (useBasic) {
-    headers['Authorization'] = `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString('base64')}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded'
+  };
+  
+  // Add Basic auth for confidential client
+  if (clientId && clientSecret) {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    headers.Authorization = `Basic ${basic}`;
   }
 
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
@@ -147,6 +201,8 @@ async function exchangeSpotifyToken(code: string) {
 
 // Get TikTok user info
 async function getTikTokUser(accessToken: string) {
+  console.log('[TikTok User Info] Fetching user data...');
+  
   const response = await fetch('https://open-api.tiktok.com/user/info/', {
     method: 'POST',
     headers: { 
@@ -159,7 +215,24 @@ async function getTikTokUser(accessToken: string) {
     })
   });
   
-  return response.json();
+  console.log('[TikTok User Info] Response status:', response.status);
+  
+  const result = await response.json();
+  
+  console.log('[TikTok User Info] Response:', {
+    hasData: !!result.data,
+    hasError: !!result.error,
+    errorCode: result.error?.code,
+    errorMessage: result.error?.message
+  });
+
+  if (!response.ok || result.error) {
+    const errorMessage = result.error?.message || result.error || `HTTP ${response.status}`;
+    console.error('[TikTok User Info] TikTok API error:', errorMessage);
+    throw new Error(`TikTok user info failed: ${errorMessage}`);
+  }
+  
+  return result;
 }
 
 // Get Twitter user info
@@ -171,23 +244,31 @@ async function getTwitterUser(accessToken: string) {
   return response.json();
 }
 
-// Refresh Twitter tokens (Confidential Client - rotation aware)
+// Refresh Twitter tokens (PKCE + confidential client - rotation aware)
 async function refreshTwitterToken(
   refreshToken: string
 ) {
-  const useBasic = !!(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET);
+  const clientId = process.env.TWITTER_CLIENT_ID!;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
+  
   try {
-    console.log('[Twitter Server] Refresh with auth mode:', useBasic ? 'Basic' : 'Body client creds');
+    console.log('[Twitter Server] Refresh with auth mode: PKCE + confidential (Basic auth)');
   } catch {}
+  
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    ...(useBasic ? {} : { client_id: process.env.TWITTER_CLIENT_ID!, client_secret: process.env.TWITTER_CLIENT_SECRET! })
+    refresh_token: refreshToken
+    // Using Basic auth instead of client_id/client_secret in body
   }).toString();
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
-  if (useBasic) {
-    headers['Authorization'] = `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString('base64')}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded'
+  };
+  
+  // Add Basic auth for confidential client (consistent with exchange)
+  if (clientId && clientSecret) {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    headers.Authorization = `Basic ${basic}`;
   }
 
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
@@ -689,12 +770,24 @@ export function registerSocialRoutes(app: Express) {
   // TikTok token exchange
   app.post('/api/social/tiktok/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.body;
-      const tokenData = await exchangeTikTokToken(code);
+      const { code, redirect_uri } = req.body || {};
+      if (!code) {
+        return res.status(400).json({ error: 'code is required' });
+      }
+      
+      console.log('[TikTok Token Route] Processing token exchange for user:', req.user?.id);
+      const tokenData = await exchangeTikTokToken(code, redirect_uri);
+      
+      // Store the token data for the user if needed
+      // TODO: Save to database if you want to persist TikTok connections
+      
       res.json(tokenData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('TikTok token exchange error:', error);
-      res.status(500).json({ error: 'Failed to exchange TikTok token' });
+      res.status(500).json({ 
+        error: 'Failed to exchange TikTok token',
+        message: error.message || 'Unknown error'
+      });
     }
   });
 
@@ -714,40 +807,64 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter token exchange (confidential client - no PKCE)
+  // Twitter token exchange (PKCE)
   app.post('/api/social/twitter/token', async (req: AuthenticatedRequest, res) => {
     try {
       const timestamp = new Date().toISOString();
-      const { code, redirect_uri } = req.body || {};
+      const { code, redirect_uri, code_verifier } = req.body || {};
       const dynamicUserIdHeader = req.headers['x-dynamic-user-id'] as string | undefined;
       const dynamicUserIdBody = (req.body && (req.body.dynamicUserId || req.body.userId)) as string | undefined;
       const dynamicUserId = dynamicUserIdHeader || dynamicUserIdBody;
 
       console.log(`[Twitter Token] ${timestamp} Request received:`, {
-        code: code ? `${code.substring(0, 10)}...` : 'missing',
+        hasCode: !!code,
+        codeLength: code?.length || 0,
         redirect_uri,
+        hasCodeVerifier: !!code_verifier,
+        verifierLength: code_verifier?.length || 0,
         userId: dynamicUserId || 'unknown'
       });
 
-      if (!code || !redirect_uri) {
+      if (!code || !redirect_uri || !code_verifier) {
         console.log('[Twitter Token] Missing required parameters');
-        return res.status(400).json({ error: 'code and redirect_uri are required' });
+        return res.status(400).json({ error: 'code, redirect_uri, and code_verifier are required' });
       }
 
+      // Check for duplicate code usage
+      const codeKey = String(code);
+      const now = Date.now();
+      if (usedCodeCache.has(codeKey)) {
+        console.warn('[Twitter Token] Code already used - duplicate exchange blocked');
+        return res.status(409).json({ error: 'code_already_used' });
+      }
+      // Reserve the code
+      usedCodeCache.set(codeKey, now + CODE_TTL_MS);
+
       console.log(`[Twitter Token] Calling exchangeTwitterToken...`);
-      const result = await exchangeTwitterToken(code, redirect_uri);
-      console.log(`[Twitter Token] ${timestamp} exchange response:`, { status: result.status, ok: result.ok, body: result.body });
+      const result = await exchangeTwitterToken(code, redirect_uri, code_verifier);
+      console.log(`[Twitter Token] ${timestamp} exchange response:`, { 
+        status: result.status, 
+        ok: result.ok, 
+        hasAccessToken: !!result.body?.access_token,
+        hasRefreshToken: !!result.body?.refresh_token,
+        expiresIn: result.body?.expires_in,
+        scope: result.body?.scope
+      });
       if (!result.ok) {
+        // On failure, remove the code reservation so user can retry
+        usedCodeCache.delete(codeKey);
         return res.status(result.status).json(result.body);
       }
       // Persist token bundle if we have a user context
       if (dynamicUserId && result.body?.access_token) {
         try {
-          await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', {
+          const tokenBundle = {
             ...result.body,
             received_at: Date.now(),
             expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
-          });
+          };
+          await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', tokenBundle);
+          console.log('[Twitter Token] Token bundle persisted successfully');
         } catch (e) {
           console.warn('[Twitter Token] Failed to persist token bundle:', e);
         }
@@ -774,11 +891,13 @@ export function registerSocialRoutes(app: Express) {
       // Persist rotated token bundle
       if (dynamicUserId && result.body?.access_token) {
         try {
-          await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', {
+          const tokenBundle = {
             ...result.body,
             received_at: Date.now(),
             expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
-          });
+          };
+          await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', tokenBundle);
+          console.log('[Twitter Refresh] Token bundle rotated and persisted successfully');
         } catch (e) {
           console.warn('[Twitter Refresh] Failed to persist token bundle:', e);
         }
@@ -804,6 +923,133 @@ export function registerSocialRoutes(app: Express) {
     } catch (error) {
       console.error('Twitter user info error:', error);
       res.status(500).json({ error: 'Failed to get Twitter user info' });
+    }
+  });
+
+  // Get stored Twitter token bundle for a user
+  app.get('/api/social/twitter/token-bundle', async (req: AuthenticatedRequest, res) => {
+    try {
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string);
+      const includeToken = req.query?.includeToken === 'true';
+      
+      console.log('[Twitter Token Bundle] Request params:', {
+        dynamicUserId,
+        includeToken,
+        queryParams: req.query
+      });
+      
+      if (!dynamicUserId) {
+        return res.status(400).json({ error: 'dynamicUserId required' });
+      }
+      
+      const tokenBundle = await storage.getSocialTokenBundle(dynamicUserId, 'twitter');
+      if (!tokenBundle) {
+        return res.status(404).json({ error: 'No Twitter tokens found for user' });
+      }
+
+      // Check if token needs refresh
+      const now = Date.now();
+      const needsRefresh = now >= (tokenBundle.expires_at - 60000); // Refresh 1 min early
+
+      const response: any = {
+        hasTokens: true,
+        needsRefresh,
+        expiresAt: tokenBundle.expires_at,
+        scope: tokenBundle.scope,
+        receivedAt: tokenBundle.received_at
+      };
+
+      // Only include access_token if explicitly requested (for testing)
+      if (includeToken) {
+        response.access_token = tokenBundle.access_token;
+        response.debug = {
+          bundleKeys: Object.keys(tokenBundle),
+          hasAccessToken: !!tokenBundle.access_token,
+          accessTokenLength: tokenBundle.access_token?.length || 0
+        };
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error('Twitter token bundle error:', error);
+      res.status(500).json({ error: 'Failed to get token bundle info' });
+    }
+  });
+
+  // Debug endpoint to see raw stored token data
+  app.get('/api/social/twitter/debug-tokens', async (req: AuthenticatedRequest, res) => {
+    try {
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string);
+      if (!dynamicUserId) {
+        return res.status(400).json({ error: 'dynamicUserId required' });
+      }
+      
+      const tokenBundle = await storage.getSocialTokenBundle(dynamicUserId, 'twitter');
+      if (!tokenBundle) {
+        return res.status(404).json({ error: 'No Twitter tokens found for user' });
+      }
+
+      res.json({
+        bundleKeys: Object.keys(tokenBundle),
+        hasAccessToken: !!tokenBundle.access_token,
+        hasRefreshToken: !!tokenBundle.refresh_token,
+        accessTokenLength: tokenBundle.access_token?.length || 0,
+        refreshTokenLength: tokenBundle.refresh_token?.length || 0,
+        tokenType: tokenBundle.token_type,
+        expiresIn: tokenBundle.expires_in,
+        scope: tokenBundle.scope,
+        receivedAt: tokenBundle.received_at,
+        expiresAt: tokenBundle.expires_at,
+        // Include first/last 4 chars of access_token for verification
+        accessTokenPreview: tokenBundle.access_token ? 
+          `${tokenBundle.access_token.substring(0, 4)}...${tokenBundle.access_token.substring(-4)}` : null
+      });
+    } catch (error) {
+      console.error('Twitter debug tokens error:', error);
+      res.status(500).json({ error: 'Failed to debug tokens' });
+    }
+  });
+
+  // Proactive token refresh endpoint
+  app.post('/api/social/twitter/refresh-if-needed', async (req: AuthenticatedRequest, res) => {
+    try {
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId;
+      if (!dynamicUserId) {
+        return res.status(400).json({ error: 'dynamicUserId required' });
+      }
+
+      const tokenBundle = await storage.getSocialTokenBundle(dynamicUserId, 'twitter');
+      if (!tokenBundle?.refresh_token) {
+        return res.status(404).json({ error: 'No refresh token found' });
+      }
+
+      const now = Date.now();
+      const needsRefresh = now >= (tokenBundle.expires_at - 60000);
+
+      if (!needsRefresh) {
+        return res.json({ refreshed: false, message: 'Token still valid' });
+      }
+
+      console.log('[Twitter Proactive Refresh] Refreshing token for user:', dynamicUserId);
+      const result = await refreshTwitterToken(tokenBundle.refresh_token);
+      
+      if (!result.ok) {
+        return res.status(result.status).json(result.body);
+      }
+
+      // Persist rotated token bundle
+      const newTokenBundle = {
+        ...result.body,
+        received_at: Date.now(),
+        expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
+      };
+      await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', newTokenBundle);
+      
+      console.log('[Twitter Proactive Refresh] Token refreshed successfully');
+      res.json({ refreshed: true, expiresAt: newTokenBundle.expires_at });
+    } catch (error) {
+      console.error('Twitter proactive refresh error:', error);
+      res.status(500).json({ error: 'Failed to refresh token' });
     }
   });
 

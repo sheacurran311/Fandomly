@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Facebook, Twitter, Instagram, Video, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FacebookSDKManager } from "@/lib/facebook";
-import { Instagram, Twitter, Facebook, Music2, Check } from "lucide-react";
+import { socialManager } from "@/lib/social-integrations";
 
 interface SocialConnectionsProps {
   userType?: "fan" | "creator";
@@ -12,11 +13,14 @@ interface SocialConnectionsProps {
 export default function SocialConnections({ userType = "fan" }: SocialConnectionsProps) {
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
   const { toast } = useToast();
 
-  // Check Facebook connection status
+  // Check Facebook and TikTok connection status
   useEffect(() => {
     checkFacebookStatus();
+    checkTiktokStatus();
   }, [userType]);
 
   const checkFacebookStatus = async () => {
@@ -30,7 +34,34 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
     }
   };
 
-  const handleFacebookConnect = async () => {
+  const checkTiktokStatus = async () => {
+    try {
+      const { getSocialConnection } = await import('@/lib/social-connection-api');
+      const { connected } = await getSocialConnection('tiktok');
+      setTiktokConnected(connected);
+    } catch (error) {
+      console.error('[Social] Error checking TikTok status:', error);
+      setTiktokConnected(false);
+    }
+  };
+
+  const handleTiktokConnect = async () => {
+    try {
+      setTiktokConnecting(true);
+      const authUrl = socialManager.getAuthUrl('tiktok');
+      window.location.href = authUrl;
+    } catch (error: any) {
+      console.error('TikTok connection error:', error);
+      toast({
+        title: "Connection Failed",
+        description: error.message || 'Failed to connect TikTok. Please try again.',
+        variant: 'destructive',
+      });
+      setTiktokConnecting(false);
+    }
+  };
+
+const handleFacebookConnect = async () => {
     setIsConnecting(true);
     try {
       const result = await FacebookSDKManager.secureLogin(userType);
@@ -85,8 +116,20 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
             </>
           ) : 'Connect Facebook'}
         </Button>
-        <Button variant="outline" className="justify-start border-white/20 text-white">
-          <Music2 className="h-4 w-4 mr-2"/>Connect TikTok
+        <Button 
+          variant="outline" 
+          className={`justify-start border-white/20 text-white ${tiktokConnected ? 'bg-purple-500/20 border-purple-500/30' : ''}`}
+          onClick={handleTiktokConnect}
+          disabled={tiktokConnecting}
+          data-testid="button-connect-tiktok-social"
+        >
+          <Video className="h-4 w-4 mr-2"/>
+          {tiktokConnecting ? 'Connecting...' : tiktokConnected ? (
+            <>
+              <Check className="h-4 w-4 ml-auto" />
+              TikTok Connected
+            </>
+          ) : 'Connect TikTok'}
         </Button>
       </CardContent>
     </Card>

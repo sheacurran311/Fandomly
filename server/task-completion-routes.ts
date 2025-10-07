@@ -1,0 +1,388 @@
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import type { IStorage } from './storage';
+import type { Task, User } from '@shared/schema';
+import { authenticateUser, type AuthenticatedRequest } from './middleware/rbac';
+
+// Validation schemas
+const startTaskSchema = z.object({
+  taskId: z.string().min(1, 'Task ID is required'),
+  tenantId: z.string().min(1, 'Tenant ID is required'),
+});
+
+const updateProgressSchema = z.object({
+  progress: z.number().min(0).max(100),
+  completionData: z.record(z.any()).optional(),
+});
+
+const completeTaskSchema = z.object({
+  completionData: z.record(z.any()).optional(),
+  verificationMethod: z.enum(['auto', 'manual', 'api']).default('auto'),
+});
+
+export function createTaskCompletionRoutes(storage: IStorage) {
+  const router = Router();
+
+  // ==============================================
+  // GET /api/task-completions/me
+  // Get all task completions for the current user
+  // ==============================================
+  router.get('/me', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const tenantId = req.query.tenantId as string | undefined;
+      const completions = await storage.getUserTaskCompletions(req.user.id, tenantId);
+
+      res.json({ completions });
+    } catch (error) {
+      console.error('Error fetching user task completions:', error);
+      res.status(500).json({ error: 'Failed to fetch task completions' });
+    }
+  });
+
+  // ==============================================
+  // GET /api/task-completions/:taskId
+  // Get user's completion for a specific task
+  // ==============================================
+  router.get('/:taskId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { taskId } = req.params;
+      const completion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);
+
+      if (!completion) {
+        return res.status(404).json({ error: 'Task completion not found' });
+      }
+
+      res.json({ completion });
+    } catch (error) {
+      console.error('Error fetching task completion:', error);
+      res.status(500).json({ error: 'Failed to fetch task completion' });
+    }
+  });
+
+  // ==============================================
+  // POST /api/task-completions/start
+  // Start a task (create initial completion record)
+  // ==============================================
+  router.post('/start', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Validate request body
+      const validation = startTaskSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: 'Invalid request data', 
+          details: validation.error.issues 
+        });
+      }
+
+      const { taskId, tenantId } = validation.data;
+
+      // Check if task exists
+      const task = await storage.getTask(taskId, tenantId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Check if user has already started this task
+      const existingCompletion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);
+      if (existingCompletion) {
+        return res.json({ 
+          completion: existingCompletion,
+          message: 'Task already started'
+        });
+      }
+
+      // Create new task completion
+      const completion = await storage.createTaskCompletion({
+        taskId,
+        userId: req.user.id,
+        tenantId,
+        status: 'in_progress',
+        progress: 0,
+        completionData: {},
+        pointsEarned: 0,
+        totalRewardsEarned: 0,
+      });
+
+      res.status(201).json({ completion });
+    } catch (error) {
+      console.error('Error starting task:', error);
+      res.status(500).json({ error: 'Failed to start task' });
+    }
+  });
+
+  // ==============================================
+  // PATCH /api/task-completions/:completionId/progress
+  // Update task progress (for multi-step tasks)
+  // ==============================================
+  router.patch('/:completionId/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { completionId } = req.params;
+
+      // Validate request body
+      const validation = updateProgressSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: 'Invalid request data', 
+          details: validation.error.issues 
+        });
+      }
+
+      // Get existing completion
+      const existingCompletion = await storage.getTaskCompletion(completionId);
+      if (!existingCompletion) {
+        return res.status(404).json({ error: 'Task completion not found' });
+      }
+
+      // Check ownership
+      if (existingCompletion.userId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to update this task completion' });
+      }
+
+      // Update progress
+      const { progress, completionData } = validation.data;
+      const updatedCompletion = await storage.updateTaskCompletion(completionId, {
+        progress,
+        completionData: completionData || existingCompletion.completionData,
+        lastActivityAt: new Date(),
+      });
+
+      res.json({ completion: updatedCompletion });
+    } catch (error) {
+      console.error('Error updating task progress:', error);
+      res.status(500).json({ error: 'Failed to update task progress' });
+    }
+  });
+
+  // ==============================================
+  // POST /api/task-completions/:completionId/complete
+  // Mark task as completed and distribute rewards
+  // ==============================================
+  router.post('/:completionId/complete', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { completionId } = req.params;
+
+      // Validate request body
+      const validation = completeTaskSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: 'Invalid request data', 
+          details: validation.error.issues 
+        });
+      }
+
+      const { completionData, verificationMethod } = validation.data;
+
+      // Get existing completion
+      const existingCompletion = await storage.getTaskCompletion(completionId);
+      if (!existingCompletion) {
+        return res.status(404).json({ error: 'Task completion not found' });
+      }
+
+      // Check ownership
+      if (existingCompletion.userId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to complete this task' });
+      }
+
+      // Get task details
+      const task = await storage.getTask(existingCompletion.taskId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Calculate rewards
+      const pointsToAward = task.pointsToReward || 0;
+      const now = new Date();
+
+      // Update completion to completed
+      const updatedCompletion = await storage.updateTaskCompletion(completionId, {
+        status: 'completed',
+        progress: 100,
+        completionData: completionData || existingCompletion.completionData,
+        pointsEarned: (existingCompletion.pointsEarned || 0) + pointsToAward,
+        totalRewardsEarned: (existingCompletion.totalRewardsEarned || 0) + pointsToAward,
+        completedAt: now,
+        verifiedAt: now,
+        verificationMethod,
+        lastActivityAt: now,
+      });
+
+      // Create reward distribution record
+      const rewardDistribution = await storage.createRewardDistribution({
+        userId: req.user.id,
+        taskId: task.id,
+        taskCompletionId: completionId,
+        tenantId: task.tenantId,
+        rewardType: 'points',
+        amount: pointsToAward,
+        currency: task.pointCurrency || 'default',
+        reason: 'task_completion',
+        description: `Completed task: ${task.name}`,
+        metadata: {
+          taskName: task.name,
+          taskType: task.taskType,
+        },
+      });
+
+      res.json({ 
+        completion: updatedCompletion,
+        reward: rewardDistribution,
+        pointsAwarded: pointsToAward
+      });
+    } catch (error) {
+      console.error('Error completing task:', error);
+      res.status(500).json({ error: 'Failed to complete task' });
+    }
+  });
+
+  // ==============================================
+  // POST /api/task-completions/:taskId/check-in
+  // Special endpoint for daily check-in tasks
+  // ==============================================
+  router.post('/:taskId/check-in', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { taskId } = req.params;
+      const { tenantId } = req.body;
+
+      // Get task
+      const task = await storage.getTask(taskId, tenantId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Note: We're not checking task.taskType === 'check_in' because 'check_in' is not in the current task type enum
+      // This will need to be addressed when the schema is updated
+
+      // Get or create completion
+      let completion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);
+      if (!completion) {
+        completion = await storage.createTaskCompletion({
+          taskId,
+          userId: req.user.id,
+          tenantId,
+          status: 'in_progress',
+          progress: 0,
+          completionData: {
+            currentStreak: 0,
+            streakMilestones: [],
+          },
+          pointsEarned: 0,
+          totalRewardsEarned: 0,
+        });
+      }
+
+      const now = new Date();
+      const lastCheckIn = completion.completionData?.lastCheckIn ? 
+        new Date(completion.completionData.lastCheckIn) : null;
+
+      // Check if already checked in today
+      if (lastCheckIn) {
+        const isToday = lastCheckIn.toDateString() === now.toDateString();
+        if (isToday) {
+          return res.status(400).json({ 
+            error: 'Already checked in today',
+            nextCheckIn: new Date(lastCheckIn.getTime() + 24 * 60 * 60 * 1000)
+          });
+        }
+      }
+
+      // Calculate streak
+      let currentStreak = completion.completionData?.currentStreak || 0;
+      const isConsecutive = lastCheckIn && 
+        (now.getTime() - lastCheckIn.getTime()) < (48 * 60 * 60 * 1000); // Within 48 hours
+
+      if (isConsecutive) {
+        currentStreak += 1;
+      } else {
+        currentStreak = 1; // Reset streak
+      }
+
+      // Award base points
+      const basePoints = task.pointsToReward || 0;
+      let totalPoints = basePoints;
+
+      // Check for streak milestone bonuses
+      const streakMilestones = completion.completionData?.streakMilestones || [];
+      const taskConfig = task.customSettings as any;
+      const streakRewards = taskConfig?.streakRewards || [];
+
+      for (const milestone of streakRewards) {
+        if (currentStreak === milestone.days) {
+          totalPoints += milestone.bonusPoints;
+          streakMilestones.push({
+            days: milestone.days,
+            completedAt: now.toISOString(),
+            pointsAwarded: milestone.bonusPoints,
+          });
+        }
+      }
+
+      // Update completion
+      const updatedCompletion = await storage.updateTaskCompletion(completion.id, {
+        completionData: {
+          ...completion.completionData,
+          currentStreak,
+          lastCheckIn: now.toISOString(),
+          streakMilestones,
+        },
+        pointsEarned: (completion.pointsEarned || 0) + totalPoints,
+        totalRewardsEarned: (completion.totalRewardsEarned || 0) + totalPoints,
+        lastActivityAt: now,
+      });
+
+      // Create reward distribution
+      const rewardDistribution = await storage.createRewardDistribution({
+        userId: req.user.id,
+        taskId: task.id,
+        taskCompletionId: completion.id,
+        tenantId: task.tenantId,
+        rewardType: 'points',
+        amount: totalPoints,
+        currency: task.pointCurrency || 'default',
+        reason: currentStreak > 1 ? 'streak_bonus' : 'task_completion',
+        description: `Check-in day ${currentStreak}`,
+        metadata: {
+          taskName: task.name,
+          taskType: task.taskType,
+          streakDays: currentStreak,
+        },
+      });
+
+      res.json({ 
+        completion: updatedCompletion,
+        reward: rewardDistribution,
+        pointsAwarded: totalPoints,
+        streak: currentStreak,
+        nextCheckIn: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      });
+    } catch (error) {
+      console.error('Error processing check-in:', error);
+      res.status(500).json({ error: 'Failed to process check-in' });
+    }
+  });
+
+  return router;
+}

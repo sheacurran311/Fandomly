@@ -47,7 +47,7 @@ export class FacebookAPI {
       // Sum followers from all connected pages
       for (const page of pages) {
         const followers = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
-        totalFollowers += followers;
+        totalFollowers += Number(followers || 0);
       }
 
       return {
@@ -77,7 +77,7 @@ export class FacebookAPI {
     
     for (const page of pages) {
       const followers = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
-      totalFollowers += followers;
+      totalFollowers += Number(followers || 0);
     }
     
     return totalFollowers;
@@ -142,10 +142,21 @@ export class TikTokAPI {
 
   constructor() {
     this.clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY || '';
-    this.redirectUri = `${window.location.origin}/auth/tiktok/callback`;
+    // Smart detection like X: use domain to derive callback
+    const origin = window.location.origin;
+    this.redirectUri = `${origin}/tiktok-callback`;
+    
+    // Validate configuration on initialization
+    if (!this.clientKey) {
+      console.warn('TikTok: VITE_TIKTOK_CLIENT_KEY not configured');
+    }
   }
 
   getAuthUrl(): string {
+    if (!this.clientKey) {
+      throw new Error('TikTok client key not configured. Please set VITE_TIKTOK_CLIENT_KEY environment variable.');
+    }
+
     const params = new URLSearchParams({
       client_key: this.clientKey,
       scope: 'user.info.basic,user.info.stats',
@@ -154,14 +165,17 @@ export class TikTokAPI {
       state: 'tiktok_auth'
     });
     
-    return `https://www.tiktok.com/auth/authorize/?${params}`;
+    const authUrl = `https://www.tiktok.com/auth/authorize?${params}`;
+    console.log('[TikTok] Generated auth URL:', authUrl);
+    
+    return authUrl;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
     const response = await fetch('/api/social/tiktok/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
     });
     
     const data = await response.json();
@@ -208,17 +222,19 @@ export class TwitterAPI {
       redirect_uri: this.redirectUri,
       scope: this.scopes,
       state: 'twitter_auth',
+      code_challenge: 'placeholder',
+      code_challenge_method: 'S256'
     });
     
     return `https://twitter.com/i/oauth2/authorize?${params}`;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
-    // Confidential client: no PKCE
+    // This fallback method uses placeholder; primary flow uses twitter.ts with proper PKCE
     const response = await fetch('/api/social/twitter/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri, code_verifier: 'placeholder' })
     });
     
     const data = await response.json();

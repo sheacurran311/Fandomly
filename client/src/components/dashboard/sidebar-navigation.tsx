@@ -28,6 +28,7 @@ import {
   Shield,
   Facebook,
   Plus,
+  Target,
   MoreHorizontal,
   CheckSquare
 } from "lucide-react";
@@ -64,6 +65,7 @@ const fanItems: SidebarItem[] = [
   { label: "Overview", href: "/fan-dashboard", icon: Home },
   { label: "Profile", href: "/fan-profile", icon: User },
   { label: "Following", href: "/fan-dashboard/following", icon: Heart, color: "text-red-400" },
+  { label: "Tasks", href: "/fan-dashboard/tasks", icon: Target, color: "text-brand-primary" },
   { label: "Campaigns", href: "/fan-dashboard/campaigns", icon: Trophy, color: "text-yellow-400" },
   { label: "Social Accounts", href: "/fan-dashboard/social", icon: Instagram, color: "text-pink-400" },
   { label: "Achievements", href: "/fan-dashboard/achievements", icon: Star, color: "text-purple-400" },
@@ -169,7 +171,7 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
       </div>
 
       {/* Navigation Items */}
-      <nav className="flex-1 p-2 space-y-1">
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {items.map((item) => {
           const isActive = location === item.href || (item.href !== `/${userType}-dashboard` && location.startsWith(item.href));
           const Icon = item.icon;
@@ -208,67 +210,68 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
         })}
       </nav>
 
-      {/* Facebook Page Widget for Creators */}
-      {userType === 'creator' && facebookConnected && activePage && !isCollapsed && (
-        <div className="p-3 mx-2 mb-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-medium text-blue-400 uppercase tracking-wider">
-              Active Page
+      {/* Bottom sticky container: Active Facebook Page + User Section */}
+      <div className="mx-2 mb-2 sticky bottom-2 space-y-2">
+        {userType === 'creator' && facebookConnected && activePage && !isCollapsed && (
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-medium text-blue-400 uppercase tracking-wider">
+                Active Page
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                onClick={() => setShowPageModal(true)}
+                data-testid="button-sidebar-switch-page"
+              >
+                <MoreHorizontal className="h-3 w-3" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
-              onClick={() => setShowPageModal(true)}
-              data-testid="button-sidebar-switch-page"
-            >
-              <MoreHorizontal className="h-3 w-3" />
-            </Button>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={activePage.picture?.data?.url} alt={activePage.name} />
-              <AvatarFallback className="bg-blue-500/20 text-blue-400 text-xs">
-                {activePage.name.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
             
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-white truncate">
-                {activePage.name}
+            <div className="flex items-center space-x-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={activePage.picture?.data?.url} alt={activePage.name} />
+                <AvatarFallback className="bg-blue-500/20 text-blue-400 text-xs">
+                  {activePage.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-white truncate">
+                  {activePage.name}
+                </div>
+                <div className="text-xs text-blue-400">
+                  {activePage.followers_count?.toLocaleString() || 0} followers
+                </div>
               </div>
-              <div className="text-xs text-blue-400">
-                {activePage.followers_count?.toLocaleString() || 0} followers
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* User Section */}
-      <div className="p-4 border-t border-white/10">
-        {!isCollapsed ? (
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full flex items-center justify-center">
-              <User className="h-4 w-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                Your Account
-              </p>
-              <p className="text-xs text-gray-400 truncate capitalize">
-                {userType}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full flex items-center justify-center">
-              <User className="h-4 w-4 text-white" />
             </div>
           </div>
         )}
+
+        <div className="p-4 border border-white/10 rounded-lg bg-white/5">
+          {!isCollapsed ? (
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full flex items-center justify-center">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  Your Account
+                </p>
+                <p className="text-xs text-gray-400 truncate capitalize">
+                  {userType}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full flex items-center justify-center">
+                <User className="h-4 w-4 text-white" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Facebook Page Selection Modal */}

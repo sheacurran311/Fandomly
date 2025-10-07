@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useAuth } from "@/hooks/use-auth";
 import { SocialProviders } from '@/contexts/social-providers';
+import { migrateLocalStorageToDatabase } from "@/lib/social-connection-api";
 
 interface AuthRouterProps {
   children: React.ReactNode;
@@ -54,6 +55,22 @@ export default function AuthRouter({ children }: AuthRouterProps) {
   
   // Check if current path is a protected route (including sub-routes)
   const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+
+  // Migrate localStorage social connections to database once on authentication
+  useEffect(() => {
+    if (dynamicUser && userData) {
+      // Run migration utility once per session
+      const migrationKey = `social_migration_done_${userData.id}`;
+      const hasMigrated = sessionStorage.getItem(migrationKey);
+      
+      if (!hasMigrated) {
+        migrateLocalStorageToDatabase().then(() => {
+          sessionStorage.setItem(migrationKey, 'true');
+          console.log('✅ Social connections migration completed');
+        });
+      }
+    }
+  }, [dynamicUser, userData]);
 
   useEffect(() => {
     const isPopup = typeof window !== 'undefined' && !!(window as any).opener;

@@ -91,6 +91,22 @@ export function requireRole(allowedRoles: Array<'fandomly_admin' | 'customer_adm
   };
 }
 
+// Middleware to require Fandomly admin access
+export function requireFandomlyAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if (req.user.role !== 'fandomly_admin') {
+    return res.status(403).json({ 
+      error: 'Fandomly admin access required',
+      current: req.user.role
+    });
+  }
+
+  next();
+}
+
 // Customer tier access control
 export function requireCustomerTier(minTier: 'basic' | 'premium' | 'vip') {
   const tierLevels = { basic: 1, premium: 2, vip: 3 };

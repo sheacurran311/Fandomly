@@ -3,6 +3,7 @@ import { useFanStats, useActiveCampaigns, useRecommendations } from "@/hooks/use
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import FanFacebookConnect from "@/components/social/fan-facebook-connect";
+import FanTwitterWidget from "@/components/social/fan-twitter-widget";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -188,6 +189,9 @@ export default function FanDashboard() {
             <div className="space-y-6">
               {/* Facebook Profile Import */}
               <FanFacebookConnect />
+              
+              {/* Twitter Widget */}
+              <FanTwitterWidget />
               
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">

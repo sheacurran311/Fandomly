@@ -5,6 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DynamicProvider from "@/components/auth/dynamic-provider";
 import AuthRouter from "@/components/auth/auth-router";
+import ErrorBoundary from "@/components/error-boundary";
+import { useEffect } from "react";
+import { initTikTokErrorHandler } from "@/lib/tiktok-error-handler";
+import { SocialProviders } from "@/contexts/social-providers";
 import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
@@ -29,6 +33,7 @@ import CreatorSettings from "@/pages/creator-dashboard/settings";
 import BillingPage from "@/pages/billing";
 import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
+import FanTasks from "@/pages/fan-dashboard/tasks";
 import FanSocial from "@/pages/fan-dashboard/social";
 import FanFollowing from "@/pages/fan-dashboard/following";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
@@ -52,7 +57,16 @@ import DataDeletionInfo from "@/pages/privacy/data-deletion";
 import TermsOfService from "@/pages/terms-of-service";
 import NotFound from "@/pages/not-found";
 import InstagramCallback from "@/pages/instagram-callback";
+import TikTokCallback from "@/pages/tiktok-callback";
 import XCallback from "@/pages/x-callback";
+import CreatorStore from "@/pages/creator-store";
+import TaskBuilder from "@/pages/creator-dashboard/task-builder";
+import AdminDashboard from "@/pages/admin-dashboard";
+import AdminOverview from "@/pages/admin-dashboard/overview";
+import AdminUsers from "@/pages/admin-dashboard/users";
+import AdminCreators from "@/pages/admin-dashboard/creators";
+import AdminTasks from "@/pages/admin-dashboard/tasks";
+import AdminAnalytics from "@/pages/admin-dashboard/analytics";
 
 function Router() {
   return (
@@ -73,12 +87,14 @@ function Router() {
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/rewards" component={CreatorRewards} />
       <Route path="/creator-dashboard/tasks" component={CreatorTasks} />
+      <Route path="/creator-dashboard/tasks/create" component={TaskBuilder} />
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
       <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
+      <Route path="/fan-dashboard/tasks" component={FanTasks} />
       <Route path="/fan-dashboard/social" component={FanSocial} />
       <Route path="/fan-dashboard/following" component={FanFollowing} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
@@ -96,34 +112,56 @@ function Router() {
       {/* Deprecated facebook-login routes removed */}
       
       <Route path="/instagram-callback" component={InstagramCallback} />
+      <Route path="/tiktok-callback" component={TikTokCallback} />
       <Route path="/x-callback" component={XCallback} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />
       <Route path="/terms-of-service" component={TermsOfService} />
+      
+      {/* Admin Dashboard Routes - Must come before creator store catch-all */}
+      <Route path="/admin-dashboard" component={AdminDashboard} />
+      <Route path="/admin-dashboard/overview" component={AdminOverview} />
+      <Route path="/admin-dashboard/users" component={AdminUsers} />
+      <Route path="/admin-dashboard/creators" component={AdminCreators} />
+      <Route path="/admin-dashboard/tasks" component={AdminTasks} />
+      <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
+      
+      {/* Creator Store - Must be last before 404 to avoid catching other routes */}
+      <Route path="/:creatorUrl" component={CreatorStore} />
+      
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function App() {
+  // Initialize TikTok error handler on app start
+  useEffect(() => {
+    initTikTokErrorHandler();
+  }, []);
+
   return (
-    <DynamicProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AuthRouter>
-            <div className="min-h-screen bg-brand-dark-bg">
-                <Navigation />
-                <main>
-                  <Router />
-                </main>
-                <Footer />
-            </div>
-            <Toaster />
-          </AuthRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </DynamicProvider>
+    <ErrorBoundary>
+      <DynamicProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <AuthRouter>
+              <SocialProviders>
+                <div className="min-h-screen bg-brand-dark-bg">
+                    <Navigation />
+                    <main>
+                      <Router />
+                    </main>
+                    <Footer />
+                </div>
+                <Toaster />
+              </SocialProviders>
+            </AuthRouter>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </DynamicProvider>
+    </ErrorBoundary>
   );
 }
 

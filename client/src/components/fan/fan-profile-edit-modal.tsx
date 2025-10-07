@@ -24,7 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, X, User, Mail, Phone, MapPin, Calendar } from "lucide-react";
+import { Save, X, User, Mail, Phone, MapPin, Calendar, Check, AlertCircle, Upload, Image as ImageIcon, Users, Music, Video } from "lucide-react";
+import useUsernameValidation from "@/hooks/use-username-validation";
+import { CREATOR_TYPE_OPTIONS, getSubcategoryOptions, getCreatorTypeLabel } from "@shared/fanInterestOptions";
+import type { CreatorTypeInterest } from "@shared/fanInterestOptions";
 
 interface FanProfileEditModalProps {
   isOpen: boolean;
@@ -34,11 +37,22 @@ interface FanProfileEditModalProps {
 interface ProfileData {
   name?: string;
   age?: number;
-  bio?: string;
   location?: string;
   phoneNumber?: string;
   dateOfBirth?: string;
   gender?: string;
+  bannerImage?: string;
+  
+  // Marketing Fields (NEW)
+  phone?: string; // SMS marketing
+  creatorTypeInterests?: CreatorTypeInterest[]; // Which creator types they follow
+  interestSubcategories?: {
+    athletes?: string[];
+    musicians?: string[];
+    content_creators?: string[];
+  };
+  
+  // Legacy fields (kept for backwards compatibility)
   interests?: Array<"musicians" | "athletes" | "content_creators">;
   socialLinks?: {
     twitter?: string;
@@ -59,14 +73,30 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // Username editing state
+  const [username, setUsername] = useState(user?.username || "");
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  
+  // Username validation (only validate when editing)
+  const { isChecking, isAvailable, error: usernameError, suggestions } = useUsernameValidation(
+    isEditingUsername ? username : ""
+  );
+  
   const [formData, setFormData] = useState<ProfileData>({
     name: "",
     age: undefined,
-    bio: "",
     location: "",
     phoneNumber: "",
     dateOfBirth: "",
     gender: "",
+    bannerImage: "",
+    phone: "", // NEW
+    creatorTypeInterests: [], // NEW
+    interestSubcategories: { // NEW
+      athletes: [],
+      musicians: [],
+      content_creators: []
+    },
     interests: [],
     socialLinks: {
       twitter: "",
@@ -77,8 +107,8 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
     preferences: {
       emailNotifications: true,
       pushNotifications: true,
-      marketingEmails: false,
-      smsNotifications: false,
+      marketingEmails: true,
+      smsNotifications: true,
     },
   });
 
@@ -88,11 +118,17 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
       setFormData({
         name: user.profileData.name || "",
         age: user.profileData.age || undefined,
-        bio: user.profileData.bio || "",
         location: user.profileData.location || "",
         phoneNumber: user.profileData.phoneNumber || "",
         dateOfBirth: user.profileData.dateOfBirth || "",
         gender: user.profileData.gender || "",
+        phone: (user.profileData as any).phone || "", // NEW
+        creatorTypeInterests: (user.profileData as any).creatorTypeInterests || [], // NEW
+        interestSubcategories: (user.profileData as any).interestSubcategories || { // NEW
+          athletes: [],
+          musicians: [],
+          content_creators: []
+        },
         interests: user.profileData.interests || [],
         socialLinks: {
           twitter: user.profileData.socialLinks?.twitter || "",
@@ -103,8 +139,8 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
         preferences: {
           emailNotifications: user.profileData.preferences?.emailNotifications ?? true,
           pushNotifications: user.profileData.preferences?.pushNotifications ?? true,
-          marketingEmails: user.profileData.preferences?.marketingEmails ?? false,
-          smsNotifications: user.profileData.preferences?.smsNotifications ?? false,
+          marketingEmails: user.profileData.preferences?.marketingEmails ?? true,
+          smsNotifications: user.profileData.preferences?.smsNotifications ?? true,
         },
       });
     }
@@ -186,6 +222,50 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
         : [...(prev.interests || []), interest]
     }));
   };
+  
+  // NEW: Handle creator type interests (marketing)
+  const toggleCreatorTypeInterest = (type: CreatorTypeInterest) => {
+    setFormData(prev => {
+      const currentInterests = prev.creatorTypeInterests || [];
+      const isSelected = currentInterests.includes(type);
+      
+      if (isSelected) {
+        // Remove type and clear its subcategories
+        return {
+          ...prev,
+          creatorTypeInterests: currentInterests.filter(t => t !== type),
+          interestSubcategories: {
+            ...prev.interestSubcategories,
+            [type]: []
+          }
+        };
+      } else {
+        // Add type
+        return {
+          ...prev,
+          creatorTypeInterests: [...currentInterests, type]
+        };
+      }
+    });
+  };
+  
+  // NEW: Handle subcategory selection
+  const toggleSubcategory = (creatorType: CreatorTypeInterest, subcategory: string) => {
+    setFormData(prev => {
+      const currentSubs = prev.interestSubcategories?.[creatorType] || [];
+      const isSelected = currentSubs.includes(subcategory);
+      
+      return {
+        ...prev,
+        interestSubcategories: {
+          ...prev.interestSubcategories,
+          [creatorType]: isSelected
+            ? currentSubs.filter(s => s !== subcategory)
+            : [...currentSubs, subcategory]
+        }
+      };
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,18 +338,6 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="bio" className="text-gray-300">Bio</Label>
-              <Textarea
-                id="bio"
-                value={formData.bio}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
-                placeholder="Tell us about yourself..."
-                rows={3}
-              />
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="location" className="text-gray-300">
@@ -284,100 +352,91 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
                   placeholder="City, State"
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="phoneNumber" className="text-gray-300">
-                  <Phone className="inline mr-1 h-4 w-4" />
-                  Phone Number
-                </Label>
-                <Input
-                  id="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="(555) 123-4567"
-                />
-              </div>
             </div>
           </div>
 
           <Separator className="bg-gray-700" />
 
-          {/* Interests */}
+          {/* Marketing & Creator Preferences - NEW */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Interests</h3>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: "musicians", label: "Musicians" },
-                { key: "athletes", label: "Athletes" },
-                { key: "content_creators", label: "Content Creators" },
-              ].map((interest) => (
-                <Badge
-                  key={interest.key}
-                  variant={formData.interests?.includes(interest.key as any) ? "default" : "outline"}
-                  className={`cursor-pointer ${
-                    formData.interests?.includes(interest.key as any)
-                      ? "bg-brand-primary text-white"
-                      : "border-gray-600 text-gray-300 hover:bg-gray-800"
-                  }`}
-                  onClick={() => toggleInterest(interest.key as "musicians" | "athletes" | "content_creators")}
-                >
-                  {interest.label}
-                </Badge>
-              ))}
+            <h3 className="text-lg font-semibold text-white flex items-center">
+              <Mail className="mr-2 h-5 w-5" />
+              Marketing & Creator Preferences
+            </h3>
+            <p className="text-sm text-gray-400">Help us connect you with the right creators and campaigns</p>
+            
+            {/* Phone Number for SMS Marketing with International Format */}
+            <div>
+              <Label htmlFor="phone" className="text-gray-300">
+                <Phone className="inline mr-1 h-4 w-4" />
+                Phone Number (SMS Marketing)
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white"
+                placeholder="+1 (555) 123-4567"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Include country code (e.g., +1 for USA, +44 for UK, +91 for India)
+              </p>
             </div>
-          </div>
-
-          <Separator className="bg-gray-700" />
-
-          {/* Social Links */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Social Media Links</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="twitter" className="text-gray-300">Twitter/X</Label>
-                <Input
-                  id="twitter"
-                  value={formData.socialLinks?.twitter}
-                  onChange={(e) => handleSocialLinkChange('twitter', e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="@username"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="instagram" className="text-gray-300">Instagram</Label>
-                <Input
-                  id="instagram"
-                  value={formData.socialLinks?.instagram}
-                  onChange={(e) => handleSocialLinkChange('instagram', e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="@username"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="tiktok" className="text-gray-300">TikTok</Label>
-                <Input
-                  id="tiktok"
-                  value={formData.socialLinks?.tiktok}
-                  onChange={(e) => handleSocialLinkChange('tiktok', e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="@username"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="youtube" className="text-gray-300">YouTube</Label>
-                <Input
-                  id="youtube"
-                  value={formData.socialLinks?.youtube}
-                  onChange={(e) => handleSocialLinkChange('youtube', e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="Channel name"
-                />
+            
+            {/* Creator Type Interests */}
+            <div>
+              <Label className="text-gray-300 mb-2 block">What type of creators do you follow?</Label>
+              <div className="flex flex-wrap gap-2">
+                {CREATOR_TYPE_OPTIONS.map(option => (
+                  <Badge
+                    key={option.value}
+                    variant={formData.creatorTypeInterests?.includes(option.value) ? "default" : "outline"}
+                    className={`cursor-pointer ${
+                      formData.creatorTypeInterests?.includes(option.value)
+                        ? "bg-brand-primary hover:bg-brand-primary/80"
+                        : "bg-gray-800 hover:bg-gray-700"
+                    }`}
+                    onClick={() => toggleCreatorTypeInterest(option.value)}
+                  >
+                    {option.value === "athletes" && <Users className="mr-1 h-3 w-3" />}
+                    {option.value === "musicians" && <Music className="mr-1 h-3 w-3" />}
+                    {option.value === "content_creators" && <Video className="mr-1 h-3 w-3" />}
+                    {option.label}
+                  </Badge>
+                ))}
               </div>
             </div>
+            
+            {/* Dynamic Subcategories */}
+            {formData.creatorTypeInterests?.map(creatorType => {
+              const subcategoryOptions = getSubcategoryOptions(creatorType);
+              const selectedSubs = formData.interestSubcategories?.[creatorType] || [];
+              
+              return (
+                <div key={creatorType} className="pl-4 border-l-2 border-brand-primary/30">
+                  <Label className="text-gray-300 mb-2 block">
+                    {getCreatorTypeLabel(creatorType)} - What interests you?
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {subcategoryOptions.map(sub => (
+                      <Badge
+                        key={sub}
+                        variant={selectedSubs.includes(sub) ? "default" : "outline"}
+                        className={`cursor-pointer text-xs ${
+                          selectedSubs.includes(sub)
+                            ? "bg-brand-secondary hover:bg-brand-secondary/80"
+                            : "bg-gray-800 hover:bg-gray-700"
+                        }`}
+                        onClick={() => toggleSubcategory(creatorType, sub)}
+                      >
+                        {sub}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <Separator className="bg-gray-700" />

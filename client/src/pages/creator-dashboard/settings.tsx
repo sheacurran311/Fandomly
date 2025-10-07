@@ -18,11 +18,15 @@ import {
   Palette,
   Key,
   Trash2,
-  Save
+  Save,
+  BadgeCheck
 } from "lucide-react";
+import { useCreatorVerification } from "@/hooks/useCreatorVerification";
+import { CreatorVerificationProgress } from "@/components/creator/CreatorVerificationProgress";
 
 export default function CreatorSettings() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { creator, verificationData, isLoading: verificationLoading } = useCreatorVerification();
   const [settings, setSettings] = useState({
     // Profile Settings
     displayName: user?.username || "",
@@ -90,12 +94,8 @@ export default function CreatorSettings() {
           </div>
 
           <div className="max-w-4xl">
-            <Tabs defaultValue="profile" className="space-y-6">
+            <Tabs defaultValue="notifications" className="space-y-6">
               <TabsList className="bg-white/10 border-white/20">
-                <TabsTrigger value="profile" className="data-[state=active]:bg-brand-primary">
-                  <User className="h-4 w-4 mr-2" />
-                  Profile
-                </TabsTrigger>
                 <TabsTrigger value="notifications" className="data-[state=active]:bg-brand-primary">
                   <Bell className="h-4 w-4 mr-2" />
                   Notifications
@@ -113,51 +113,7 @@ export default function CreatorSettings() {
                   Billing
                 </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="profile" className="space-y-6">
-                <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-                  <CardHeader>
-                    <CardTitle className="text-white">Profile Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="displayName" className="text-gray-300">Display Name</Label>
-                        <Input
-                          id="displayName"
-                          value={settings.displayName}
-                          onChange={(e) => setSettings(prev => ({ ...prev, displayName: e.target.value }))}
-                          className="bg-white/10 border-white/20 text-white"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="email" className="text-gray-300">Email Address</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={settings.email}
-                          onChange={(e) => setSettings(prev => ({ ...prev, email: e.target.value }))}
-                          className="bg-white/10 border-white/20 text-white"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="bio" className="text-gray-300">Bio</Label>
-                      <textarea
-                        id="bio"
-                        value={settings.bio}
-                        onChange={(e) => setSettings(prev => ({ ...prev, bio: e.target.value }))}
-                        className="w-full p-3 bg-white/10 border border-white/20 text-white rounded-lg resize-none h-24"
-                        placeholder="Tell your fans about yourself..."
-                      />
-                    </div>
-                    <Button onClick={handleSave} className="bg-brand-primary hover:bg-brand-primary/80">
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+              
 
               <TabsContent value="notifications" className="space-y-6">
                 <Card className="bg-white/5 backdrop-blur-lg border border-white/10">

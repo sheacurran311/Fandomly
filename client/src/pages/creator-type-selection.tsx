@@ -20,11 +20,11 @@ const creatorTypes = [
     description: 'Perfect for college athletes, Olympians, and professional sports figures',
     examples: 'Football players, Basketball stars, Olympic medalists',
     features: [
-      'NIL compliance monitoring',
-      'Sport-specific analytics',
-      'University integration',
+      'Proprietary NIL Valuation Calculator',
+      'Access to Sponsor Directory',
+      'Physical & NFT / Digital Collectibles Support',
       'Performance tracking',
-      'Sponsor management'
+      'Fan engagement campaigns'
     ],
     color: 'from-blue-500 to-blue-600',
     popular: true
@@ -36,11 +36,11 @@ const creatorTypes = [
     description: 'For independent artists, bands, and music creators building their fanbase',
     examples: 'Solo artists, Bands, Music producers',
     features: [
-      'Music catalog integration',
-      'Streaming platform sync',
-      'Fan engagement tools',
-      'Concert promotion',
-      'Merchandise campaigns'
+      'Music catalog integrations (Spotify, Apple Music, SoundCloud)',
+      'Streaming platform sync across all major platforms',
+      'Token-Gated Fan Experiences',
+      'Ticket Marketplace Integrations (Ticketmaster Affiliate)',
+      'Physical & NFT / Digital Collectibles'
     ],
     color: 'from-purple-500 to-purple-600',
     popular: false
@@ -52,11 +52,11 @@ const creatorTypes = [
     description: 'For influencers, podcasters, and digital content creators',
     examples: 'YouTubers, TikTokers, Podcasters, Influencers',
     features: [
-      'Multi-platform tracking',
-      'Content performance analytics',
-      'Brand partnership tools',
-      'Audience segmentation',
-      'Creator monetization'
+      'Multi-platform analytics dashboard',
+      'Content performance & engagement tracking',
+      'Brand partnership management tools',
+      'Advanced audience segmentation',
+      'Creator monetization & revenue tracking'
     ],
     color: 'from-green-500 to-green-600',
     popular: false
@@ -65,10 +65,26 @@ const creatorTypes = [
 
 export default function CreatorTypeSelection() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, dynamicUser, isLoading } = useAuth();
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
-  if (!user) {
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
+          <CardContent className="text-center p-6">
+            <h2 className="text-xl font-bold text-white mb-4">Loading...</h2>
+            <p className="text-gray-300">Please wait while we load your profile.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Check for Dynamic user (wallet connected) rather than backend user data
+  // This allows newly registered users to proceed before the query refetches
+  if (!dynamicUser) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">

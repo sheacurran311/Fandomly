@@ -2,6 +2,11 @@ import { fetchApi } from "@/lib/queryClient";
 
 type UserType = "creator" | "fan";
 
+// Module-level guards to prevent duplicate flows
+let twitterLoginInFlight = false;
+let twitterPopup: Window | null = null;
+let _lastAuthUrlBuild = 0;
+
 export interface TwitterUserInfo {
   id: string;
   username: string;
@@ -63,7 +68,6 @@ function getEnvScopes(): string {
 function getClientId(): string {
   const clientId = import.meta.env.VITE_TWITTER_CLIENT_ID as string | undefined;
   if (!clientId) throw new Error("VITE_TWITTER_CLIENT_ID is not set");
-  console.log(`[Twitter] CLIENT_ID fingerprint: ${clientId.substring(0, 6)} ... ${clientId.substring(clientId.length - 6)}`);
   return clientId;
 }
 
@@ -101,17 +105,37 @@ function getDynamicUserId(): string | null {
 }
 
 export class TwitterSDKManager {
-  static getAuthUrl(userType: UserType, state?: string, forcedRedirectUri?: string): string {
+  static async getAuthUrl(userType: UserType, state?: string, forcedRedirectUri?: string): Promise<string> {
+    // Prevent duplicate calls within 200ms
+    const now = Date.now();
+    if (now - _lastAuthUrlBuild < 200) {
+      await new Promise(r => setTimeout(r, 220));
+    }
+    _lastAuthUrlBuild = Date.now();
+
     const clientId = getClientId();
     const redirectUri = forcedRedirectUri || getEnvRedirectUri();
     const scope = "users.read tweet.read tweet.write offline.access";
+
+    // 1) Create verifier & challenge for PKCE
+    const verifier = generateRandomString(64);
+    const challenge = await generateCodeChallenge(verifier);
+
+    // 2) Persist verifier keyed by state (10-15 min TTL)
+    const st = state || `twitter_${userType}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const map = JSON.parse(localStorage.getItem("twitter_pkce_map") || "{}");
+    map[st] = { verifier, ts: Date.now(), userType };
+    localStorage.setItem("twitter_pkce_map", JSON.stringify(map));
+    localStorage.setItem("twitter_oauth_state", st);
 
     const params = new URLSearchParams();
     params.set("response_type", "code");
     params.set("client_id", clientId);
     params.set("redirect_uri", redirectUri);
     params.set("scope", scope);
-    params.set("state", state || `twitter_${userType}_${Date.now()}`);
+    params.set("state", st);
+    params.set("code_challenge", challenge);
+    params.set("code_challenge_method", "S256");
 
     // Force %20 encoding for spaces instead of + (Twitter prefers this)
     const url = `https://twitter.com/i/oauth2/authorize?${params.toString().replace(/\+/g, '%20')}`;
@@ -124,6 +148,11 @@ export class TwitterSDKManager {
   }
 
   static async secureLogin(userType: UserType, dynamicUserIdParam?: string): Promise<TwitterLoginResult> {
+    if (twitterLoginInFlight) {
+      return { success: false, error: "Twitter auth already in progress" };
+    }
+    twitterLoginInFlight = true;
+    
     try {
       // Clear any stale state first (do NOT clear twitter_dynamic_user_id preemptively)
       try {
@@ -158,56 +187,76 @@ export class TwitterSDKManager {
         console.warn('[Twitter] No Dynamic user ID available - connection may fail');
       }
 
-      const redirectUri = "https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/x-callback";
+      const redirectUri = getEnvRedirectUri();
       console.log("[Twitter] Using redirectUri:", redirectUri);
-      const authUrl = this.getAuthUrl(userType, stateValue, redirectUri);
-      console.log(`[Twitter] FINAL redirectUri: ${redirectUri}`);
-      console.log(`[Twitter] FINAL authorize URL: ${authUrl}`);
+      const authUrl = await this.getAuthUrl(userType, stateValue, redirectUri);
 
       return new Promise<TwitterLoginResult>((resolve) => {
-        const popup = window.open(
+        try { twitterPopup?.close(); } catch {}
+        twitterPopup = window.open(
           authUrl,
           "twitter-oauth",
           "width=600,height=700,scrollbars=yes,resizable=yes"
         );
-
-        if (!popup) {
+        if (!twitterPopup) {
+          twitterLoginInFlight = false;
           resolve({ success: false, error: "Popup blocked. Please allow popups and try again." });
           return;
         }
 
-        const pollTimer = setInterval(() => {
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener("message", onMsg); } catch {}
+          try { twitterPopup?.close(); } catch {}
+          twitterPopup = null;
+          twitterLoginInFlight = false;
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type === 'twitter-pkce-request') {
+            try {
+              const reqState = event.data?.state as string | undefined;
+              let verifier: string | null = null;
+              try {
+                const rawMap = localStorage.getItem('twitter_pkce_map');
+                const map: Record<string, any> = rawMap ? JSON.parse(rawMap) : {};
+                verifier = (reqState && map[reqState]?.verifier) || null;
+              } catch {}
+              (event.source as Window | null)?.postMessage({ type: 'twitter-pkce-response', state: reqState, verifier }, '*');
+            } catch {}
+            return;
+          }
+          if (event.data?.type !== "twitter-oauth-result") return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result as TwitterLoginResult);
+        };
+        window.addEventListener("message", onMsg, { once: true });
+
+        const poll = setInterval(() => {
           try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              const callbackData = (window as any).twitterCallbackData as TwitterLoginResult | undefined;
-              if (callbackData) {
-                delete (window as any).twitterCallbackData;
-                resolve(callbackData);
-              } else {
-                resolve({ success: false, error: "Twitter authorization was cancelled or failed" });
+            if (!twitterPopup || twitterPopup.closed) {
+              clearInterval(poll);
+              if (!settled) {
+                settled = true;
+                cleanup();
+                const cb = (window as any).twitterCallbackData as TwitterLoginResult | undefined;
+                if (cb) {
+                  delete (window as any).twitterCallbackData;
+                  resolve(cb);
+                } else {
+                  resolve({ success: false, error: "Twitter authorization was cancelled or failed" });
+                }
               }
             }
           } catch {}
-        }, 800);
-
-        const messageListener = (event: MessageEvent) => {
-          if (event.data?.type === "twitter-oauth-result") {
-            clearInterval(pollTimer);
-            window.removeEventListener("message", messageListener);
-            try { popup.close(); } catch {}
-            try { localStorage.removeItem('twitter_oauth_state'); } catch {}
-            try { (window as any).__twitterState = null; } catch {}
-            // Do NOT clear parent's __dynamicUserId; Dynamic SDK owns auth state
-            // Debug log for parent
-            try { console.log('[Twitter] Received oauth result from popup:', event.data?.result); } catch {}
-            resolve(event.data.result as TwitterLoginResult);
-          }
-        };
-        window.addEventListener("message", messageListener);
+        }, 600);
       });
-    } catch (error: any) {
-      return { success: false, error: error?.message || "Twitter login failed" };
+    } catch (e: any) {
+      twitterLoginInFlight = false;
+      return { success: false, error: e?.message || "Twitter login failed" };
     }
   }
 
@@ -226,23 +275,101 @@ export class TwitterSDKManager {
         return { success: false, error: "Missing code/state in callback" };
       }
 
+      // Idempotency lock per state to prevent double processing
+      const cbLockKey = state ? `tw_cb_lock_${state}` : undefined;
+      if (cbLockKey && sessionStorage.getItem(cbLockKey)) {
+        console.warn('[Twitter] Duplicate callback run blocked');
+        // Try to reuse previously stored successful result if available
+        try {
+          if (state) {
+            const prev = sessionStorage.getItem(`tw_cb_result_${state}`);
+            if (prev) {
+              return JSON.parse(prev) as TwitterLoginResult;
+            }
+          }
+        } catch {}
+        try {
+          const openerResult = (window as any).opener?.twitterCallbackData as TwitterLoginResult | undefined;
+          if (openerResult) return openerResult;
+        } catch {}
+        return { success: false, error: 'Callback already processed' };
+      }
+      if (cbLockKey) sessionStorage.setItem(cbLockKey, '1');
+
+      // Get PKCE verifier from state mapping (try multiple sources)
+      const st = state!;
+      let verifier: string | null = null;
+      
+      // Try current window localStorage first
+      try {
+        const pkceMap = JSON.parse(localStorage.getItem("twitter_pkce_map") || "{}");
+        verifier = pkceMap?.[st]?.verifier || null;
+      } catch {}
+      
+      // Try opener window localStorage if not found
+      if (!verifier && (window as any).opener) {
+        try {
+          const openerPkceMap = JSON.parse((window as any).opener.localStorage?.getItem("twitter_pkce_map") || "{}");
+          verifier = openerPkceMap?.[st]?.verifier || null;
+        } catch {}
+      }
+      
+      // Try requesting verifier from opener via postMessage
+      if (!verifier && (window as any).opener) {
+        try {
+          verifier = await new Promise<string | null>((resolve) => {
+            const timeout = setTimeout(() => {
+              window.removeEventListener('message', onResponse);
+              resolve(null);
+            }, 8000);
+            function onResponse(ev: MessageEvent) {
+              if (ev.data?.type === 'twitter-pkce-response' && ev.data?.state === st) {
+                clearTimeout(timeout);
+                window.removeEventListener('message', onResponse);
+                resolve(ev.data?.verifier || null);
+              }
+            }
+            window.addEventListener('message', onResponse);
+            (window as any).opener.postMessage({ type: 'twitter-pkce-request', state: st }, '*');
+          });
+        } catch {}
+      }
+      
+      if (!verifier) {
+        try { console.error('[Twitter] Missing PKCE verifier for state:', st, 'tried all sources'); } catch {}
+        return { success: false, error: "Missing PKCE verifier" };
+      }
+
       try { console.log('[Twitter] Callback detected, exchanging code for token...'); } catch {}
       console.log(`[Twitter] About to call exchangeCodeForToken with:`, {
         code: code.substring(0, 10) + '...',
-        state
+        state,
+        hasVerifier: !!verifier
       });
 
-      const token = await this.exchangeCodeForToken(code);
+      const token = await this.exchangeCodeForToken(code, verifier);
       
       console.log(`[Twitter] exchangeCodeForToken returned:`, token ? `token (${token.substring(0, 10)}...)` : 'null');
       
-      // Clean up state and pkce map entries AFTER token exchange
+      // Clean up state and pkce map entries AFTER token exchange success
       try { localStorage.removeItem('twitter_oauth_state'); } catch {}
       try { localStorage.removeItem('twitter_dynamic_user_id'); } catch {}
       try { if ((window as any).opener) (window as any).opener.localStorage?.removeItem('twitter_oauth_state'); } catch {}
       try { if ((window as any).opener) (window as any).opener.localStorage?.removeItem('twitter_dynamic_user_id'); } catch {}
       try { if ((window as any).opener) (window as any).opener.__twitterState = null; } catch {}
       // Do NOT clear parent's __dynamicUserId; Dynamic SDK owns auth state
+
+      // Clean up PKCE mapping after exchange
+      try {
+        const rawMap = localStorage.getItem('twitter_pkce_map');
+        const map: Record<string, any> = rawMap ? JSON.parse(rawMap) : {};
+        if (state && map[state]) { delete map[state]; localStorage.setItem('twitter_pkce_map', JSON.stringify(map)); }
+      } catch {}
+      try {
+        const openerRawMap = (window as any).opener?.localStorage?.getItem('twitter_pkce_map');
+        const openerMap: Record<string, any> = openerRawMap ? JSON.parse(openerRawMap) : {};
+        if (state && openerMap[state]) { delete openerMap[state]; (window as any).opener?.localStorage?.setItem('twitter_pkce_map', JSON.stringify(openerMap)); }
+      } catch {}
 
       // No PKCE mapping to clear for confidential clients
       
@@ -261,6 +388,9 @@ export class TwitterSDKManager {
         state,
         userType,
       };
+
+      // Persist result for reuse if a second callback run occurs
+      try { if (state) sessionStorage.setItem(`tw_cb_result_${state}`, JSON.stringify(result)); } catch {}
 
       try {
         const dynamicUserId = getDynamicUserId();
@@ -293,65 +423,27 @@ export class TwitterSDKManager {
   // Track used codes to prevent reuse
   private static usedCodes = new Set<string>();
 
-  static async exchangeCodeForToken(code: string): Promise<string | null> {
-    try {
-      const timestamp = new Date().toISOString();
-      console.log(`[Twitter] ${timestamp} exchangeCodeForToken called with code: ${code.substring(0, 10)}...`);
-      console.trace('[Twitter] exchangeCodeForToken call stack');
-      
-      // Prevent duplicate use of the same authorization code
-      if (TwitterSDKManager.usedCodes.has(code)) {
-        console.warn(`[Twitter] Code already used: ${code.substring(0, 10)}... - blocking duplicate call`);
-        return null;
-      }
-      TwitterSDKManager.usedCodes.add(code);
-      
-      const redirectUri = "https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/x-callback";
-      const dynamicUserId = getDynamicUserId();
-      
-      console.log(`[Twitter] Request params: redirectUri=${redirectUri}, dynamicUserId=${dynamicUserId ? 'present' : 'missing'}`);
-      console.log(`[Twitter] Dynamic user ID sources check:`, {
-        fromWindow: (window as any).__dynamicUserId || null,
-        fromStorage: localStorage.getItem("twitter_dynamic_user_id") || null,
-        fromOpener: ((window as any).opener && (window as any).opener.__dynamicUserId) || null,
-        fromOpenerStorage: ((window as any).opener && (window as any).opener.localStorage?.getItem("twitter_dynamic_user_id")) || null,
-        final: dynamicUserId
-      });
+  static async exchangeCodeForToken(code: string, codeVerifier: string): Promise<string | null> {
+    const lockKey = `tw_code_lock_${code.slice(0,24)}`;
+    if (sessionStorage.getItem(lockKey)) {
+      console.warn("[Twitter] Duplicate code exchange blocked by session lock");
+      return null;
+    }
+    sessionStorage.setItem(lockKey, "1");
 
-      console.log(`[Twitter] Making token exchange request to server...`);
+    try {
+      const redirectUri = getEnvRedirectUri();
+      const dynamicUserId = getDynamicUserId();
       
       const data = await fetchApi("/api/social/twitter/token", {
         method: "POST",
-        body: JSON.stringify({ code, redirect_uri: redirectUri, dynamicUserId })
+        body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier, dynamicUserId })
       });
-
-      console.log(`[Twitter] Token exchange API response:`, data);
-      console.log(`[Twitter] Response type:`, typeof data);
-      console.log(`[Twitter] Response keys:`, Object.keys(data || {}));
-      console.log(`[Twitter] access_token exists:`, !!data?.access_token);
-      console.log(`[Twitter] Raw response for inspection:`, JSON.stringify(data));
-
-      // Backend returns the token response directly (not wrapped)
-      // The server route does: return res.json(result.body);
-      const accessToken = data?.access_token;
-      const refreshToken = data?.refresh_token;
       
-      if (accessToken) {
-        console.log(`[Twitter] Successfully received access token: ${accessToken.substring(0, 10)}...`);
-        console.log(`[Twitter] Refresh token present: ${!!refreshToken}`);
-        return accessToken;
-      }
-      
-      console.error(`[Twitter] No access token in response. Full response:`, data);
+      return data?.access_token ?? null;
+    } catch (e) {
+      console.error("[Twitter] Token exchange error:", e);
       return null;
-    } catch (error) {
-      console.error("[Twitter] Token exchange error:", error);
-      return null;
-    } finally {
-      // Clean up used codes after 5 minutes to prevent memory leaks
-      setTimeout(() => {
-        TwitterSDKManager.usedCodes.delete(code);
-      }, 5 * 60 * 1000);
     }
   }
 

@@ -156,7 +156,7 @@ export default function CreatorFacebookProfileImport({ className }: CreatorFaceb
     mutationFn: async (pageData: FacebookPageData) => {
       if (!user) throw new Error("No user found");
       
-      return apiRequest("/api/auth/facebook-business-import", "POST", {
+      return apiRequest("POST", "/api/auth/facebook-business-import", {
         pageData: {
           id: pageData.id,
           name: pageData.name,

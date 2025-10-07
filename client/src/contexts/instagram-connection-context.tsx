@@ -78,32 +78,38 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
 
     (window as any).handleInstagramConnectionResult = instagramStatusCallback;
     
-    // Load saved connection data
-    const loadSavedConnection = () => {
+    // Load saved connection data from database
+    const loadSavedConnection = async () => {
       try {
-        const savedData = localStorage.getItem(`instagram_connection_${user.id}`);
-        if (savedData) {
-          const parsed = JSON.parse(savedData);
+        const { getSocialConnection } = await import('@/lib/social-connection-api');
+        const { connected, connection } = await getSocialConnection('instagram');
+        
+        if (connected && connection) {
           setState(prev => ({
             ...prev,
             isConnected: true,
-            userInfo: parsed.userInfo,
-            businessAccountId: parsed.businessAccountId,
-            accessToken: parsed.accessToken,
+            userInfo: {
+              id: connection.platformUserId || '',
+              username: connection.platformUsername || '',
+              name: connection.platformDisplayName || '',
+              profile_picture_url: connection.profileData?.profilePictureUrl,
+              followers_count: connection.profileData?.followers,
+              media_count: connection.profileData?.following,
+            },
+            businessAccountId: connection.platformUserId || '',
+            accessToken: '', // Don't store token in state for security
           }));
-          console.log('[Instagram] Loaded saved connection for user:', parsed.userInfo?.username);
+          console.log('[Instagram] Loaded saved connection for user:', connection.platformUsername);
         }
       } catch (error) {
         console.error('[Instagram] Error loading saved connection:', error);
-        // Clear invalid data
-        localStorage.removeItem(`instagram_connection_${user.id}`);
       }
     };
 
     loadSavedConnection();
   }, [user]);
 
-  const saveConnection = useCallback((data: {
+  const saveConnection = useCallback(async (data: {
     userInfo: InstagramUser;
     businessAccountId: string;
     accessToken: string;
@@ -111,17 +117,32 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     if (!user) return;
 
     try {
-      localStorage.setItem(`instagram_connection_${user.id}`, JSON.stringify(data));
+      const { saveSocialConnection } = await import('@/lib/social-connection-api');
+      await saveSocialConnection({
+        platform: 'instagram',
+        platformUserId: data.userInfo.id,
+        platformUsername: data.userInfo.username,
+        platformDisplayName: data.userInfo.name,
+        accessToken: data.accessToken,
+        profileData: {
+          profilePictureUrl: data.userInfo.profile_picture_url,
+          followers: data.userInfo.followers_count,
+          following: data.userInfo.follows_count,
+        }
+      });
+      console.log('[Instagram] Connection saved to database');
     } catch (error) {
       console.error('[Instagram] Error saving connection:', error);
     }
   }, [user]);
 
-  const clearConnection = useCallback(() => {
+  const clearConnection = useCallback(async () => {
     if (!user) return;
 
     try {
-      localStorage.removeItem(`instagram_connection_${user.id}`);
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('instagram');
+      console.log('[Instagram] Connection cleared from database');
     } catch (error) {
       console.error('[Instagram] Error clearing connection:', error);
     }

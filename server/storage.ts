@@ -2,7 +2,7 @@ import {
   users, creators, loyaltyPrograms, rewards, fanPrograms, 
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
-  tasks, taskAssignments, taskTemplates,
+  tasks, taskAssignments, taskTemplates, taskCompletions, rewardDistributions,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -11,17 +11,20 @@ import {
   type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership,
   type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
   type Task, type InsertTask, type TaskTemplate, type InsertTaskTemplate, type TaskAssignment, type InsertTaskAssignment,
+  type TaskCompletion, type InsertTaskCompletion, type RewardDistribution, type InsertRewardDistribution,
   insertSocialCampaignTaskSchema,
   creatorFacebookPages
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { encryptToken, decryptToken } from "./crypto-utils";
 
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByDynamicId(dynamicUserId: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
   getUsersByFacebookId(facebookId: string): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   createUser(user: any): Promise<User>;
@@ -113,10 +116,12 @@ export interface IStorage {
 
   // Task operations (new workflow)
   getTasks(creatorId: string, tenantId?: string): Promise<Task[]>;
+  getTasksByTenantId(tenantId: string): Promise<Task[]>;
+  getAllTasks(): Promise<Task[]>;
   getTask(id: string, tenantId?: string): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
-  updateTask(id: string, updates: Partial<InsertTask>, tenantId: string): Promise<Task | undefined>;
-  deleteTask(id: string, tenantId: string): Promise<void>;
+  updateTask(id: string, updates: Partial<InsertTask>, tenantId?: string): Promise<Task | undefined>;
+  deleteTask(id: string, tenantId?: string): Promise<void>;
   
   // Task Template operations
   getTaskTemplates(tenantId?: string): Promise<TaskTemplate[]>;
@@ -130,6 +135,18 @@ export interface IStorage {
   getCampaignTasks(campaignId: string): Promise<Task[]>;
   assignTaskToCampaign(taskId: string, campaignId: string, tenantId: string): Promise<TaskAssignment>;
   unassignTaskFromCampaign(taskId: string, campaignId: string, tenantId: string): Promise<void>;
+  
+  // Task Completion operations
+  getTaskCompletion(id: string): Promise<TaskCompletion | undefined>;
+  getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined>;
+  getUserTaskCompletions(userId: string, tenantId?: string): Promise<TaskCompletion[]>;
+  getTaskCompletions(taskId: string): Promise<TaskCompletion[]>;
+  createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion>;
+  updateTaskCompletion(id: string, updates: Partial<InsertTaskCompletion>): Promise<TaskCompletion | undefined>;
+  
+  // Reward Distribution operations
+  getUserRewardDistributions(userId: string, tenantId?: string): Promise<RewardDistribution[]>;
+  createRewardDistribution(distribution: InsertRewardDistribution): Promise<RewardDistribution>;
   
   // Campaign Publishing operations
   publishCampaign(campaignId: string, tenantId: string): Promise<Campaign | undefined>;
@@ -166,6 +183,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByDynamicId(dynamicUserId: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.dynamicUserId, dynamicUserId));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
   }
 
@@ -251,8 +273,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCreator(id: string, updates: Partial<InsertCreator>): Promise<Creator> {
-    const [creator] = await db.update(creators).set(updates as any).where(eq(creators.id, id)).returning();
-    return creator;
+    const [updatedCreator] = await db.update(creators).set(updates as any).where(eq(creators.id, id)).returning();
+    
+    // Auto-check verification status after update
+    if (updatedCreator) {
+      try {
+        const { calculateCreatorVerification } = await import('@shared/creatorVerificationSchema');
+        const creatorType = updatedCreator.category as 'athlete' | 'musician' | 'content_creator';
+        const verificationData = calculateCreatorVerification(updatedCreator, creatorType);
+        
+        // Auto-verify if profile is complete
+        const shouldVerify = verificationData.profileComplete && !updatedCreator.isVerified;
+        const shouldUnverify = !verificationData.profileComplete && updatedCreator.isVerified;
+        
+        if (shouldVerify || shouldUnverify || JSON.stringify(verificationData) !== JSON.stringify(updatedCreator.verificationData)) {
+          const [finalCreator] = await db.update(creators)
+            .set({
+              isVerified: shouldVerify ? true : shouldUnverify ? false : updatedCreator.isVerified,
+              verificationData: verificationData as any
+            })
+            .where(eq(creators.id, id))
+            .returning();
+          
+          if (shouldVerify) {
+            console.log(`✅ Auto-verified creator: ${updatedCreator.displayName} (${id})`);
+          } else if (shouldUnverify) {
+            console.log(`⚠️  Removed verification from creator: ${updatedCreator.displayName} (${id})`);
+          }
+          
+          return finalCreator;
+        }
+      } catch (verificationError) {
+        console.error(`⚠️  Auto-verification check failed for creator ${id}:`, verificationError);
+        // Continue without verification check - don't fail the update
+      }
+    }
+    
+    return updatedCreator;
   }
 
   async getAllCreators(): Promise<Creator[]> {
@@ -717,6 +774,16 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tasks).where(conditions).orderBy(desc(tasks.createdAt));
   }
 
+  async getTasksByTenantId(tenantId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(eq(tasks.tenantId, tenantId))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async getAllTasks(): Promise<Task[]> {
+    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  }
+
   async getTask(id: string, tenantId?: string): Promise<Task | undefined> {
     const conditions = tenantId 
       ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
@@ -726,20 +793,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTask(task: InsertTask): Promise<Task> {
-    const [newTask] = await db.insert(tasks).values(task).returning();
+    const taskData = {
+      ...task,
+      hashtags: task.hashtags ? Array.from(task.hashtags as string[]) : null
+    };
+    const [newTask] = await db.insert(tasks).values(taskData as any).returning();
     return newTask;
   }
 
-  async updateTask(id: string, updates: Partial<InsertTask>, tenantId: string): Promise<Task | undefined> {
+  async updateTask(id: string, updates: Partial<InsertTask>, tenantId?: string): Promise<Task | undefined> {
+    const updateData = {
+      ...updates,
+      hashtags: updates.hashtags ? Array.from(updates.hashtags as string[]) : updates.hashtags,
+      updatedAt: new Date()
+    };
+    
+    const conditions = tenantId 
+      ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
+      : eq(tasks.id, id);
+    
     const [task] = await db.update(tasks)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)))
+      .set(updateData as any)
+      .where(conditions)
       .returning();
     return task;
   }
 
-  async deleteTask(id: string, tenantId: string): Promise<void> {
-    await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)));
+  async deleteTask(id: string, tenantId?: string): Promise<void> {
+    const conditions = tenantId 
+      ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
+      : eq(tasks.id, id);
+    await db.delete(tasks).where(conditions);
   }
 
   // Task Template operations
@@ -836,6 +920,74 @@ export class DatabaseStorage implements IStorage {
         eq(taskAssignments.campaignId, campaignId),
         eq(taskAssignments.tenantId, tenantId)
       ));
+  }
+
+  // Task Completion operations
+  async getTaskCompletion(id: string): Promise<TaskCompletion | undefined> {
+    const [completion] = await db.select().from(taskCompletions).where(eq(taskCompletions.id, id));
+    return completion;
+  }
+
+  async getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined> {
+    const [completion] = await db.select().from(taskCompletions)
+      .where(and(
+        eq(taskCompletions.userId, userId),
+        eq(taskCompletions.taskId, taskId)
+      ));
+    return completion;
+  }
+
+  async getUserTaskCompletions(userId: string, tenantId?: string): Promise<TaskCompletion[]> {
+    const conditions = tenantId 
+      ? and(eq(taskCompletions.userId, userId), eq(taskCompletions.tenantId, tenantId))
+      : eq(taskCompletions.userId, userId);
+    return await db.select().from(taskCompletions)
+      .where(conditions)
+      .orderBy(desc(taskCompletions.lastActivityAt));
+  }
+
+  async getTaskCompletions(taskId: string): Promise<TaskCompletion[]> {
+    return await db.select().from(taskCompletions)
+      .where(eq(taskCompletions.taskId, taskId))
+      .orderBy(desc(taskCompletions.startedAt));
+  }
+
+  async createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion> {
+    const [newCompletion] = await db.insert(taskCompletions).values({
+      ...completion,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    return newCompletion;
+  }
+
+  async updateTaskCompletion(id: string, updates: Partial<InsertTaskCompletion>): Promise<TaskCompletion | undefined> {
+    const [updated] = await db.update(taskCompletions)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(taskCompletions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Reward Distribution operations
+  async getUserRewardDistributions(userId: string, tenantId?: string): Promise<RewardDistribution[]> {
+    const conditions = tenantId 
+      ? and(eq(rewardDistributions.userId, userId), eq(rewardDistributions.tenantId, tenantId))
+      : eq(rewardDistributions.userId, userId);
+    return await db.select().from(rewardDistributions)
+      .where(conditions)
+      .orderBy(desc(rewardDistributions.createdAt));
+  }
+
+  async createRewardDistribution(distribution: InsertRewardDistribution): Promise<RewardDistribution> {
+    const [newDistribution] = await db.insert(rewardDistributions).values({
+      ...distribution,
+      createdAt: new Date(),
+    }).returning();
+    return newDistribution;
   }
 
   // Campaign Publishing operations
@@ -978,11 +1130,18 @@ export class DatabaseStorage implements IStorage {
         ? profileData.socialTokens
         : {};
 
-      socialTokens[platform] = tokenBundle;
+      // Encrypt sensitive tokens before storage
+      const secureTokenBundle = {
+        ...tokenBundle,
+        refresh_token: tokenBundle.refresh_token ? encryptToken(tokenBundle.refresh_token) : tokenBundle.refresh_token,
+        // Keep access_token unencrypted for easier debugging (it's short-lived)
+      };
+
+      socialTokens[platform] = secureTokenBundle;
 
       const nextProfileData = { ...profileData, socialTokens };
       await this.updateUser(user.id, { profileData: nextProfileData } as any);
-      console.log(`[Storage] Saved ${platform} token bundle for user ${user.id}`);
+      console.log(`[Storage] Saved ${platform} token bundle for user ${user.id} (refresh_token encrypted)`);
     } catch (error) {
       console.error(`[Storage] Failed to save ${platform} token bundle:`, error);
       throw error;
@@ -997,7 +1156,15 @@ export class DatabaseStorage implements IStorage {
       const socialTokens = profileData.socialTokens && typeof profileData.socialTokens === 'object'
         ? profileData.socialTokens
         : {};
-      return socialTokens[platform];
+      
+      const tokenBundle = socialTokens[platform];
+      if (!tokenBundle) return undefined;
+
+      // Decrypt sensitive tokens when retrieving
+      return {
+        ...tokenBundle,
+        refresh_token: tokenBundle.refresh_token ? decryptToken(tokenBundle.refresh_token) : tokenBundle.refresh_token,
+      };
     } catch (error) {
       console.error(`[Storage] Failed to get ${platform} token bundle:`, error);
       return undefined;

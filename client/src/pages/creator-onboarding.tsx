@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
+import useUsernameValidation from "@/hooks/use-username-validation";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -24,8 +25,13 @@ import {
   Rocket,
   Building,
   Zap,
-  CheckCircle
+  CheckCircle,
+  Upload,
+  Image,
+  AlertCircle,
+  Check
 } from "lucide-react";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 const topSports = [
   "American Football", "Basketball", "Baseball", "Soccer", "Tennis", "Golf", 
@@ -47,6 +53,47 @@ const educationLevels = [
   { value: "not_enrolled", label: "Not Currently Enrolled" },
   { value: "professional", label: "Professional Athlete" }
 ];
+
+const gradeSubcategories = {
+  high_school: [
+    { value: "freshman", label: "Freshman (Year 9)" },
+    { value: "sophomore", label: "Sophomore (Year 10)" },
+    { value: "junior", label: "Junior (Year 11)" },
+    { value: "senior", label: "Senior (Year 12)" }
+  ],
+  college_d1: [
+    { value: "freshman", label: "Freshman" },
+    { value: "sophomore", label: "Sophomore" },
+    { value: "junior", label: "Junior" },
+    { value: "senior", label: "Senior" },
+    { value: "graduate", label: "Graduate Student" }
+  ],
+  college_d2: [
+    { value: "freshman", label: "Freshman" },
+    { value: "sophomore", label: "Sophomore" },
+    { value: "junior", label: "Junior" },
+    { value: "senior", label: "Senior" },
+    { value: "graduate", label: "Graduate Student" }
+  ],
+  college_d3: [
+    { value: "freshman", label: "Freshman" },
+    { value: "sophomore", label: "Sophomore" },
+    { value: "junior", label: "Junior" },
+    { value: "senior", label: "Senior" },
+    { value: "graduate", label: "Graduate Student" }
+  ],
+  naia: [
+    { value: "freshman", label: "Freshman" },
+    { value: "sophomore", label: "Sophomore" },
+    { value: "junior", label: "Junior" },
+    { value: "senior", label: "Senior" },
+    { value: "graduate", label: "Graduate Student" }
+  ],
+  junior_college: [
+    { value: "freshman", label: "First Year" },
+    { value: "sophomore", label: "Second Year" }
+  ]
+};
 
 const musicGenres = [
   "Pop", "Rock", "Hip-Hop", "R&B", "Country", "Electronic", "Jazz", "Classical",
@@ -134,7 +181,8 @@ export default function CreatorOnboardingPage() {
   const creatorType = params.get('type') || 'athlete';
   
   const [formData, setFormData] = useState({
-    // Common fields
+    // Common fields - username now required
+    username: '',
     creatorType,
     displayName: '',
     bio: '',
@@ -148,8 +196,10 @@ export default function CreatorOnboardingPage() {
     sport: '',
     ageRange: '',
     education: '',
+    grade: '', // New field for education subcategory
     position: '',
     school: '',
+    graduationYear: '',
     currentSponsors: '',
     nilCompliant: false,
     
@@ -172,14 +222,15 @@ export default function CreatorOnboardingPage() {
     secondaryColor: '#10b981',
     accentColor: '#f59e0b',
     
-    // Social Links
-    instagram: '',
-    twitter: '',
-    tiktok: '',
+    // Banner image instead of social links
+    bannerImage: '',
     
     // Settings
     subscriptionTier: 'professional'
   });
+
+  // Username validation
+  const { isChecking, isAvailable, error: usernameError, suggestions, hasChecked } = useUsernameValidation(formData.username);
 
   const completeOnboardingMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -310,6 +361,59 @@ export default function CreatorOnboardingPage() {
               <p className="text-gray-300">Tell your fans who you are and what makes you unique</p>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Username Field - Required */}
+              <div>
+                <Label htmlFor="username" className="text-gray-300">Username *</Label>
+                <div className="relative">
+                  <Input
+                    id="username"
+                    value={formData.username}
+                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '') }))}
+                    placeholder="your_unique_username"
+                    className={`bg-white/10 border-white/20 text-white pr-10 ${
+                      hasChecked && !isAvailable ? 'border-red-500' : 
+                      hasChecked && isAvailable ? 'border-green-500' : ''
+                    }`}
+                  />
+                  {isChecking && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                    </div>
+                  )}
+                  {hasChecked && !isChecking && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      {isAvailable ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {usernameError && (
+                  <p className="text-red-400 text-sm mt-1">{usernameError}</p>
+                )}
+                {hasChecked && isAvailable && (
+                  <p className="text-green-400 text-sm mt-1">✓ Username is available!</p>
+                )}
+                {suggestions.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-gray-400 text-sm mb-1">Suggestions:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => setFormData(prev => ({ ...prev, username: suggestion }))}
+                          className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <Label htmlFor="displayName" className="text-gray-300">Display Name *</Label>
                 <Input
@@ -346,7 +450,7 @@ export default function CreatorOnboardingPage() {
 
               <Button 
                 onClick={() => setStep(2)}
-                disabled={!formData.displayName || !formData.followerCount}
+                disabled={!formData.username || !formData.displayName || !formData.followerCount || !isAvailable || isChecking}
                 className="w-full gradient-primary text-[#101636] font-bold"
               >
                 Continue to {creatorType === 'athlete' ? 'Athletic' : creatorType === 'musician' ? 'Music' : 'Content'} Details
@@ -408,7 +512,7 @@ export default function CreatorOnboardingPage() {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-gray-300">Current Education *</Label>
-                      <Select value={formData.education} onValueChange={(value) => setFormData(prev => ({ ...prev, education: value }))}>
+                      <Select value={formData.education} onValueChange={(value) => setFormData(prev => ({ ...prev, education: value, grade: '' }))}>
                         <SelectTrigger className="bg-white/10 border-white/20 text-white">
                           <SelectValue placeholder="Select education level" />
                         </SelectTrigger>
@@ -420,13 +524,30 @@ export default function CreatorOnboardingPage() {
                       </Select>
                     </div>
 
+                    {/* Grade Subcategory - Show if education level has subcategories */}
+                    {formData.education && gradeSubcategories[formData.education as keyof typeof gradeSubcategories] && (
+                      <div>
+                        <Label className="text-gray-300">Grade/Year *</Label>
+                        <Select value={formData.grade} onValueChange={(value) => setFormData(prev => ({ ...prev, grade: value }))}>
+                          <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                            <SelectValue placeholder="Select your current grade/year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {gradeSubcategories[formData.education as keyof typeof gradeSubcategories].map((grade) => (
+                              <SelectItem key={grade.value} value={grade.value}>{grade.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     <div>
-                      <Label htmlFor="position" className="text-gray-300">Position</Label>
+                      <Label htmlFor="position" className="text-gray-300">Position (if applicable)</Label>
                       <Input
                         id="position"
                         value={formData.position}
                         onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-                        placeholder="e.g., Quarterback, Point Guard"
+                        placeholder="e.g., Quarterback, Point Guard, N/A"
                         className="bg-white/10 border-white/20 text-white"
                       />
                     </div>
@@ -710,40 +831,15 @@ export default function CreatorOnboardingPage() {
                 </div>
               </div>
 
+              {/* Banner Image Upload */}
               <div>
-                <Label className="text-gray-300 mb-4 block">Social Media Links</Label>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="instagram" className="text-gray-400 text-sm">Instagram</Label>
-                    <Input
-                      id="instagram"
-                      value={formData.instagram}
-                      onChange={(e) => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
-                      placeholder="@your_instagram"
-                      className="bg-white/10 border-white/20 text-white"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="twitter" className="text-gray-400 text-sm">Twitter/X</Label>
-                    <Input
-                      id="twitter"
-                      value={formData.twitter}
-                      onChange={(e) => setFormData(prev => ({ ...prev, twitter: e.target.value }))}
-                      placeholder="@your_twitter"
-                      className="bg-white/10 border-white/20 text-white"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tiktok" className="text-gray-400 text-sm">TikTok</Label>
-                    <Input
-                      id="tiktok"
-                      value={formData.tiktok}
-                      onChange={(e) => setFormData(prev => ({ ...prev, tiktok: e.target.value }))}
-                      placeholder="@your_tiktok"
-                      className="bg-white/10 border-white/20 text-white"
-                    />
-                  </div>
-                </div>
+                <Label className="text-gray-300 mb-4 block">Profile Banner</Label>
+                <ImageUpload
+                  type="banner"
+                  currentImageUrl={formData.bannerImage}
+                  onUploadSuccess={(url) => setFormData(prev => ({ ...prev, bannerImage: url }))}
+                  onRemove={() => setFormData(prev => ({ ...prev, bannerImage: '' }))}
+                />
               </div>
 
               <div className="flex gap-4">

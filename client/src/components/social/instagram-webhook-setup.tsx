@@ -52,7 +52,7 @@ export default function InstagramWebhookSetup() {
     if (!accessToken || !userInfo?.id) return;
     if (checkingRef.current) return;
     const now = Date.now();
-    if (now - lastCheckTsRef.current < 15000) return; // throttle to 15s
+    if (now - lastCheckTsRef.current < 30000) return; // throttle to 30s to avoid loops
 
     checkingRef.current = true;
     lastCheckTsRef.current = now;
@@ -70,8 +70,8 @@ export default function InstagramWebhookSetup() {
       const msg = (error?.message as string) || 'Failed to check webhook status';
       // Handle rate limit gracefully
       if (msg.includes('429') || msg.toLowerCase().includes('rate')) {
-        toast({ title: 'Rate Limited', description: 'Too many requests. Cooling down for 1 minute.' });
-        lastCheckTsRef.current = Date.now() + 60000; // backoff 60s
+        toast({ title: 'Rate Limited', description: 'Too many requests. Cooling down for 2 minutes.' });
+        lastCheckTsRef.current = Date.now() + 120000; // backoff 120s
       }
       console.error('[Instagram Webhooks] Status check error:', error);
       setWebhookStatus(prev => ({ ...prev, loading: false, error: msg }));
@@ -134,7 +134,9 @@ export default function InstagramWebhookSetup() {
       lastCheckTsRef.current = 0; // reset throttle for new account
       checkWebhookStatus();
     }
-  }, [accessToken, userInfo?.id]);
+    // Do not auto check on every render; manual 'Refresh Status' button triggers checks
+    // This avoids loops when tokens change or rate limits are hit
+  }, [userInfo?.id]);
 
   return (
     <Card className="w-full max-w-2xl">

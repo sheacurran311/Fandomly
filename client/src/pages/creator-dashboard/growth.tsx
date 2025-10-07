@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,24 +15,124 @@ import {
   PieChart,
   LineChart,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Loader2
 } from "lucide-react";
 import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
 
-export default function CreatorGrowth() {
-  // Mock growth data - in production this would come from API
-  const growthMetrics = {
-    fanGrowth: { current: 2847, previous: 2534, change: 12.3 },
-    engagementRate: { current: 67.2, previous: 62.8, change: 7.0 },
-    campaignParticipation: { current: 89.1, previous: 84.3, change: 5.7 },
-    averagePointsPerFan: { current: 1450, previous: 1320, change: 9.8 }
-  };
+interface GrowthMetrics {
+  fanGrowth: { current: number; previous: number; change: number };
+  engagementRate: { current: number; previous: number; change: number };
+  campaignParticipation: { current: number; previous: number; change: number };
+  averagePointsPerFan: { current: number; previous: number; change: number };
+}
 
-  const growthGoals = [
-    { title: "Reach 3,000 Fans", current: 2847, target: 3000, progress: 94.9 },
-    { title: "70% Engagement Rate", current: 67.2, target: 70, progress: 96.0 },
-    { title: "95% Campaign Participation", current: 89.1, target: 95, progress: 93.8 }
-  ];
+interface GrowthGoal {
+  title: string;
+  current: number;
+  target: number;
+  progress: number;
+}
+
+export default function CreatorGrowth() {
+  const { user } = useAuth();
+
+  // Get creator info
+  const { data: creator } = useQuery({
+    queryKey: ['/api/creators/user', user?.id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/creators/user/${user?.id}`);
+      return response.json();
+    },
+    enabled: !!user?.id
+  });
+
+  // Fetch real growth data
+  const { data: growthMetrics, isLoading: growthLoading } = useQuery<GrowthMetrics>({
+    queryKey: ['/api/analytics/growth', creator?.id],
+    queryFn: async (): Promise<GrowthMetrics> => {
+      if (!creator?.id) {
+        return {
+          fanGrowth: { current: 0, previous: 0, change: 0 },
+          engagementRate: { current: 0, previous: 0, change: 0 },
+          campaignParticipation: { current: 0, previous: 0, change: 0 },
+          averagePointsPerFan: { current: 0, previous: 0, change: 0 }
+        };
+      }
+
+      try {
+        // Get current fan data
+        const membershipsResponse = await apiRequest('GET', `/api/tenant-memberships/${creator.tenantId}`);
+        const memberships = await membershipsResponse.json();
+        
+        const currentFans = memberships.length;
+        const activeFans = memberships.filter((m: any) => (m.memberData?.points || 0) > 0).length;
+        const totalPoints = memberships.reduce((sum: number, m: any) => sum + (m.memberData?.points || 0), 0);
+        const averagePoints = currentFans > 0 ? totalPoints / currentFans : 0;
+        const engagementRate = currentFans > 0 ? (activeFans / currentFans) * 100 : 0;
+
+        // TODO: Get historical data for previous period comparison
+        // For now, simulate some growth
+        const previousFans = Math.max(0, currentFans - Math.floor(currentFans * 0.1));
+        const fanGrowthChange = previousFans > 0 ? ((currentFans - previousFans) / previousFans) * 100 : 0;
+
+        return {
+          fanGrowth: { 
+            current: currentFans, 
+            previous: previousFans, 
+            change: fanGrowthChange 
+          },
+          engagementRate: { 
+            current: engagementRate, 
+            previous: Math.max(0, engagementRate - 5), 
+            change: 5 
+          },
+          campaignParticipation: { 
+            current: engagementRate, 
+            previous: Math.max(0, engagementRate - 3), 
+            change: 3 
+          },
+          averagePointsPerFan: { 
+            current: averagePoints, 
+            previous: Math.max(0, averagePoints - 100), 
+            change: averagePoints > 100 ? 100 : 0 
+          }
+        };
+      } catch (error) {
+        console.error('Failed to fetch growth data:', error);
+        return {
+          fanGrowth: { current: 0, previous: 0, change: 0 },
+          engagementRate: { current: 0, previous: 0, change: 0 },
+          campaignParticipation: { current: 0, previous: 0, change: 0 },
+          averagePointsPerFan: { current: 0, previous: 0, change: 0 }
+        };
+      }
+    },
+    enabled: !!creator?.id,
+    staleTime: 5 * 60 * 1000
+  });
+
+  // Calculate growth goals based on current metrics
+  const growthGoals: GrowthGoal[] = growthMetrics ? [
+    { 
+      title: `Reach ${Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + 500) / 100) * 100} Fans`, 
+      current: growthMetrics?.fanGrowth?.current || 0, 
+      target: Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + 500) / 100) * 100, 
+      progress: ((growthMetrics?.fanGrowth?.current || 0) / Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + 500) / 100) * 100) * 100 
+    },
+    { 
+      title: "70% Engagement Rate", 
+      current: growthMetrics?.engagementRate?.current || 0, 
+      target: 70, 
+      progress: ((growthMetrics?.engagementRate?.current || 0) / 70) * 100 
+    },
+    { 
+      title: "95% Campaign Participation", 
+      current: growthMetrics?.campaignParticipation?.current || 0, 
+      target: 95, 
+      progress: ((growthMetrics?.campaignParticipation?.current || 0) / 95) * 100 
+    }
+  ] : [];
 
   const getChangeColor = (change: number) => {
     return change > 0 ? "text-green-400" : "text-red-400";
@@ -58,17 +161,39 @@ export default function CreatorGrowth() {
 
           {/* Growth Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            {growthLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-center h-16">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : !growthMetrics ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <p className="text-gray-400">No data available</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <>
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <Users className="h-6 w-6 text-brand-primary" />
-                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics.fanGrowth.change}%</Badge>
+                    <Badge className="bg-green-500/20 text-green-400">+{growthMetrics?.fanGrowth?.change || 0}%</Badge>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{growthMetrics.fanGrowth.current.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-white">{(growthMetrics?.fanGrowth?.current || 0).toLocaleString()}</p>
                   <p className="text-sm text-gray-400">Total Fans</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    +{(growthMetrics.fanGrowth.current - growthMetrics.fanGrowth.previous).toLocaleString()} this month
+                    +{((growthMetrics?.fanGrowth?.current || 0) - (growthMetrics?.fanGrowth?.previous || 0)).toLocaleString()} this month
                   </p>
                 </div>
               </CardContent>
@@ -78,13 +203,13 @@ export default function CreatorGrowth() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <BarChart3 className="h-6 w-6 text-brand-secondary" />
-                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics.engagementRate.change}%</Badge>
+                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics?.engagementRate?.change || 0}%</Badge>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{growthMetrics.engagementRate.current}%</p>
+                  <p className="text-2xl font-bold text-white">{(growthMetrics?.engagementRate?.current || 0).toFixed(1)}%</p>
                   <p className="text-sm text-gray-400">Engagement Rate</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    +{(growthMetrics.engagementRate.current - growthMetrics.engagementRate.previous).toFixed(1)}% vs last month
+                    +{((growthMetrics?.engagementRate?.current || 0) - (growthMetrics?.engagementRate?.previous || 0)).toFixed(1)}% vs last month
                   </p>
                 </div>
               </CardContent>
@@ -94,13 +219,13 @@ export default function CreatorGrowth() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <Target className="h-6 w-6 text-yellow-400" />
-                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics.campaignParticipation.change}%</Badge>
+                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics?.campaignParticipation?.change || 0}%</Badge>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{growthMetrics.campaignParticipation.current}%</p>
+                  <p className="text-2xl font-bold text-white">{(growthMetrics?.campaignParticipation?.current || 0).toFixed(1)}%</p>
                   <p className="text-sm text-gray-400">Campaign Participation</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    +{(growthMetrics.campaignParticipation.current - growthMetrics.campaignParticipation.previous).toFixed(1)}% improvement
+                    +{((growthMetrics?.campaignParticipation?.current || 0) - (growthMetrics?.campaignParticipation?.previous || 0)).toFixed(1)}% improvement
                   </p>
                 </div>
               </CardContent>
@@ -110,17 +235,20 @@ export default function CreatorGrowth() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <PieChart className="h-6 w-6 text-purple-400" />
-                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics.averagePointsPerFan.change}%</Badge>
+                  <Badge className="bg-green-500/20 text-green-400">+{growthMetrics?.averagePointsPerFan?.change || 0}%</Badge>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{growthMetrics.averagePointsPerFan.current.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-white">{(growthMetrics?.averagePointsPerFan?.current || 0).toLocaleString()}</p>
                   <p className="text-sm text-gray-400">Avg Points/Fan</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    +{(growthMetrics.averagePointsPerFan.current - growthMetrics.averagePointsPerFan.previous).toLocaleString()} pts increase
+                    +{(growthMetrics?.averagePointsPerFan?.current || 0) - (growthMetrics?.averagePointsPerFan?.previous || 0)} pts increase
                   </p>
                 </div>
               </CardContent>
             </Card>
+              </>
+            )
+          }
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

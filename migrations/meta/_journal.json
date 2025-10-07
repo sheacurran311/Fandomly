@@ -15,6 +15,20 @@
       "when": 1756652385775,
       "tag": "0001_friendly_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759249077324,
+      "tag": "0002_crazy_moondragon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759688157199,
+      "tag": "0003_faithful_mastermind",
+      "breakpoints": true
     }
   ]
 }

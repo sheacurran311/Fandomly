@@ -122,11 +122,46 @@ export const tenants = pgTable("tenants", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Social Media Connections table - stores OAuth tokens and connection data
+export const socialConnections = pgTable("social_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text("platform").notNull(), // 'facebook', 'twitter', 'tiktok', 'instagram', etc.
+  
+  // OAuth data
+  platformUserId: text("platform_user_id"), // User's ID on the platform
+  platformUsername: text("platform_username"), // @handle or username
+  platformDisplayName: text("platform_display_name"),
+  accessToken: text("access_token"), // Encrypted in production
+  refreshToken: text("refresh_token"), // Encrypted in production
+  tokenExpiresAt: timestamp("token_expires_at"),
+  
+  // Platform-specific data
+  profileData: jsonb("profile_data").$type<{
+    followers?: number;
+    following?: number;
+    verified?: boolean;
+    profilePictureUrl?: string;
+    bio?: string;
+    website?: string;
+    // Platform-specific fields
+    [key: string]: any;
+  }>(),
+  
+  // Connection metadata
+  connectedAt: timestamp("connected_at").defaultNow(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dynamicUserId: text("dynamic_user_id").unique(),
   email: text("email"),
-  username: text("username"),
+  username: text("username").unique().notNull(), // Required unique username for all users
   avatar: text("avatar"),
   walletAddress: text("wallet_address"),
   walletChain: text("wallet_chain"),
@@ -140,15 +175,56 @@ export const users = pgTable("users", {
     bio?: string;
     location?: string;
     avatar?: string;
+    bannerImage?: string; // Replaces social media links
     phoneNumber?: string;
     dateOfBirth?: string;
     gender?: string;
     favoriteCreators?: string[];
+    
+    // Fan Marketing Fields (NEW)
+    phone?: string; // SMS marketing number
+    creatorTypeInterests?: Array<"athletes" | "musicians" | "content_creators">; // Which creator types they follow
+    interestSubcategories?: {
+      athletes?: string[]; // Sport types: ["football", "basketball", "soccer"]
+      musicians?: string[]; // Music genres: ["hip_hop", "pop", "rock"]
+      content_creators?: string[]; // Content types: ["gaming", "vlogging", "cooking"]
+    };
+    
+    // Enhanced athlete fields
+    sport?: string;
+    position?: string; // Athletic position if applicable
+    education?: {
+      level: 'middle_school' | 'high_school' | 'junior_college' | 'college_d1' | 'college_d2' | 'college_d3' | 'naia' | 'not_enrolled' | 'professional';
+      grade?: 'freshman' | 'sophomore' | 'junior' | 'senior' | 'graduate'; // For high school and college
+      school?: string;
+      graduationYear?: number;
+    };
+    
+    // Enhanced musician fields
+    musicGenre?: string;
+    artistType?: 'independent' | 'signed' | 'hobby';
+    musicCatalog?: {
+      spotify?: string;
+      appleMusic?: string;
+      soundcloud?: string;
+      bandcamp?: string;
+      youtube?: string;
+    };
+    
+    // Enhanced content creator fields
+    contentType?: string;
+    platforms?: string[];
+    topicsOfFocus?: string[];
+    
     socialLinks?: {
       twitter?: string;
       instagram?: string;
       tiktok?: string;
       youtube?: string;
+      spotify?: string;
+      soundcloud?: string;
+      twitch?: string;
+      discord?: string;
     };
     facebookData?: {
       id: string;
@@ -297,7 +373,22 @@ export const creators = pgTable("creators", {
     facebook?: string;
     discord?: string;
   }>(),
+  
+  // Creator Verification System
   isVerified: boolean("is_verified").default(false),
+  verificationData: jsonb("verification_data").$type<{
+    profileComplete: boolean;
+    requiredFieldsFilled: string[]; // List of completed required fields
+    verifiedAt?: string;
+    verificationMethod?: 'auto' | 'manual'; // Auto when profile is complete, manual for admin override
+    completionPercentage: number; // 0-100
+    missingFields?: string[]; // Fields still needed for verification
+  }>().default({
+    profileComplete: false,
+    requiredFieldsFilled: [],
+    completionPercentage: 0,
+  }),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -445,11 +536,20 @@ export const campaignTriggerEnum = pgEnum('campaign_trigger', [
 export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive', 'draft', 'archived', 'pending_tasks']);
 
 // Advanced Campaign Types & Rewards
-export const rewardTypeEnum = pgEnum('reward_type', ['points', 'raffle', 'nft', 'badge']);
+export const rewardTypeEnum = pgEnum('reward_type', ['points', 'raffle', 'nft', 'badge', 'multiplier']);
 export const socialPlatformEnum = pgEnum('social_platform', [
   'facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify', 
-  'apple_music', 'discord', 'telegram'
+  'apple_music', 'discord', 'telegram', 'system'
 ]);
+
+// Snag-Inspired Task System Enums
+export const taskSectionEnum = pgEnum('task_section', [
+  'user_onboarding', 'social_engagement', 'community_building', 
+  'content_creation', 'streaming_music', 'token_activity', 'custom'
+]);
+
+export const updateCadenceEnum = pgEnum('update_cadence', ['immediate', 'daily', 'weekly', 'monthly']);
+export const rewardFrequencyEnum = pgEnum('reward_frequency', ['one_time', 'daily', 'weekly', 'monthly']);
 // Enhanced task type enum with consistent platform-specific naming
 export const taskTypeEnum = pgEnum('task_type', [
   // Twitter/X tasks (consistent prefixing)
@@ -464,6 +564,8 @@ export const taskTypeEnum = pgEnum('task_type', [
   'tiktok_follow', 'tiktok_like', 'tiktok_share',
   // Spotify tasks  
   'spotify_follow', 'spotify_playlist', 'spotify_album',
+  // Engagement & Rewards tasks (new)
+  'check_in', 'follower_milestone', 'complete_profile',
   // Generic tasks (legacy)
   'follow', 'join', 'repost', 'referral'
 ]);
@@ -607,33 +709,104 @@ export const socialCampaignTasks = pgTable("social_campaign_tasks", {
 });
 
 // Independent Tasks (for new workflow)
+// Task Ownership Level
+export const taskOwnershipEnum = pgEnum('task_ownership', ['platform', 'creator']);
+
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
-  creatorId: varchar("creator_id").references(() => creators.id).notNull(),
   
-  // Task Info
+  // Ownership
+  ownershipLevel: taskOwnershipEnum("ownership_level").notNull().default('creator'),
+  tenantId: varchar("tenant_id").references(() => tenants.id), // NULL for platform tasks
+  creatorId: varchar("creator_id").references(() => creators.id), // NULL for platform tasks
+  
+  // ============================================
+  // SECTION 1: BASIC DETAILS
+  // ============================================
   name: text("name").notNull(),
   description: text("description").notNull(),
+  
+  // Task Organization (Snag-Inspired)
+  section: taskSectionEnum("section").notNull().default('custom'),
   
   // Task Configuration
   taskType: taskTypeEnum("task_type").notNull(),
   platform: socialPlatformEnum("platform").notNull(),
   
-  // Task-specific Data
+  // Time Constraints
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  
+  // Special Flags
+  isRequired: boolean("is_required").default(false), // Block other tasks until this is complete
+  hideFromUI: boolean("hide_from_ui").default(false), // Hidden background task
+  
+  // ============================================
+  // SECTION 2: REWARD CONFIGURATION (Snag-Inspired)
+  // ============================================
+  rewardType: rewardTypeEnum("reward_type").notNull().default('points'),
+  
+  // Points reward configuration
+  pointsToReward: integer("points_to_reward").default(50),
+  pointCurrency: text("point_currency").default('default'),
+  
+  // Multiplier reward configuration
+  multiplierValue: decimal("multiplier_value", { precision: 4, scale: 2 }), // e.g., 1.50, 2.00, 3.00
+  currenciesToApply: jsonb("currencies_to_apply").$type<string[]>(), // Which currencies the multiplier applies to
+  applyToExistingBalance: boolean("apply_to_existing_balance").default(false),
+  
+  // Legacy field (keeping for backwards compatibility)
+  rewardValue: integer("reward_value").default(50),
+  
+  // ============================================
+  // SECTION 3: TIMING CONFIGURATION (Snag-Inspired)
+  // ============================================
+  updateCadence: updateCadenceEnum("update_cadence").notNull().default('immediate'),
+  rewardFrequency: rewardFrequencyEnum("reward_frequency").notNull().default('one_time'),
+  
+  // ============================================
+  // SECTION 4: TASK-SPECIFIC DATA
+  // ============================================
   targetUrl: text("target_url"), // URL for posts/videos/playlists
   hashtags: jsonb("hashtags").$type<string[]>(), // Required hashtags
   inviteCode: text("invite_code"), // Discord/Telegram invites
   customInstructions: text("custom_instructions"), // Additional instructions
   
-  // Reward Configuration
-  rewardType: rewardTypeEnum("reward_type").notNull().default('points'),
-  rewardValue: integer("reward_value").notNull().default(50),
+  // Custom settings for each task type (handles, URLs, required fields, etc.)
+  customSettings: jsonb("custom_settings").$type<Record<string, any>>(),
   
-  // Status & Analytics
+  // ============================================
+  // SECTION 5: STATUS & ANALYTICS
+  // ============================================
   isActive: boolean("is_active").default(true),
+  isDraft: boolean("is_draft").default(false),
   totalCompletions: integer("total_completions").default(0),
   
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Platform Tasks Table - Platform-wide tasks that award Fandomly Points
+export const platformTasks = pgTable("platform_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Task Identity
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  type: text("type").notNull(), // 'profile', 'social', 'engagement'
+  category: text("category").notNull(), // 'Profile Completion', 'Social Connection', etc.
+  
+  // Reward Configuration
+  points: integer("points").notNull().default(50), // Fandomly Points to award
+  
+  // Task Configuration
+  requiredFields: jsonb("required_fields").$type<string[]>().default([]), // For profile tasks
+  socialPlatform: text("social_platform"), // For social connection tasks
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -713,6 +886,103 @@ export const campaignParticipations = pgTable("campaign_participations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Task Completions - Track fan progress on tasks
+export const taskCompletions = pgTable("task_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  
+  // Completion Status
+  status: text("status").notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed'
+  progress: integer("progress").default(0), // 0-100 percentage
+  
+  // Completion Data (task-specific tracking)
+  completionData: jsonb("completion_data").$type<{
+    // Check-in specific
+    currentStreak?: number;
+    lastCheckIn?: string; // ISO timestamp
+    streakMilestones?: Array<{
+      days: number;
+      completedAt: string;
+      pointsAwarded: number;
+    }>;
+    
+    // Referral specific
+    referredUsers?: Array<{
+      userId: string;
+      username: string;
+      signupDate: string;
+      qualified: boolean;
+      pointsAwarded: number;
+    }>;
+    
+    // Follower milestone specific
+    currentFollowers?: number;
+    milestonesReached?: Array<{
+      threshold: number;
+      reachedAt: string;
+      pointsAwarded: number;
+    }>;
+    
+    // Complete profile specific
+    fieldsCompleted?: string[];
+    fieldProgress?: Record<string, boolean>;
+    
+    // Generic completion tracking
+    completedSteps?: number;
+    totalSteps?: number;
+    metadata?: Record<string, any>;
+  }>(),
+  
+  // Rewards Tracking
+  pointsEarned: integer("points_earned").default(0),
+  totalRewardsEarned: integer("total_rewards_earned").default(0), // For repeating tasks
+  
+  // Timing
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  
+  // Validation
+  verifiedAt: timestamp("verified_at"), // When completion was verified
+  verificationMethod: text("verification_method"), // 'auto' | 'manual' | 'api'
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Reward Distribution Log - Track all point awards
+export const rewardDistributions = pgTable("reward_distributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // References
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taskId: varchar("task_id").references(() => tasks.id).notNull(),
+  taskCompletionId: varchar("task_completion_id").references(() => taskCompletions.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  
+  // Reward Details
+  rewardType: text("reward_type").notNull(), // 'points' | 'multiplier' | 'bonus'
+  amount: integer("amount").notNull(), // Points awarded
+  currency: text("currency").default('default'),
+  
+  // Context
+  reason: text("reason").notNull(), // 'task_completion' | 'streak_bonus' | 'referral_bonus' | etc.
+  description: text("description"),
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<{
+    taskName?: string;
+    taskType?: string;
+    streakDays?: number;
+    milestoneThreshold?: number;
+    referredUsername?: string;
+    [key: string]: any;
+  }>(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 
 // Relations
@@ -747,6 +1017,14 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   fanPrograms: many(fanPrograms),
   rewardRedemptions: many(rewardRedemptions),
+  socialConnections: many(socialConnections),
+}));
+
+export const socialConnectionsRelations = relations(socialConnections, ({ one }) => ({
+  user: one(users, {
+    fields: [socialConnections.userId],
+    references: [users.id],
+  }),
 }));
 
 export const tenantMembershipsRelations = relations(tenantMemberships, ({ one }) => ({
@@ -1017,6 +1295,10 @@ export type TaskTemplate = typeof taskTemplates.$inferSelect;
 export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
+export type TaskCompletion = typeof taskCompletions.$inferSelect;
+export type InsertTaskCompletion = typeof taskCompletions.$inferInsert;
+export type RewardDistribution = typeof rewardDistributions.$inferSelect;
+export type InsertRewardDistribution = typeof rewardDistributions.$inferInsert;
 
 // Achievement System Tables
 export const achievements = pgTable("achievements", {
@@ -1088,5 +1370,199 @@ export type UserAchievement = typeof userAchievements.$inferSelect;
 export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
 export type UserLevel = typeof userLevels.$inferSelect;
 export type InsertUserLevel = z.infer<typeof insertUserLevelSchema>;
+
+// ============================================================================
+// REFERRAL ENGINE TABLES
+// ============================================================================
+
+// Status enums for referrals
+export const referralStatusEnum = pgEnum('referral_status', ['pending', 'active', 'completed', 'expired', 'cancelled']);
+
+// Creator → Creator Referrals (Revenue Share)
+export const creatorReferrals = pgTable("creator_referrals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Participants
+  referringCreatorId: varchar("referring_creator_id").notNull().references(() => creators.id),
+  referredCreatorId: varchar("referred_creator_id").references(() => creators.id),
+  
+  // Referral Codes
+  referralCode: varchar("referral_code", { length: 50 }).unique().notNull(),
+  referralUrl: text("referral_url").notNull(),
+  
+  // Tracking
+  clickCount: integer("click_count").default(0),
+  signupDate: timestamp("signup_date"),
+  firstPaidDate: timestamp("first_paid_date"),
+  
+  // Revenue Tracking
+  totalRevenueGenerated: decimal("total_revenue_generated", { precision: 10, scale: 2 }).default('0'),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default('0'),
+  commissionPercentage: decimal("commission_percentage", { precision: 5, scale: 2 }).default('10.00'),
+  
+  // Status
+  status: referralStatusEnum("status").default('active'),
+  expiresAt: timestamp("expires_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Fan → Fan Referrals (Platform Rewards)
+export const fanReferrals = pgTable("fan_referrals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Participants
+  referringFanId: varchar("referring_fan_id").notNull().references(() => users.id),
+  referredFanId: varchar("referred_fan_id").references(() => users.id),
+  
+  // Referral Codes
+  referralCode: varchar("referral_code", { length: 50 }).unique().notNull(),
+  referralUrl: text("referral_url").notNull(),
+  
+  // Tracking
+  clickCount: integer("click_count").default(0),
+  signupDate: timestamp("signup_date"),
+  firstTaskCompletedAt: timestamp("first_task_completed_at"),
+  profileCompletedAt: timestamp("profile_completed_at"),
+  
+  // Points Tracking (Fandomly Points)
+  totalPointsReferredUserEarned: integer("total_points_referred_user_earned").default(0),
+  totalPointsReferrerEarned: integer("total_points_referrer_earned").default(0),
+  
+  // Percentage Earnings
+  percentageRewardsEnabled: boolean("percentage_rewards_enabled").default(false),
+  percentageValue: decimal("percentage_value", { precision: 5, scale: 2 }).default('0'),
+  percentageExpiresAt: timestamp("percentage_expires_at"),
+  
+  // Status
+  status: referralStatusEnum("status").default('pending'),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Creator Task/Campaign Referrals (Creator Points)
+export const creatorTaskReferrals = pgTable("creator_task_referrals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Context
+  creatorId: varchar("creator_id").notNull().references(() => creators.id),
+  taskId: varchar("task_id").references(() => tasks.id),
+  campaignId: varchar("campaign_id").references(() => campaigns.id),
+  
+  // Participants
+  referringFanId: varchar("referring_fan_id").notNull().references(() => users.id),
+  referredFanId: varchar("referred_fan_id").references(() => users.id),
+  
+  // Referral Codes
+  referralCode: varchar("referral_code", { length: 100 }).unique().notNull(),
+  referralUrl: text("referral_url").notNull(),
+  referralType: varchar("referral_type", { length: 20 }).notNull(), // 'task' or 'campaign'
+  
+  // Tracking
+  clickCount: integer("click_count").default(0),
+  signupDate: timestamp("signup_date"),
+  joinedCreatorDate: timestamp("joined_creator_date"),
+  completedTaskDate: timestamp("completed_task_date"),
+  
+  // Points Tracking (Creator Points)
+  totalCreatorPointsEarned: integer("total_creator_points_earned").default(0),
+  sharePercentage: decimal("share_percentage", { precision: 5, scale: 2 }).default('0'),
+  shareExpiresAt: timestamp("share_expires_at"),
+  
+  // Status
+  status: referralStatusEnum("status").default('pending'),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Referral Schemas
+export const insertCreatorReferralSchema = createInsertSchema(creatorReferrals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFanReferralSchema = createInsertSchema(fanReferrals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCreatorTaskReferralSchema = createInsertSchema(creatorTaskReferrals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Platform Tasks Schemas
+export const insertPlatformTaskSchema = createInsertSchema(platformTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Referral Types
+export type CreatorReferral = typeof creatorReferrals.$inferSelect;
+export type InsertCreatorReferral = z.infer<typeof insertCreatorReferralSchema>;
+export type FanReferral = typeof fanReferrals.$inferSelect;
+export type InsertFanReferral = z.infer<typeof insertFanReferralSchema>;
+export type CreatorTaskReferral = typeof creatorTaskReferrals.$inferSelect;
+export type InsertCreatorTaskReferral = z.infer<typeof insertCreatorTaskReferralSchema>;
+
+// Platform Task Types
+export type PlatformTask = typeof platformTasks.$inferSelect;
+export type InsertPlatformTask = z.infer<typeof insertPlatformTaskSchema>;
+
+// ============================================================================
+// REFERRAL RELATIONS
+// ============================================================================
+
+export const creatorReferralsRelations = relations(creatorReferrals, ({ one }) => ({
+  referringCreator: one(creators, {
+    fields: [creatorReferrals.referringCreatorId],
+    references: [creators.id],
+  }),
+  referredCreator: one(creators, {
+    fields: [creatorReferrals.referredCreatorId],
+    references: [creators.id],
+  }),
+}));
+
+export const fanReferralsRelations = relations(fanReferrals, ({ one }) => ({
+  referringFan: one(users, {
+    fields: [fanReferrals.referringFanId],
+    references: [users.id],
+  }),
+  referredFan: one(users, {
+    fields: [fanReferrals.referredFanId],
+    references: [users.id],
+  }),
+}));
+
+export const creatorTaskReferralsRelations = relations(creatorTaskReferrals, ({ one }) => ({
+  creator: one(creators, {
+    fields: [creatorTaskReferrals.creatorId],
+    references: [creators.id],
+  }),
+  task: one(tasks, {
+    fields: [creatorTaskReferrals.taskId],
+    references: [tasks.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [creatorTaskReferrals.campaignId],
+    references: [campaigns.id],
+  }),
+  referringFan: one(users, {
+    fields: [creatorTaskReferrals.referringFanId],
+    references: [users.id],
+  }),
+  referredFan: one(users, {
+    fields: [creatorTaskReferrals.referredFanId],
+    references: [users.id],
+  }),
+}));
 
 

@@ -31,11 +31,23 @@ import {
   CheckCircle,
   AlertCircle,
   Zap,
-  Unlink
+  Unlink,
+  Video
 } from "lucide-react";
 import { TwitterSDKManager } from "@/lib/twitter";
+import { socialManager } from "@/lib/social-integrations";
 
 export default function CreatorSocial() {
+  // Format follower counts: comma format below 10k, K-format at 10k+
+  const formatFollowers = (num: number): string => {
+    if (!num || num < 0) return '0';
+    if (num >= 10000) {
+      const val = num / 1000;
+      const dec = val < 100 ? 1 : 0; // 10k-99.9k -> 1 decimal, 100k+ -> no decimals
+      return `${val.toFixed(dec)}K`;
+    }
+    return num.toLocaleString();
+  };
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   
@@ -60,12 +72,20 @@ export default function CreatorSocial() {
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
   const [twitterFollowers, setTwitterFollowers] = useState<number>(0);
   const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  
+  // TikTok connection state
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
+  const [tiktokHandle, setTiktokHandle] = useState<string | null>(null);
+  const [tiktokFollowers, setTiktokFollowers] = useState<number>(0);
+  const [isCheckingTiktokStatus, setIsCheckingTiktokStatus] = useState(true);
 
-  // Check Facebook status and Twitter status when user becomes available
+  // Check Facebook status, Twitter status, and TikTok status when user becomes available
   useEffect(() => {
     if (user?.dynamicUserId) {
       checkFacebookStatus();
       checkTwitterStatus();
+      checkTiktokStatus();
       // Load saved active page ID from localStorage
       const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
       if (savedActivePageId) {
@@ -115,6 +135,32 @@ export default function CreatorSocial() {
       setTwitterHandle(null);
     } finally {
       setIsCheckingTwitterStatus(false);
+    }
+  };
+
+  const checkTiktokStatus = async () => {
+    try {
+      setIsCheckingTiktokStatus(true);
+      // Check if TikTok connection exists in localStorage or API
+      const savedTiktokData = localStorage.getItem('fandomly_tiktok_connection');
+      if (savedTiktokData) {
+        try {
+          const tiktokData = JSON.parse(savedTiktokData);
+          setTiktokConnected(true);
+          setTiktokHandle(tiktokData.username);
+          setTiktokFollowers(tiktokData.followers || 0);
+        } catch {
+          localStorage.removeItem('fandomly_tiktok_connection');
+        }
+      }
+      
+      // TODO: Add API call to check server-side TikTok connection status
+      // This would be similar to checkTwitterStatus but for TikTok
+    } catch (error) {
+      console.error('Error checking TikTok status:', error);
+      setTiktokConnected(false);
+    } finally {
+      setIsCheckingTiktokStatus(false);
     }
   };
 
@@ -253,6 +299,46 @@ export default function CreatorSocial() {
     }
   };
 
+  const connectTiktok = async () => {
+    try {
+      setTiktokConnecting(true);
+      const authUrl = socialManager.getAuthUrl('tiktok');
+      window.location.href = authUrl;
+    } catch (error: any) {
+      console.error('TikTok connection error:', error);
+      toast({
+        title: "Connection Failed",
+        description: error.message || 'Failed to connect TikTok. Please try again.',
+        variant: 'destructive',
+      });
+      setTiktokConnecting(false);
+    }
+  };
+
+  const disconnectTiktok = async () => {
+    try {
+      // Clear local storage
+      localStorage.removeItem('fandomly_tiktok_connection');
+      setTiktokConnected(false);
+      setTiktokHandle(null);
+      setTiktokFollowers(0);
+      
+      // TODO: Add API call to disconnect TikTok on server side
+      
+      toast({
+        title: "TikTok Disconnected",
+        description: "Your TikTok account has been disconnected.",
+      });
+    } catch (error) {
+      console.error('Error disconnecting TikTok:', error);
+      toast({
+        title: "Disconnection Failed",
+        description: "Failed to disconnect TikTok. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+
   const connectFacebook = async () => {
     setFacebookConnecting(true);
     try {
@@ -361,8 +447,8 @@ export default function CreatorSocial() {
       icon: Instagram,
       handle: instagramUserInfo ? `@${instagramUserInfo.username}` : "@aerialace_athletics",
       followers: instagramUserInfo ? 
-        (instagramUserInfo.followers_count ? `${(instagramUserInfo.followers_count / 1000).toFixed(1)}K` : "0") : 
-        "12.4K",
+        `${formatFollowers(instagramUserInfo.followers_count || 0)} Followers` : 
+        "12.4K Followers",
       engagement: "8.2%",
       connected: instagramConnected,
       color: "text-pink-400",
@@ -372,7 +458,7 @@ export default function CreatorSocial() {
       platform: "Twitter",
       icon: Twitter,
       handle: twitterConnected && twitterHandle ? `@${twitterHandle}` : '@yourhandle',
-      followers: twitterConnected ? `${(twitterFollowers / 1000).toFixed(1)}K` : "0",
+      followers: twitterConnected ? `${formatFollowers(twitterFollowers)} Followers` : "0 Followers",
       engagement: twitterConnected ? "Active" : "—",
       connected: twitterConnected,
       color: "text-blue-400",
@@ -380,11 +466,11 @@ export default function CreatorSocial() {
     },
     {
       platform: "TikTok",
-      icon: Music,
-      handle: "@aerialaceflips",
-      followers: "45.2K",
-      engagement: "12.1%",
-      connected: true,
+      icon: Video,
+      handle: tiktokConnected && tiktokHandle ? `@${tiktokHandle}` : '@yourhandle',
+      followers: tiktokConnected ? `${formatFollowers(tiktokFollowers)} Followers` : "0 Followers",
+      engagement: tiktokConnected ? "Active" : "—",
+      connected: tiktokConnected,
       color: "text-purple-400",
       bgColor: "bg-purple-400/20"
     },
@@ -392,7 +478,7 @@ export default function CreatorSocial() {
       platform: "YouTube",
       icon: Youtube,
       handle: "Aerial Ace Athletics",
-      followers: "6.7K",
+      followers: "6.7K Followers",
       engagement: "9.3%",
       connected: false,
       color: "text-red-400",
@@ -476,7 +562,7 @@ export default function CreatorSocial() {
                   <Users className="h-6 w-6 text-brand-secondary" />
                 </div>
                 <div className="text-2xl font-bold text-white mb-1">
-                  {getTotalFollowers() > 0 ? `${(getTotalFollowers() / 1000).toFixed(1)}K` : '0'}
+                  {formatFollowers(getTotalFollowers())}
                 </div>
                 <div className="text-sm text-gray-400">Total Followers</div>
               </CardContent>
@@ -526,7 +612,7 @@ export default function CreatorSocial() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-white">{account.followers}</div>
+                        <div className="text-sm font-bold text-white">{account.followers}</div>
                         <p className="text-sm text-gray-400">{account.engagement} engagement</p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -574,7 +660,7 @@ export default function CreatorSocial() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="border-white/20 text_gray-300 hover:bg-white/10"
+                                className="border-white/20 text-white hover:bg-white/10"
                                 onClick={disconnectInstagram}
                                 data-testid="button-disconnect-instagram-social"
                               >
@@ -592,7 +678,7 @@ export default function CreatorSocial() {
                             </>
                           ) : (
                             <Button 
-                              className="bg-gradient_to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600"
+                              className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600"
                               onClick={connectInstagram}
                               disabled={instagramConnecting}
                               data-testid="button-connect-instagram-social"
@@ -607,7 +693,7 @@ export default function CreatorSocial() {
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
-                                  className="border-white/20 text-gray-300 hover:bg-white/10"
+                                  className="border-white/20 text-white hover:bg-white/10"
                                   onClick={disconnectTwitter}
                                   data-testid="button-disconnect-twitter-social"
                                 >
@@ -625,12 +711,44 @@ export default function CreatorSocial() {
                               </>
                             ) : (
                               <Button 
-                                className="bg-brand-primary hover:bg-brand-primary/80" 
+                                className="bg-black text-white hover:bg-black/80" 
                                 onClick={connectTwitter} 
                                 disabled={twitterConnecting}
                                 data-testid="button-connect-twitter-social"
                               >
                                 {twitterConnecting ? 'Connecting...' : 'Connect'}
+                              </Button>
+                            )
+                          ) : account.platform === 'TikTok' ? (
+                            account.connected ? (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-white hover:bg-white/10"
+                                  onClick={disconnectTiktok}
+                                  data-testid="button-disconnect-tiktok-social"
+                                >
+                                  <Unlink className="h-4 w-4 mr-1" />
+                                  Disconnect
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-gray-300 hover:bg-white/10" 
+                                  onClick={() => window.open(`https://tiktok.com/@${tiktokHandle}`, '_blank')}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button 
+                                className="bg-purple-600 hover:bg-purple-700" 
+                                onClick={connectTiktok} 
+                                disabled={tiktokConnecting}
+                                data-testid="button-connect-tiktok-social"
+                              >
+                                {tiktokConnecting ? 'Connecting...' : 'Connect'}
                               </Button>
                             )
                           ) : (

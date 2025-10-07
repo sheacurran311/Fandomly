@@ -739,7 +739,7 @@ export default function CampaignBuilder() {
   const { data: availableTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ['/api/tasks', userData?.id],
     queryFn: async (): Promise<Task[]> => {
-      const response = await apiRequest('/api/tasks', 'GET');
+      const response = await apiRequest('GET', '/api/tasks');
       return response.json();
     },
     enabled: !!userData?.id && showTaskAssignModal,

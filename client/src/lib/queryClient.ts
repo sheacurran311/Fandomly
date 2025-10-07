@@ -2,7 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
 // Helper to get current Dynamic user ID from multiple sources
-function getDynamicUserId(): string | null {
+export function getDynamicUserId(): string | null {
   try {
     // 1. Current window (for parent window)
     if ((window as any).__dynamicUserId) {
