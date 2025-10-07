@@ -53,30 +53,30 @@ export default function MobileTopMenu({ userType, isNILAthlete = false }: Mobile
               const Icon = item.icon;
               
               return (
-                <Link key={item.href} href={item.href}>
-                  <button
-                    onClick={() => setIsOpen(false)}
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 no-underline",
+                    isActive
+                      ? "bg-brand-primary text-white shadow-lg"
+                      : "text-gray-300 hover:text-white hover:bg-brand-primary/60"
+                  )}
+                  data-testid={`overflow-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Icon 
                     className={cn(
-                      "w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                      isActive
-                        ? "bg-brand-primary text-white shadow-lg"
-                        : "text-gray-300 hover:text-white hover:bg-brand-primary/60"
-                    )}
-                    data-testid={`overflow-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <Icon 
-                      className={cn(
-                        "flex-shrink-0 h-5 w-5 mr-3",
-                        isActive ? "text-white" : (item.color || "text-gray-400")
-                      )} 
-                    />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    {item.badge && (
-                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-brand-secondary/20 text-brand-secondary rounded-full">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
+                      "flex-shrink-0 h-5 w-5 mr-3",
+                      isActive ? "text-white" : (item.color || "text-gray-400")
+                    )} 
+                  />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.badge && (
+                    <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-brand-secondary/20 text-brand-secondary rounded-full">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
