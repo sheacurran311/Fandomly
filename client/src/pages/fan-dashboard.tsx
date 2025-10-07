@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useFanStats, useActiveCampaigns, useRecommendations } from "@/hooks/use-fan-dashboard";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import FanFacebookConnect from "@/components/social/fan-facebook-connect";
 import FanTwitterWidget from "@/components/social/fan-twitter-widget";
@@ -48,11 +48,8 @@ export default function FanDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="fan" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="fan">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">
@@ -299,8 +296,7 @@ export default function FanDashboard() {
               </Card>
             </div>
           </div>
-        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
