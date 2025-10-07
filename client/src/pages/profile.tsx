@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { FacebookSDKManager } from "@/lib/facebook";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import CreatorProfileEditModal from "@/components/creator/creator-profile-edit-modal";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -348,11 +348,8 @@ export default function Profile() {
   const userInitials = getInitials(user.username || user.profileData?.name || 'User');
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-3 sm:p-4 lg:pl-6 lg:pr-2">
+    <DashboardLayout userType="creator">
+      <div className="p-3 sm:p-4 lg:pl-6 lg:pr-2">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Profile</h1>
@@ -929,7 +926,6 @@ export default function Profile() {
             </Tabs>
           </div>
         </div>
-      </div>
       
       {/* Creator Profile Edit Modal */}
       {user && (
@@ -940,6 +936,6 @@ export default function Profile() {
           creator={creator || undefined}
         />
       )}
-    </div>
+    </DashboardLayout>
   );
 }

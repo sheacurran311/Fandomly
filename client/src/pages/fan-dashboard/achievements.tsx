@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import AchievementBadge from "@/components/achievements/achievement-badge";
 import LevelProgress from "@/components/achievements/level-progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -266,11 +266,8 @@ export default function FanAchievements() {
   );
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="fan" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="fan">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Achievements & Levels</h1>
@@ -470,7 +467,6 @@ export default function FanAchievements() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }

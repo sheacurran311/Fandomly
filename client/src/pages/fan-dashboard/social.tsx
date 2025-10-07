@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect } from "react";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { useToast } from "@/hooks/use-toast";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -348,11 +348,8 @@ export default function FanSocial() {
   ];
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="fan" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="fan">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Social Accounts</h1>
@@ -638,7 +635,6 @@ export default function FanSocial() {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }

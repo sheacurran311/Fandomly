@@ -5,7 +5,7 @@ import CreatorInstagramConnect from "@/components/social/creator-instagram-conne
 import InstagramMessageTest from "@/components/social/instagram-message-test";
 import InstagramWebhookSetup from "@/components/social/instagram-webhook-setup";
 import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

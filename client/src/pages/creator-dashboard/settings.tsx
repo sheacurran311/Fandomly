@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,11 +77,8 @@ export default function CreatorSettings() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2 flex items-center">
@@ -306,7 +303,6 @@ export default function CreatorSettings() {
             </Tabs>
           </div>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }

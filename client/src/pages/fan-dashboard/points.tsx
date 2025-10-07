@@ -18,7 +18,7 @@ import {
   CheckCircle,
   ExternalLink
 } from "lucide-react";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import { usePointTransactionHistory, usePointsSummary, useAvailableRewards, useRewardRedemptions, useRedeemReward } from "@/hooks/use-points";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -107,11 +107,8 @@ export default function FanPoints() {
   const pointsToNextTier = getPointsToNextTier(pointsSummary?.totalPoints || 0, currentTier);
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="fan" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="fan">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2 flex items-center">
@@ -320,7 +317,6 @@ export default function FanPoints() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,11 +39,8 @@ export default function CreatorAnalytics() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="p-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
@@ -304,8 +301,7 @@ export default function CreatorAnalytics() {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

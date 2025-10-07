@@ -17,7 +17,7 @@ import {
   Calendar,
   Target
 } from "lucide-react";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 
 export default function CreatorNIL() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -33,11 +33,8 @@ export default function CreatorNIL() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2 flex items-center">
@@ -241,7 +238,6 @@ export default function CreatorNIL() {
             </TabsContent>
           </Tabs>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import FanProfileEditModal from "@/components/fan/fan-profile-edit-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -341,11 +341,8 @@ export default function FanProfile() {
   const userInitials = getInitials(user.profileData?.name || user.username || 'Fan');
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="fan" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="fan">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Fan Profile</h1>
@@ -877,13 +874,12 @@ export default function FanProfile() {
             </div>
           </div>
         </div>
-      </div>
       
       {/* Profile Edit Modal */}
       <FanProfileEditModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
       />
-    </div>
+    </DashboardLayout>
   );
 }

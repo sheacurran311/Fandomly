@@ -18,7 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye } from "lucide-react";
 import type { Reward } from "@shared/schema";
 import { insertRewardSchema } from "@shared/schema";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 
 // Form schema extending insertRewardSchema with additional validation
@@ -108,11 +108,8 @@ export default function RewardsManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
@@ -213,8 +210,7 @@ export default function RewardsManagement() {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }
 

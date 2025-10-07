@@ -14,7 +14,7 @@ import {
   Plus, Settings, Target, Trash2, Edit, Eye, EyeOff,
   CheckCircle, Clock, BarChart3, Search, Filter
 } from "lucide-react";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 
 interface Task {
@@ -139,11 +139,8 @@ export default function CreatorTasksIndex() {
   const platforms = Array.from(new Set(tasks.map(t => t.platform).filter(Boolean))) as string[];
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
@@ -308,8 +305,7 @@ export default function CreatorTasksIndex() {
             </TabsContent>
           </Tabs>
         </div>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }
 
