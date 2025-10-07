@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useCreatorStats, useCreatorActivity } from "@/hooks/use-creator-dashboard";
-import SidebarNavigation from "@/components/dashboard/sidebar-navigation";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
 import CreatorInstagramWidget from "@/components/social/creator-instagram-widget";
@@ -272,14 +272,13 @@ export default function CreatorDashboard() {
   }
 
   return (
-    <div className="relative min-h-screen bg-brand-dark-bg flex overflow-hidden">
-      {/* Background layers */}
-      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.10),transparent_60%),radial-gradient(40%_40%_at_90%_10%,rgba(20,254,238,0.10),transparent_60%)]" />
-      <div className="absolute inset-0 gradient-primary opacity-[0.03]" />
-      <SidebarNavigation userType="creator" />
-      
-      <div className="relative z-10 flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="relative">
+        {/* Background layers */}
+        <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.10),transparent_60%),radial-gradient(40%_40%_at_90%_10%,rgba(20,254,238,0.10),transparent_60%)]" />
+        <div className="absolute inset-0 gradient-primary opacity-[0.03]" />
+        
+        <div className="relative z-10 p-6">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">
@@ -480,6 +479,6 @@ export default function CreatorDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
