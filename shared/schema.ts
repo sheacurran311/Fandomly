@@ -287,6 +287,52 @@ export const users = pgTable("users", {
     subscriptionStatus?: "active" | "inactive" | "trial";
     subscriptionTier?: "starter" | "professional" | "enterprise";
   }>(),
+  
+  // Notification Preferences - Comprehensive multi-channel system
+  notificationPreferences: jsonb("notification_preferences").$type<{
+    marketing: {
+      push: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    campaignUpdates: {
+      push: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    creatorUpdates: {
+      push: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    newTasks: {
+      push: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    newRewards: {
+      push: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    achievementAlerts: {
+      push: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    weeklyDigest: boolean;
+    monthlyReport: boolean;
+  }>().default({
+    marketing: { push: true, email: true, sms: false },
+    campaignUpdates: { push: true, email: true, sms: false },
+    creatorUpdates: { push: true, email: false, sms: false },
+    newTasks: { push: true, email: true, sms: false },
+    newRewards: { push: true, email: true, sms: false },
+    achievementAlerts: { push: true, email: false, sms: false },
+    weeklyDigest: false,
+    monthlyReport: false,
+  }),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -387,6 +433,23 @@ export const creators = pgTable("creators", {
     profileComplete: false,
     requiredFieldsFilled: [],
     completionPercentage: 0,
+  }),
+  
+  // Public Page Settings - Controls what sections are visible on creator's public page
+  publicPageSettings: jsonb("public_page_settings").$type<{
+    showAbout: boolean;
+    showTasks: boolean;
+    showSocialPosts: boolean;
+    showAnalytics: boolean;
+    showRewards: boolean;
+    showCommunity: boolean;
+  }>().default({
+    showAbout: true,
+    showTasks: true,
+    showSocialPosts: true,
+    showAnalytics: false,
+    showRewards: true,
+    showCommunity: true
   }),
   
   createdAt: timestamp("created_at").defaultNow(),
@@ -524,6 +587,59 @@ export const rewardRedemptions = pgTable("reward_redemptions", {
     deliveryInfo?: any;
   }>(),
   redeemedAt: timestamp("redeemed_at").defaultNow(),
+});
+
+// Notifications - In-app notification system
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'points_earned',
+  'task_completed',
+  'campaign_new',
+  'campaign_update',
+  'creator_post',
+  'creator_update',
+  'reward_available',
+  'reward_claimed',
+  'achievement_unlocked',
+  'level_up',
+  'follower_milestone',
+  'system',
+  'marketing',
+]);
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id), // Optional - null for platform-wide notifications
+  
+  // Notification Content
+  type: notificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  
+  // Additional Data
+  metadata: jsonb("metadata").$type<{
+    points?: number;
+    taskId?: string;
+    campaignId?: string;
+    creatorId?: string;
+    rewardId?: string;
+    achievementId?: string;
+    actionUrl?: string; // Deep link to relevant page
+    imageUrl?: string;
+  }>(),
+  
+  // Status
+  read: boolean("read").default(false),
+  readAt: timestamp("read_at"),
+  
+  // Delivery tracking
+  sentVia: jsonb("sent_via").$type<{
+    push?: boolean;
+    email?: boolean;
+    sms?: boolean;
+  }>().default({ push: true, email: false, sms: false }),
+  
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // OpenLoyalty-style Campaign System
@@ -1272,6 +1388,15 @@ export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema
 
 export type RewardRedemption = typeof rewardRedemptions.$inferSelect;
 export type InsertRewardRedemption = z.infer<typeof insertRewardRedemptionSchema>;
+
+// Notification Types
+export type Notification = typeof notifications.$inferSelect;
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  readAt: true,
+});
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // Campaign Types
 export type Campaign = typeof campaigns.$inferSelect;

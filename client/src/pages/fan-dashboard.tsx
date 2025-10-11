@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 import { 
   CreditCard, 
   Heart, 
@@ -142,9 +143,11 @@ export default function FanDashboard() {
                       <div className="text-center py-8">
                         <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-400 mb-4">No active campaigns yet</p>
-                        <Button variant="outline" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
-                          Discover Creators
-                        </Button>
+                        <Link href="/find-creators">
+                          <Button variant="outline" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                            Discover Creators
+                          </Button>
+                        </Link>
                       </div>
                     ) : (
                       activeCampaigns.map((campaign, index) => (
@@ -211,14 +214,15 @@ export default function FanDashboard() {
                     <Gift className="h-4 w-4 mr-2" />
                     Browse Rewards
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start"
-                    onClick={() => window.location.href = '/marketplace'}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Discover Creators
-                  </Button>
+                  <Link href="/find-creators">
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Discover Creators
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
 

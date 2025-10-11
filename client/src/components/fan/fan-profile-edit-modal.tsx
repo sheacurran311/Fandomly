@@ -24,7 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, X, User, Mail, Phone, MapPin, Calendar, Check, AlertCircle, Upload, Image as ImageIcon, Users, Music, Video } from "lucide-react";
+import { Save, X, User, Mail, Phone, MapPin, Calendar, Check, AlertCircle, Upload, Image as ImageIcon, Users, Music, Video, Bell } from "lucide-react";
+import { Link } from "wouter";
 import useUsernameValidation from "@/hooks/use-username-validation";
 import { CREATOR_TYPE_OPTIONS, getSubcategoryOptions, getCreatorTypeLabel } from "@shared/fanInterestOptions";
 import type { CreatorTypeInterest } from "@shared/fanInterestOptions";
@@ -78,7 +79,7 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   
   // Username validation (only validate when editing)
-  const { isChecking, isAvailable, error: usernameError, suggestions } = useUsernameValidation(
+  const { isChecking, isAvailable, error: usernameError, suggestions, hasChecked } = useUsernameValidation(
     isEditingUsername ? username : ""
   );
   
@@ -114,46 +115,54 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
 
   // Load existing data when modal opens
   useEffect(() => {
-    if (isOpen && user?.profileData) {
-      setFormData({
-        name: user.profileData.name || "",
-        age: user.profileData.age || undefined,
-        location: user.profileData.location || "",
-        phoneNumber: user.profileData.phoneNumber || "",
-        dateOfBirth: user.profileData.dateOfBirth || "",
-        gender: user.profileData.gender || "",
-        phone: (user.profileData as any).phone || "", // NEW
-        creatorTypeInterests: (user.profileData as any).creatorTypeInterests || [], // NEW
-        interestSubcategories: (user.profileData as any).interestSubcategories || { // NEW
-          athletes: [],
-          musicians: [],
-          content_creators: []
-        },
-        interests: user.profileData.interests || [],
-        socialLinks: {
-          twitter: user.profileData.socialLinks?.twitter || "",
-          instagram: user.profileData.socialLinks?.instagram || "",
-          tiktok: user.profileData.socialLinks?.tiktok || "",
-          youtube: user.profileData.socialLinks?.youtube || "",
-        },
-        preferences: {
-          emailNotifications: user.profileData.preferences?.emailNotifications ?? true,
-          pushNotifications: user.profileData.preferences?.pushNotifications ?? true,
-          marketingEmails: user.profileData.preferences?.marketingEmails ?? true,
-          smsNotifications: user.profileData.preferences?.smsNotifications ?? true,
-        },
-      });
+    if (isOpen && user) {
+      // Load username
+      setUsername(user.username || "");
+      setIsEditingUsername(false);
+      
+      // Load profile data
+      if (user.profileData) {
+        setFormData({
+          name: user.profileData.name || "",
+          age: user.profileData.age || undefined,
+          location: user.profileData.location || "",
+          phoneNumber: user.profileData.phoneNumber || "",
+          dateOfBirth: user.profileData.dateOfBirth || "",
+          gender: user.profileData.gender || "",
+          phone: (user.profileData as any).phone || "", // NEW
+          creatorTypeInterests: (user.profileData as any).creatorTypeInterests || [], // NEW
+          interestSubcategories: (user.profileData as any).interestSubcategories || { // NEW
+            athletes: [],
+            musicians: [],
+            content_creators: []
+          },
+          interests: user.profileData.interests || [],
+          socialLinks: {
+            twitter: user.profileData.socialLinks?.twitter || "",
+            instagram: user.profileData.socialLinks?.instagram || "",
+            tiktok: user.profileData.socialLinks?.tiktok || "",
+            youtube: user.profileData.socialLinks?.youtube || "",
+          },
+          preferences: {
+            emailNotifications: user.profileData.preferences?.emailNotifications ?? true,
+            pushNotifications: user.profileData.preferences?.pushNotifications ?? true,
+            marketingEmails: user.profileData.preferences?.marketingEmails ?? true,
+            smsNotifications: user.profileData.preferences?.smsNotifications ?? true,
+          },
+        });
+      }
     }
-  }, [isOpen, user?.profileData]);
+  }, [isOpen, user]);
 
   const updateProfile = useMutation({
-    mutationFn: async (profileData: ProfileData) => {
+    mutationFn: async (data: { username?: string; profileData: ProfileData }) => {
       if (!user) throw new Error("User not found");
       
       const response = await apiRequest("POST", "/api/auth/profile", {
         userId: user.id,
+        username: data.username, // Include username if changed
         profileData: {
-          ...profileData,
+          ...data.profileData,
           // Keep existing Facebook data
           facebookData: user.profileData?.facebookData,
         }
@@ -269,7 +278,21 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile.mutate(formData);
+    
+    // Validate username if editing
+    if (isEditingUsername && (!isAvailable || isChecking)) {
+      toast({
+        title: "Invalid Username",
+        description: "Please choose a valid and available username",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    updateProfile.mutate({
+      username: isEditingUsername && username !== user?.username ? username : undefined,
+      profileData: formData,
+    });
   };
 
   return (
@@ -283,6 +306,84 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Username Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-white">Username</h3>
+            <div>
+              <Label htmlFor="username" className="text-gray-300 flex items-center justify-between">
+                <span>Username *</span>
+                {!isEditingUsername && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditingUsername(true)}
+                    className="text-brand-primary hover:text-brand-primary/80 h-auto p-1"
+                  >
+                    Edit
+                  </Button>
+                )}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                  disabled={!isEditingUsername}
+                  className={`bg-gray-800 border-gray-700 text-white pr-10 ${
+                    !isEditingUsername ? 'opacity-70 cursor-not-allowed' : ''
+                  } ${
+                    isEditingUsername && hasChecked && !isAvailable ? 'border-red-500' : 
+                    isEditingUsername && hasChecked && isAvailable ? 'border-green-500' : ''
+                  }`}
+                  placeholder="your_unique_username"
+                />
+                {isEditingUsername && isChecking && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+                {isEditingUsername && hasChecked && !isChecking && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {isAvailable ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {isEditingUsername && usernameError && (
+                <p className="text-red-400 text-sm mt-1">{usernameError}</p>
+              )}
+              {isEditingUsername && hasChecked && isAvailable && (
+                <p className="text-green-400 text-sm mt-1 flex items-center">
+                  <Check className="h-3 w-3 mr-1" />
+                  Username available!
+                </p>
+              )}
+              {isEditingUsername && suggestions && suggestions.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-gray-400 text-xs mb-1">Suggestions:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {suggestions.slice(0, 3).map(suggestion => (
+                      <Badge
+                        key={suggestion}
+                        variant="outline"
+                        className="cursor-pointer text-xs bg-gray-800 hover:bg-gray-700"
+                        onClick={() => setUsername(suggestion)}
+                      >
+                        {suggestion}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Separator className="bg-gray-700" />
+
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">Basic Information</h3>
@@ -441,45 +542,72 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
 
           <Separator className="bg-gray-700" />
 
-          {/* Notification Preferences */}
+          {/* Notification Preferences - Comprehensive */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Notification Preferences</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="emailNotifications" className="text-gray-300">Email Notifications</Label>
-                <Switch
-                  id="emailNotifications"
-                  checked={formData.preferences?.emailNotifications}
-                  onCheckedChange={(checked) => handlePreferenceChange('emailNotifications', checked)}
-                />
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Bell className="mr-2 h-5 w-5" />
+                  Notification Preferences
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  {formData.phone ? 'SMS enabled - ' : 'Add phone for SMS - '}
+                  <Link href="/fan-dashboard/settings#notifications">
+                    <span className="text-brand-primary hover:underline cursor-pointer">
+                      Manage all settings
+                    </span>
+                  </Link>
+                </p>
+              </div>
+            </div>
+            
+            <div className="space-y-3 text-sm">
+              {/* Marketing */}
+              <div className="p-3 bg-gray-800/50 rounded-lg">
+                <div className="font-medium text-white mb-2">Marketing Communications</div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="marketingEmails" className="text-gray-300 text-xs">Email Updates</Label>
+                  <Switch
+                    id="marketingEmails"
+                    checked={formData.preferences?.marketingEmails}
+                    onCheckedChange={(checked) => handlePreferenceChange('marketingEmails', checked)}
+                  />
+                </div>
               </div>
               
-              <div className="flex items-center justify-between">
-                <Label htmlFor="pushNotifications" className="text-gray-300">Push Notifications</Label>
-                <Switch
-                  id="pushNotifications"
-                  checked={formData.preferences?.pushNotifications}
-                  onCheckedChange={(checked) => handlePreferenceChange('pushNotifications', checked)}
-                />
+              {/* Creator Updates */}
+              <div className="p-3 bg-gray-800/50 rounded-lg">
+                <div className="font-medium text-white mb-2">Creator Updates</div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300 text-xs">Email Notifications</Label>
+                    <Switch
+                      checked={formData.preferences?.emailNotifications}
+                      onCheckedChange={(checked) => handlePreferenceChange('emailNotifications', checked)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300 text-xs">Push Notifications</Label>
+                    <Switch
+                      checked={formData.preferences?.pushNotifications}
+                      onCheckedChange={(checked) => handlePreferenceChange('pushNotifications', checked)}
+                    />
+                  </div>
+                  {formData.phone && (
+                    <div className="flex items-center justify-between">
+                      <Label className="text-gray-300 text-xs">SMS Alerts</Label>
+                      <Switch
+                        checked={formData.preferences?.smsNotifications}
+                        onCheckedChange={(checked) => handlePreferenceChange('smsNotifications', checked)}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
               
-              <div className="flex items-center justify-between">
-                <Label htmlFor="marketingEmails" className="text-gray-300">Marketing Emails</Label>
-                <Switch
-                  id="marketingEmails"
-                  checked={formData.preferences?.marketingEmails}
-                  onCheckedChange={(checked) => handlePreferenceChange('marketingEmails', checked)}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <Label htmlFor="smsNotifications" className="text-gray-300">SMS Notifications</Label>
-                <Switch
-                  id="smsNotifications"
-                  checked={formData.preferences?.smsNotifications}
-                  onCheckedChange={(checked) => handlePreferenceChange('smsNotifications', checked)}
-                />
-              </div>
+              <p className="text-xs text-gray-500 italic">
+                Visit Settings → Notifications for granular control (campaigns, tasks, rewards, achievements)
+              </p>
             </div>
           </div>
 

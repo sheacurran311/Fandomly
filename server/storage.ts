@@ -3,6 +3,7 @@ import {
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
   tasks, taskAssignments, taskTemplates, taskCompletions, rewardDistributions,
+  notifications,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -313,7 +314,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllCreators(): Promise<Creator[]> {
-    return await db.select().from(creators).orderBy(desc(creators.followerCount));
+    // Get all creators without ordering first (will be sorted in API layer)
+    const allCreators = await db.select().from(creators);
+    console.log(`📊 getAllCreators() found ${allCreators.length} creators`);
+    return allCreators;
   }
 
   // Loyalty program operations

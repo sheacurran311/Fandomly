@@ -6,12 +6,15 @@ import { FacebookSDKManager } from "@/lib/facebook";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import CreatorProfileEditModal from "@/components/creator/creator-profile-edit-modal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useInstagramConnection } from "@/contexts/instagram-connection-context";
+import useUsernameValidation from "@/hooks/use-username-validation";
+import { transformImageUrl } from "@/lib/image-utils";
 import { 
   User, 
   Mail, 
@@ -32,7 +35,9 @@ import {
   Share2,
   Settings,
   Music,
-  Video
+  Video,
+  X,
+  Check
 } from "lucide-react";
 import { Twitter } from "lucide-react";
 import { TwitterSDKManager } from "@/lib/twitter";
@@ -51,6 +56,13 @@ export default function Profile() {
   const [twitterConnected, setTwitterConnected] = useState(false);
   const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
   const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  
+  // Username editing state
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editedUsername, setEditedUsername] = useState('');
+  const { isChecking, isAvailable, error: usernameError, suggestions, hasChecked } = useUsernameValidation(
+    isEditingUsername ? editedUsername : ""
+  );
   
   // Facebook import state
   const [isImporting, setIsImporting] = useState(false);
@@ -388,7 +400,7 @@ export default function Profile() {
                           <div className="relative">
                             <Avatar className="w-32 h-32 mx-auto" data-testid="img-profile-photo">
                               <AvatarImage 
-                                src={user.profileData?.avatar} 
+                                src={transformImageUrl(user.profileData?.avatar) || undefined} 
                                 alt={user.profileData?.name || user.username || "Creator"} 
                               />
                               <AvatarFallback className="w-32 h-32 bg-gradient-to-br from-pink-400 to-pink-600 text-white text-2xl font-bold">
@@ -474,9 +486,103 @@ export default function Profile() {
                           
                           <div>
                             <label className="text-sm text-gray-400 mb-1 block">Username</label>
-                            <div className="text-white break-words" data-testid="text-username">
-                              @{user.username || 'username'}
-                            </div>
+                            {isEditingUsername ? (
+                              <div className="space-y-2">
+                                <div className="flex gap-2">
+                                  <div className="flex-1">
+                                    <Input
+                                      value={editedUsername}
+                                      onChange={(e) => {
+                                        setEditedUsername(e.target.value);
+                                      }}
+                                      placeholder="Enter username"
+                                      className="bg-white/5 border-white/20 text-white"
+                                    />
+                                    {isChecking && (
+                                      <p className="text-xs text-gray-400 mt-1">Checking availability...</p>
+                                    )}
+                                    {usernameError && (
+                                      <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        {usernameError}
+                                      </p>
+                                    )}
+                                    {isAvailable && !usernameError && editedUsername && hasChecked && (
+                                      <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                                        <CheckCircle className="h-3 w-3" />
+                                        Username available!
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={async () => {
+                                        if (isAvailable && editedUsername) {
+                                          try {
+                                            const response = await apiRequest('POST', '/api/auth/profile', {
+                                              userId: user.id,
+                                              username: editedUsername
+                                            });
+                                            await response.json();
+                                            
+                                            toast({
+                                              title: "Success!",
+                                              description: "Username updated successfully",
+                                            });
+                                            
+                                            // Invalidate all user-related queries to refresh data
+                                            await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+                                            await queryClient.refetchQueries({ queryKey: ['/api/auth/me'] });
+                                            
+                                            setIsEditingUsername(false);
+                                          } catch (error: any) {
+                                            toast({
+                                              title: "Error",
+                                              description: error.message || "Failed to update username",
+                                              variant: "destructive",
+                                            });
+                                          }
+                                        }
+                                      }}
+                                      disabled={!isAvailable || !editedUsername || isChecking}
+                                      className="text-green-400 hover:text-green-300"
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setIsEditingUsername(false);
+                                        setEditedUsername(user.username || '');
+                                      }}
+                                      className="text-red-400 hover:text-red-300"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="text-white break-words" data-testid="text-username">
+                                  @{user.username || 'username'}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditedUsername(user.username || '');
+                                    setIsEditingUsername(true);
+                                  }}
+                                  className="text-brand-primary hover:text-brand-primary/80"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                           
                           <div>

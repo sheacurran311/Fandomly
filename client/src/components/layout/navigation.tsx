@@ -9,6 +9,7 @@ import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 import UserTypeSwitcher from "@/components/auth/user-type-switcher";
 import { useAuth } from "@/hooks/use-auth";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
+import { transformImageUrl } from "@/lib/image-utils";
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -50,8 +51,8 @@ export default function Navigation() {
                   <Link href="/#features" className="text-gray-300 hover:text-brand-secondary transition-colors">
                     Features
                   </Link>
-                  <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                    Rewards Store
+                  <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                    Find Creators
                   </Link>
                   <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
                     Who It's For
@@ -60,6 +61,9 @@ export default function Navigation() {
               ) : (
                 // Authenticated users see simplified navigation
                 <>
+                  <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                    Find Creators
+                  </Link>
                   <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
                     Rewards Store
                   </Link>
@@ -96,7 +100,7 @@ export default function Navigation() {
                       <Button variant="ghost" className="flex items-center space-x-2 text-white hover:text-brand-secondary">
                         <Avatar className="w-8 h-8" data-testid="img-nav-user-avatar">
                           <AvatarImage 
-                            src={userData?.profileData?.avatar} 
+                            src={transformImageUrl(userData?.profileData?.avatar) || undefined} 
                             alt={userData?.profileData?.name || userData?.username || dynamicUser?.email || "User"} 
                           />
                           <AvatarFallback className="w-8 h-8 bg-brand-primary text-white text-sm font-bold">
@@ -125,14 +129,18 @@ export default function Navigation() {
                           </DropdownMenuItem>
                         </Link>
                       </RoleGuard>
-                      <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
-                        <User className="mr-2 h-4 w-4" />
-                        Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Settings
-                      </DropdownMenuItem>
+                      <Link href={userData?.userType === 'creator' ? '/profile' : '/fan-profile'}>
+                        <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
+                          <User className="mr-2 h-4 w-4" />
+                          Profile
+                        </DropdownMenuItem>
+                      </Link>
+                      <Link href={userData?.userType === 'creator' ? '/creator-dashboard/settings' : '/fan-dashboard/settings'}>
+                        <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
+                          <Settings className="mr-2 h-4 w-4" />
+                          Settings
+                        </DropdownMenuItem>
+                      </Link>
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
                       {userData && (
                         <div className="px-2 py-1">
@@ -179,8 +187,8 @@ export default function Navigation() {
                     <Link href="/#features" className="text-gray-300 hover:text-brand-secondary transition-colors">
                       Features
                     </Link>
-                    <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                      Marketplace
+                    <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Find Creators
                     </Link>
                     <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
                       Who It's For
@@ -189,8 +197,11 @@ export default function Navigation() {
                 ) : (
                   // Authenticated mobile navigation
                   <>
+                    <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
+                      Find Creators
+                    </Link>
                     <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                      Marketplace
+                      Rewards Store
                     </Link>
                     {userData?.userType === 'creator' ? (
                       <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">

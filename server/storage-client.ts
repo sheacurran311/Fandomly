@@ -42,8 +42,8 @@ export async function uploadImage(
     }
     
     // Generate the public URL for the uploaded image
-    // Format: https://storage.replit.com/{bucket-id}/{object-path}
-    const url = `https://storage.replit.com/${BUCKET_ID}/${filename}`;
+    // Use our own server endpoint to proxy the image from Replit storage
+    const url = `/api/storage/${filename}`;
     
     return { ok: true, url };
   } catch (error) {

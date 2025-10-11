@@ -12,14 +12,17 @@ import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 
 export default function Home() {
-  const { user } = useDynamicContext();
+  const { user, setShowAuthFlow } = useDynamicContext();
 
   const { data: creators = [] } = useQuery<Creator[]>({
     queryKey: ["/api/creators"],
     enabled: true,
   });
 
-
+  const handleUnauthenticatedClick = () => {
+    // Trigger Dynamic auth modal for unauthenticated users
+    setShowAuthFlow(true);
+  };
 
   const handleStartCreatorSignup = () => {
     if (!user) {
@@ -60,19 +63,24 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-stretch sm:items-center mb-12 sm:mb-16 px-4">
-              <ConnectWalletButton 
-                className="w-full sm:w-auto bg-brand-accent text-[#0e1430] px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 hover:scale-105 shadow-[0_0_18px_rgba(20,254,238,0.5),_0_0_42px_rgba(20,254,238,0.3)] min-h-[48px] sm:min-h-[56px]"
+              <button
+                onClick={() => setShowAuthFlow(true)}
+                className="w-full sm:w-[200px] bg-brand-accent text-[#0e1430] px-8 py-2.5 sm:py-3 rounded-full font-bold transition-all duration-300 hover:scale-105 shadow-[0_0_18px_rgba(20,254,238,0.5),_0_0_42px_rgba(20,254,238,0.3)] h-[52px] sm:h-[56px] flex flex-col items-center justify-center"
               >
-                Start Now
-              </ConnectWalletButton>
-              <Button 
-                onClick={() => window.location.href = "/marketplace"}
-                size="lg"
-                variant="neon"
-                className="w-full sm:w-auto px-8 sm:px-10 lg:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all duration-300 h-auto min-h-[48px] sm:min-h-[56px]"
+                <span className="text-[22px] sm:text-2xl font-bold">Fans</span>
+                <span className="flex items-center text-[11px] sm:text-xs mt-0.5 font-medium">
+                  Start here <ArrowRight className="ml-1 h-3 w-3" />
+                </span>
+              </button>
+              <button 
+                onClick={() => setShowAuthFlow(true)}
+                className="w-full sm:w-[200px] bg-brand-primary text-white px-8 py-2.5 sm:py-3 rounded-full font-bold transition-all duration-300 hover:scale-105 hover:bg-brand-primary/90 h-[52px] sm:h-[56px] flex flex-col items-center justify-center border-2 border-brand-primary"
               >
-                Explore Creators
-              </Button>
+                <span className="text-[22px] sm:text-2xl font-bold">Creators</span>
+                <span className="flex items-center text-[11px] sm:text-xs mt-0.5 font-medium">
+                  Start here <ArrowRight className="ml-1 h-3 w-3" />
+                </span>
+              </button>
             </div>
             
             {/* Trust Indicators */}
@@ -191,6 +199,8 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl lg:text-5xl font-bold mb-6">
+              <span className="text-brand-accent font-black">Fans</span>{" "}
+              <span className="text-white">-</span>{" "}
               <span className="text-brand-secondary">Discover</span>{" "}
               <span className="text-brand-primary">Amazing Creators</span>
             </h2>
@@ -201,12 +211,16 @@ export default function Home() {
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             {creators.slice(0, 3).map((creator) => (
-              <CreatorCard key={creator.id} creator={creator} />
+              <CreatorCard 
+                key={creator.id} 
+                creator={creator} 
+                onUnauthenticatedClick={!user ? handleUnauthenticatedClick : undefined}
+              />
             ))}
           </div>
           
           <div className="text-center">
-            <Link href="/marketplace">
+            <Link href="/find-creators">
               <Button
                 variant="outline"
                 size="lg"
@@ -228,7 +242,7 @@ export default function Home() {
               Who Fandomly Is For
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Built specifically for NIL athletes, content creators, and musicians who want to monetize their personal brand and build lasting relationships with their fans through innovative AI and blockchainf-powered loyalty programs.
+              Built specifically for NIL athletes, content creators, and musicians who want to monetize their personal brand and build lasting relationships with their fans through innovative AI and blockchain-powered loyalty programs.
             </p>
           </div>
           

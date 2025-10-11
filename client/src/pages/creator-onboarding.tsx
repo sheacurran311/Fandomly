@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import useUsernameValidation from "@/hooks/use-username-validation";
+import useSlugValidation from "@/hooks/use-slug-validation";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -29,7 +30,8 @@ import {
   Upload,
   Image,
   AlertCircle,
-  Check
+  Check,
+  Edit2
 } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
 
@@ -175,6 +177,7 @@ export default function CreatorOnboardingPage() {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [selectedTier, setSelectedTier] = useState('professional');
+  const [isEditingSlug, setIsEditingSlug] = useState(false);
   
   // Get creator type from URL params
   const params = new URLSearchParams(window.location.search);
@@ -231,6 +234,15 @@ export default function CreatorOnboardingPage() {
 
   // Username validation
   const { isChecking, isAvailable, error: usernameError, suggestions, hasChecked } = useUsernameValidation(formData.username);
+  
+  // Slug validation
+  const { 
+    isChecking: slugChecking, 
+    isAvailable: slugAvailable, 
+    error: slugError, 
+    suggestions: slugSuggestions,
+    hasChecked: slugHasChecked 
+  } = useSlugValidation(formData.slug);
 
   const completeOnboardingMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -266,7 +278,15 @@ export default function CreatorOnboardingPage() {
     setFormData(prev => ({
       ...prev,
       name,
-      slug: generateSlug(name)
+      // Only auto-generate slug if not manually edited
+      slug: isEditingSlug ? prev.slug : generateSlug(name)
+    }));
+  };
+
+  const handleSlugChange = (slug: string) => {
+    setFormData(prev => ({
+      ...prev,
+      slug: slug.toLowerCase()
     }));
   };
 
@@ -765,16 +785,92 @@ export default function CreatorOnboardingPage() {
 
               <div>
                 <Label htmlFor="storeSlug" className="text-gray-300">Store URL *</Label>
-                <div className="flex items-center">
-                  <span className="text-gray-400 text-sm mr-2">fandomly.com/</span>
-                  <Input
-                    id="storeSlug"
-                    value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    placeholder="your-store-name"
-                    className="bg-white/10 border-white/20 text-white"
-                  />
-                </div>
+                <p className="text-sm text-gray-400 mb-2">Your unique creator page URL</p>
+                
+                {!isEditingSlug ? (
+                  <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/10 rounded-lg">
+                    <span className="text-gray-400 text-sm">fandomly.com/@</span>
+                    <span className="text-white font-mono flex-1">{formData.slug || 'your-slug'}</span>
+                    <Button
+                      type="button"
+                      onClick={() => setIsEditingSlug(true)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-brand-primary hover:text-brand-primary/80 hover:bg-brand-primary/10"
+                    >
+                      <Edit2 className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-sm">fandomly.com/@</span>
+                      <div className="relative flex-1">
+                        <Input
+                          id="storeSlug"
+                          value={formData.slug}
+                          onChange={(e) => handleSlugChange(e.target.value)}
+                          placeholder="your-store-name"
+                          className={`bg-white/10 border-white/20 text-white pr-10 font-mono ${
+                            slugHasChecked && !slugAvailable ? 'border-red-500' : 
+                            slugHasChecked && slugAvailable ? 'border-green-500' : ''
+                          }`}
+                        />
+                        {slugChecking && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                          </div>
+                        )}
+                        {slugHasChecked && !slugChecking && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            {slugAvailable ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => setIsEditingSlug(false)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-gray-400 hover:text-white hover:bg-white/10"
+                      >
+                        Done
+                      </Button>
+                    </div>
+                    {slugError && (
+                      <p className="text-red-400 text-sm mt-1">{slugError}</p>
+                    )}
+                    {slugHasChecked && slugAvailable && (
+                      <p className="text-green-400 text-sm mt-1">✓ Slug is available!</p>
+                    )}
+                    {slugSuggestions.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-gray-400 text-sm mb-1">Suggestions:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {slugSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, slug: suggestion }));
+                              }}
+                              className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30 font-mono"
+                            >
+                              @{suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  ⓘ Use lowercase letters, numbers, and hyphens only. This will be your permanent URL.
+                </p>
               </div>
 
               <div>
@@ -853,6 +949,7 @@ export default function CreatorOnboardingPage() {
                 </Button>
                 <Button 
                   onClick={() => setStep(4)}
+                  disabled={!formData.name || !formData.slug || !slugAvailable || slugChecking}
                   className="flex-1 gradient-primary text-[#101636] font-bold"
                 >
                   Continue to Subscription

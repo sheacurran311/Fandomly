@@ -59,30 +59,30 @@ export default function FloatingCreateButton({ userType }: FloatingCreateButtonP
 
       {/* Create Options Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10 mx-4 max-w-[calc(100vw-2rem)]">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl">Create New</DialogTitle>
-            <DialogDescription className="text-gray-400">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md bg-brand-dark-bg border-white/10">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-white text-xl text-center sm:text-left">Create New</DialogTitle>
+            <DialogDescription className="text-gray-400 text-center sm:text-left">
               Choose what you'd like to create
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3 py-2">
             <Button
               onClick={handleCreateTask}
               className={cn(
-                "h-auto p-6 flex items-start gap-4 bg-white/5 hover:bg-brand-primary/20",
+                "h-auto p-4 sm:p-6 flex items-start gap-3 sm:gap-4 bg-white/5 hover:bg-brand-primary/20",
                 "border border-white/10 hover:border-brand-primary/50",
                 "transition-all duration-200"
               )}
               data-testid="button-create-task"
             >
-              <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                <Target className="h-6 w-6 text-indigo-400" />
+              <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                <Target className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
               </div>
               <div className="flex-1 text-left">
-                <div className="font-semibold text-white mb-1">New Task</div>
-                <div className="text-sm text-gray-400">
+                <div className="font-semibold text-white mb-1 text-sm sm:text-base">New Task</div>
+                <div className="text-xs sm:text-sm text-gray-400 leading-snug">
                   Create a social media task for fans to complete
                 </div>
               </div>
@@ -91,18 +91,18 @@ export default function FloatingCreateButton({ userType }: FloatingCreateButtonP
             <Button
               onClick={handleCreateCampaign}
               className={cn(
-                "h-auto p-6 flex items-start gap-4 bg-white/5 hover:bg-brand-primary/20",
+                "h-auto p-4 sm:p-6 flex items-start gap-3 sm:gap-4 bg-white/5 hover:bg-brand-primary/20",
                 "border border-white/10 hover:border-brand-primary/50",
                 "transition-all duration-200"
               )}
               data-testid="button-create-campaign"
             >
-              <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                <Megaphone className="h-6 w-6 text-orange-400" />
+              <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-orange-400" />
               </div>
               <div className="flex-1 text-left">
-                <div className="font-semibold text-white mb-1">New Campaign</div>
-                <div className="text-sm text-gray-400">
+                <div className="font-semibold text-white mb-1 text-sm sm:text-base">New Campaign</div>
+                <div className="text-xs sm:text-sm text-gray-400 leading-snug">
                   Launch a campaign with multiple tasks and rewards
                 </div>
               </div>

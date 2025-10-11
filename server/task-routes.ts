@@ -137,6 +137,40 @@ export function registerTaskRoutes(app: Express) {
     }
   });
 
+  // Get published tasks for a specific creator (public endpoint)
+  app.get("/api/tasks/creator/:creatorId", async (req: Request, res: Response) => {
+    try {
+      const { creatorId } = req.params;
+      
+      // Get all tasks for this creator
+      const allTasks = await storage.getTasksByCreator(creatorId);
+      
+      // Filter to only published, active tasks
+      const now = new Date();
+      const publishedTasks = allTasks.filter(task => {
+        // Must be published (not draft) and active
+        if (task.isDraft || !task.isActive) {
+          return false;
+        }
+        
+        // Check time constraints
+        if (task.startTime && new Date(task.startTime) > now) {
+          return false;
+        }
+        if (task.endTime && new Date(task.endTime) < now) {
+          return false;
+        }
+        
+        return true;
+      });
+      
+      res.json(publishedTasks);
+    } catch (error) {
+      console.error('Error fetching creator tasks:', error);
+      res.status(500).json({ error: 'Failed to fetch creator tasks' });
+    }
+  });
+
   // Create new task
   app.post("/api/tasks", async (req: Request, res: Response) => {
     try {
@@ -310,6 +344,37 @@ export function registerTaskRoutes(app: Express) {
         error: "Failed to fetch task",
         message: error.message,
       });
+    }
+  });
+
+  // Get single task by ID
+  app.get("/api/tasks/:taskId", async (req: Request, res: Response) => {
+    try {
+      const { taskId } = req.params;
+      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+
+      const task = await storage.getTask(taskId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Only allow the creator who owns this task to fetch it
+      if (userId) {
+        const creator = await storage.getCreatorByUserId(userId);
+        if (creator && task.creatorId === creator.id) {
+          return res.json(task);
+        }
+      }
+
+      // For non-owners, only return if task is published
+      if (!task.isDraft && task.isActive) {
+        return res.json(task);
+      }
+
+      return res.status(401).json({ error: 'Unauthorized to view this task' });
+    } catch (error) {
+      console.error('Error fetching task:', error);
+      res.status(500).json({ error: 'Failed to fetch task' });
     }
   });
 

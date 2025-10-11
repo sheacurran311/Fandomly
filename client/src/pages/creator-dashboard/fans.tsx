@@ -127,15 +127,15 @@ export default function CreatorFans() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400">Total Fans</p>
+                    <p className="text-sm text-gray-400">Fandomly Followers</p>
                     <p className="text-2xl font-bold text-white">{fans.length.toLocaleString()}</p>
                   </div>
                   <Users className="h-8 w-8 text-brand-primary" />
                 </div>
-                <div className="mt-2 flex items-center text-sm">
-                  <TrendingUp className="h-4 w-4 text-green-400 mr-1" />
-                  <span className="text-green-400">+12.5%</span>
-                  <span className="text-gray-400 ml-1">this month</span>
+                <div className="mt-2">
+                  <p className="text-xs text-gray-400">
+                    Total Fandomly platform followers
+                  </p>
                 </div>
               </CardContent>
             </Card>

@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Users, Trophy, Star, Grid, List, Sparkles, Coins } from "lucide-react";
+import { Search, Filter, Users, Trophy, Star, Grid, List, Sparkles, Coins, Lock } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
 import NFTCard from "@/components/marketplace/nft-card";
 import BlockchainFilter from "@/components/marketplace/blockchain-filter";
 import { type Creator, type Reward } from "@shared/schema";
 import { sampleNFTRewards } from "@/data/sampleNFTs";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 
 export default function Marketplace() {
+  const { user } = useDynamicContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedChains, setSelectedChains] = useState<string[]>([]);
@@ -67,6 +70,27 @@ export default function Marketplace() {
 
   const clearChainFilters = () => setSelectedChains([]);
 
+  // Route protection: Only authenticated users can access Rewards Store
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="mb-6">
+            <Lock className="h-16 w-16 text-brand-primary mx-auto mb-4" />
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-4">Rewards Store Access</h2>
+          <p className="text-gray-300 mb-8">
+            Please sign in to access the Rewards Store and browse exclusive NFT rewards from your favorite creators.
+          </p>
+          <ConnectWalletButton 
+            className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-8 py-3 rounded-xl transition-all duration-200 hover:scale-105"
+            text="Sign In to Continue"
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (creatorsLoading || rewardsLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
@@ -85,10 +109,10 @@ export default function Marketplace() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h1 className="text-4xl lg:text-6xl font-bold mb-6 gradient-text">
-              NFT & Creator Marketplace
+              Rewards Store
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Discover exclusive NFTs, join creator loyalty programs, and earn rewards across multiple blockchains. Your gateway to Web3 fan experiences.
+              Redeem your points for exclusive NFTs and rewards from your favorite creators across multiple blockchains.
             </p>
           </div>
 

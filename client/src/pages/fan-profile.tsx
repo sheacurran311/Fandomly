@@ -38,6 +38,7 @@ import { FacebookSDKManager } from "@/lib/facebook";
 import { socialManager } from "@/lib/social-integrations";
 import { getCreatorTypeLabel } from "@shared/fanInterestOptions";
 import FanReferralDashboard from "@/components/referrals/FanReferralDashboard";
+import { Link } from "wouter";
 
 export default function FanProfile() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -352,8 +353,8 @@ export default function FanProfile() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Profile Overview Card */}
-            <div className="lg:col-span-1">
+            {/* Left Column - Profile Overview + Personal Info */}
+            <div className="lg:col-span-1 space-y-6">
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader className="text-center">
                   <div className="relative mx-auto mb-4">
@@ -452,13 +453,7 @@ export default function FanProfile() {
                 </CardContent>
               </Card>
 
-              {/* Fan Referral Dashboard */}
-              <FanReferralDashboard />
-            </div>
-
-            {/* Profile Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Personal Information */}
+              {/* Personal Information - Moved to Left Column */}
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center">
@@ -468,6 +463,13 @@ export default function FanProfile() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-gray-300">Username</label>
+                      <div className="text-white font-medium">
+                        @{user.username || "Not set"}
+                      </div>
+                    </div>
+                    
                     <div>
                       <label className="text-sm text-gray-300">Display Name</label>
                       <div className="text-white font-medium">
@@ -502,13 +504,21 @@ export default function FanProfile() {
                 </CardContent>
               </Card>
 
-              {/* Marketing Preferences - NEW */}
+              {/* Marketing & Creator Preferences - Moved to Left Column */}
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center">
                     <MessageSquare className="mr-2 h-5 w-5" />
                     Marketing & Creator Preferences
                   </CardTitle>
+                  <p className="text-xs text-gray-400 mt-1">
+                    For notification settings:{' '}
+                    <Link href="/fan-dashboard/settings#notifications">
+                      <span className="text-brand-primary hover:underline cursor-pointer">
+                        Manage in Settings
+                      </span>
+                    </Link>
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Phone Number */}
@@ -619,8 +629,11 @@ export default function FanProfile() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
 
-              {/* Recent Activity */}
+            {/* Right Column - Activity, Social, Referral, Settings */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Recent Activity - Moved to Top */}
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center">
@@ -833,7 +846,10 @@ export default function FanProfile() {
                 </CardContent>
               </Card>
 
-              {/* Account Settings */}
+              {/* Fan Referral Dashboard - Moved to Right Column */}
+              <FanReferralDashboard />
+
+              {/* Account Settings - Last */}
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white">Account Settings</CardTitle>

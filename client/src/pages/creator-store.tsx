@@ -31,7 +31,8 @@ import {
   Award,
   Zap,
 } from "lucide-react";
-import { type Creator, type Campaign, type Reward } from "@shared/schema";
+import { type Creator, type Campaign, type Reward, type Task } from "@shared/schema";
+import { transformImageUrl } from "@/lib/image-utils";
 
 interface CreatorStoreData {
   creator: Creator & {
@@ -69,6 +70,20 @@ export default function CreatorStore() {
       return response.json();
     },
     enabled: !!creatorUrl,
+  });
+
+  // Fetch creator's published tasks
+  const { data: creatorTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ["/api/tasks/creator", storeData?.creator?.id],
+    queryFn: async () => {
+      if (!storeData?.creator?.id) return [];
+      const response = await fetch(`/api/tasks/creator/${storeData.creator.id}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!storeData?.creator?.id,
   });
 
   if (isLoading) {
@@ -114,7 +129,7 @@ export default function CreatorStore() {
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: creator.bannerImage 
-              ? `url(${creator.bannerImage})`
+              ? `url(${transformImageUrl(creator.bannerImage)})`
               : `linear-gradient(135deg, ${branding?.primaryColor || '#1a1f3a'}, ${branding?.secondaryColor || '#0f1629'})`,
           }}
         >
@@ -130,7 +145,7 @@ export default function CreatorStore() {
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-white/20 bg-white/10 backdrop-blur-lg overflow-hidden">
                   {creator.imageUrl ? (
                     <img 
-                      src={creator.imageUrl} 
+                      src={transformImageUrl(creator.imageUrl) || creator.imageUrl} 
                       alt={creator.displayName}
                       className="w-full h-full object-cover"
                     />
@@ -484,65 +499,135 @@ export default function CreatorStore() {
             </TabsContent>
 
             {/* Campaigns Tab */}
-            <TabsContent value="campaigns" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">
-                  Active Campaigns ({activeCampaigns.length})
-                </h2>
+            <TabsContent value="campaigns" className="space-y-8">
+              {/* Active Campaigns Section */}
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">
+                    Active Campaigns ({activeCampaigns.length})
+                  </h2>
+                </div>
+
+                {activeCampaigns.length === 0 ? (
+                  <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                    <CardContent className="text-center py-16">
+                      <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-white mb-2">No Active Campaigns</h3>
+                      <p className="text-gray-400">Check back soon for new campaigns!</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {activeCampaigns.map((campaign: any) => (
+                      <Card
+                        key={campaign.id}
+                        className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all hover:scale-105"
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <CardTitle className="text-white text-lg">
+                              {campaign.title || campaign.name}
+                            </CardTitle>
+                            <Badge variant="outline" className="border-brand-accent/30 text-brand-accent">
+                              Active
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <p className="text-gray-300 text-sm">{campaign.description}</p>
+
+                          {campaign.rules && campaign.rules.length > 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Star className="h-4 w-4 text-brand-secondary" />
+                              <span className="text-brand-secondary font-medium">
+                                Earn rewards for participating!
+                              </span>
+                            </div>
+                          )}
+
+                          {campaign.endDate && (
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <Clock className="h-4 w-4" />
+                              <span>Ends {new Date(campaign.endDate).toLocaleDateString()}</span>
+                            </div>
+                          )}
+
+                          <Button className="w-full bg-brand-primary hover:bg-brand-primary/90">
+                            Join Campaign
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {activeCampaigns.length === 0 ? (
-                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                  <CardContent className="text-center py-16">
-                    <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-white mb-2">No Active Campaigns</h3>
-                    <p className="text-gray-400">Check back soon for new campaigns!</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {activeCampaigns.map((campaign: any) => (
-                    <Card
-                      key={campaign.id}
-                      className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all hover:scale-105"
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-white text-lg">
-                            {campaign.title || campaign.name}
-                          </CardTitle>
-                          <Badge variant="outline" className="border-brand-accent/30 text-brand-accent">
-                            Active
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p className="text-gray-300 text-sm">{campaign.description}</p>
-
-                        {campaign.rules && campaign.rules.length > 0 && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Star className="h-4 w-4 text-brand-secondary" />
-                            <span className="text-brand-secondary font-medium">
-                              Earn rewards for participating!
-                            </span>
-                          </div>
-                        )}
-
-                        {campaign.endDate && (
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
-                            <Clock className="h-4 w-4" />
-                            <span>Ends {new Date(campaign.endDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-
-                        <Button className="w-full bg-brand-primary hover:bg-brand-primary/90">
-                          Join Campaign
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
+              {/* Available Tasks Section */}
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">
+                    Available Tasks ({creatorTasks.length})
+                  </h2>
                 </div>
-              )}
+
+                {tasksLoading ? (
+                  <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                    <CardContent className="text-center py-16">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+                      <p className="text-gray-400">Loading tasks...</p>
+                    </CardContent>
+                  </Card>
+                ) : creatorTasks.length === 0 ? (
+                  <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                    <CardContent className="text-center py-16">
+                      <Target className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-white mb-2">No Tasks Available</h3>
+                      <p className="text-gray-400">This creator hasn't published any tasks yet. Check back soon!</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {creatorTasks.map((task: Task) => (
+                      <Card
+                        key={task.id}
+                        className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all"
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <CardTitle className="text-white text-base">
+                              {task.name}
+                            </CardTitle>
+                            <Badge variant="outline" className="border-green-500/30 text-green-400">
+                              <Zap className="h-3 w-3 mr-1" />
+                              {task.points || 0} pts
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <p className="text-gray-300 text-sm line-clamp-2">{task.description}</p>
+                          
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <Target className="h-3 w-3" />
+                            <span className="capitalize">{task.taskType?.replace('_', ' ') || 'Task'}</span>
+                          </div>
+
+                          {task.rewardFrequency && task.rewardFrequency !== 'one_time' && (
+                            <Badge variant="outline" className="text-xs border-brand-primary/30 text-brand-primary">
+                              {task.rewardFrequency === 'daily' && '📅 Daily'}
+                              {task.rewardFrequency === 'weekly' && '📅 Weekly'}
+                              {task.rewardFrequency === 'monthly' && '📅 Monthly'}
+                            </Badge>
+                          )}
+
+                          <Button className="w-full bg-brand-accent hover:bg-brand-accent/90">
+                            Start Task
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
             </TabsContent>
 
             {/* Rewards Tab */}

@@ -19,10 +19,6 @@ localPort = 33571
 externalPort = 3002
 
 [[ports]]
-localPort = 35885
-externalPort = 3003
-
-[[ports]]
 localPort = 38699
 externalPort = 3001
 
@@ -55,7 +51,7 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
-integrations = ["javascript_log_in_with_replit==1.0.0", "javascript_stripe==1.0.0", "javascript_database==1.0.0"]
+integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_stripe:1.0.0", "javascript_database:1.0.0"]
 
 [objectStorage]
 defaultBucketID = "replit-objstore-b86a50a0-f1f5-4ba0-80ed-68fd70de5783"

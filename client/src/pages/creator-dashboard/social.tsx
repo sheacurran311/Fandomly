@@ -524,11 +524,8 @@ export default function CreatorSocial() {
   ];
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
-      <SidebarNavigation userType="creator" />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
+    <DashboardLayout userType="creator">
+      <div className="p-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
@@ -588,34 +585,40 @@ export default function CreatorSocial() {
                 {socialAccounts.map((account, index) => {
                   const Icon = account.icon;
                   return (
-                    <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 ${account.bgColor} rounded-full flex items-center justify-center`}>
+                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                      {/* Icon and Platform Info */}
+                      <div className="flex items-center space-x-4 flex-1 min-w-0">
+                        <div className={`w-12 h-12 flex-shrink-0 ${account.bgColor} rounded-full flex items-center justify-center`}>
                           <Icon className={`h-6 w-6 ${account.color}`} />
                         </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                             <h4 className="text-white font-medium">{account.platform}</h4>
                             {account.connected ? (
-                              <Badge className="bg-green-500/20 text-green-400 text-xs">
+                              <Badge className="bg-green-500/20 text-green-400 text-xs flex-shrink-0">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Connected
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="border-gray-500/30 text-gray-400 text-xs">
+                              <Badge variant="outline" className="border-gray-500/30 text-gray-400 text-xs flex-shrink-0">
                                 <AlertCircle className="h-3 w-3 mr-1" />
                                 Not Connected
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-gray-400">{account.handle}</p>
+                          <p className="text-sm text-gray-400 truncate">{account.handle}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-white">{account.followers}</div>
-                        <p className="text-sm text-gray-400">{account.engagement} engagement</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
+                      
+                      {/* Stats */}
+                      <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6">
+                        <div className="text-left sm:text-right">
+                          <div className="text-sm font-bold text-white">{account.followers}</div>
+                          <p className="text-xs sm:text-sm text-gray-400">{account.engagement} engagement</p>
+                        </div>
+                      
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
                         {account.platform === "Facebook" ? (
                           // Facebook-specific buttons using unified state
                           account.connected ? (
@@ -770,6 +773,7 @@ export default function CreatorSocial() {
                             )
                           )
                         )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -859,9 +863,7 @@ export default function CreatorSocial() {
               <InstagramMessageTest />
             </CardContent>
           </Card>
-
         </div>
-      </div>
       
       {/* Facebook Page Selection Modal */}
       <Dialog open={showPageModal} onOpenChange={setShowPageModal}>
@@ -967,6 +969,6 @@ export default function CreatorSocial() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardLayout>
   );
 }

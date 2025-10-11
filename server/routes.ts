@@ -10,6 +10,7 @@ import { registerTwitterVerificationRoutes } from "./twitter-verification-routes
 import { registerReferralRoutes } from "./referral-routes";
 import { registerPointsRoutes } from "./points-routes";
 import { registerAdminPlatformTasksRoutes } from "./admin-platform-tasks-routes";
+import { registerNotificationRoutes } from "./notification-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -76,6 +77,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve static files for uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // Proxy images from Replit Object Storage
+  app.get('/api/storage/*', async (req, res) => {
+    try {
+      const filename = req.params[0]; // Get everything after /api/storage/
+      const { getStorageClient } = await import('./storage-client');
+      const client = getStorageClient();
+      
+      const result = await client.downloadAsBytes(filename);
+      
+      if (!result.ok || !result.value) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
+      
+      // Determine content type based on file extension
+      const ext = filename.split('.').pop()?.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+      };
+      
+      res.setHeader('Content-Type', contentTypes[ext || 'jpg'] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.send(Buffer.from(result.value));
+    } catch (error) {
+      console.error('Error serving image from storage:', error);
+      res.status(500).json({ error: 'Failed to load image' });
+    }
+  });
   
   // Register image upload routes
   app.use('/api/upload', uploadRoutes);
@@ -123,6 +156,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Username check error:', error);
       res.status(500).json({ available: false, error: 'Server error checking username' });
+    }
+  });
+
+  // Check tenant slug availability
+  app.get('/api/tenants/check-slug/:slug', async (req, res) => {
+    try {
+      const { slug } = req.params;
+      
+      // Validate slug format
+      if (!slug || slug.length < 3 || slug.length > 50) {
+        return res.status(400).json({ 
+          available: false, 
+          error: 'Slug must be between 3 and 50 characters' 
+        });
+      }
+      
+      // Check for invalid characters (lowercase, numbers, hyphens only)
+      if (!/^[a-z0-9-]+$/.test(slug)) {
+        return res.status(400).json({ 
+          available: false, 
+          error: 'Slug can only contain lowercase letters, numbers, and hyphens' 
+        });
+      }
+
+      // Check if starts or ends with hyphen
+      if (slug.startsWith('-') || slug.endsWith('-')) {
+        return res.status(400).json({ 
+          available: false, 
+          error: 'Slug cannot start or end with a hyphen' 
+        });
+      }
+      
+      // Check if slug exists
+      const existingTenant = await storage.getTenantBySlug(slug);
+      
+      res.json({ 
+        available: !existingTenant,
+        slug,
+        suggestions: existingTenant ? [
+          `${slug}-official`,
+          `${slug}-creator`,
+          `${slug}1`,
+          `${slug}2025`
+        ] : []
+      });
+    } catch (error) {
+      console.error('Slug check error:', error);
+      res.status(500).json({ available: false, error: 'Server error checking slug' });
     }
   });
 
@@ -757,13 +838,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/creators", async (req, res) => {
     try {
       const creators = await storage.getAllCreators();
-      // Optionally enrich with active campaign info
+      console.log(`📊 GET /api/creators - Fetched ${creators.length} creators from database`);
+      
+      // Enrich with active campaign info, task counts, and user/tenant data
+      // Wrap each enrichment in try-catch to ensure ALL creators are returned
       const enriched = await Promise.all(creators.map(async (c) => {
-        const activeCampaigns = await storage.getActiveCampaignsByCreator(c.id);
-        return { ...c, hasActiveCampaign: activeCampaigns.length > 0 };
+        try {
+          const activeCampaigns = await storage.getActiveCampaignsByCreator(c.id);
+          
+          // Get published tasks count
+          let publishedTasks: any[] = [];
+          try {
+            const allTasks = await storage.getTasksByCreator(c.id);
+            const now = new Date();
+            publishedTasks = allTasks.filter(task => {
+              if (task.isDraft || !task.isActive) return false;
+              if (task.startTime && new Date(task.startTime) > now) return false;
+              if (task.endTime && new Date(task.endTime) < now) return false;
+              return true;
+            });
+          } catch (taskError) {
+            console.warn(`Failed to fetch tasks for creator ${c.id}:`, taskError);
+          }
+          
+          // Get user data for username
+          let user = null;
+          try {
+            user = await storage.getUser(c.userId);
+          } catch (userError) {
+            console.warn(`Failed to fetch user for creator ${c.id}:`, userError);
+          }
+          
+          // Get tenant data
+          let tenant = null;
+          try {
+            tenant = await storage.getTenant(c.tenantId);
+          } catch (tenantError) {
+            console.warn(`Failed to fetch tenant for creator ${c.id}:`, tenantError);
+          }
+          
+          return { 
+            ...c, 
+            hasActiveCampaign: activeCampaigns.length > 0,
+            activeCampaignsCount: activeCampaigns.length,
+            publishedTasksCount: publishedTasks.length,
+            isLive: activeCampaigns.length > 0 || publishedTasks.length > 0,
+            user: user ? { username: user.username } : null,
+            tenant: tenant ? { slug: tenant.slug, branding: tenant.branding } : null,
+          };
+        } catch (enrichError) {
+          // If enrichment completely fails, still return the creator with defaults
+          console.error(`Failed to enrich creator ${c.id}:`, enrichError);
+          return { 
+            ...c, 
+            hasActiveCampaign: false,
+            activeCampaignsCount: 0,
+            publishedTasksCount: 0,
+            isLive: false,
+            user: null,
+            tenant: null,
+          };
+        }
       }));
-      res.json(enriched);
+      
+      // Sort by creation date (newest first) in the API layer
+      const sorted = enriched.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA; // Newest first
+      });
+      
+      console.log(`✅ Returning ${sorted.length} creators (sorted by newest first)`);
+      res.json(sorted);
     } catch (error) {
+      console.error('Error fetching creators:', error);
       res.status(500).json({ error: "Failed to fetch creators" });
     }
   });
@@ -826,6 +974,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Creator update error:', error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update creator" });
+    }
+  });
+
+  // Get public creator page data (no auth required)
+  app.get("/api/creators/public/:creatorUrl", async (req, res) => {
+    try {
+      const { creatorUrl } = req.params;
+      
+      // First try to find by tenant slug
+      const tenant = await storage.getTenantBySlug(creatorUrl);
+      if (!tenant) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      // Get creator by tenant ID
+      const creators = await storage.getCreatorsByTenantId(tenant.id);
+      if (!creators || creators.length === 0) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      const creator = creators[0]; // Primary creator for this tenant
+      
+      // Get user data
+      const user = await storage.getUser(creator.userId);
+      if (!user) {
+        return res.status(404).json({ error: "Creator user not found" });
+      }
+      
+      // Get published tasks
+      const allTasks = await storage.getTasksByCreator(creator.id);
+      const now = new Date();
+      const publishedTasks = allTasks.filter(task => {
+        if (task.isDraft || !task.isActive) return false;
+        if (task.startTime && new Date(task.startTime) > now) return false;
+        if (task.endTime && new Date(task.endTime) < now) return false;
+        return true;
+      });
+      
+      // Get active campaigns
+      const activeCampaigns = await storage.getActiveCampaignsByCreator(creator.id);
+      
+      // Get fan count
+      const fanCount = await storage.getTenantMemberCount(tenant.id);
+      
+      // Construct response
+      res.json({
+        creator: {
+          ...creator,
+          user: {
+            username: user.username,
+            displayName: user.displayName || creator.displayName,
+            profileData: user.profileData
+          },
+          tenant: {
+            slug: tenant.slug,
+            branding: tenant.branding
+          }
+        },
+        tasks: publishedTasks,
+        campaigns: activeCampaigns,
+        fanCount,
+        stats: {
+          activeCampaigns: activeCampaigns.length,
+          totalRewards: 0, // TODO: Calculate from completions
+          engagementRate: undefined
+        }
+      });
+    } catch (error) {
+      console.error('Public creator page error:', error);
+      res.status(500).json({ error: "Failed to fetch creator data" });
+    }
+  });
+
+  // Update creator public page settings (authenticated)
+  app.patch("/api/creators/:id/public-settings", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User ID required" });
+      }
+      
+      // Verify the creator belongs to this user
+      const creator = await storage.getCreator(id);
+      if (!creator) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      if (creator.userId !== userId) {
+        return res.status(403).json({ error: "Unauthorized to update this creator" });
+      }
+      
+      // Update public page settings
+      const { publicPageSettings } = req.body;
+      if (!publicPageSettings) {
+        return res.status(400).json({ error: "Public page settings required" });
+      }
+      
+      const updatedCreator = await storage.updateCreator(id, {
+        publicPageSettings
+      });
+      
+      res.json(updatedCreator);
+    } catch (error) {
+      console.error('Public settings update error:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update settings" });
     }
   });
 
@@ -2029,6 +2284,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tenant memberships (followers/fans)
+  app.get("/api/tenant-memberships/:tenantId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      
+      // Get all memberships for this tenant
+      const memberships = await storage.getTenantMembers(tenantId);
+      
+      // Enrich with user data
+      const enrichedMemberships = await Promise.all(
+        memberships.map(async (membership) => {
+          const user = await storage.getUser(membership.userId);
+          return {
+            ...membership,
+            user: user ? {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              avatar: user.avatar,
+            } : null
+          };
+        })
+      );
+      
+      console.log(`✅ Returning ${enrichedMemberships.length} members for tenant ${tenantId}`);
+      res.json(enrichedMemberships);
+    } catch (error) {
+      console.error('Error fetching tenant memberships:', error);
+      res.status(500).json({ error: "Failed to fetch tenant members" });
+    }
+  });
+
   // Update user profile data (fan onboarding info and enhanced fields)
   // Supports: Basic info, marketing fields (phone, creatorTypeInterests, interestSubcategories), social links, preferences
   app.post("/api/auth/profile", authenticateUser, async (req: AuthenticatedRequest, res) => {
@@ -2255,70 +2542,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // File upload endpoints
-  app.post("/api/upload/image", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      // Generate the URL for the uploaded file
-      const fileUrl = `/uploads/images/${req.file.filename}`;
-      
-      res.json({
-        url: fileUrl,
-        fileName: req.file.filename,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: "File upload failed" });
-    }
-  });
-
-  app.post("/api/upload/avatar", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      // Generate the URL for the uploaded avatar
-      const fileUrl = `/uploads/avatars/${req.file.filename}`;
-      
-      res.json({
-        url: fileUrl,
-        fileName: req.file.filename,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype
-      });
-    } catch (error) {
-      console.error('Avatar upload error:', error);
-      res.status(500).json({ error: "Avatar upload failed" });
-    }
-  });
-
-  app.post("/api/upload/branding", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      // Generate the URL for the uploaded branding asset
-      const fileUrl = `/uploads/branding/${req.file.filename}`;
-      
-      res.json({
-        url: fileUrl,
-        fileName: req.file.filename,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype
-      });
-    } catch (error) {
-      console.error('Branding upload error:', error);
-      res.status(500).json({ error: "Branding asset upload failed" });
-    }
-  });
-
   // Stripe Payment Routes - Using javascript_stripe integration
   
   // Stripe payment intent for one-time payments
@@ -2521,6 +2744,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register points routes
   registerPointsRoutes(app);
+
+  // Register notification routes
+  registerNotificationRoutes(app);
+
+  // Register admin platform tasks routes
+  registerAdminPlatformTasksRoutes(app);
 
   // Register task routes
   const { registerTaskRoutes } = await import("./task-routes");

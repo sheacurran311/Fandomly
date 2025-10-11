@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Link } from "wouter";
 import { 
   Heart, 
   Search, 
@@ -119,16 +120,18 @@ export default function FanFollowing() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Following</h1>
+              <h1 className="text-3xl font-bold text-white mb-2">Creators</h1>
               <p className="text-gray-400">
-                Manage your followed creators and track your engagement with their programs.
+                Manage your creators and track your engagement with their programs.
               </p>
             </div>
             <div className="flex gap-3 mt-4 sm:mt-0">
-              <Button className="bg-brand-secondary hover:bg-brand-secondary/80">
-                <Plus className="h-4 w-4 mr-2" />
-                Discover Creators
-              </Button>
+              <Link href="/find-creators">
+                <Button className="bg-brand-secondary hover:bg-brand-secondary/80">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Discover Creators
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -140,7 +143,7 @@ export default function FanFollowing() {
                   <Heart className="h-6 w-6 text-brand-primary" />
                 </div>
                 <div className="text-2xl font-bold text-white mb-1">{followingCreators.length}</div>
-                <div className="text-sm text-gray-400">Following</div>
+                <div className="text-sm text-gray-400">Creators</div>
               </CardContent>
             </Card>
             <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
@@ -285,9 +288,11 @@ export default function FanFollowing() {
               <p className="text-gray-300 mb-6 max-w-md mx-auto">
                 Find new creators and athletes to follow. Join their loyalty programs and start earning exclusive rewards.
               </p>
-              <Button className="bg-brand-primary hover:bg-brand-primary/80">
-                Browse Marketplace
-              </Button>
+              <Link href="/find-creators">
+                <Button className="bg-brand-primary hover:bg-brand-primary/80">
+                  Browse Creators
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>

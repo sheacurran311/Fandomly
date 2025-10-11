@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,6 +13,7 @@ import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
 import Marketplace from "@/pages/marketplace";
+import FindCreators from "@/pages/find-creators";
 import UserTypeSelection from "@/pages/user-type-selection";
 import CreatorTypeSelection from "@/pages/creator-type-selection";
 import CreatorOnboarding from "@/pages/creator-onboarding";
@@ -59,7 +60,7 @@ import NotFound from "@/pages/not-found";
 import InstagramCallback from "@/pages/instagram-callback";
 import TikTokCallback from "@/pages/tiktok-callback";
 import XCallback from "@/pages/x-callback";
-import CreatorStore from "@/pages/creator-store";
+import CreatorPublic from "@/pages/creator-public";
 import TaskBuilder from "@/pages/creator-dashboard/task-builder";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminOverview from "@/pages/admin-dashboard/overview";
@@ -72,6 +73,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/find-creators" component={FindCreators} />
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/user-type-selection" component={UserTypeSelection} />
       <Route path="/creator-type-selection" component={CreatorTypeSelection} />
@@ -88,6 +90,7 @@ function Router() {
       <Route path="/creator-dashboard/rewards" component={CreatorRewards} />
       <Route path="/creator-dashboard/tasks" component={CreatorTasks} />
       <Route path="/creator-dashboard/tasks/create" component={TaskBuilder} />
+      <Route path="/creator-dashboard/tasks/edit/:id" component={TaskBuilder} />
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
@@ -127,8 +130,8 @@ function Router() {
       <Route path="/admin-dashboard/tasks" component={AdminTasks} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
       
-      {/* Creator Store - Must be last before 404 to avoid catching other routes */}
-      <Route path="/:creatorUrl" component={CreatorStore} />
+      {/* Creator Public Page - Must be last before 404 to avoid catching other routes */}
+      <Route path="/@:creatorUrl" component={CreatorPublic} />
       
       <Route component={NotFound} />
     </Switch>
@@ -136,10 +139,31 @@ function Router() {
 }
 
 function App() {
+  const [location] = useLocation();
+  
   // Initialize TikTok error handler on app start
   useEffect(() => {
     initTikTokErrorHandler();
   }, []);
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+
+  // Define public routes that should show the full footer
+  const publicRoutes = [
+    '/',
+    '/find-creators',
+    '/privacy-policy',
+    '/data-deletion',
+    '/privacy/data-deletion',
+    '/terms-of-service',
+    '/creator-showcase',
+  ];
+
+  // Check if current route is public
+  const isPublicRoute = publicRoutes.some(route => location === route);
 
   return (
     <ErrorBoundary>
@@ -153,7 +177,7 @@ function App() {
                     <main>
                       <Router />
                     </main>
-                    <Footer />
+                    {isPublicRoute && <Footer />}
                 </div>
                 <Toaster />
               </SocialProviders>

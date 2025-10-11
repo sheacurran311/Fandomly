@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
+import useUsernameValidation from "@/hooks/use-username-validation";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import NotificationPreferencesSection from "@/components/settings/NotificationPreferencesSection";
+import { type NotificationPreferences } from "@shared/notificationPreferences";
 import { 
   Settings, 
   User, 
@@ -19,11 +23,40 @@ import {
   Key,
   Trash2,
   Save,
-  Download
+  Download,
+  Check,
+  AlertCircle
 } from "lucide-react";
 
 export default function FanSettings() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const [location] = useLocation();
+  const [activeTab, setActiveTab] = useState("profile");
+  
+  // Username editing state
+  const [username, setUsername] = useState(user?.username || "");
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  
+  // Username validation (only when editing)
+  const { isChecking, isAvailable, error: usernameError, suggestions, hasChecked } = useUsernameValidation(
+    isEditingUsername ? username : ""
+  );
+  
+  // Handle hash navigation (e.g., #notifications)
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && ['profile', 'notifications', 'privacy', 'security'].includes(hash)) {
+      setActiveTab(hash);
+    }
+  }, [location]);
+  
+  // Initialize username when user loads
+  useEffect(() => {
+    if (user?.username) {
+      setUsername(user.username);
+    }
+  }, [user?.username]);
+  
   const [settings, setSettings] = useState({
     // Profile Settings
     displayName: user?.profileData?.name || user?.username || "",
@@ -68,6 +101,7 @@ export default function FanSettings() {
     console.log("Saving fan settings:", settings);
   };
 
+
   const handleExportData = () => {
     // TODO: Implement data export
     console.log("Exporting user data");
@@ -93,7 +127,7 @@ export default function FanSettings() {
           </div>
 
           <div className="max-w-4xl">
-            <Tabs defaultValue="profile" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="bg-white/10 border-white/20">
                 <TabsTrigger value="profile" className="data-[state=active]:bg-brand-primary">
                   <User className="h-4 w-4 mr-2" />
@@ -119,6 +153,81 @@ export default function FanSettings() {
                     <CardTitle className="text-white">Profile Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Username Field */}
+                    <div>
+                      <Label htmlFor="username" className="text-gray-300 flex items-center justify-between">
+                        <span>Username *</span>
+                        {!isEditingUsername && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsEditingUsername(true)}
+                            className="text-brand-primary hover:text-brand-primary/80 h-auto p-1"
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                          disabled={!isEditingUsername}
+                          className={`bg-white/10 border-white/20 text-white pr-10 ${
+                            !isEditingUsername ? 'opacity-70 cursor-not-allowed' : ''
+                          } ${
+                            isEditingUsername && hasChecked && !isAvailable ? 'border-red-500' : 
+                            isEditingUsername && hasChecked && isAvailable ? 'border-green-500' : ''
+                          }`}
+                          placeholder="your_unique_username"
+                        />
+                        {isEditingUsername && isChecking && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                          </div>
+                        )}
+                        {isEditingUsername && hasChecked && !isChecking && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            {isAvailable ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {isEditingUsername && usernameError && (
+                        <p className="text-red-400 text-sm mt-1">{usernameError}</p>
+                      )}
+                      {isEditingUsername && hasChecked && isAvailable && (
+                        <p className="text-green-400 text-sm mt-1 flex items-center">
+                          <Check className="h-3 w-3 mr-1" />
+                          Username available!
+                        </p>
+                      )}
+                      {isEditingUsername && suggestions && suggestions.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-gray-400 text-xs mb-1">Suggestions:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {suggestions.slice(0, 3).map(suggestion => (
+                              <Badge
+                                key={suggestion}
+                                variant="outline"
+                                className="cursor-pointer text-xs bg-gray-800 hover:bg-gray-700"
+                                onClick={() => setUsername(suggestion)}
+                              >
+                                {suggestion}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator className="bg-white/10" />
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="displayName" className="text-gray-300">Display Name</Label>
@@ -159,67 +268,9 @@ export default function FanSettings() {
               </TabsContent>
 
               <TabsContent value="notifications" className="space-y-6">
-                <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-                  <CardHeader>
-                    <CardTitle className="text-white">Notification Preferences</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-white font-medium">Email Notifications</h4>
-                        <p className="text-sm text-gray-400">Receive important updates via email</p>
-                      </div>
-                      <Switch
-                        checked={settings.emailNotifications}
-                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, emailNotifications: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-white font-medium">Push Notifications</h4>
-                        <p className="text-sm text-gray-400">Browser notifications for real-time updates</p>
-                      </div>
-                      <Switch
-                        checked={settings.pushNotifications}
-                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, pushNotifications: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-white font-medium">Campaign Updates</h4>
-                        <p className="text-sm text-gray-400">New campaigns from creators you follow</p>
-                      </div>
-                      <Switch
-                        checked={settings.campaignUpdates}
-                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, campaignUpdates: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-white font-medium">Creator Updates</h4>
-                        <p className="text-sm text-gray-400">Posts and updates from followed creators</p>
-                      </div>
-                      <Switch
-                        checked={settings.creatorUpdates}
-                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, creatorUpdates: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-white font-medium">Achievement Alerts</h4>
-                        <p className="text-sm text-gray-400">When you unlock new achievements</p>
-                      </div>
-                      <Switch
-                        checked={settings.achievementAlerts}
-                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, achievementAlerts: checked }))}
-                      />
-                    </div>
-                    <Button onClick={handleSave} className="bg-brand-primary hover:bg-brand-primary/80">
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Preferences
-                    </Button>
-                  </CardContent>
-                </Card>
+                <NotificationPreferencesSection
+                  userPhone={(user?.profileData as any)?.phone}
+                />
               </TabsContent>
 
               <TabsContent value="privacy" className="space-y-6">

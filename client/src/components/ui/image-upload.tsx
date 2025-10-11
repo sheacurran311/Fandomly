@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getDynamicUserId } from "@/lib/queryClient";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
+import { transformImageUrl } from "@/lib/image-utils";
 
 interface ImageUploadProps {
   type: 'avatar' | 'banner';
@@ -207,7 +208,9 @@ export function ImageUpload({
     onRemove?.();
   };
 
-  const displayUrl = previewUrl || currentImageUrl;
+  // Transform image URL to use our proxy for Replit storage images
+  const transformedImageUrl = transformImageUrl(currentImageUrl);
+  const displayUrl = previewUrl || transformedImageUrl;
   const aspectRatio = isAvatar ? 1 : 4; // 1:1 for avatar, 4:1 for banner
 
   return (
