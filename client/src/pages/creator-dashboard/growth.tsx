@@ -71,31 +71,81 @@ export default function CreatorGrowth() {
         const averagePoints = currentFans > 0 ? totalPoints / currentFans : 0;
         const engagementRate = currentFans > 0 ? (activeFans / currentFans) * 100 : 0;
 
-        // TODO: Get historical data for previous period comparison
-        // For now, simulate some growth
-        const previousFans = Math.max(0, currentFans - Math.floor(currentFans * 0.1));
+        // Calculate real historical data (30 days ago)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const previousMemberships = memberships.filter((m: any) => 
+          new Date(m.joinedAt) < thirtyDaysAgo
+        );
+        const previousFans = previousMemberships.length;
+        const previousActiveFans = previousMemberships.filter((m: any) => (m.memberData?.points || 0) > 0).length;
+        const previousTotalPoints = previousMemberships.reduce((sum: number, m: any) => sum + (m.memberData?.points || 0), 0);
+        const previousAveragePoints = previousFans > 0 ? previousTotalPoints / previousFans : 0;
+        const previousEngagementRate = previousFans > 0 ? (previousActiveFans / previousFans) * 100 : 0;
+
+        // Calculate percentage changes
         const fanGrowthChange = previousFans > 0 ? ((currentFans - previousFans) / previousFans) * 100 : 0;
+        const engagementChange = previousEngagementRate > 0 ? ((engagementRate - previousEngagementRate) / previousEngagementRate) * 100 : 0;
+        const averagePointsChange = previousAveragePoints > 0 ? ((averagePoints - previousAveragePoints) / previousAveragePoints) * 100 : 0;
+
+        // Get campaign participation data
+        const programsResponse = await apiRequest('GET', `/api/loyalty-programs/creator/${creator.id}`);
+        const programs = await programsResponse.json();
+        
+        let currentCampaignParticipants = 0;
+        let previousCampaignParticipants = 0;
+        
+        for (const program of programs) {
+          try {
+            const transactionsResponse = await apiRequest('GET', `/api/point-transactions/program/${program.id}`);
+            const transactions = await transactionsResponse.json();
+            
+            // Current period (last 30 days)
+            const recentTransactions = transactions.filter((tx: any) => 
+              new Date(tx.timestamp) > thirtyDaysAgo
+            );
+            const recentUniqueFans = new Set(recentTransactions.map((tx: any) => tx.fanId));
+            currentCampaignParticipants += recentUniqueFans.size;
+            
+            // Previous period (30-60 days ago)
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            const previousTransactions = transactions.filter((tx: any) => {
+              const txDate = new Date(tx.timestamp);
+              return txDate > sixtyDaysAgo && txDate <= thirtyDaysAgo;
+            });
+            const previousUniqueFans = new Set(previousTransactions.map((tx: any) => tx.fanId));
+            previousCampaignParticipants += previousUniqueFans.size;
+          } catch (error) {
+            console.warn(`Failed to get campaign data for program ${program.id}:`, error);
+          }
+        }
+
+        const currentParticipationRate = currentFans > 0 ? (currentCampaignParticipants / currentFans) * 100 : 0;
+        const previousParticipationRate = previousFans > 0 ? (previousCampaignParticipants / previousFans) * 100 : 0;
+        const participationChange = previousParticipationRate > 0 ? ((currentParticipationRate - previousParticipationRate) / previousParticipationRate) * 100 : 0;
 
         return {
           fanGrowth: { 
             current: currentFans, 
             previous: previousFans, 
-            change: fanGrowthChange 
+            change: parseFloat(fanGrowthChange.toFixed(1))
           },
           engagementRate: { 
-            current: engagementRate, 
-            previous: Math.max(0, engagementRate - 5), 
-            change: 5 
+            current: parseFloat(engagementRate.toFixed(1)), 
+            previous: parseFloat(previousEngagementRate.toFixed(1)), 
+            change: parseFloat(engagementChange.toFixed(1))
           },
           campaignParticipation: { 
-            current: engagementRate, 
-            previous: Math.max(0, engagementRate - 3), 
-            change: 3 
+            current: parseFloat(currentParticipationRate.toFixed(1)), 
+            previous: parseFloat(previousParticipationRate.toFixed(1)), 
+            change: parseFloat(participationChange.toFixed(1))
           },
           averagePointsPerFan: { 
-            current: averagePoints, 
-            previous: Math.max(0, averagePoints - 100), 
-            change: averagePoints > 100 ? 100 : 0 
+            current: parseFloat(averagePoints.toFixed(0)), 
+            previous: parseFloat(previousAveragePoints.toFixed(0)), 
+            change: parseFloat(averagePointsChange.toFixed(1))
           }
         };
       } catch (error) {

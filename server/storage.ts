@@ -211,12 +211,23 @@ export class DatabaseStorage implements IStorage {
   async updateUserType(userId: string, userType: "fan" | "creator"): Promise<User | undefined> {
     try {
       const role = userType === "creator" ? "customer_admin" : "customer_end_user";
+      
+      // Reset onboarding state when switching user types
+      // This ensures users go through the appropriate onboarding for their new type
+      const resetOnboardingState = {
+        currentStep: 0,
+        totalSteps: userType === "creator" ? 3 : 2,
+        completedSteps: [],
+        isCompleted: false,
+        lastOnboardingRoute: null
+      };
+      
       const [updatedUser] = await db
         .update(users)
         .set({ 
           userType, 
-          role
-          // Preserve existing onboarding state and profile data when switching types
+          role,
+          onboardingState: resetOnboardingState
         })
         .where(eq(users.id, userId))
         .returning();

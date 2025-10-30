@@ -52,7 +52,7 @@ export default function Navigation() {
                     Features
                   </Link>
                   <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                    Find Creators
+                    Explore
                   </Link>
                   <Link href="/#ideal-users" className="text-gray-300 hover:text-brand-secondary transition-colors">
                     Who It's For
@@ -62,22 +62,13 @@ export default function Navigation() {
                 // Authenticated users see simplified navigation
                 <>
                   <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                    Find Creators
+                    Explore
                   </Link>
                   <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
                     Rewards Store
                   </Link>
-                  {userData?.userType === 'creator' ? (
-                        <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                          Dashboard
-                        </Link>
-                      ) : (
-                        <Link href="/fan-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                          Dashboard
-                        </Link>
-                      )}
-                    </>
-                  )}
+                </>
+              )}
               {dynamicUser ? (
                 <div className="flex items-center space-x-4">
                   {userData?.userType === 'creator' ? (
@@ -121,14 +112,7 @@ export default function Navigation() {
                       </div>
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
                       {/* Role Dashboard removed - users use type-specific dashboards */}
-                      <RoleGuard allowedRoles={['customer_admin']}>
-                        <Link href="/nil-dashboard">
-                          <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
-                            <Shield className="mr-2 h-4 w-4" />
-                            NIL Dashboard
-                          </DropdownMenuItem>
-                        </Link>
-                      </RoleGuard>
+                      {/* NIL Dashboard hidden from menu but page remains accessible */}
                       <Link href={userData?.userType === 'creator' ? '/profile' : '/fan-profile'}>
                         <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
                           <User className="mr-2 h-4 w-4" />
@@ -198,20 +182,11 @@ export default function Navigation() {
                   // Authenticated mobile navigation
                   <>
                     <Link href="/find-creators" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                      Find Creators
+                      Explore
                     </Link>
                     <Link href="/marketplace" className="text-gray-300 hover:text-brand-secondary transition-colors">
                       Rewards Store
                     </Link>
-                    {userData?.userType === 'creator' ? (
-                      <Link href="/creator-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                        Dashboard
-                      </Link>
-                    ) : (
-                      <Link href="/fan-dashboard" className="text-gray-300 hover:text-brand-secondary transition-colors">
-                        Dashboard
-                      </Link>
-                    )}
                   </>
                 )}
                 {!dynamicUser && (

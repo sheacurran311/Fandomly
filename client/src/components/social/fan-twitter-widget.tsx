@@ -26,10 +26,10 @@ export default function FanTwitterWidget() {
   }
 
   useEffect(() => {
-    // Check Twitter connection status - use same endpoint as Creator widget
+    // Check Twitter connection status - use consistent endpoint
     const loadStatus = async () => {
       try {
-        const response = await fetch('/api/social/accounts', {
+        const response = await fetch('/api/social-connections/twitter', {
           headers: {
             'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
             'Content-Type': 'application/json'
@@ -38,15 +38,15 @@ export default function FanTwitterWidget() {
         });
         
         if (response.ok) {
-          const connections = await response.json();
-          const tw = connections.find((c: any) => c.platform === 'twitter');
-          if (tw) {
+          const data = await response.json();
+          if (data.connected && data.connection) {
             setIsConnected(true);
+            const conn = data.connection;
             setUserInfo({
-              id: tw.accountId,
-              name: tw.displayName,
-              username: tw.username,
-              followers_count: tw.followers
+              id: conn.platformUserId,
+              name: conn.platformDisplayName,
+              username: conn.platformUsername,
+              followers_count: conn.profileData?.followers_count || 0
             });
           } else {
             setIsConnected(false);

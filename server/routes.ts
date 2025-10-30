@@ -10,7 +10,13 @@ import { registerTwitterVerificationRoutes } from "./twitter-verification-routes
 import { registerReferralRoutes } from "./referral-routes";
 import { registerPointsRoutes } from "./points-routes";
 import { registerAdminPlatformTasksRoutes } from "./admin-platform-tasks-routes";
+import { registerPlatformPointsRoutes } from "./platform-points-routes";
+import { registerPlatformTaskRoutes } from "./platform-task-routes";
+import { registerFanDashboardRoutes } from "./fan-dashboard-routes";
 import { registerNotificationRoutes } from "./notification-routes";
+import { registerCrossmintRoutes } from "./crossmint-routes";
+import { registerProgramRoutes } from "./program-routes";
+import { registerAnnouncementRoutes } from "./announcement-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -70,6 +76,7 @@ const upload = multer({
 
 // Import upload routes
 import uploadRoutes from "./upload-routes";
+import videoUploadRoutes from "./video-upload-routes";
 import socialConnectionRoutes from "./social-connection-routes";
 import creatorVerificationRoutes from "./creator-verification-routes";
 
@@ -81,14 +88,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Proxy images from Replit Object Storage
   app.get('/api/storage/*', async (req, res) => {
     try {
-      const filename = req.params[0]; // Get everything after /api/storage/
+      const filename = (req.params as any)[0]; // Get everything after /api/storage/
       const { getStorageClient } = await import('./storage-client');
-      const client = getStorageClient();
+      const client = await getStorageClient();
       
       const result = await client.downloadAsBytes(filename);
       
       if (!result.ok || !result.value) {
+        console.error('Image not found:', filename, result.error);
         return res.status(404).json({ error: 'Image not found' });
+      }
+      
+      // The Replit SDK returns the buffer wrapped in an array
+      // Access the actual buffer from result.value[0]
+      const resultValue: any = result.value;
+      const imageBuffer = Array.isArray(resultValue) ? resultValue[0] : resultValue;
+      
+      if (!imageBuffer || !Buffer.isBuffer(imageBuffer)) {
+        console.error('Invalid buffer format for:', filename);
+        return res.status(500).json({ error: 'Invalid image data' });
       }
       
       // Determine content type based on file extension
@@ -103,15 +121,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.setHeader('Content-Type', contentTypes[ext || 'jpg'] || 'image/jpeg');
       res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-      res.send(Buffer.from(result.value));
+      res.send(imageBuffer);
     } catch (error) {
       console.error('Error serving image from storage:', error);
       res.status(500).json({ error: 'Failed to load image' });
     }
   });
+
+  // Proxy videos from Replit Object Storage
+  app.get('/api/storage/videos/*', async (req, res) => {
+    try {
+      const filename = (req.params as any)[0]; // Get everything after /api/storage/videos/
+      const { getStorageClient } = await import('./storage-client');
+      const client = await getStorageClient();
+      
+      const result = await client.downloadAsBytes(filename);
+      
+      if (!result.ok || !result.value) {
+        console.error('Video not found:', filename, result.error);
+        return res.status(404).json({ error: 'Video not found' });
+      }
+      
+      const resultValue: any = result.value;
+      const videoBuffer = Array.isArray(resultValue) ? resultValue[0] : resultValue;
+      
+      if (!videoBuffer || !Buffer.isBuffer(videoBuffer)) {
+        console.error('Invalid buffer format for:', filename);
+        return res.status(500).json({ error: 'Invalid video data' });
+      }
+      
+      // Determine content type based on file extension
+      const ext = filename.split('.').pop()?.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime',
+        'avi': 'video/x-msvideo',
+      };
+      
+      res.setHeader('Content-Type', contentTypes[ext || 'mp4'] || 'video/mp4');
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.send(videoBuffer);
+    } catch (error) {
+      console.error('Error serving video from storage:', error);
+      res.status(500).json({ error: 'Failed to load video' });
+    }
+  });
   
   // Register image upload routes
   app.use('/api/upload', uploadRoutes);
+  
+  // Register video upload routes
+  app.use('/api/upload', videoUploadRoutes);
   
   // Register social connection routes
   app.use('/api/social-connections', socialConnectionRoutes);
@@ -391,7 +452,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         artistType,
         musicGenre,
         contentType,
-        topicsOfFocus,
+        topicsOfFocus, // Now array for content creators
+        customTopics, // New field for user-input topics
         sponsorships,
         totalViews,
         platforms,
@@ -399,7 +461,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         secondaryColor,
         accentColor,
         bannerImage, // New field replacing social links
-        subscriptionTier
+        subscriptionTier,
+        location // Add location field
       } = req.body;
 
       // Validate and update username if provided
@@ -449,10 +512,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         };
       } else if (creatorType === 'content_creator') {
+        // Combine topicsOfFocus and customTopics into a single array
+        const allTopics = [
+          ...(Array.isArray(topicsOfFocus) ? topicsOfFocus : []),
+          ...(Array.isArray(customTopics) ? customTopics : [])
+        ];
+        
         typeSpecificData = {
           contentCreator: {
             contentType: Array.isArray(contentType) ? contentType : (typeof contentType === 'string' ? contentType.split(',').map(s => s.trim()) : []),
-            topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : (typeof topicsOfFocus === 'string' ? topicsOfFocus.split(',').map(s => s.trim()) : []),
+            topicsOfFocus: allTopics, // Combined array of predefined and custom topics
             sponsorships: Array.isArray(sponsorships) ? sponsorships : (typeof sponsorships === 'string' ? sponsorships.split(',').map(s => s.trim()) : []),
             totalViews: totalViews || 'unknown',
             platforms: Array.isArray(platforms) ? platforms : (typeof platforms === 'string' ? platforms.split(',').map(s => s.trim()) : [])
@@ -503,22 +572,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: username || user.username, // Update username
         profileData: {
           ...(user.profileData || {}),
-          name: displayName || name,
+          name: displayName || name, // Use 'name' field instead of 'displayName'
           bio: bio || '',
+          location: location || undefined,
           bannerImage: bannerImage || undefined,
+          // Athlete-specific fields
           sport: sport || undefined,
           position: position || undefined,
           education: (creatorType === 'athlete' && (typeSpecificData as any).athlete) ? (typeSpecificData as any).athlete.education : undefined,
+          // Musician-specific fields
           musicGenre: musicGenre || undefined,
           artistType: artistType || undefined,
+          // Content Creator-specific fields
           contentType: contentType || undefined,
           platforms: platforms || undefined,
-          topicsOfFocus: topicsOfFocus ? topicsOfFocus.split(',').map((t: string) => t.trim()) : undefined
-        },
+          topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : undefined
+        } as any, // Type assertion to allow flexibility with profileData
         onboardingState: {
-          currentStep: 5,
-          totalSteps: 5, 
-          completedSteps: ["1", "2", "3", "4", "5"],
+          currentStep: 3, // Updated to 3 steps (was 5)
+          totalSteps: 3, 
+          completedSteps: ["1", "2", "3"],
           isCompleted: true
         }
       });
@@ -530,27 +603,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tenant = userTenants[0];
         
         if (tenant) {
-          // Only update slug if it's different from current one to avoid unique constraint violation
+          // Build update data conditionally - store setup is now optional during onboarding
           const updateData: any = {
-            name: name || tenant.name,
-            subscriptionTier: subscriptionTier || 'starter',
-            branding: {
-              primaryColor: primaryColor || '#8B5CF6',
-              secondaryColor: secondaryColor || '#06B6D4',
-              accentColor: accentColor || '#10B981'
-            },
+            subscriptionTier: subscriptionTier || tenant.subscriptionTier || 'starter',
             businessInfo: {
-              businessType: creatorType || 'athlete'
-            },
-            billingInfo: {
-              stripeCustomerId,
-              subscriptionId: stripeSubscriptionId
+              businessType: creatorType || tenant.businessInfo?.businessType || 'athlete'
             },
             settings: {
               timezone: tenant.settings?.timezone || 'UTC',
               currency: tenant.settings?.currency || 'USD',
               language: tenant.settings?.language || 'en',
-              nilCompliance: nilCompliant || false,
+              nilCompliance: nilCompliant || tenant.settings?.nilCompliance || false,
               publicProfile: tenant.settings?.publicProfile ?? true,
               allowRegistration: tenant.settings?.allowRegistration ?? true,
               requireEmailVerification: tenant.settings?.requireEmailVerification ?? false,
@@ -558,7 +621,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           };
           
-          // Only add slug if it's different to avoid unique constraint violation
+          // Only update name if provided (store setup optional)
+          if (name) {
+            updateData.name = name;
+          }
+          
+          // Only update branding if colors provided (store setup optional)
+          if (primaryColor || secondaryColor || accentColor) {
+            updateData.branding = {
+              primaryColor: primaryColor || tenant.branding?.primaryColor || '#8B5CF6',
+              secondaryColor: secondaryColor || tenant.branding?.secondaryColor || '#06B6D4',
+              accentColor: accentColor || tenant.branding?.accentColor || '#10B981'
+            };
+          }
+          
+          // Only update billing info if Stripe customer created
+          if (stripeCustomerId || stripeSubscriptionId) {
+            updateData.billingInfo = {
+              stripeCustomerId: stripeCustomerId || tenant.billingInfo?.stripeCustomerId,
+              subscriptionId: stripeSubscriptionId || tenant.billingInfo?.subscriptionId
+            };
+          }
+          
+          // Only add slug if provided and different to avoid unique constraint violation
           if (slug && slug !== tenant.slug) {
             updateData.slug = slug;
           }
@@ -569,25 +654,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update or create creator profile
         let creator = await storage.getCreatorByUserId(user.id);
         if (creator) {
-          await storage.updateCreator(creator.id, {
-            displayName: displayName || name,
-            bio: bio,
-            category: creatorType,
-            followerCount: parseInt(followerCount) || 0,
-            typeSpecificData: typeSpecificData,
-            brandColors: {
-              primary: primaryColor || '#8B5CF6',
-              secondary: secondaryColor || '#06B6D4',
-              accent: accentColor || '#10B981'
-            },
-            socialLinks: {}
-          });
+          // Build update object with optional fields
+          const creatorUpdate: any = {
+            category: creatorType || creator.category,
+            typeSpecificData: typeSpecificData
+          };
+          
+          // Only update fields if provided
+          if (displayName || name) {
+            creatorUpdate.displayName = displayName || name;
+          }
+          if (bio !== undefined) {
+            creatorUpdate.bio = bio;
+          }
+          if (followerCount !== undefined) {
+            creatorUpdate.followerCount = parseInt(followerCount) || 0;
+          }
+          if (primaryColor || secondaryColor || accentColor) {
+            creatorUpdate.brandColors = {
+              primary: primaryColor || creator.brandColors?.primary || '#8B5CF6',
+              secondary: secondaryColor || creator.brandColors?.secondary || '#06B6D4',
+              accent: accentColor || creator.brandColors?.accent || '#10B981'
+            };
+          }
+          
+          await storage.updateCreator(creator.id, creatorUpdate);
         } else if (tenant) {
           // Create creator profile if it doesn't exist (only if tenant exists)
           await storage.createCreator({
             userId: user.id,
             tenantId: tenant.id,
-            displayName: displayName || name || 'Creator',
+            displayName: displayName || name || username || 'Creator',
             bio: bio || '',
             category: creatorType || 'athlete',
             followerCount: parseInt(followerCount) || 0,
@@ -607,7 +704,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedUser);
     } catch (error) {
       console.error("Onboarding completion error:", error);
-      res.status(500).json({ error: "Failed to complete onboarding" });
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      console.error("Request body:", JSON.stringify(req.body, null, 2));
+      res.status(500).json({ 
+        error: "Failed to complete onboarding",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
@@ -849,9 +951,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get published tasks count
           let publishedTasks: any[] = [];
           try {
-            const allTasks = await storage.getTasksByCreator(c.id);
+            const allTasks = await storage.getTasks(c.id, c.tenantId);
             const now = new Date();
-            publishedTasks = allTasks.filter(task => {
+            publishedTasks = allTasks.filter((task: any) => {
               if (task.isDraft || !task.isActive) return false;
               if (task.startTime && new Date(task.startTime) > now) return false;
               if (task.endTime && new Date(task.endTime) < now) return false;
@@ -955,6 +1057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         displayName,
         bio,
         bannerImage,
+        imageUrl,
         storeColors,
         typeSpecificData,
         publicFields
@@ -965,6 +1068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (displayName !== undefined) updates.displayName = displayName;
       if (bio !== undefined) updates.bio = bio;
       if (bannerImage !== undefined) updates.bannerImage = bannerImage;
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
       if (storeColors !== undefined) updates.storeColors = storeColors;
       if (typeSpecificData !== undefined) updates.typeSpecificData = typeSpecificData;
       if (publicFields !== undefined) updates.publicFields = publicFields;
@@ -988,8 +1092,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Creator not found" });
       }
       
-      // Get creator by tenant ID
-      const creators = await storage.getCreatorsByTenantId(tenant.id);
+      // Get creator by tenant ID - get all creators for this tenant
+      const allCreators = await storage.getAllCreators();
+      const creators = allCreators.filter(c => c.tenantId === tenant.id);
       if (!creators || creators.length === 0) {
         return res.status(404).json({ error: "Creator not found" });
       }
@@ -1003,9 +1108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get published tasks
-      const allTasks = await storage.getTasksByCreator(creator.id);
+      const allTasks = await storage.getTasks(creator.id, creator.tenantId);
       const now = new Date();
-      const publishedTasks = allTasks.filter(task => {
+      const publishedTasks = allTasks.filter((task: any) => {
         if (task.isDraft || !task.isActive) return false;
         if (task.startTime && new Date(task.startTime) > now) return false;
         if (task.endTime && new Date(task.endTime) < now) return false;
@@ -1016,7 +1121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeCampaigns = await storage.getActiveCampaignsByCreator(creator.id);
       
       // Get fan count
-      const fanCount = await storage.getTenantMemberCount(tenant.id);
+      const tenantMembers = await storage.getTenantMembers(tenant.id);
+      const fanCount = tenantMembers.length;
       
       // Construct response
       res.json({
@@ -1024,7 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...creator,
           user: {
             username: user.username,
-            displayName: user.displayName || creator.displayName,
+            displayName: (user.profileData as any)?.displayName || creator.displayName,
             profileData: user.profileData
           },
           tenant: {
@@ -2320,7 +2426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Supports: Basic info, marketing fields (phone, creatorTypeInterests, interestSubcategories), social links, preferences
   app.post("/api/auth/profile", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const { userId, username, profileData } = req.body;
+      const { userId, username, avatar, profileData } = req.body;
       if (!userId) return res.status(400).json({ error: "userId required" });
       
       const updates: any = {};
@@ -2343,6 +2449,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         updates.username = username;
+      }
+      
+      // Handle avatar update (separate field in users table)
+      if (avatar !== undefined) {
+        updates.avatar = avatar;
       }
       
       // Handle profile data updates (supports enhanced schema)
@@ -2454,6 +2565,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(rewards);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch rewards" });
+    }
+  });
+
+  // Admin physical rewards approval routes
+  app.get("/api/admin/physical-rewards", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // TODO: Add admin role check here
+      // For now, any authenticated user can access (update this with proper admin check)
+
+      // Get all physical rewards using storage layer
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+      
+      const allRewards = await storage.getAllRewards(creator.tenantId);
+      const physicalRewards = allRewards.filter(r => r.rewardType === 'physical');
+      
+      res.json(physicalRewards);
+    } catch (error) {
+      console.error('Error fetching physical rewards:', error);
+      res.status(500).json({ error: "Failed to fetch physical rewards" });
+    }
+  });
+
+  app.put("/api/admin/physical-rewards/:id/approve", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // TODO: Add admin role check here
+
+      const { id } = req.params;
+      const { adminNotes, approvedAt } = req.body;
+
+      // Get the reward and update it
+      const reward = await storage.getReward(id);
+      if (!reward) {
+        return res.status(404).json({ error: "Reward not found" });
+      }
+
+      // Update reward data with approval status
+      const updatedRewardData = {
+        ...reward.rewardData,
+        physicalData: {
+          ...(reward.rewardData as any)?.physicalData,
+          approvalStatus: 'approved',
+          adminNotes: adminNotes || null,
+          approvedAt: approvedAt || new Date().toISOString()
+        }
+      };
+
+      const updatedReward = await storage.updateReward(id, {
+        rewardData: updatedRewardData,
+        isActive: true // Auto-activate approved rewards
+      });
+
+      res.json(updatedReward);
+    } catch (error) {
+      console.error('Error approving reward:', error);
+      res.status(500).json({ error: "Failed to approve reward" });
+    }
+  });
+
+  app.put("/api/admin/physical-rewards/:id/reject", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // TODO: Add admin role check here
+
+      const { id } = req.params;
+      const { adminNotes } = req.body;
+
+      if (!adminNotes) {
+        return res.status(400).json({ error: "Admin notes are required for rejection" });
+      }
+
+      // Get the reward and update it
+      const reward = await storage.getReward(id);
+      if (!reward) {
+        return res.status(404).json({ error: "Reward not found" });
+      }
+
+      // Update reward data with rejection status
+      const updatedRewardData = {
+        ...reward.rewardData,
+        physicalData: {
+          ...(reward.rewardData as any)?.physicalData,
+          approvalStatus: 'rejected',
+          adminNotes: adminNotes
+        }
+      };
+
+      const updatedReward = await storage.updateReward(id, {
+        rewardData: updatedRewardData,
+        isActive: false // Deactivate rejected rewards
+      });
+
+      res.json(updatedReward);
+    } catch (error) {
+      console.error('Error rejecting reward:', error);
+      res.status(500).json({ error: "Failed to reject reward" });
     }
   });
 
@@ -2745,11 +2968,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register points routes
   registerPointsRoutes(app);
 
+  // Register Crossmint NFT routes
+  registerCrossmintRoutes(app);
+
   // Register notification routes
   registerNotificationRoutes(app);
 
   // Register admin platform tasks routes
   registerAdminPlatformTasksRoutes(app);
+
+  // Register platform points routes
+  registerPlatformPointsRoutes(app);
+
+  // Register platform task routes
+  registerPlatformTaskRoutes(app);
+
+  // Register fan dashboard routes
+  registerFanDashboardRoutes(app);
+
+  // Register program routes
+  registerProgramRoutes(app);
+
+  // Register announcement routes
+  registerAnnouncementRoutes(app);
 
   // Register task routes
   const { registerTaskRoutes } = await import("./task-routes");
@@ -2783,6 +3024,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get tenant data
       const tenant = await storage.getTenant(creator.tenantId);
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
 
       // Get published campaigns only
       const allCampaigns = await storage.getCampaignsByCreator(creator.id);
@@ -2792,8 +3036,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rewards: any[] = [];
 
       // Get fan count - count unique fans following this creator
-      // For now, we'll use a placeholder. TODO: Add proper fan counting method
-      const fanCount = 0; // Placeholder until we implement proper fan counting
+      const tenantMembers = await storage.getTenantMembers(tenant.id);
+      const fanCount = tenantMembers.length;
 
       // Calculate total rewards distributed (mock for now)
       const totalRewards = fanCount * 10; // Placeholder calculation
@@ -2803,7 +3047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...creator,
           user: {
             username: user.username,
-            displayName: user.displayName,
+            displayName: (user.profileData as any)?.displayName || user.username,
             profileData: user.profileData,
           },
           tenant: {

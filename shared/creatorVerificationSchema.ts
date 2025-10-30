@@ -22,8 +22,6 @@ export const CREATOR_VERIFICATION_REQUIREMENTS = {
   athlete: [
     "sport",          // Sport played
     "education",      // Education level (HS, College, Pro, etc.)
-    "ageRange",       // Age bracket
-    "nilCompliant",   // NIL compliance status
   ],
   
   musician: [

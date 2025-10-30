@@ -23,6 +23,7 @@ import {
   Instagram,
   Twitter,
   Video,
+  Youtube,
   CheckCircle,
   AlertCircle,
   ExternalLink,
@@ -33,6 +34,7 @@ import {
   Music,
   Phone
 } from "lucide-react";
+import { FaSpotify } from "react-icons/fa";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { socialManager } from "@/lib/social-integrations";
@@ -64,6 +66,18 @@ export default function FanProfile() {
   const [tiktokConnecting, setTiktokConnecting] = useState(false);
   const [tiktokHandle, setTiktokHandle] = useState<string | null>(null);
   const [tiktokFollowers, setTiktokFollowers] = useState<number>(0);
+
+  // YouTube connection state
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [youtubeConnecting, setYoutubeConnecting] = useState(false);
+  const [youtubeChannelName, setYoutubeChannelName] = useState<string | null>(null);
+  const [youtubeSubscribers, setYoutubeSubscribers] = useState<number>(0);
+
+  // Spotify connection state
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [spotifyConnecting, setSpotifyConnecting] = useState(false);
+  const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
+  const [spotifyFollowers, setSpotifyFollowers] = useState<number>(0);
   
   // Check social connections status when user becomes available
   useEffect(() => {
@@ -71,13 +85,15 @@ export default function FanProfile() {
       checkFacebookStatus();
       checkTwitterStatus();
       checkTiktokStatus();
+      checkYoutubeStatus();
+      checkSpotifyStatus();
     }
   }, [user?.dynamicUserId]);
 
   const checkTwitterStatus = async () => {
     try {
       setIsCheckingTwitterStatus(true);
-      const response = await fetch('/api/social/accounts', {
+      const response = await fetch('/api/social-connections/twitter', {
         headers: {
           'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
           'Content-Type': 'application/json'
@@ -86,11 +102,10 @@ export default function FanProfile() {
       });
       
       if (response.ok) {
-        const connections = await response.json();
-        const tw = connections.find((c: any) => c.platform === 'twitter');
-        if (tw) {
+        const data = await response.json();
+        if (data.connected && data.connection) {
           setTwitterConnected(true);
-          setTwitterHandle(tw.username);
+          setTwitterHandle(data.connection.platformUsername || data.connection.platformDisplayName);
         } else {
           setTwitterConnected(false);
           setTwitterHandle(null);
@@ -124,22 +139,55 @@ export default function FanProfile() {
   };
 
   const checkTiktokStatus = async () => {
+    console.log('[Fan Profile] Starting TikTok status check...');
     try {
-      const { getSocialConnection } = await import('@/lib/social-connection-api');
-      const { connected, connection } = await getSocialConnection('tiktok');
+      const response = await fetch('/api/social-connections/tiktok', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
       
+      if (!response.ok) {
+        console.error('[Fan Profile] TikTok status check failed:', response.status);
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('[Fan Profile] TikTok raw response:', data);
+      
+      const connected = data.connected;
+      const connection = data.connection;
+      console.log('[Fan Profile] TikTok status check:', { connected, connection });
+      
+      setTiktokConnected(connected);
       if (connected && connection) {
-        setTiktokConnected(true);
-        setTiktokHandle(connection.platformUsername || null);
-        setTiktokFollowers(connection.profileData?.followers || 0);
+        const profile = connection.profileData;
+        // Check multiple possible fields for the username/handle (same as creator)
+        const handle = 
+          connection.platformUsername || 
+          profile?.display_name || 
+          profile?.username ||
+          connection.platformDisplayName ||
+          null;
+        const followers = 
+          profile?.follower_count || 
+          profile?.followers || 
+          0;
+        console.log('[Fan Profile] TikTok extracted:', { handle, followers });
+        setTiktokHandle(handle);
+        setTiktokFollowers(followers);
       } else {
-        setTiktokConnected(false);
+        console.log('[Fan Profile] TikTok not connected, clearing state');
         setTiktokHandle(null);
         setTiktokFollowers(0);
       }
     } catch (error) {
       console.error('[Fan Profile] Error checking TikTok status:', error);
       setTiktokConnected(false);
+      setTiktokHandle(null);
+      setTiktokFollowers(0);
     }
   };
   
@@ -259,8 +307,24 @@ export default function FanProfile() {
   const connectTiktok = async () => {
     try {
       setTiktokConnecting(true);
-      const authUrl = socialManager.getAuthUrl('tiktok');
-      window.location.href = authUrl;
+      // Use popup flow (same as creators) instead of full-page redirect
+      const tiktokAPI = socialManager['tiktok'];
+      const result = await tiktokAPI.secureLogin();
+      
+      if (result.success) {
+        // Reload status after successful connection
+        await checkTiktokStatus();
+        toast({
+          title: "TikTok Connected! 🎵",
+          description: result.username ? `Connected @${result.username}` : "Successfully connected to TikTok",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'TikTok login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } catch (error: any) {
       console.error('TikTok connection error:', error);
       toast({
@@ -268,22 +332,22 @@ export default function FanProfile() {
         description: error.message || 'Failed to connect TikTok. Please try again.',
         variant: 'destructive',
       });
+    } finally {
       setTiktokConnecting(false);
     }
   };
 
   const disconnectTwitter = async () => {
     try {
-      const response = await fetch('/api/social/twitter', {
-        method: 'DELETE',
-        headers: { 'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '' },
-        credentials: 'include'
-      });
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('twitter');
       
-      if (response.ok) {
+      if (result.success) {
         setTwitterConnected(false);
         setTwitterHandle(null);
         toast({ title: "Twitter Disconnected", description: "Your Twitter account has been disconnected." });
+      } else {
+        throw new Error(result.error || 'Failed to disconnect');
       }
     } catch (error) {
       toast({ title: "Disconnection Failed", description: "Failed to disconnect Twitter. Please try again.", variant: 'destructive' });
@@ -303,13 +367,144 @@ export default function FanProfile() {
 
   const disconnectTiktok = async () => {
     try {
-      localStorage.removeItem('fandomly_tiktok_connection');
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('tiktok');
       setTiktokConnected(false);
       setTiktokHandle(null);
       setTiktokFollowers(0);
       toast({ title: "TikTok Disconnected", description: "Your TikTok account has been disconnected." });
     } catch (error) {
       toast({ title: "Disconnection Failed", description: "Failed to disconnect TikTok. Please try again.", variant: 'destructive' });
+    }
+  };
+
+  const checkYoutubeStatus = async () => {
+    try {
+      const response = await fetch('/api/social-connections/youtube', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setYoutubeConnected(data.connected);
+        if (data.connected && data.connection) {
+          const profile = data.connection.profileData;
+          setYoutubeChannelName(data.connection.platformDisplayName || profile?.title || null);
+          setYoutubeSubscribers(profile?.subscriberCount || 0);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking YouTube status:', error);
+    }
+  };
+
+  const connectYoutube = async () => {
+    try {
+      setYoutubeConnecting(true);
+      // Use popup flow (same as creators) instead of full-page redirect
+      const youtubeAPI = socialManager['youtube'];
+      const result = await youtubeAPI.secureLogin();
+      
+      if (result.success) {
+        // Reload status after successful connection
+        await checkYoutubeStatus();
+        toast({
+          title: "YouTube Connected! 📺",
+          description: result.channelName ? `Connected ${result.channelName}` : "Successfully connected to YouTube",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'YouTube login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({ title: 'Connection Failed', description: error.message || 'Failed to connect YouTube.', variant: 'destructive' });
+    } finally {
+      setYoutubeConnecting(false);
+    }
+  };
+
+  const disconnectYoutube = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('youtube');
+      setYoutubeConnected(false);
+      setYoutubeChannelName(null);
+      setYoutubeSubscribers(0);
+      toast({ title: "YouTube Disconnected", description: "Your YouTube account has been disconnected." });
+    } catch (error) {
+      toast({ title: "Disconnection Failed", description: "Failed to disconnect YouTube.", variant: 'destructive' });
+    }
+  };
+
+  const checkSpotifyStatus = async () => {
+    try {
+      const response = await fetch('/api/social-connections/spotify', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSpotifyConnected(data.connected);
+        if (data.connected && data.connection) {
+          const profile = data.connection.profileData;
+          setSpotifyDisplayName(data.connection.platformDisplayName || profile?.display_name || null);
+          setSpotifyFollowers(profile?.followers?.total || 0);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking Spotify status:', error);
+    }
+  };
+
+  const connectSpotify = async () => {
+    try {
+      setSpotifyConnecting(true);
+      // Use popup flow (same as creators) instead of full-page redirect
+      const spotifyAPI = socialManager['spotify'];
+      const result = await spotifyAPI.secureLogin();
+      
+      if (result.success) {
+        // Reload status after successful connection
+        await checkSpotifyStatus();
+        toast({
+          title: "Spotify Connected! 🎵",
+          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Spotify",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Spotify login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({ title: 'Connection Failed', description: error.message || 'Failed to connect Spotify.', variant: 'destructive' });
+    } finally {
+      setSpotifyConnecting(false);
+    }
+  };
+
+  const disconnectSpotify = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('spotify');
+      setSpotifyConnected(false);
+      setSpotifyDisplayName(null);
+      setSpotifyFollowers(0);
+      toast({ title: "Spotify Disconnected", description: "Your Spotify account has been disconnected." });
+    } catch (error) {
+      toast({ title: "Disconnection Failed", description: "Failed to disconnect Spotify.", variant: 'destructive' });
     }
   };
 
@@ -355,14 +550,38 @@ export default function FanProfile() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Profile Overview + Personal Info */}
             <div className="lg:col-span-1 space-y-6">
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                <CardHeader className="text-center">
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
+                {/* Banner Image Section */}
+                <div className="relative h-32">
+                  {user.profileData?.bannerImage ? (
+                    <img 
+                      src={user.profileData.bannerImage} 
+                      alt="Profile Banner"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-brand-primary/30 via-brand-secondary/30 to-brand-accent/30" />
+                  )}
+                  
+                  {/* Upload Banner Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm border-white/20 text-white hover:bg-black/70 hover:text-white"
+                    onClick={() => setIsEditModalOpen(true)}
+                  >
+                    <Camera className="h-3 w-3 mr-1" />
+                    Upload Banner
+                  </Button>
+                </div>
+
+                <CardHeader className="text-center -mt-16 relative">
                   <div className="relative mx-auto mb-4">
                     {/* Profile Photo */}
                     <div className="relative">
-                      <Avatar className="w-32 h-32 mx-auto" data-testid="img-fan-profile-photo">
+                      <Avatar className="w-32 h-32 mx-auto ring-4 ring-gray-900" data-testid="img-fan-profile-photo">
                         <AvatarImage 
-                          src={user.profileData?.avatar} 
+                          src={user.avatar || user.profileData?.avatar} 
                           alt={user.profileData?.name || user.username || "Fan"} 
                         />
                         <AvatarFallback className="w-32 h-32 bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-2xl font-bold">
@@ -370,10 +589,14 @@ export default function FanProfile() {
                         </AvatarFallback>
                       </Avatar>
                       
-                      {/* Camera Icon Overlay */}
-                      <div className="absolute bottom-2 right-2 bg-white/20 backdrop-blur-sm rounded-full p-2">
+                      {/* Camera Icon Overlay - Make it clickable */}
+                      <button
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="absolute bottom-2 right-2 bg-brand-primary hover:bg-brand-primary/80 backdrop-blur-sm rounded-full p-2 transition-colors cursor-pointer"
+                        title="Upload Profile Photo"
+                      >
                         <Camera className="h-4 w-4 text-white" />
-                      </div>
+                      </button>
                     </div>
                     
                     <Button
@@ -504,131 +727,6 @@ export default function FanProfile() {
                 </CardContent>
               </Card>
 
-              {/* Marketing & Creator Preferences - Moved to Left Column */}
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <MessageSquare className="mr-2 h-5 w-5" />
-                    Marketing & Creator Preferences
-                  </CardTitle>
-                  <p className="text-xs text-gray-400 mt-1">
-                    For notification settings:{' '}
-                    <Link href="/fan-dashboard/settings#notifications">
-                      <span className="text-brand-primary hover:underline cursor-pointer">
-                        Manage in Settings
-                      </span>
-                    </Link>
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Phone Number */}
-                  {((user.profileData as any)?.phone) && (
-                    <div>
-                      <label className="text-sm text-gray-300 flex items-center">
-                        <Phone className="mr-1 h-4 w-4" />
-                        Phone Number (SMS)
-                      </label>
-                      <div className="text-white font-medium">
-                        {(user.profileData as any).phone}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Creator Type Interests */}
-                  {((user.profileData as any)?.creatorTypeInterests && (user.profileData as any).creatorTypeInterests.length > 0) && (
-                    <div>
-                      <label className="text-sm text-gray-300">Creator Types You Follow</label>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {(user.profileData as any).creatorTypeInterests.map((type: string) => (
-                          <Badge 
-                            key={type} 
-                            className="bg-brand-primary/20 text-brand-primary border-brand-primary"
-                          >
-                            {type === "athletes" && <Users className="mr-1 h-3 w-3" />}
-                            {type === "musicians" && <Music className="mr-1 h-3 w-3" />}
-                            {type === "content_creators" && <Video className="mr-1 h-3 w-3" />}
-                            {getCreatorTypeLabel(type as any)}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Interest Subcategories */}
-                  {((user.profileData as any)?.interestSubcategories) && (
-                    <>
-                      {(user.profileData as any).interestSubcategories.athletes?.length > 0 && (
-                        <div className="pl-4 border-l-2 border-brand-primary/30">
-                          <label className="text-sm text-gray-300 flex items-center mb-2">
-                            <Users className="mr-1 h-4 w-4" />
-                            Sports I Follow
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {(user.profileData as any).interestSubcategories.athletes.map((sport: string) => (
-                              <Badge key={sport} variant="outline" className="text-xs bg-gray-800">
-                                {sport}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {(user.profileData as any).interestSubcategories.musicians?.length > 0 && (
-                        <div className="pl-4 border-l-2 border-brand-primary/30">
-                          <label className="text-sm text-gray-300 flex items-center mb-2">
-                            <Music className="mr-1 h-4 w-4" />
-                            Music Genres I Follow
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {(user.profileData as any).interestSubcategories.musicians.map((genre: string) => (
-                              <Badge key={genre} variant="outline" className="text-xs bg-gray-800">
-                                {genre}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {(user.profileData as any).interestSubcategories.content_creators?.length > 0 && (
-                        <div className="pl-4 border-l-2 border-brand-primary/30">
-                          <label className="text-sm text-gray-300 flex items-center mb-2">
-                            <Video className="mr-1 h-4 w-4" />
-                            Content Types I Follow
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {(user.profileData as any).interestSubcategories.content_creators.map((type: string) => (
-                              <Badge key={type} variant="outline" className="text-xs bg-gray-800">
-                                {type}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  
-                  {/* Empty State */}
-                  {!(user.profileData as any)?.phone && 
-                   (!(user.profileData as any)?.creatorTypeInterests || (user.profileData as any).creatorTypeInterests.length === 0) && (
-                    <div className="text-center py-6 text-gray-400">
-                      <MessageSquare className="mx-auto h-12 w-12 mb-2 opacity-50" />
-                      <p className="text-sm">No marketing preferences set</p>
-                      <p className="text-xs text-gray-500 mt-1">Help us connect you with the right creators</p>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-end pt-4">
-                    <Button 
-                      variant="outline" 
-                      className="border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white"
-                      onClick={() => setIsEditModalOpen(true)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Update Preferences
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Right Column - Activity, Social, Referral, Settings */}
@@ -819,6 +917,84 @@ export default function FanProfile() {
                         disabled={tiktokConnecting}
                       >
                         {tiktokConnecting ? 'Connecting…' : 'Connect'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* YouTube */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Youtube className="h-5 w-5 text-red-500" />
+                      <div>
+                        <div className="text-white font-medium">YouTube</div>
+                        <div className="text-xs text-gray-400">
+                          {youtubeConnected && youtubeChannelName ? `Connected: ${youtubeChannelName}` : 'Connect your YouTube channel'}
+                        </div>
+                      </div>
+                    </div>
+                    {youtubeConnected ? (
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-500/20 text-green-400 text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Connected
+                        </Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="border-white/20 text-gray-300 hover:bg-white/10"
+                          onClick={disconnectYoutube}
+                        >
+                          <Unlink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                        onClick={connectYoutube}
+                        disabled={youtubeConnecting}
+                      >
+                        {youtubeConnecting ? 'Connecting…' : 'Connect'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Spotify */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FaSpotify className="h-5 w-5 text-green-500" />
+                      <div>
+                        <div className="text-white font-medium">Spotify</div>
+                        <div className="text-xs text-gray-400">
+                          {spotifyConnected && spotifyDisplayName ? `Connected: ${spotifyDisplayName}` : 'Connect your Spotify account'}
+                        </div>
+                      </div>
+                    </div>
+                    {spotifyConnected ? (
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-500/20 text-green-400 text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Connected
+                        </Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="border-white/20 text-gray-300 hover:bg-white/10"
+                          onClick={disconnectSpotify}
+                        >
+                          <Unlink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-green-500/30 text-green-500 hover:bg-green-500/10"
+                        onClick={connectSpotify}
+                        disabled={spotifyConnecting}
+                      >
+                        {spotifyConnecting ? 'Connecting…' : 'Connect'}
                       </Button>
                     )}
                   </div>

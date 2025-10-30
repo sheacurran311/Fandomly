@@ -4,6 +4,9 @@ import crypto from "crypto";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 import { URLSearchParams } from "url";
 import { storage } from "./storage";
+import { db } from "./db";
+import { socialConnections } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 // Server-side code idempotency
 const usedCodeCache = new Map<string, number>(); // code -> expiryMillis
@@ -11,7 +14,7 @@ const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function pruneUsedCodes() {
   const now = Date.now();
-  for (const [k, v] of usedCodeCache.entries()) {
+  for (const [k, v] of Array.from(usedCodeCache.entries())) {
     if (v < now) usedCodeCache.delete(k);
   }
 }
@@ -71,7 +74,10 @@ async function exchangeInstagramToken(code: string, redirectUri: string, userTyp
 async function exchangeTikTokToken(code: string, redirectUri?: string) {
   console.log('[TikTok Token Exchange] Request details:', {
     hasClientKey: !!process.env.TIKTOK_CLIENT_KEY,
+    clientKeyPrefix: process.env.TIKTOK_CLIENT_KEY?.substring(0, 5) + '...',
+    clientKeyLength: process.env.TIKTOK_CLIENT_KEY?.length,
     hasClientSecret: !!process.env.TIKTOK_CLIENT_SECRET,
+    clientSecretLength: process.env.TIKTOK_CLIENT_SECRET?.length,
     redirectUri,
     codeLength: code.length
   });
@@ -80,18 +86,35 @@ async function exchangeTikTokToken(code: string, redirectUri?: string) {
     throw new Error('TikTok client credentials not configured');
   }
 
+  if (!redirectUri) {
+    throw new Error('redirect_uri is required for TikTok token exchange');
+  }
+
+  // TikTok API v2 requires these exact parameters
   const requestBody = {
     client_key: process.env.TIKTOK_CLIENT_KEY,
     client_secret: process.env.TIKTOK_CLIENT_SECRET,
     code,
     grant_type: 'authorization_code',
-    ...(redirectUri ? { redirect_uri: redirectUri } : {})
+    redirect_uri: redirectUri
   };
 
-  console.log('[TikTok Token Exchange] Making request to TikTok API...');
-  const response = await fetch('https://open-api.tiktok.com/oauth/access_token/', {
+  console.log('[TikTok Token Exchange] Request body:', {
+    client_key: requestBody.client_key,
+    hasClientSecret: !!requestBody.client_secret,
+    code: requestBody.code.substring(0, 20) + '...',
+    grant_type: requestBody.grant_type,
+    redirect_uri: requestBody.redirect_uri
+  });
+
+  console.log('[TikTok Token Exchange] Making request to TikTok API v2...');
+  // TikTok API v2 uses /v2/oauth/token/ endpoint
+  const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cache-Control': 'no-cache'
+    },
     body: new URLSearchParams(requestBody).toString()
   });
   
@@ -99,19 +122,36 @@ async function exchangeTikTokToken(code: string, redirectUri?: string) {
   
   const result = await response.json();
   
-  console.log('[TikTok Token Exchange] Response:', {
-    hasAccessToken: !!result.access_token,
-    hasError: !!result.error,
-    errorCode: result.error,
-    errorMessage: result.error_description
-  });
-
-  if (!response.ok || result.error) {
-    const errorMessage = result.error_description || result.error || `HTTP ${response.status}`;
-    console.error('[TikTok Token Exchange] TikTok API error:', errorMessage);
+  console.log('[TikTok Token Exchange] Raw response:', JSON.stringify(result));
+  
+  // TikTok API v2 response structure (per official docs):
+  // Success: { access_token, open_id, refresh_token, expires_in, ... } (flat structure)
+  // Error: { error, error_description, log_id }
+  
+  if (result.error) {
+    const errorMessage = result.error_description || result.error;
+    console.error('[TikTok Token Exchange] TikTok API error:', {
+      error: result.error,
+      error_description: result.error_description,
+      log_id: result.log_id
+    });
     throw new Error(`TikTok token exchange failed: ${errorMessage}`);
   }
   
+  if (!result.access_token) {
+    console.error('[TikTok Token Exchange] No access_token in response:', result);
+    throw new Error('TikTok API did not return access_token');
+  }
+  
+  console.log('[TikTok Token Exchange] Success! Token data:', {
+    hasAccessToken: !!result.access_token,
+    hasOpenId: !!result.open_id,
+    hasRefreshToken: !!result.refresh_token,
+    expiresIn: result.expires_in,
+    scope: result.scope
+  });
+  
+  // Return the result directly (access_token, open_id, refresh_token are at root level)
   return result;
 }
 
@@ -165,24 +205,84 @@ async function exchangeTwitterToken(
 }
 
 // YouTube Data API token exchange
-async function exchangeYouTubeToken(code: string) {
+async function exchangeYouTubeToken(code: string, redirectUri: string) {
+  console.log('[YouTube Token Exchange] Request details:', {
+    hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+    hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri,
+    codeLength: code.length
+  });
+
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    throw new Error('YouTube/Google client credentials not configured');
+  }
+
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: process.env.YOUTUBE_CLIENT_ID!,
-      client_secret: process.env.YOUTUBE_CLIENT_SECRET!,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: `${process.env.BASE_URL}/auth/youtube/callback`
+      redirect_uri: redirectUri
     }).toString()
   });
+  
+  console.log('[YouTube Token Exchange] Response status:', response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[YouTube Token Exchange] Error:', errorText);
+    throw new Error(`YouTube token exchange failed: ${response.status} ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+// YouTube token refresh
+async function refreshYouTubeToken(refreshToken: string) {
+  console.log('[YouTube Token Refresh] Refreshing token...');
+  
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    throw new Error('YouTube/Google client credentials not configured');
+  }
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token'
+    }).toString()
+  });
+  
+  console.log('[YouTube Token Refresh] Response status:', response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[YouTube Token Refresh] Error:', errorText);
+    throw new Error(`YouTube token refresh failed: ${response.status}`);
+  }
   
   return response.json();
 }
 
 // Spotify Web API token exchange
-async function exchangeSpotifyToken(code: string) {
+async function exchangeSpotifyToken(code: string, redirectUri: string) {
+  console.log('[Spotify Token Exchange] Request details:', {
+    hasClientId: !!process.env.SPOTIFY_CLIENT_ID,
+    hasClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
+    redirectUri,
+    codeLength: code.length
+  });
+
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    throw new Error('Spotify client credentials not configured');
+  }
+
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: { 
@@ -192,9 +292,48 @@ async function exchangeSpotifyToken(code: string) {
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: `${process.env.BASE_URL}/auth/spotify/callback`
+      redirect_uri: redirectUri
     }).toString()
   });
+  
+  console.log('[Spotify Token Exchange] Response status:', response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Spotify Token Exchange] Error:', errorText);
+    throw new Error(`Spotify token exchange failed: ${response.status} ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+// Spotify token refresh
+async function refreshSpotifyToken(refreshToken: string) {
+  console.log('[Spotify Token Refresh] Refreshing token...');
+  
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    throw new Error('Spotify client credentials not configured');
+  }
+
+  const response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken
+    }).toString()
+  });
+  
+  console.log('[Spotify Token Refresh] Response status:', response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Spotify Token Refresh] Error:', errorText);
+    throw new Error(`Spotify token refresh failed: ${response.status}`);
+  }
   
   return response.json();
 }
@@ -203,35 +342,48 @@ async function exchangeSpotifyToken(code: string) {
 async function getTikTokUser(accessToken: string) {
   console.log('[TikTok User Info] Fetching user data...');
   
-  const response = await fetch('https://open-api.tiktok.com/user/info/', {
-    method: 'POST',
+  // TikTok API v2 uses GET request with query parameters
+  const fields = ['open_id', 'union_id', 'avatar_url', 'display_name', 'follower_count', 'following_count', 'likes_count', 'video_count'];
+  const url = `https://open.tiktokapis.com/v2/user/info/?fields=${fields.join(',')}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
     headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({
-      access_token: accessToken,
-      fields: ['open_id', 'union_id', 'avatar_url', 'display_name', 'follower_count', 'following_count', 'likes_count', 'video_count']
-    })
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
   });
   
   console.log('[TikTok User Info] Response status:', response.status);
   
   const result = await response.json();
   
-  console.log('[TikTok User Info] Response:', {
-    hasData: !!result.data,
-    hasError: !!result.error,
-    errorCode: result.error?.code,
-    errorMessage: result.error?.message
-  });
-
-  if (!response.ok || result.error) {
-    const errorMessage = result.error?.message || result.error || `HTTP ${response.status}`;
-    console.error('[TikTok User Info] TikTok API error:', errorMessage);
+  console.log('[TikTok User Info] Raw response:', JSON.stringify(result));
+  
+  // TikTok Display API v2 response structure:
+  // Success: { data: { user: { ... } }, error: { code: "ok", message: "", log_id: "..." } }
+  // Error: { error: { code: "error_code", message: "...", log_id: "..." } }
+  // Note: TikTok ALWAYS returns an "error" object, but code "ok" means success!
+  
+  if (result.error && result.error.code !== 'ok') {
+    const errorMessage = result.error.message || result.error.code || JSON.stringify(result.error);
+    console.error('[TikTok User Info] TikTok API error:', result.error);
     throw new Error(`TikTok user info failed: ${errorMessage}`);
   }
   
+  // Display API actually does use nested structure
+  if (!result.data || !result.data.user) {
+    console.error('[TikTok User Info] Missing user data in response:', result);
+    throw new Error('TikTok API did not return user data');
+  }
+  
+  console.log('[TikTok User Info] Success! User data:', {
+    open_id: result.data.user.open_id,
+    display_name: result.data.user.display_name,
+    follower_count: result.data.user.follower_count
+  });
+  
+  // Return the full result (keeps data.user structure for callback)
   return result;
 }
 
@@ -1056,24 +1208,132 @@ export function registerSocialRoutes(app: Express) {
   // YouTube token exchange
   app.post('/api/social/youtube/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.body;
-      const tokenData = await exchangeYouTubeToken(code);
+      const { code, redirect_uri } = req.body;
+      if (!code || !redirect_uri) {
+        return res.status(400).json({ error: 'code and redirect_uri are required' });
+      }
+      console.log('[YouTube Token Route] Processing token exchange');
+      const tokenData = await exchangeYouTubeToken(code, redirect_uri);
       res.json(tokenData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('YouTube token exchange error:', error);
-      res.status(500).json({ error: 'Failed to exchange YouTube token' });
+      res.status(500).json({ 
+        error: 'Failed to exchange YouTube token',
+        message: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // YouTube user/channel info
+  app.get('/api/social/youtube/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Access token required' });
+      }
+      
+      console.log('[YouTube Me Route] Fetching channel info');
+      const response = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[YouTube Me Route] Error:', errorText);
+        return res.status(response.status).json({ error: 'Failed to fetch channel info' });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('YouTube me error:', error);
+      res.status(500).json({ error: 'Failed to get YouTube channel info' });
+    }
+  });
+
+  // YouTube token refresh
+  app.post('/api/social/youtube/refresh', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { refresh_token } = req.body;
+      if (!refresh_token) {
+        return res.status(400).json({ error: 'refresh_token required' });
+      }
+      
+      console.log('[YouTube Refresh Route] Refreshing token');
+      const tokenData = await refreshYouTubeToken(refresh_token);
+      res.json(tokenData);
+    } catch (error: any) {
+      console.error('YouTube token refresh error:', error);
+      res.status(500).json({ 
+        error: 'Failed to refresh YouTube token',
+        message: error.message || 'Unknown error'
+      });
     }
   });
 
   // Spotify token exchange
   app.post('/api/social/spotify/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.body;
-      const tokenData = await exchangeSpotifyToken(code);
+      const { code, redirect_uri } = req.body;
+      if (!code || !redirect_uri) {
+        return res.status(400).json({ error: 'code and redirect_uri are required' });
+      }
+      console.log('[Spotify Token Route] Processing token exchange');
+      const tokenData = await exchangeSpotifyToken(code, redirect_uri);
       res.json(tokenData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Spotify token exchange error:', error);
-      res.status(500).json({ error: 'Failed to exchange Spotify token' });
+      res.status(500).json({ 
+        error: 'Failed to exchange Spotify token',
+        message: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // Spotify user profile
+  app.get('/api/social/spotify/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Access token required' });
+      }
+      
+      console.log('[Spotify Me Route] Fetching user profile');
+      const response = await fetch('https://api.spotify.com/v1/me', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Spotify Me Route] Error:', errorText);
+        return res.status(response.status).json({ error: 'Failed to fetch profile' });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Spotify me error:', error);
+      res.status(500).json({ error: 'Failed to get Spotify profile' });
+    }
+  });
+
+  // Spotify token refresh
+  app.post('/api/social/spotify/refresh', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { refresh_token } = req.body;
+      if (!refresh_token) {
+        return res.status(400).json({ error: 'refresh_token required' });
+      }
+      
+      console.log('[Spotify Refresh Route] Refreshing token');
+      const tokenData = await refreshSpotifyToken(refresh_token);
+      res.json(tokenData);
+    } catch (error: any) {
+      console.error('Spotify token refresh error:', error);
+      res.status(500).json({ 
+        error: 'Failed to refresh Spotify token',
+        message: error.message || 'Unknown error'
+      });
     }
   });
 
@@ -1098,8 +1358,55 @@ export function registerSocialRoutes(app: Express) {
         return res.status(400).json({ error: 'Platform and account data are required' });
       }
       
-      // Save to database
+      // Save to BOTH systems for consistency
+      // 1. Save to old storage system (users.profileData.socialConnections)
       await storage.saveSocialAccount(dynamicUserId, platform, accountData);
+      
+      // 2. Also save to socialConnections table for consistency across all pages
+      try {
+        const user = await storage.getUserByDynamicId(dynamicUserId);
+        if (user) {
+          // Check if connection already exists in socialConnections table
+          const existingConnection = await db.query.socialConnections.findFirst({
+            where: and(
+              eq(socialConnections.userId, user.id),
+              eq(socialConnections.platform, platform)
+            ),
+          });
+
+          const connectionData = {
+            platformUserId: accountData.user?.id || accountData.id,
+            platformUsername: accountData.user?.username || accountData.username,
+            platformDisplayName: accountData.user?.name || accountData.name || accountData.displayName,
+            profileData: accountData,
+            lastSyncedAt: new Date(),
+            isActive: true,
+            updatedAt: new Date(),
+          };
+
+          if (existingConnection) {
+            // Update existing connection
+            await db
+              .update(socialConnections)
+              .set(connectionData)
+              .where(eq(socialConnections.id, existingConnection.id));
+            console.log(`[Social Connect] Updated ${platform} in socialConnections table for user ${user.id}`);
+          } else {
+            // Create new connection
+            await db
+              .insert(socialConnections)
+              .values({
+                userId: user.id,
+                platform,
+                ...connectionData,
+              });
+            console.log(`[Social Connect] Created ${platform} in socialConnections table for user ${user.id}`);
+          }
+        }
+      } catch (syncError) {
+        console.error(`[Social Connect] Error syncing to socialConnections table:`, syncError);
+        // Don't fail the request if the sync fails
+      }
       
       console.log(`[Social Connect] Successfully saved ${platform} account for user ${dynamicUserId}`);
       res.json({ success: true, message: `${platform} account connected successfully` });
@@ -1124,7 +1431,106 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Disconnect social account (no custom auth middleware)
+  // Get individual platform connection status
+  app.get('/api/social-connections/:platform', async (req: AuthenticatedRequest, res) => {
+    try {
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
+      const { platform } = req.params;
+      
+      if (!dynamicUserId) {
+        return res.json({ connected: false, connectionData: null });
+      }
+      
+      // Query from socialConnections table for consistency
+      const user = await storage.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        return res.json({ connected: false, connectionData: null });
+      }
+
+      const connection = await db.query.socialConnections.findFirst({
+        where: and(
+          eq(socialConnections.userId, user.id),
+          eq(socialConnections.platform, platform)
+        ),
+      });
+      
+      if (connection && connection.isActive) {
+        res.json({
+          connected: true,
+          connection: {
+            id: connection.id,
+            platform: connection.platform,
+            platformUserId: connection.platformUserId,
+            platformUsername: connection.platformUsername,
+            platformDisplayName: connection.platformDisplayName,
+            profileData: connection.profileData,
+            connectedAt: connection.connectedAt,
+            lastSyncedAt: connection.lastSyncedAt,
+            isActive: connection.isActive,
+          }
+        });
+      } else {
+        res.json({ connected: false, connectionData: null });
+      }
+    } catch (error) {
+      console.error(`Get ${req.params.platform} connection status error:`, error);
+      res.json({ connected: false, connectionData: null });
+    }
+  });
+
+  // Disconnect social account (generic endpoint for all platforms)
+  app.post('/api/social-connections/disconnect', async (req: AuthenticatedRequest, res) => {
+    try {
+      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
+      const { platform } = req.body;
+      
+      console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${dynamicUserId}`);
+      
+      if (!dynamicUserId) {
+        return res.status(400).json({ error: 'dynamicUserId required' });
+      }
+      
+      if (!platform) {
+        return res.status(400).json({ error: 'platform required' });
+      }
+      
+      // Remove from BOTH systems for consistency
+      // 1. Remove from old storage system
+      const success = await storage.removeSocialAccount(dynamicUserId, platform);
+      
+      // 2. Also remove from socialConnections table
+      try {
+        const user = await storage.getUserByDynamicId(dynamicUserId);
+        if (user) {
+          await db
+            .delete(socialConnections)
+            .where(
+              and(
+                eq(socialConnections.userId, user.id),
+                eq(socialConnections.platform, platform)
+              )
+            );
+          console.log(`[Social Disconnect] Also removed ${platform} from socialConnections table for user ${user.id}`);
+        }
+      } catch (syncError) {
+        console.error(`[Social Disconnect] Error removing from socialConnections table:`, syncError);
+        // Don't fail the request if the sync fails
+      }
+      
+      if (success) {
+        console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);
+        res.json({ success: true, message: `${platform} account disconnected successfully` });
+      } else {
+        console.log(`[Social Disconnect] Failed to disconnect ${platform} for user ${dynamicUserId}`);
+        res.status(500).json({ error: `Failed to disconnect ${platform} account` });
+      }
+    } catch (error) {
+      console.error('Social disconnect error:', error);
+      res.status(500).json({ error: 'Failed to disconnect social account' });
+    }
+  });
+
+  // Disconnect social account (no custom auth middleware) - legacy endpoint
   app.delete('/api/social/:platform', async (req: AuthenticatedRequest, res) => {
     try {
       const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
@@ -1136,8 +1542,28 @@ export function registerSocialRoutes(app: Express) {
         return res.status(400).json({ error: 'dynamicUserId required' });
       }
       
-      // Remove from database
+      // Remove from BOTH systems for consistency
+      // 1. Remove from old storage system
       const success = await storage.removeSocialAccount(dynamicUserId, platform);
+      
+      // 2. Also remove from socialConnections table
+      try {
+        const user = await storage.getUserByDynamicId(dynamicUserId);
+        if (user) {
+          await db
+            .delete(socialConnections)
+            .where(
+              and(
+                eq(socialConnections.userId, user.id),
+                eq(socialConnections.platform, platform)
+              )
+            );
+          console.log(`[Social Disconnect] Also removed ${platform} from socialConnections table for user ${user.id}`);
+        }
+      } catch (syncError) {
+        console.error(`[Social Disconnect] Error removing from socialConnections table:`, syncError);
+        // Don't fail the request if the sync fails
+      }
       
       if (success) {
         console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);

@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { LocationPicker } from "@/components/ui/location-picker";
+import { PersonalLinksInput } from "@/components/ui/personal-links-input";
+import { StarRating } from "@/components/ui/star-rating";
 import { 
   Save, 
   X, 
@@ -22,7 +25,6 @@ import {
   Image as ImageIcon,
   Eye,
   EyeOff,
-  Palette,
   Trophy,
   Music,
   Video
@@ -40,6 +42,10 @@ const topSports = [
   "American Football", "Basketball", "Baseball", "Soccer", "Tennis", "Golf", 
   "Swimming", "Track & Field", "Wrestling", "Gymnastics", "Volleyball", 
   "Softball", "Hockey", "Lacrosse", "Cross Country", "Skiing"
+];
+
+const collegeCommitmentOptions = [
+  "Committed", "Signed", "Enrolled", "Interested", "Contacted", "Offered"
 ];
 
 const educationLevels = [
@@ -73,18 +79,20 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     location: "",
     bannerImage: "",
     avatar: "",
-    followerCount: "",
     
     // Athlete Fields
     sport: "",
-    ageRange: "",
     position: "",
     education: "",
     grade: "",
     school: "",
-    graduationYear: "",
+    graduatingClass: "",
     currentSponsors: "",
-    nilCompliant: false,
+    personalLinks: [] as string[],
+    rivalsScore: "",
+    espnScoutGrade: "",
+    rating247: "",
+    collegeCommitmentStatus: "",
     
     // Musician Fields
     musicGenre: [] as string[],
@@ -99,7 +107,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     sponsorships: "",
     totalViews: "",
     
-    // Store Settings
+    // Store Settings (hidden from UI, but kept for backend)
     storeColors: {
       primary: "#E10698",
       secondary: "#14FEEE"
@@ -127,18 +135,20 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
         location: user.profileData?.location || "",
         bannerImage: user.profileData?.bannerImage || creator?.bannerImage || "",
         avatar: user.profileData?.avatar || "",
-        followerCount: creator?.followerCount?.toString() || "",
         
         // Athlete
         sport: typeSpecificData?.athlete?.sport || user.profileData?.sport || "",
-        ageRange: typeSpecificData?.athlete?.ageRange || "",
         position: typeSpecificData?.athlete?.position || user.profileData?.position || "",
         education: typeSpecificData?.athlete?.education?.level || user.profileData?.education?.level || "",
         grade: typeSpecificData?.athlete?.education?.grade || user.profileData?.education?.grade || "",
         school: typeSpecificData?.athlete?.education?.school || user.profileData?.education?.school || "",
-        graduationYear: typeSpecificData?.athlete?.education?.graduationYear?.toString() || user.profileData?.education?.graduationYear?.toString() || "",
+        graduatingClass: typeSpecificData?.athlete?.graduatingClass?.toString() || user.profileData?.education?.graduationYear?.toString() || "",
         currentSponsors: typeSpecificData?.athlete?.currentSponsors?.join(", ") || "",
-        nilCompliant: typeSpecificData?.athlete?.nilCompliant || false,
+        personalLinks: typeSpecificData?.athlete?.personalLinks || [],
+        rivalsScore: typeSpecificData?.athlete?.rivalsScore?.toString() || "",
+        espnScoutGrade: typeSpecificData?.athlete?.espnScoutGrade?.toString() || "",
+        rating247: typeSpecificData?.athlete?.rating247?.toString() || "",
+        collegeCommitmentStatus: typeSpecificData?.athlete?.collegeCommitmentStatus || "",
         
         // Musician
         musicGenre: typeSpecificData?.musician?.musicGenre || user.profileData?.musicGenre || [],
@@ -157,7 +167,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
           : (typeSpecificData?.contentCreator?.sponsorships || ""),
         totalViews: typeSpecificData?.contentCreator?.totalViews || "",
         
-        // Store Colors
+        // Store Colors (hidden from UI, preserved for backend)
         storeColors: creator?.storeColors as any || {
           primary: "#E10698",
           secondary: "#14FEEE"
@@ -192,7 +202,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
             level: data.education,
             grade: data.grade,
             school: data.school,
-            graduationYear: data.graduationYear ? parseInt(data.graduationYear) : undefined
+            graduatingClass: data.graduatingClass ? parseInt(data.graduatingClass) : undefined
           } : undefined,
           musicGenre: data.musicGenre,
           artistType: data.artistType,
@@ -210,16 +220,19 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
           typeSpecificData = {
             athlete: {
               sport: data.sport,
-              ageRange: data.ageRange,
               position: data.position,
               education: {
                 level: data.education,
                 grade: data.grade,
-                school: data.school,
-                graduationYear: data.graduationYear ? parseInt(data.graduationYear) : undefined
+                school: data.school
               },
+              graduatingClass: data.graduatingClass ? parseInt(data.graduatingClass) : undefined,
               currentSponsors: data.currentSponsors ? data.currentSponsors.split(',').map((s: string) => s.trim()) : [],
-              nilCompliant: data.nilCompliant
+              personalLinks: data.personalLinks,
+              rivalsScore: data.rivalsScore ? parseFloat(data.rivalsScore) : undefined,
+              espnScoutGrade: data.espnScoutGrade ? parseFloat(data.espnScoutGrade) : undefined,
+              rating247: data.rating247 ? parseFloat(data.rating247) : undefined,
+              collegeCommitmentStatus: data.collegeCommitmentStatus || undefined
             }
           };
         } else if (creatorType === 'musician') {
@@ -246,17 +259,26 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
         await apiRequest("PUT", `/api/creators/${creator.id}`, {
           displayName: data.displayName,
           bio: data.bio,
+          imageUrl: data.avatar,  // Save profile photo to creator.imageUrl for verification
           bannerImage: data.bannerImage,
-          followerCount: data.followerCount ? parseInt(data.followerCount) : undefined,
-          storeColors: data.storeColors,
+          storeColors: data.storeColors,  // Preserve store colors (managed in program builder)
           typeSpecificData,
           publicFields: data.publicFields
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
+      
+      // Trigger verification check after profile update
+      try {
+        await apiRequest("POST", "/api/creator-verification/check", {});
+        queryClient.invalidateQueries({ queryKey: ["/api/creator-verification/status"] });
+      } catch (error) {
+        console.error("Verification check failed:", error);
+      }
+      
       toast({
         title: "Profile Updated! ✅",
         description: "Your creator profile has been successfully updated.",
@@ -328,20 +350,20 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
               </div>
               
               <div>
-                <Label htmlFor="location" className="text-gray-300 flex items-center justify-between">
-                  <span><MapPin className="inline mr-1 h-4 w-4" />Location</span>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-gray-300 flex items-center">
+                    <MapPin className="inline mr-1 h-4 w-4" />Location
+                  </Label>
                   <Switch
                     checked={formData.publicFields.location}
                     onCheckedChange={() => handlePublicFieldToggle('location')}
                     className="scale-75"
                   />
-                </Label>
-                <Input
-                  id="location"
+                </div>
+                <LocationPicker
                   value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="City, State"
+                  onChange={(location) => handleInputChange('location', location)}
+                  label=""
                 />
               </div>
             </div>
@@ -365,7 +387,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
               />
             </div>
 
-            <div>
+            <div className="hidden">
               <Label htmlFor="followerCount" className="text-gray-300 flex items-center justify-between">
                 <span>Total Follower Count</span>
                 <Switch
@@ -445,23 +467,6 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
                 </div>
 
                 <div>
-                  <Label htmlFor="ageRange" className="text-gray-300">Age Range</Label>
-                  <Select value={formData.ageRange} onValueChange={(value) => handleInputChange('ageRange', value)}>
-                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                      <SelectValue placeholder="Select age range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="13-15">13-15</SelectItem>
-                      <SelectItem value="16-18">16-18</SelectItem>
-                      <SelectItem value="19-22">19-22</SelectItem>
-                      <SelectItem value="23-26">23-26</SelectItem>
-                      <SelectItem value="27-30">27-30</SelectItem>
-                      <SelectItem value="31+">31+</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label htmlFor="position" className="text-gray-300">Position</Label>
                   <Input
                     id="position"
@@ -505,26 +510,42 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
                 </div>
 
                 <div>
-                  <Label htmlFor="school" className="text-gray-300">School/Institution</Label>
+                  <Label htmlFor="school" className="text-gray-300">Current School/College/Institution</Label>
                   <Input
                     id="school"
                     value={formData.school}
                     onChange={(e) => handleInputChange('school', e.target.value)}
                     className="bg-gray-800 border-gray-700 text-white"
-                    placeholder="School name"
+                    placeholder="University of Oklahoma, St. John Bosco..."
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="graduationYear" className="text-gray-300">Graduation Year</Label>
+                  <Label htmlFor="graduatingClass" className="text-gray-300">Graduating Class</Label>
                   <Input
-                    id="graduationYear"
+                    id="graduatingClass"
                     type="number"
-                    value={formData.graduationYear}
-                    onChange={(e) => handleInputChange('graduationYear', e.target.value)}
+                    value={formData.graduatingClass}
+                    onChange={(e) => handleInputChange('graduatingClass', e.target.value)}
                     className="bg-gray-800 border-gray-700 text-white"
                     placeholder="2025"
+                    min={new Date().getFullYear()}
+                    max={new Date().getFullYear() + 10}
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <Label className="text-gray-300">College Commitment Status</Label>
+                  <Select value={formData.collegeCommitmentStatus} onValueChange={(value) => handleInputChange('collegeCommitmentStatus', value)}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                      <SelectValue placeholder="Select status (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {collegeCommitmentOptions.map(status => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -540,14 +561,77 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
                 <p className="text-xs text-gray-500 mt-1">e.g., Nike, Gatorade, Under Armour</p>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                <Label htmlFor="nilCompliant" className="text-gray-300">NIL Compliant</Label>
-                <Switch
-                  id="nilCompliant"
-                  checked={formData.nilCompliant}
-                  onCheckedChange={(checked) => handleInputChange('nilCompliant', checked)}
-                />
+              {/* Recruiting Metrics */}
+              <div className="space-y-4 p-4 bg-white/5 rounded-lg">
+                <h4 className="text-white font-semibold">Recruiting Metrics (Optional)</h4>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="rivalsScore" className="text-gray-300">Rivals Score</Label>
+                    <Input
+                      id="rivalsScore"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.rivalsScore}
+                      onChange={(e) => handleInputChange('rivalsScore', e.target.value)}
+                      placeholder="0-100"
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    {formData.rivalsScore && (
+                      <div className="mt-2">
+                        <StarRating score={parseFloat(formData.rivalsScore)} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="espnScoutGrade" className="text-gray-300">ESPN Scout Grade</Label>
+                    <Input
+                      id="espnScoutGrade"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.espnScoutGrade}
+                      onChange={(e) => handleInputChange('espnScoutGrade', e.target.value)}
+                      placeholder="0-100"
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    {formData.espnScoutGrade && (
+                      <div className="mt-2">
+                        <StarRating score={parseFloat(formData.espnScoutGrade)} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="rating247" className="text-gray-300">247 Rating</Label>
+                    <Input
+                      id="rating247"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.rating247}
+                      onChange={(e) => handleInputChange('rating247', e.target.value)}
+                      placeholder="0-100"
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    {formData.rating247 && (
+                      <div className="mt-2">
+                        <StarRating score={parseFloat(formData.rating247)} />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Personal Links */}
+              <PersonalLinksInput
+                value={formData.personalLinks}
+                onChange={(links) => handleInputChange('personalLinks', links)}
+              />
             </div>
           )}
 
@@ -694,56 +778,6 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
               </div>
             </div>
           )}
-
-          <Separator className="bg-gray-700" />
-
-          {/* Store Colors */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Store Branding
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="primaryColor" className="text-gray-300">Primary Color</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="primaryColor"
-                    type="color"
-                    value={formData.storeColors.primary}
-                    onChange={(e) => handleInputChange('storeColors', { ...formData.storeColors, primary: e.target.value })}
-                    className="w-20 h-10 p-1 bg-gray-800 border-gray-700"
-                  />
-                  <Input
-                    value={formData.storeColors.primary}
-                    onChange={(e) => handleInputChange('storeColors', { ...formData.storeColors, primary: e.target.value })}
-                    className="flex-1 bg-gray-800 border-gray-700 text-white"
-                    placeholder="#E10698"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="secondaryColor" className="text-gray-300">Secondary Color</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="secondaryColor"
-                    type="color"
-                    value={formData.storeColors.secondary}
-                    onChange={(e) => handleInputChange('storeColors', { ...formData.storeColors, secondary: e.target.value })}
-                    className="w-20 h-10 p-1 bg-gray-800 border-gray-700"
-                  />
-                  <Input
-                    value={formData.storeColors.secondary}
-                    onChange={(e) => handleInputChange('storeColors', { ...formData.storeColors, secondary: e.target.value })}
-                    className="flex-1 bg-gray-800 border-gray-700 text-white"
-                    placeholder="#14FEEE"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">

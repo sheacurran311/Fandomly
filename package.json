@@ -15,15 +15,9 @@
     "promote-admin": "tsx scripts/promote-to-admin.ts"
   },
   "dependencies": {
-    "@dynamic-labs/algorand": "^4.25.10",
-    "@dynamic-labs/bitcoin": "^4.25.10",
-    "@dynamic-labs/cosmos": "^4.25.8",
     "@dynamic-labs/ethereum": "^4.25.8",
-    "@dynamic-labs/flow": "^4.25.10",
     "@dynamic-labs/sdk-react-core": "^4.25.8",
     "@dynamic-labs/solana": "^4.25.8",
-    "@dynamic-labs/starknet": "^4.25.8",
-    "@dynamic-labs/sui": "^4.25.10",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",

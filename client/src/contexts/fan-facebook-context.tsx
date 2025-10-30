@@ -41,14 +41,11 @@ export function FanFacebookConnectionProvider({ children }: { children: ReactNod
   useEffect(() => {
     // Wait for user data to load before checking user type
     if (isLoading) {
-      console.log('[Fan FB] Waiting for user data to load...');
       return;
     }
 
-
     // Only initialize Facebook for authenticated fan users
     if (!user || user.userType !== 'fan') {
-      console.log('[Fan FB] Not a fan user - skipping Facebook initialization');
       return;
     }
 

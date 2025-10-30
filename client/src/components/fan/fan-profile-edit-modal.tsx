@@ -29,6 +29,72 @@ import { Link } from "wouter";
 import useUsernameValidation from "@/hooks/use-username-validation";
 import { CREATOR_TYPE_OPTIONS, getSubcategoryOptions, getCreatorTypeLabel } from "@shared/fanInterestOptions";
 import type { CreatorTypeInterest } from "@shared/fanInterestOptions";
+import { ImageUpload } from "@/components/ui/image-upload";
+
+// Topic categories for fan interests (same as creator onboarding)
+const topicCategories = [
+  // Main categories and subcategories
+  { value: "sports", label: "Sports", isMain: true },
+  { value: "football", label: "Football", parent: "sports" },
+  { value: "soccer", label: "Soccer", parent: "sports" },
+  { value: "basketball", label: "Basketball", parent: "sports" },
+  { value: "hockey", label: "Hockey", parent: "sports" },
+  { value: "sports-betting", label: "Sports Betting", parent: "sports" },
+  
+  { value: "technology", label: "Technology", isMain: true },
+  { value: "blockchain-crypto", label: "Blockchain/Crypto", parent: "technology" },
+  { value: "ai", label: "AI", parent: "technology" },
+  { value: "coding", label: "Coding", parent: "technology" },
+  
+  { value: "entertainment", label: "Entertainment", isMain: true },
+  { value: "gaming", label: "Gaming", parent: "entertainment" },
+  { value: "music", label: "Music", parent: "entertainment" },
+  { value: "movies-tv", label: "Movies & TV", parent: "entertainment" },
+  
+  { value: "health-wellness", label: "Health & Wellness", isMain: true },
+  { value: "diet-fitness", label: "Diet/Fitness", parent: "health-wellness" },
+  { value: "mental-health", label: "Mental Health", parent: "health-wellness" },
+  { value: "meditation", label: "Meditation", parent: "health-wellness" },
+  
+  { value: "finance", label: "Finance", isMain: true },
+  { value: "stock-market", label: "Stock Market", parent: "finance" },
+  { value: "investing", label: "Investing", parent: "finance" },
+  { value: "personal-finance", label: "Personal Finance", parent: "finance" },
+  
+  { value: "science", label: "Science", isMain: true },
+  { value: "physics", label: "Physics", parent: "science" },
+  { value: "biology", label: "Biology", parent: "science" },
+  { value: "astronomy", label: "Astronomy", parent: "science" },
+  
+  { value: "writing", label: "Writing", isMain: true },
+  { value: "blogs", label: "Blogs", parent: "writing" },
+  { value: "journalism", label: "Journalism", parent: "writing" },
+  { value: "creative-writing", label: "Creative Writing", parent: "writing" },
+  
+  { value: "fashion", label: "Fashion", isMain: true },
+  { value: "modeling", label: "Modeling", parent: "fashion" },
+  { value: "streetwear", label: "Streetwear", parent: "fashion" },
+  { value: "luxury", label: "Luxury", parent: "fashion" },
+  
+  { value: "academics", label: "Academics", isMain: true },
+  { value: "tutoring", label: "Tutoring", parent: "academics" },
+  { value: "study-tips", label: "Study Tips", parent: "academics" },
+  
+  { value: "guides-how-tos", label: "Guides/How-Tos", isMain: true },
+  { value: "recipes", label: "Recipes", parent: "guides-how-tos" },
+  { value: "diy", label: "DIY", parent: "guides-how-tos" },
+  { value: "tutorials", label: "Tutorials", parent: "guides-how-tos" },
+  
+  { value: "travel", label: "Travel", isMain: true },
+  { value: "adventure", label: "Adventure", parent: "travel" },
+  { value: "budget-travel", label: "Budget Travel", parent: "travel" },
+  { value: "luxury-travel", label: "Luxury Travel", parent: "travel" },
+  
+  { value: "politics", label: "Politics", isMain: true },
+  { value: "news", label: "News", parent: "politics" },
+  { value: "predictions", label: "Predictions", parent: "politics" },
+  { value: "policy", label: "Policy", parent: "politics" },
+];
 
 interface FanProfileEditModalProps {
   isOpen: boolean;
@@ -42,6 +108,7 @@ interface ProfileData {
   phoneNumber?: string;
   dateOfBirth?: string;
   gender?: string;
+  avatar?: string; // Profile photo
   bannerImage?: string;
   
   // Marketing Fields (NEW)
@@ -52,6 +119,8 @@ interface ProfileData {
     musicians?: string[];
     content_creators?: string[];
   };
+  topicsOfFocus?: string[]; // Selected predefined topics
+  customTopics?: string[]; // Custom user-entered topics
   
   // Legacy fields (kept for backwards compatibility)
   interests?: Array<"musicians" | "athletes" | "content_creators">;
@@ -90,6 +159,7 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
     phoneNumber: "",
     dateOfBirth: "",
     gender: "",
+    avatar: "",
     bannerImage: "",
     phone: "", // NEW
     creatorTypeInterests: [], // NEW
@@ -98,6 +168,8 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
       musicians: [],
       content_creators: []
     },
+    topicsOfFocus: [], // NEW
+    customTopics: [], // NEW
     interests: [],
     socialLinks: {
       twitter: "",
@@ -129,6 +201,8 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
           phoneNumber: user.profileData.phoneNumber || "",
           dateOfBirth: user.profileData.dateOfBirth || "",
           gender: user.profileData.gender || "",
+          avatar: user.avatar || (user.profileData as any).avatar || "",
+          bannerImage: user.profileData.bannerImage || "",
           phone: (user.profileData as any).phone || "", // NEW
           creatorTypeInterests: (user.profileData as any).creatorTypeInterests || [], // NEW
           interestSubcategories: (user.profileData as any).interestSubcategories || { // NEW
@@ -136,6 +210,8 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
             musicians: [],
             content_creators: []
           },
+          topicsOfFocus: (user.profileData as any).topicsOfFocus || [], // NEW
+          customTopics: (user.profileData as any).customTopics || [], // NEW
           interests: user.profileData.interests || [],
           socialLinks: {
             twitter: user.profileData.socialLinks?.twitter || "",
@@ -155,12 +231,13 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
   }, [isOpen, user]);
 
   const updateProfile = useMutation({
-    mutationFn: async (data: { username?: string; profileData: ProfileData }) => {
+    mutationFn: async (data: { username?: string; avatar?: string; profileData: ProfileData }) => {
       if (!user) throw new Error("User not found");
       
       const response = await apiRequest("POST", "/api/auth/profile", {
         userId: user.id,
         username: data.username, // Include username if changed
+        avatar: data.avatar, // Include avatar update
         profileData: {
           ...data.profileData,
           // Keep existing Facebook data
@@ -276,6 +353,67 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
     });
   };
 
+  // NEW: Handle topic selection (limit to 5)
+  const [customTopicInput, setCustomTopicInput] = useState("");
+  
+  const toggleTopic = (topicValue: string) => {
+    setFormData(prev => {
+      const currentTopics = prev.topicsOfFocus || [];
+      const isSelected = currentTopics.includes(topicValue);
+      const totalSelected = currentTopics.length + (prev.customTopics || []).length;
+      
+      if (isSelected) {
+        return {
+          ...prev,
+          topicsOfFocus: currentTopics.filter(t => t !== topicValue)
+        };
+      } else if (totalSelected < 5) {
+        return {
+          ...prev,
+          topicsOfFocus: [...currentTopics, topicValue]
+        };
+      }
+      return prev;
+    });
+  };
+  
+  const addCustomTopic = () => {
+    if (!customTopicInput.trim()) return;
+    
+    const totalSelected = (formData.topicsOfFocus || []).length + (formData.customTopics || []).length;
+    if (totalSelected >= 5) {
+      toast({
+        title: "Maximum Reached",
+        description: "You can select up to 5 topics total",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check for duplicates
+    if ((formData.customTopics || []).includes(customTopicInput.trim())) {
+      toast({
+        title: "Duplicate Topic",
+        description: "You've already added this topic",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      customTopics: [...(prev.customTopics || []), customTopicInput.trim()]
+    }));
+    setCustomTopicInput("");
+  };
+  
+  const removeCustomTopic = (topic: string) => {
+    setFormData(prev => ({
+      ...prev,
+      customTopics: (prev.customTopics || []).filter(t => t !== topic)
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -291,6 +429,7 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
     
     updateProfile.mutate({
       username: isEditingUsername && username !== user?.username ? username : undefined,
+      avatar: formData.avatar !== (user?.avatar || user?.profileData?.avatar) ? formData.avatar : undefined,
       profileData: formData,
     });
   };
@@ -458,32 +597,40 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
 
           <Separator className="bg-gray-700" />
 
-          {/* Marketing & Creator Preferences - NEW */}
+          {/* Profile Images */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-white">Profile Images</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-300 mb-2 block">Profile Photo</Label>
+                <ImageUpload
+                  type="avatar"
+                  currentImageUrl={formData.avatar}
+                  onUploadSuccess={(url) => handleInputChange('avatar', url)}
+                />
+              </div>
+              
+              <div>
+                <Label className="text-gray-300 mb-2 block">Banner Image</Label>
+                <ImageUpload
+                  type="banner"
+                  currentImageUrl={formData.bannerImage}
+                  onUploadSuccess={(url) => handleInputChange('bannerImage', url)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-gray-700" />
+
+          {/* Interests - Creator Preferences (UPDATED) */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center">
-              <Mail className="mr-2 h-5 w-5" />
-              Marketing & Creator Preferences
+              <Users className="mr-2 h-5 w-5" />
+              Interests
             </h3>
             <p className="text-sm text-gray-400">Help us connect you with the right creators and campaigns</p>
-            
-            {/* Phone Number for SMS Marketing with International Format */}
-            <div>
-              <Label htmlFor="phone" className="text-gray-300">
-                <Phone className="inline mr-1 h-4 w-4" />
-                Phone Number (SMS Marketing)
-              </Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
-                placeholder="+1 (555) 123-4567"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Include country code (e.g., +1 for USA, +44 for UK, +91 for India)
-              </p>
-            </div>
             
             {/* Creator Type Interests */}
             <div>
@@ -538,78 +685,105 @@ export default function FanProfileEditModal({ isOpen, onClose }: FanProfileEditM
                 </div>
               );
             })}
-          </div>
-
-          <Separator className="bg-gray-700" />
-
-          {/* Notification Preferences - Comprehensive */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Bell className="mr-2 h-5 w-5" />
-                  Notification Preferences
-                </h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  {formData.phone ? 'SMS enabled - ' : 'Add phone for SMS - '}
-                  <Link href="/fan-dashboard/settings#notifications">
-                    <span className="text-brand-primary hover:underline cursor-pointer">
-                      Manage all settings
-                    </span>
-                  </Link>
-                </p>
-              </div>
-            </div>
             
-            <div className="space-y-3 text-sm">
-              {/* Marketing */}
-              <div className="p-3 bg-gray-800/50 rounded-lg">
-                <div className="font-medium text-white mb-2">Marketing Communications</div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="marketingEmails" className="text-gray-300 text-xs">Email Updates</Label>
-                  <Switch
-                    id="marketingEmails"
-                    checked={formData.preferences?.marketingEmails}
-                    onCheckedChange={(checked) => handlePreferenceChange('marketingEmails', checked)}
-                  />
-                </div>
-              </div>
-              
-              {/* Creator Updates */}
-              <div className="p-3 bg-gray-800/50 rounded-lg">
-                <div className="font-medium text-white mb-2">Creator Updates</div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-300 text-xs">Email Notifications</Label>
-                    <Switch
-                      checked={formData.preferences?.emailNotifications}
-                      onCheckedChange={(checked) => handlePreferenceChange('emailNotifications', checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-300 text-xs">Push Notifications</Label>
-                    <Switch
-                      checked={formData.preferences?.pushNotifications}
-                      onCheckedChange={(checked) => handlePreferenceChange('pushNotifications', checked)}
-                    />
-                  </div>
-                  {formData.phone && (
-                    <div className="flex items-center justify-between">
-                      <Label className="text-gray-300 text-xs">SMS Alerts</Label>
-                      <Switch
-                        checked={formData.preferences?.smsNotifications}
-                        onCheckedChange={(checked) => handlePreferenceChange('smsNotifications', checked)}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <p className="text-xs text-gray-500 italic">
-                Visit Settings → Notifications for granular control (campaigns, tasks, rewards, achievements)
+            {/* Topics Selection (NEW) */}
+            <div className="mt-4">
+              <Label className="text-gray-300 mb-2 block">
+                Your Interest Topics (Select up to 5)
+              </Label>
+              <p className="text-xs text-gray-400 mb-2">
+                {(formData.topicsOfFocus || []).length + (formData.customTopics || []).length}/5 selected
               </p>
+              
+              {/* Topic Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar p-2 bg-gray-800/50 rounded-lg">
+                {topicCategories.map((topic) => {
+                  const isSelected = (formData.topicsOfFocus || []).includes(topic.value);
+                  const totalSelected = (formData.topicsOfFocus || []).length + (formData.customTopics || []).length;
+                  const isDisabled = !isSelected && totalSelected >= 5;
+                  
+                  return (
+                    <button
+                      key={topic.value}
+                      type="button"
+                      onClick={() => toggleTopic(topic.value)}
+                      disabled={isDisabled}
+                      className={`p-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected 
+                          ? 'bg-brand-primary text-white border-2 border-brand-primary' 
+                          : isDisabled
+                            ? 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed opacity-50'
+                            : topic.isMain
+                              ? 'bg-gray-700 text-white border border-gray-600 hover:bg-gray-600'
+                              : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                      } ${topic.isMain ? 'font-bold' : 'pl-4'}`}
+                    >
+                      {topic.label}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Custom Topic Input */}
+              <div className="mt-3">
+                <Label className="text-gray-300 text-xs mb-1 block">Add Custom Topic</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={customTopicInput}
+                    onChange={(e) => setCustomTopicInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTopic())}
+                    placeholder="Enter a topic..."
+                    className="bg-gray-800 border-gray-700 text-white text-sm"
+                    disabled={(formData.topicsOfFocus || []).length + (formData.customTopics || []).length >= 5}
+                  />
+                  <Button
+                    type="button"
+                    onClick={addCustomTopic}
+                    size="sm"
+                    disabled={(formData.topicsOfFocus || []).length + (formData.customTopics || []).length >= 5}
+                    className="bg-brand-secondary hover:bg-brand-secondary/80"
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Selected Topics Display */}
+              {((formData.topicsOfFocus || []).length > 0 || (formData.customTopics || []).length > 0) && (
+                <div className="mt-3">
+                  <Label className="text-gray-300 text-xs mb-2 block">Selected Topics:</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(formData.topicsOfFocus || []).map(topic => {
+                      const topicData = topicCategories.find(t => t.value === topic);
+                      return (
+                        <Badge
+                          key={topic}
+                          className="bg-brand-primary/20 text-brand-primary border border-brand-primary/30 cursor-pointer hover:bg-brand-primary/30"
+                          onClick={() => toggleTopic(topic)}
+                        >
+                          {topicData?.label || topic}
+                          <X className="ml-1 h-3 w-3" />
+                        </Badge>
+                      );
+                    })}
+                    {(formData.customTopics || []).map(topic => (
+                      <Badge
+                        key={topic}
+                        className="bg-purple-500/20 text-purple-400 border border-purple-500/30 cursor-pointer hover:bg-purple-500/30"
+                        onClick={() => removeCustomTopic(topic)}
+                      >
+                        {topic}
+                        <X className="ml-1 h-3 w-3" />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Phone and Notification Preferences removed - Now managed in Settings page */}
 
           <DialogFooter className="gap-2">
             <Button

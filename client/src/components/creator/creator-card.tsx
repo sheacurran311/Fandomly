@@ -100,7 +100,7 @@ export default function CreatorCard({ creator, showJoinButton = true, onUnauthen
       const program = programs[0];
       const response = await apiRequest("POST", "/api/fan-programs", {
         tenantId: program.tenantId,
-        fanId: user.userId,
+        fanId: user.id,
         programId: program.id,
       });
       

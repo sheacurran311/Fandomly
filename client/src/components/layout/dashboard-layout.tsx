@@ -47,9 +47,9 @@ export default function DashboardLayout({
 
   // Desktop layout with sidebar
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex">
+    <div className="min-h-screen bg-brand-dark-bg">
       <SidebarNavigation userType={userType} isNILAthlete={isNILAthlete} />
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="ml-64 flex flex-col min-h-screen">
         <main className={cn("flex-1", className)}>
           {children}
         </main>

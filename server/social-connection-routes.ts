@@ -120,6 +120,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       ),
     });
 
+    let savedConnection;
     if (existingConnection) {
       // Update existing connection
       const [updated] = await db
@@ -139,16 +140,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         .where(eq(socialConnections.id, existingConnection.id))
         .returning();
 
-      return res.json({
-        success: true,
-        connection: {
-          id: updated.id,
-          platform: updated.platform,
-          platformUsername: updated.platformUsername,
-          platformDisplayName: updated.platformDisplayName,
-          profileData: updated.profileData,
-        }
-      });
+      savedConnection = updated;
     } else {
       // Create new connection
       const [newConnection] = await db
@@ -168,17 +160,48 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         })
         .returning();
 
-      return res.json({
-        success: true,
-        connection: {
-          id: newConnection.id,
-          platform: newConnection.platform,
-          platformUsername: newConnection.platformUsername,
-          platformDisplayName: newConnection.platformDisplayName,
-          profileData: newConnection.profileData,
-        }
-      });
+      savedConnection = newConnection;
     }
+
+    // Also sync to old storage system for backwards compatibility
+    try {
+      const { storage } = await import('./storage');
+      const user = await db.query.users.findFirst({
+        where: eq(socialConnections.userId, userId)
+      });
+      if (user && (user as any).dynamicUserId) {
+        // Create accountData format expected by storage system
+        const accountData = {
+          user: {
+            id: platformUserId,
+            username: platformUsername,
+            name: platformDisplayName,
+            ...profileData
+          },
+          id: platformUserId,
+          username: platformUsername,
+          name: platformDisplayName,
+          displayName: platformDisplayName,
+          followersCount: profileData?.follower_count || profileData?.followers_count || profileData?.followers?.total || 0,
+        };
+        await storage.saveSocialAccount((user as any).dynamicUserId, platform, accountData);
+        console.log(`[Social Connection POST] Also saved ${platform} to old storage system`);
+      }
+    } catch (syncError) {
+      console.error(`[Social Connection POST] Error syncing to old storage system:`, syncError);
+      // Don't fail the request if sync fails
+    }
+
+    return res.json({
+      success: true,
+      connection: {
+        id: savedConnection.id,
+        platform: savedConnection.platform,
+        platformUsername: savedConnection.platformUsername,
+        platformDisplayName: savedConnection.platformDisplayName,
+        profileData: savedConnection.profileData,
+      }
+    });
   } catch (error) {
     console.error('Error saving social connection:', error);
     res.status(500).json({ error: 'Failed to save social connection' });
@@ -198,6 +221,7 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
       return res.status(401).json({ error: 'User ID required' });
     }
 
+    // Remove from socialConnections table
     await db
       .delete(socialConnections)
       .where(
@@ -206,6 +230,21 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
           eq(socialConnections.platform, platform)
         )
       );
+
+    // Also remove from old storage system for consistency
+    try {
+      const { storage } = await import('./storage');
+      const user = await db.query.users.findFirst({
+        where: eq(socialConnections.userId, userId)
+      });
+      if (user && (user as any).dynamicUserId) {
+        await storage.removeSocialAccount((user as any).dynamicUserId, platform);
+        console.log(`[Social Connection DELETE] Also removed ${platform} from old storage system`);
+      }
+    } catch (syncError) {
+      console.error(`[Social Connection DELETE] Error removing from old storage system:`, syncError);
+      // Don't fail the request if sync fails
+    }
 
     res.json({ success: true, message: `${platform} disconnected successfully` });
   } catch (error) {

@@ -37,11 +37,6 @@ export default function InstagramWebhookSetup() {
     error: null
   });
 
-  // Only show for creators with connected Instagram
-  if (user?.userType !== 'creator' || !isConnected || !userInfo) {
-    return null;
-  }
-
   const webhookFields = [
     { name: 'messages', label: 'Messages', icon: MessageCircle, description: 'Receive incoming messages from users' },
     { name: 'message_reactions', label: 'Message Reactions', icon: Heart, description: 'Get notified when users react to messages' },
@@ -137,6 +132,11 @@ export default function InstagramWebhookSetup() {
     // Do not auto check on every render; manual 'Refresh Status' button triggers checks
     // This avoids loops when tokens change or rate limits are hit
   }, [userInfo?.id]);
+
+  // Only show for creators with connected Instagram (AFTER all hooks)
+  if (user?.userType !== 'creator' || !isConnected || !userInfo) {
+    return null;
+  }
 
   return (
     <Card className="w-full max-w-2xl">

@@ -152,23 +152,94 @@ export class TikTokAPI {
     }
   }
 
-  getAuthUrl(): string {
+  getAuthUrl(state?: string): string {
     if (!this.clientKey) {
       throw new Error('TikTok client key not configured. Please set VITE_TIKTOK_CLIENT_KEY environment variable.');
     }
+
+    const csrfState = state || `tiktok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
     const params = new URLSearchParams({
       client_key: this.clientKey,
       scope: 'user.info.basic,user.info.stats',
       response_type: 'code',
       redirect_uri: this.redirectUri,
-      state: 'tiktok_auth'
+      state: csrfState
     });
     
-    const authUrl = `https://www.tiktok.com/auth/authorize?${params}`;
+    const authUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
     console.log('[TikTok] Generated auth URL:', authUrl);
     
     return authUrl;
+  }
+
+  async secureLogin(): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      try {
+        // Generate CSRF state token
+        const state = `tiktok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('tiktok_oauth_state', state);
+
+        const authUrl = this.getAuthUrl(state);
+        
+        const popup = window.open(
+          authUrl,
+          'tiktok-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener('message', onMsg); } catch {}
+          try { popup?.close(); } catch {}
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'tiktok-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+        
+        window.addEventListener('message', onMsg);
+
+        // Poll for popup closure (fallback)
+        const pollTimer = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ success: false, error: 'Authorization cancelled' });
+              }
+            }
+          } catch (error) {
+            // Cross-origin error means popup is still open
+          }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[TikTok] Login error:', error);
+        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate TikTok login' });
+      }
+    });
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
@@ -268,28 +339,109 @@ export class YouTubeAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_YOUTUBE_CLIENT_ID || '';
-    this.redirectUri = `${window.location.origin}/auth/youtube/callback`;
+    this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    const origin = window.location.origin;
+    this.redirectUri = import.meta.env.VITE_YOUTUBE_REDIRECT_URI || `${origin}/youtube-callback`;
+    
+    if (!this.clientId) {
+      console.warn('YouTube: VITE_GOOGLE_CLIENT_ID not configured');
+    }
   }
 
-  getAuthUrl(): string {
+  getAuthUrl(state?: string): string {
+    if (!this.clientId) {
+      throw new Error('YouTube client ID not configured');
+    }
+
+    const csrfState = state || `youtube_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/youtube.readonly',
+      scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.channel-memberships.creator',
       access_type: 'offline',
-      state: 'youtube_auth'
+      prompt: 'consent',
+      state: csrfState
     });
     
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  async secureLogin(): Promise<{ success: boolean; error?: string; channelName?: string }> {
+    return new Promise((resolve) => {
+      try {
+        // Generate CSRF state token
+        const state = `youtube_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('youtube_oauth_state', state);
+
+        const authUrl = this.getAuthUrl(state);
+        
+        const popup = window.open(
+          authUrl,
+          'youtube-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener('message', onMsg); } catch {}
+          try { popup?.close(); } catch {}
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'youtube-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+        
+        window.addEventListener('message', onMsg);
+
+        // Poll for popup closure (fallback)
+        const pollTimer = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ success: false, error: 'Authorization cancelled' });
+              }
+            }
+          } catch (error) {
+            // Cross-origin error means popup is still open
+          }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[YouTube] Login error:', error);
+        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate YouTube login' });
+      }
+    });
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
     const response = await fetch('/api/social/youtube/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
     });
     
     const data = await response.json();
@@ -323,26 +475,107 @@ export class SpotifyAPI {
 
   constructor() {
     this.clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
-    this.redirectUri = `${window.location.origin}/auth/spotify/callback`;
+    const origin = window.location.origin;
+    this.redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || `${origin}/spotify-callback`;
+    
+    if (!this.clientId) {
+      console.warn('Spotify: VITE_SPOTIFY_CLIENT_ID not configured');
+    }
   }
 
-  getAuthUrl(): string {
+  getAuthUrl(state?: string): string {
+    if (!this.clientId) {
+      throw new Error('Spotify client ID not configured');
+    }
+
+    const csrfState = state || `spotify_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.clientId,
-      scope: 'user-read-private user-read-email user-follow-read',
+      scope: 'user-follow-modify user-follow-read user-library-modify user-library-read user-read-private user-read-email',
       redirect_uri: this.redirectUri,
-      state: 'spotify_auth'
+      state: csrfState,
+      show_dialog: 'true'
     });
     
-    return `https://accounts.spotify.com/authorize?${params}`;
+    return `https://accounts.spotify.com/authorize?${params.toString()}`;
+  }
+
+  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+    return new Promise((resolve) => {
+      try {
+        // Generate CSRF state token
+        const state = `spotify_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('spotify_oauth_state', state);
+
+        const authUrl = this.getAuthUrl(state);
+        
+        const popup = window.open(
+          authUrl,
+          'spotify-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener('message', onMsg); } catch {}
+          try { popup?.close(); } catch {}
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'spotify-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+        
+        window.addEventListener('message', onMsg);
+
+        // Poll for popup closure (fallback)
+        const pollTimer = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ success: false, error: 'Authorization cancelled' });
+              }
+            }
+          } catch (error) {
+            // Cross-origin error means popup is still open
+          }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[Spotify] Login error:', error);
+        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate Spotify login' });
+      }
+    });
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
     const response = await fetch('/api/social/spotify/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
     });
     
     const data = await response.json();

@@ -8,7 +8,6 @@ import AuthRouter from "@/components/auth/auth-router";
 import ErrorBoundary from "@/components/error-boundary";
 import { useEffect } from "react";
 import { initTikTokErrorHandler } from "@/lib/tiktok-error-handler";
-import { SocialProviders } from "@/contexts/social-providers";
 import Navigation from "@/components/layout/navigation";
 import Footer from "@/components/layout/footer";
 import Home from "@/pages/home";
@@ -28,9 +27,13 @@ import CreatorGrowth from "@/pages/creator-dashboard/growth";
 import CreatorRevenue from "@/pages/creator-dashboard/revenue";
 import CreatorRewards from "@/pages/creator-dashboard/rewards";
 import CreatorTasks from "@/pages/creator-dashboard/tasks";
+import CreatorActivity from "@/pages/creator-dashboard/activity";
+import NftCollections from "@/pages/creator-dashboard/nft-collections";
 import CreatorNIL from "@/pages/creator-dashboard/nil";
 import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
 import CreatorSettings from "@/pages/creator-dashboard/settings";
+import ProgramBuilder from "@/pages/creator-dashboard/program-builder";
+import ProgramPublic from "@/pages/program-public";
 import BillingPage from "@/pages/billing";
 import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
@@ -40,6 +43,7 @@ import FanFollowing from "@/pages/fan-dashboard/following";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
 import FanPoints from "@/pages/fan-dashboard/points";
 import FanNotifications from "@/pages/fan-dashboard/notifications";
+import FanNftCollection from "@/pages/fan-dashboard/nft-collection";
 import FanSettings from "@/pages/fan-dashboard/settings";
 import NILDashboard from "@/pages/nil-dashboard";
 // RBAC Dashboard removed - users now route to type-specific dashboards
@@ -60,6 +64,8 @@ import NotFound from "@/pages/not-found";
 import InstagramCallback from "@/pages/instagram-callback";
 import TikTokCallback from "@/pages/tiktok-callback";
 import XCallback from "@/pages/x-callback";
+import YouTubeCallback from "@/pages/youtube-callback";
+import SpotifyCallback from "@/pages/spotify-callback";
 import CreatorPublic from "@/pages/creator-public";
 import TaskBuilder from "@/pages/creator-dashboard/task-builder";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -67,7 +73,10 @@ import AdminOverview from "@/pages/admin-dashboard/overview";
 import AdminUsers from "@/pages/admin-dashboard/users";
 import AdminCreators from "@/pages/admin-dashboard/creators";
 import AdminTasks from "@/pages/admin-dashboard/tasks";
+import AdminPlatformTaskCreate from "@/pages/admin-dashboard/platform-tasks/create";
+import AdminProfile from "@/pages/admin-dashboard/profile";
 import AdminAnalytics from "@/pages/admin-dashboard/analytics";
+import AdminNftManagement from "@/pages/admin-dashboard/nft-management";
 
 function Router() {
   return (
@@ -82,12 +91,16 @@ function Router() {
       <Route path="/tenant-setup" component={TenantSetup} />
       <Route path="/branding-studio" component={BrandingStudio} />
       <Route path="/creator-dashboard" component={CreatorDashboard} />
+      <Route path="/creator-dashboard/program-builder" component={ProgramBuilder} />
+      <Route path="/programs/:programId/preview" component={ProgramPublic} />
       <Route path="/creator-dashboard/analytics" component={CreatorAnalytics} />
+      <Route path="/creator-dashboard/activity" component={CreatorActivity} />
       <Route path="/creator-dashboard/social" component={CreatorSocial} />
       <Route path="/creator-dashboard/fans" component={CreatorFans} />
       <Route path="/creator-dashboard/growth" component={CreatorGrowth} />
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/rewards" component={CreatorRewards} />
+      <Route path="/creator-dashboard/nft-collections" component={NftCollections} />
       <Route path="/creator-dashboard/tasks" component={CreatorTasks} />
       <Route path="/creator-dashboard/tasks/create" component={TaskBuilder} />
       <Route path="/creator-dashboard/tasks/edit/:id" component={TaskBuilder} />
@@ -100,6 +113,7 @@ function Router() {
       <Route path="/fan-dashboard/tasks" component={FanTasks} />
       <Route path="/fan-dashboard/social" component={FanSocial} />
       <Route path="/fan-dashboard/following" component={FanFollowing} />
+      <Route path="/fan-dashboard/nfts" component={FanNftCollection} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
@@ -117,6 +131,8 @@ function Router() {
       <Route path="/instagram-callback" component={InstagramCallback} />
       <Route path="/tiktok-callback" component={TikTokCallback} />
       <Route path="/x-callback" component={XCallback} />
+      <Route path="/youtube-callback" component={YouTubeCallback} />
+      <Route path="/spotify-callback" component={SpotifyCallback} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />
@@ -127,8 +143,16 @@ function Router() {
       <Route path="/admin-dashboard/overview" component={AdminOverview} />
       <Route path="/admin-dashboard/users" component={AdminUsers} />
       <Route path="/admin-dashboard/creators" component={AdminCreators} />
-      <Route path="/admin-dashboard/tasks" component={AdminTasks} />
+      <Route path="/admin-dashboard/platform-tasks" component={AdminTasks} />
+      <Route path="/admin-dashboard/platform-tasks/create" component={AdminPlatformTaskCreate} />
+      <Route path="/admin-dashboard/platform-tasks/edit/:id" component={AdminPlatformTaskCreate} />
+      <Route path="/admin-dashboard/tasks" component={() => { window.location.href = '/admin-dashboard/platform-tasks'; return null; }} />
+      <Route path="/admin-dashboard/profile" component={AdminProfile} />
+      <Route path="/admin-dashboard/nft-management" component={AdminNftManagement} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
+      
+      {/* Program Public Page */}
+      <Route path="/programs/:slug" component={ProgramPublic} />
       
       {/* Creator Public Page - Must be last before 404 to avoid catching other routes */}
       <Route path="/@:creatorUrl" component={CreatorPublic} />
@@ -162,8 +186,18 @@ function App() {
     '/creator-showcase',
   ];
 
-  // Check if current route is public
+  // Define onboarding routes that should hide navigation
+  const onboardingRoutes = [
+    '/user-type-selection',
+    '/creator-type-selection',
+    '/creator-onboarding',
+    '/fan-onboarding-profile',
+    '/fan-choose-creators',
+  ];
+
+  // Check if current route is public or onboarding
   const isPublicRoute = publicRoutes.some(route => location === route);
+  const isOnboardingRoute = onboardingRoutes.some(route => location === route);
 
   return (
     <ErrorBoundary>
@@ -171,16 +205,14 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <AuthRouter>
-              <SocialProviders>
-                <div className="min-h-screen bg-brand-dark-bg">
-                    <Navigation />
-                    <main>
-                      <Router />
-                    </main>
-                    {isPublicRoute && <Footer />}
-                </div>
-                <Toaster />
-              </SocialProviders>
+              <div className="min-h-screen bg-brand-dark-bg">
+                  {!isOnboardingRoute && <Navigation />}
+                  <main>
+                    <Router />
+                  </main>
+                  {isPublicRoute && <Footer />}
+              </div>
+              <Toaster />
             </AuthRouter>
           </TooltipProvider>
         </QueryClientProvider>

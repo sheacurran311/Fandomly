@@ -48,14 +48,46 @@ export default function CreatorFans() {
 
   // Fetch real fan data from tenant memberships
   const { data: fans = [], isLoading: fansLoading, error: fansError } = useQuery<Fan[]>({
-    queryKey: ['/api/tenant-memberships', creator?.tenantId],
+    queryKey: ['/api/tenant-memberships', creator?.tenantId, creator?.id],
     queryFn: async (): Promise<Fan[]> => {
-      if (!creator?.tenantId) return [];
+      if (!creator?.tenantId || !creator?.id) return [];
       
       const response = await apiRequest('GET', `/api/tenant-memberships/${creator.tenantId}`);
       const memberships = await response.json();
       
-      // Transform membership data into fan format
+      // Get campaign participation data for all fans
+      const programsResponse = await apiRequest('GET', `/api/loyalty-programs/creator/${creator.id}`);
+      const programs = await programsResponse.json();
+      
+      // Build a map of fan campaign participation counts
+      const fanCampaignCounts: { [fanId: string]: number } = {};
+      
+      for (const program of programs) {
+        try {
+          const transactionsResponse = await apiRequest('GET', `/api/point-transactions/program/${program.id}`);
+          const transactions = await transactionsResponse.json();
+          
+          // Count unique campaigns per fan
+          const fanCampaignsMap: { [fanId: string]: Set<string> } = {};
+          transactions.forEach((tx: any) => {
+            if (tx.fanId && tx.campaignName) {
+              if (!fanCampaignsMap[tx.fanId]) {
+                fanCampaignsMap[tx.fanId] = new Set();
+              }
+              fanCampaignsMap[tx.fanId].add(tx.campaignName);
+            }
+          });
+          
+          // Add to total counts
+          Object.entries(fanCampaignsMap).forEach(([fanId, campaigns]) => {
+            fanCampaignCounts[fanId] = (fanCampaignCounts[fanId] || 0) + campaigns.size;
+          });
+        } catch (error) {
+          console.warn(`Failed to get campaign data for program ${program.id}:`, error);
+        }
+      }
+      
+      // Transform membership data into fan format with real campaign counts
       return memberships.map((membership: any) => {
         const memberData = membership.memberData || {};
         const user = membership.user || {};
@@ -69,12 +101,12 @@ export default function CreatorFans() {
           tier: memberData.tier || 'Bronze',
           lastActive: membership.lastActiveAt ? 
             getRelativeTime(new Date(membership.lastActiveAt)) : 'Unknown',
-          campaigns: 0, // TODO: Calculate from campaign participations
+          campaigns: fanCampaignCounts[membership.userId] || 0,
           username: user.username
         };
       });
     },
-    enabled: !!creator?.tenantId,
+    enabled: !!creator?.tenantId && !!creator?.id,
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 

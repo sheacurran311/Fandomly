@@ -7,39 +7,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
+import { getNavigationItems, type NavigationItem } from "@/config/navigation";
 import { 
-  BarChart3, 
-  Users, 
-  TrendingUp, 
-  DollarSign, 
-  Gift,
-  Megaphone, 
-  Instagram, 
-  User, 
-  Settings,
-  Home,
-  Heart,
-  Trophy,
-  Star,
-  Bell,
-  CreditCard,
   ChevronLeft,
   ChevronRight,
-  Shield,
-  Facebook,
-  Plus,
-  Target,
+  ChevronDown,
+  ChevronUp,
   MoreHorizontal,
-  CheckSquare
+  User,
 } from "lucide-react";
-
-interface SidebarItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-  badge?: string;
-  color?: string;
-}
 
 interface SidebarNavigationProps {
   userType: "creator" | "fan";
@@ -47,36 +23,10 @@ interface SidebarNavigationProps {
   isNILAthlete?: boolean;
 }
 
-const creatorItems: SidebarItem[] = [
-  { label: "Overview", href: "/creator-dashboard", icon: Home },
-  { label: "Analytics", href: "/creator-dashboard/analytics", icon: BarChart3, color: "text-blue-400" },
-  { label: "Fans", href: "/creator-dashboard/fans", icon: Users, color: "text-green-400" },
-  { label: "Growth", href: "/creator-dashboard/growth", icon: TrendingUp, color: "text-purple-400" },
-  { label: "Revenue", href: "/creator-dashboard/revenue", icon: DollarSign, color: "text-yellow-400" },
-  { label: "Rewards", href: "/creator-dashboard/rewards", icon: Gift, color: "text-emerald-400" },
-  { label: "Campaigns", href: "/creator-dashboard/campaigns", icon: Megaphone, color: "text-orange-400" },
-  { label: "Tasks", href: "/creator-dashboard/tasks", icon: CheckSquare, color: "text-indigo-400" },
-  { label: "Social Accounts", href: "/creator-dashboard/social", icon: Instagram, color: "text-pink-400" },
-  { label: "Profile", href: "/profile", icon: User },
-  { label: "Settings", href: "/creator-dashboard/settings", icon: Settings },
-];
-
-const fanItems: SidebarItem[] = [
-  { label: "Overview", href: "/fan-dashboard", icon: Home },
-  { label: "Profile", href: "/fan-profile", icon: User },
-  { label: "Creators", href: "/fan-dashboard/following", icon: Users, color: "text-brand-primary" },
-  { label: "Tasks", href: "/fan-dashboard/tasks", icon: Target, color: "text-brand-accent" },
-  { label: "Campaigns", href: "/fan-dashboard/campaigns", icon: Trophy, color: "text-yellow-400" },
-  { label: "Social Accounts", href: "/fan-dashboard/social", icon: Instagram, color: "text-pink-400" },
-  { label: "Achievements", href: "/fan-dashboard/achievements", icon: Star, color: "text-purple-400" },
-  { label: "Points", href: "/fan-dashboard/points", icon: CreditCard, color: "text-green-400" },
-  { label: "Notifications", href: "/fan-dashboard/notifications", icon: Bell, color: "text-blue-400" },
-  { label: "Settings", href: "/fan-dashboard/settings", icon: Settings },
-];
-
 export default function SidebarNavigation({ userType, className, isNILAthlete = false }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]); // Collapse parent menus by default
   const { toast } = useToast();
   
   // Facebook page state for creators
@@ -86,12 +36,15 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
   const [showPageModal, setShowPageModal] = useState(false);
   const [isLoadingFacebook, setIsLoadingFacebook] = useState(false);
   
-  // Add NIL dashboard for athletes
-  const creatorItemsWithNIL = isNILAthlete 
-    ? [...creatorItems.slice(0, -2), { label: "NIL Dashboard", href: "/creator-dashboard/nil", icon: Shield, color: "text-purple-400" }, ...creatorItems.slice(-2)]
-    : creatorItems;
+  const items = getNavigationItems(userType, isNILAthlete);
   
-  const items = userType === "creator" ? creatorItemsWithNIL : fanItems;
+  const toggleSubmenu = (label: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(label) 
+        ? prev.filter(item => item !== label)
+        : [...prev, label]
+    );
+  };
 
   // Load Facebook status for creators
   useEffect(() => {
@@ -146,12 +99,12 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
 
   return (
     <div className={cn(
-      "flex flex-col bg-brand-dark-purple/30 backdrop-blur-lg border-r border-white/10 transition-all duration-300",
+      "flex flex-col bg-brand-dark-purple/30 backdrop-blur-lg border-r border-white/10 transition-all duration-300 fixed top-0 left-0 h-screen",
       isCollapsed ? "w-16" : "w-64",
       className
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+      <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
         {!isCollapsed && (
           <div>
             <h2 className="text-lg font-bold text-white">
@@ -171,47 +124,110 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
       </div>
 
       {/* Navigation Items */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto min-h-0">
         {items.map((item) => {
+          const hasSubmenu = item.submenu && item.submenu.length > 0;
+          const isExpanded = expandedMenus.includes(item.label);
           const isActive = location === item.href || (item.href !== `/${userType}-dashboard` && location.startsWith(item.href));
           const Icon = item.icon;
           
           return (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={cn(
-                  "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer",
-                  isActive
-                    ? "bg-brand-primary text-white shadow-lg"
-                    : "text-gray-300 hover:text-white hover:bg-brand-primary/60",
-                  isCollapsed && "justify-center"
-                )}
-              >
-                <Icon 
-                  className={cn(
-                    "flex-shrink-0 h-5 w-5",
-                    isActive ? "text-white" : (item.color || "text-gray-400"),
-                    !isCollapsed && "mr-3"
-                  )} 
-                />
-                {!isCollapsed && (
-                  <>
-                    <span className="flex-1">{item.label}</span>
-                    {item.badge && (
-                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-brand-secondary/20 text-brand-secondary rounded-full">
-                        {item.badge}
-                      </span>
+            <div key={item.href}>
+              {hasSubmenu ? (
+                <>
+                  <div
+                    onClick={() => !isCollapsed && toggleSubmenu(item.label)}
+                    className={cn(
+                      "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer",
+                      "text-gray-300 hover:text-white hover:bg-brand-primary/60",
+                      isCollapsed && "justify-center"
                     )}
-                  </>
-                )}
-              </div>
-            </Link>
+                  >
+                    <Icon 
+                      className={cn(
+                        "flex-shrink-0 h-5 w-5",
+                        item.color || "text-gray-400",
+                        !isCollapsed && "mr-3"
+                      )} 
+                    />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1">{item.label}</span>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {!isCollapsed && isExpanded && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.submenu.map((subItem) => {
+                        const subIsActive = location === subItem.href;
+                        const SubIcon = subItem.icon;
+                        return (
+                          <Link key={subItem.href} href={subItem.href}>
+                            <div
+                              className={cn(
+                                "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
+                                subIsActive
+                                  ? "bg-brand-primary text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white hover:bg-brand-primary/60"
+                              )}
+                            >
+                              <SubIcon 
+                                className={cn(
+                                  "flex-shrink-0 h-4 w-4 mr-3",
+                                  subIsActive ? "text-white" : (subItem.color || "text-gray-400")
+                                )} 
+                              />
+                              <span className="flex-1">{subItem.label}</span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link href={item.href}>
+                  <div
+                    className={cn(
+                      "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer",
+                      isActive
+                        ? "bg-brand-primary text-white shadow-lg"
+                        : "text-gray-300 hover:text-white hover:bg-brand-primary/60",
+                      isCollapsed && "justify-center"
+                    )}
+                  >
+                    <Icon 
+                      className={cn(
+                        "flex-shrink-0 h-5 w-5",
+                        isActive ? "text-white" : (item.color || "text-gray-400"),
+                        !isCollapsed && "mr-3"
+                      )} 
+                    />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1">{item.label}</span>
+                        {item.badge && (
+                          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-brand-secondary/20 text-brand-secondary rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </Link>
+              )}
+            </div>
           );
         })}
       </nav>
 
-      {/* Bottom sticky container: Active Facebook Page + User Section */}
-      <div className="mx-2 mb-2 sticky bottom-2 space-y-2">
+      {/* Bottom container: Active Facebook Page + User Section */}
+      <div className="mx-2 mb-2 mt-auto space-y-2">
         {userType === 'creator' && facebookConnected && activePage && !isCollapsed && (
           <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
             <div className="flex items-center justify-between mb-2">

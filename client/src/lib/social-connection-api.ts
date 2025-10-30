@@ -72,7 +72,22 @@ export async function getSocialConnection(platform: string): Promise<{ connected
     }
 
     const data = await response.json();
-    return data;
+    // Map server response structure to expected format
+    if (data.connected && data.connectionData) {
+      return {
+        connected: true,
+        connection: {
+          id: data.connectionData.accountId,
+          platform: data.connectionData.platform,
+          platformUserId: data.connectionData.accountId,
+          platformUsername: data.connectionData.username,
+          platformDisplayName: data.connectionData.displayName,
+          profileData: data.connectionData.profile,
+          connectedAt: data.connectionData.connectedAt
+        }
+      };
+    }
+    return { connected: false };
   } catch (error) {
     console.error(`Error fetching ${platform} connection:`, error);
     return { connected: false };

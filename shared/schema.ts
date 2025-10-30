@@ -240,6 +240,9 @@ export const users = pgTable("users", {
       marketingEmails?: boolean;
       smsNotifications?: boolean;
     };
+    
+    // Platform Points Balance (Fandomly-issued points for platform-wide tasks)
+    fandomlyPoints?: number;
   }>(),
   
   // Multi-Tenant Support
@@ -471,14 +474,64 @@ export const creatorFacebookPages = pgTable("creator_facebook_pages", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Programs are the highest level container (one per creator)
+// Previously called "loyalty_programs" - now serves as the Program Page
 export const loyaltyPrograms = pgTable("loyalty_programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   creatorId: varchar("creator_id").references(() => creators.id).notNull(),
+  
+  // Basic Program Info
   name: text("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true),
   pointsName: text("points_name").default("Points"), // e.g. "Thunder Points", "Luna Coins"
+  
+  // Program Page Configuration (Snap-inspired)
+  pageConfig: jsonb("page_config").$type<{
+    headerImage?: string;
+    logo?: string;
+    brandColors?: {
+      primary: string;
+      secondary: string;
+      accent: string;
+    };
+    theme?: {
+      mode: 'light' | 'dark' | 'custom'; // Preset or custom
+      backgroundColor?: string; // Custom background color
+      textColor?: string; // Custom text color
+    };
+    customDomain?: string;
+    socialLinks?: {
+      twitter?: string;
+      instagram?: string;
+      discord?: string;
+      website?: string;
+    };
+    visibility?: {
+      // Section-level visibility
+      showProfile?: boolean;
+      showCampaigns?: boolean;
+      showTasks?: boolean;
+      showRewards?: boolean;
+      showLeaderboard?: boolean;
+      showActivityFeed?: boolean;
+      showFanWidget?: boolean;
+      // Granular profile data visibility
+      profileData?: {
+        showBio?: boolean;
+        showLocation?: boolean;
+        showWebsite?: boolean;
+        showSocialLinks?: boolean;
+        showJoinDate?: boolean;
+        showFollowerCount?: boolean;
+        showVerificationBadge?: boolean;
+        showTiers?: boolean;
+      };
+    };
+  }>(),
+  
+  // Tiers/Levels
   tiers: jsonb("tiers").$type<Array<{
     id: string;
     name: string;
@@ -486,7 +539,14 @@ export const loyaltyPrograms = pgTable("loyalty_programs", {
     benefits: string[];
     color: string;
   }>>(),
+  
+  // Publishing & Status
+  status: text("status").notNull().default('draft'), // 'draft' | 'published' | 'archived'
+  publishedAt: timestamp("published_at"),
+  slug: text("slug"), // URL-friendly identifier for public page
+  
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const rewards = pgTable("rewards", {
@@ -530,6 +590,13 @@ export const rewards = pgTable("rewards", {
       stockQuantity?: number;
       weight?: number;
       dimensions?: { length: number; width: number; height: number; };
+      condition?: 'game-used' | 'new' | 'like-new' | 'sponsor-item';
+      quantity?: number;
+      photos?: string[];
+      approvalStatus?: 'pending' | 'approved' | 'rejected';
+      adminNotes?: string;
+      submittedAt?: string;
+      approvedAt?: string;
     };
     customData?: {
       serviceName: string;
@@ -538,6 +605,14 @@ export const rewards = pgTable("rewards", {
       estimatedFulfillmentDays?: number;
       customInstructions?: string;
       requiresPersonalization: boolean;
+    };
+    videoData?: {
+      maxVideoDuration: number;
+      deliveryInstructions: string;
+      turnaroundDays: number;
+      requiresPersonalization: boolean;
+      personalizationInstructions?: string;
+      sampleVideoUrl?: string;
     };
   }>(),
   maxRedemptions: integer("max_redemptions"),
@@ -686,10 +761,12 @@ export const taskTypeEnum = pgEnum('task_type', [
   'follow', 'join', 'repost', 'referral'
 ]);
 
+// Campaigns belong to a Program (second level in hierarchy)
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   creatorId: varchar("creator_id").references(() => creators.id).notNull(),
+  programId: varchar("program_id").references(() => loyaltyPrograms.id), // Belongs to a Program (optional for now)
   
   // Basic Info
   name: text("name").notNull(),
@@ -836,6 +913,10 @@ export const tasks = pgTable("tasks", {
   tenantId: varchar("tenant_id").references(() => tenants.id), // NULL for platform tasks
   creatorId: varchar("creator_id").references(() => creators.id), // NULL for platform tasks
   
+  // Program & Campaign Association
+  programId: varchar("program_id").references(() => loyaltyPrograms.id), // Belongs to a Program (optional)
+  campaignId: varchar("campaign_id").references(() => campaigns.id), // Belongs to a Campaign (optional)
+  
   // ============================================
   // SECTION 1: BASIC DETAILS
   // ============================================
@@ -892,7 +973,13 @@ export const tasks = pgTable("tasks", {
   customSettings: jsonb("custom_settings").$type<Record<string, any>>(),
   
   // ============================================
-  // SECTION 5: STATUS & ANALYTICS
+  // SECTION 5: ELIGIBILITY & TARGETING
+  // ============================================
+  eligibleAccountTypes: jsonb("eligible_account_types").$type<string[]>().default(['fan']), 
+  // ['fan', 'creator', 'creator-athlete', 'creator-musician', 'creator-content-creator']
+  
+  // ============================================
+  // SECTION 6: STATUS & ANALYTICS
   // ============================================
   isActive: boolean("is_active").default(true),
   isDraft: boolean("is_draft").default(false),
@@ -1068,6 +1155,33 @@ export const taskCompletions = pgTable("task_completions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Platform Task Completions - Track platform-wide task completions (separate from creator tasks)
+export const platformTaskCompletions = pgTable("platform_task_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Completion Status
+  status: text("status").notNull().default('pending'), // 'pending' | 'completed' | 'verified'
+  pointsAwarded: integer("points_awarded").default(0),
+  
+  // Completion Data
+  completionData: jsonb("completion_data").$type<{
+    socialPlatform?: string;
+    verificationUrl?: string;
+    screenshotUrl?: string;
+    metadata?: Record<string, any>;
+  }>(),
+  
+  // Timing
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  verifiedAt: timestamp("verified_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Reward Distribution Log - Track all point awards
 export const rewardDistributions = pgTable("reward_distributions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1098,6 +1212,29 @@ export const rewardDistributions = pgTable("reward_distributions", {
   }>(),
   
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Program Announcements - Creator posts and updates
+export const programAnnouncements = pgTable("program_announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  programId: varchar("program_id").references(() => loyaltyPrograms.id, { onDelete: 'cascade' }).notNull(),
+  creatorId: varchar("creator_id").references(() => creators.id, { onDelete: 'cascade' }).notNull(),
+  
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  type: text("type").notNull().default('update'), // 'update' | 'new_campaign' | 'new_task' | 'achievement'
+  
+  metadata: jsonb("metadata").$type<{
+    campaignId?: string;
+    taskId?: string;
+    imageUrl?: string;
+  }>(),
+  
+  isPinned: boolean("is_pinned").default(false),
+  isPublished: boolean("is_published").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 
@@ -1286,6 +1423,8 @@ export const insertCreatorSchema = createInsertSchema(creators).omit({
 export const insertLoyaltyProgramSchema = createInsertSchema(loyaltyPrograms).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  publishedAt: true,
 });
 
 export const insertRewardSchema = createInsertSchema(rewards).omit({
@@ -1376,6 +1515,9 @@ export type InsertCreator = z.infer<typeof insertCreatorSchema>;
 
 export type LoyaltyProgram = typeof loyaltyPrograms.$inferSelect;
 export type InsertLoyaltyProgram = z.infer<typeof insertLoyaltyProgramSchema>;
+// Alias for clarity - Program is the top-level container
+export type Program = LoyaltyProgram;
+export type InsertProgram = InsertLoyaltyProgram;
 
 export type Reward = typeof rewards.$inferSelect;
 export type InsertReward = z.infer<typeof insertRewardSchema>;
@@ -1689,5 +1831,330 @@ export const creatorTaskReferralsRelations = relations(creatorTaskReferrals, ({ 
     references: [users.id],
   }),
 }));
+
+// ============================================================================
+// NFT & CROSSMINT INTEGRATION TABLES
+// ============================================================================
+
+// Token type enum for NFT collections
+export const nftTokenTypeEnum = pgEnum('nft_token_type', [
+  'ERC721', 
+  'ERC1155', 
+  'SOLANA', 
+  'SOLANA_COMPRESSED'
+]);
+
+// NFT mint status enum
+export const nftMintStatusEnum = pgEnum('nft_mint_status', [
+  'pending',
+  'processing', 
+  'success',
+  'failed'
+]);
+
+// NFT category enum for templates
+export const nftCategoryEnum = pgEnum('nft_category', [
+  'badge_credential',
+  'digital_art',
+  'collectible',
+  'reward_perk',
+  'event_ticket',
+  'custom'
+]);
+
+// NFT Collections - Creator-owned or Fandomly platform collections
+export const nftCollections = pgTable("nft_collections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Ownership
+  creatorId: varchar("creator_id").references(() => creators.id),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  
+  // Crossmint Integration
+  crossmintCollectionId: text("crossmint_collection_id").unique(), // Crossmint's collection ID
+  
+  // Collection Details
+  name: text("name").notNull(),
+  description: text("description"),
+  symbol: text("symbol"), // Token symbol (e.g., "BADGE", "FAN")
+  
+  // Blockchain Configuration
+  chain: text("chain").notNull(), // "polygon", "base", "solana", etc.
+  contractAddress: text("contract_address"), // Deployed contract address
+  tokenType: nftTokenTypeEnum("token_type").notNull().default('ERC721'),
+  
+  // Ownership Control
+  isCreatorOwned: boolean("is_creator_owned").default(true), // false for Fandomly platform badges
+  ownerWalletAddress: text("owner_wallet_address"), // Creator's wallet that owns the contract
+  
+  // Collection Metadata
+  metadata: jsonb("metadata").$type<{
+    totalSupply?: number;
+    maxSupply?: number;
+    royaltyPercentage?: number; // 0-10%
+    baseTokenURI?: string;
+    collectionImageUrl?: string;
+    externalUrl?: string;
+  }>(),
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  deployedAt: timestamp("deployed_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Fandomly Badge Templates - Platform-wide badge credentials
+export const fandomlyBadgeTemplates = pgTable("fandomly_badge_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Badge Identity
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // "achievement", "milestone", "special", "event"
+  
+  // Badge Requirements
+  requirementType: text("requirement_type").notNull(), // "task_completion", "points_threshold", "referrals", "streak", "manual"
+  requirementData: jsonb("requirement_data").$type<{
+    taskId?: string;
+    pointsRequired?: number;
+    referralsRequired?: number;
+    streakDays?: number;
+    customCriteria?: string;
+  }>(),
+  
+  // Visual Design
+  imageUrl: text("image_url").notNull(),
+  badgeColor: text("badge_color"), // Hex color for badge styling
+  
+  // NFT Metadata
+  nftMetadata: jsonb("nft_metadata").$type<{
+    attributes: Array<{ trait_type: string; value: string; }>;
+    rarity?: string; // "common", "uncommon", "rare", "epic", "legendary"
+  }>(),
+  
+  // Linked Collection
+  collectionId: varchar("collection_id").references(() => nftCollections.id),
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  totalIssued: integer("total_issued").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// NFT Templates - Creator-defined NFT templates for their collections
+export const nftTemplates = pgTable("nft_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Collection Association
+  collectionId: varchar("collection_id").references(() => nftCollections.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  
+  // Template Details
+  name: text("name").notNull(),
+  description: text("description"),
+  category: nftCategoryEnum("category").notNull().default('custom'),
+  
+  // NFT Metadata
+  metadata: jsonb("metadata").$type<{
+    image: string; // IPFS or URL
+    animationUrl?: string;
+    externalUrl?: string;
+    attributes: Array<{ trait_type: string; value: string; display_type?: string; }>;
+    rarity?: string;
+    properties?: Record<string, any>;
+  }>().notNull(),
+  
+  // Supply & Pricing
+  mintPrice: integer("mint_price").default(0), // Points cost (0 = free)
+  maxSupply: integer("max_supply"), // null = unlimited
+  currentSupply: integer("current_supply").default(0),
+  
+  // Template Status
+  isActive: boolean("is_active").default(true),
+  isDraft: boolean("is_draft").default(true),
+  publishedAt: timestamp("published_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// NFT Mints - Track all minting operations
+export const nftMints = pgTable("nft_mints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Mint Operation Details
+  crossmintActionId: text("crossmint_action_id").unique().notNull(), // Crossmint's action ID for status tracking
+  
+  // Source Information
+  collectionId: varchar("collection_id").references(() => nftCollections.id).notNull(),
+  templateId: varchar("template_id").references(() => nftTemplates.id), // null for badge mints
+  badgeTemplateId: varchar("badge_template_id").references(() => fandomlyBadgeTemplates.id), // null for regular NFTs
+  
+  // Recipient Information
+  recipientUserId: varchar("recipient_user_id").references(() => users.id).notNull(),
+  recipientWalletAddress: text("recipient_wallet_address").notNull(), // Actual wallet address from Dynamic
+  recipientChain: text("recipient_chain").notNull(), // Chain where NFT was minted
+  
+  // Mint Context
+  mintReason: text("mint_reason").notNull(), // "reward_redemption", "task_completion", "badge_achievement", "direct_mint", "admin_issued"
+  contextData: jsonb("context_data").$type<{
+    rewardId?: string;
+    taskId?: string;
+    pointsSpent?: number;
+    adminUserId?: string;
+    notes?: string;
+  }>(),
+  
+  // Blockchain Details
+  tokenId: text("token_id"), // On-chain token ID
+  txHash: text("tx_hash"), // Transaction hash
+  contractAddress: text("contract_address"), // Deployed contract address
+  
+  // Status Tracking
+  status: nftMintStatusEnum("status").notNull().default('pending'),
+  errorMessage: text("error_message"), // If failed
+  retryCount: integer("retry_count").default(0),
+  
+  // Timestamps
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// NFT Deliveries - Track successful NFT deliveries to users
+export const nftDeliveries = pgTable("nft_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Links
+  mintId: varchar("mint_id").references(() => nftMints.id).notNull().unique(), // One delivery per mint
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  collectionId: varchar("collection_id").references(() => nftCollections.id).notNull(),
+  
+  // NFT Details
+  tokenId: text("token_id").notNull(),
+  txHash: text("tx_hash").notNull(),
+  chain: text("chain").notNull(),
+  contractAddress: text("contract_address").notNull(),
+  
+  // Metadata Snapshot (for quick display without blockchain calls)
+  metadataSnapshot: jsonb("metadata_snapshot").$type<{
+    name: string;
+    description?: string;
+    image: string;
+    attributes?: Array<{ trait_type: string; value: string; }>;
+  }>().notNull(),
+  
+  // Delivery Status
+  isViewed: boolean("is_viewed").default(false), // Has user seen this NFT?
+  viewedAt: timestamp("viewed_at"),
+  
+  // Notification
+  notificationSent: boolean("notification_sent").default(false),
+  notificationSentAt: timestamp("notification_sent_at"),
+  
+  deliveredAt: timestamp("delivered_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ============================================================================
+// NFT RELATIONS
+// ============================================================================
+
+export const nftCollectionsRelations = relations(nftCollections, ({ one, many }) => ({
+  creator: one(creators, {
+    fields: [nftCollections.creatorId],
+    references: [creators.id],
+  }),
+  tenant: one(tenants, {
+    fields: [nftCollections.tenantId],
+    references: [tenants.id],
+  }),
+  templates: many(nftTemplates),
+  mints: many(nftMints),
+  badgeTemplates: many(fandomlyBadgeTemplates),
+}));
+
+export const nftTemplatesRelations = relations(nftTemplates, ({ one, many }) => ({
+  collection: one(nftCollections, {
+    fields: [nftTemplates.collectionId],
+    references: [nftCollections.id],
+  }),
+  tenant: one(tenants, {
+    fields: [nftTemplates.tenantId],
+    references: [tenants.id],
+  }),
+  mints: many(nftMints),
+}));
+
+export const fandomlyBadgeTemplatesRelations = relations(fandomlyBadgeTemplates, ({ one, many }) => ({
+  collection: one(nftCollections, {
+    fields: [fandomlyBadgeTemplates.collectionId],
+    references: [nftCollections.id],
+  }),
+  mints: many(nftMints),
+}));
+
+export const nftMintsRelations = relations(nftMints, ({ one }) => ({
+  collection: one(nftCollections, {
+    fields: [nftMints.collectionId],
+    references: [nftCollections.id],
+  }),
+  template: one(nftTemplates, {
+    fields: [nftMints.templateId],
+    references: [nftTemplates.id],
+  }),
+  badgeTemplate: one(fandomlyBadgeTemplates, {
+    fields: [nftMints.badgeTemplateId],
+    references: [fandomlyBadgeTemplates.id],
+  }),
+  recipientUser: one(users, {
+    fields: [nftMints.recipientUserId],
+    references: [users.id],
+  }),
+  delivery: one(nftDeliveries, {
+    fields: [nftMints.id],
+    references: [nftDeliveries.mintId],
+  }),
+}));
+
+export const nftDeliveriesRelations = relations(nftDeliveries, ({ one }) => ({
+  mint: one(nftMints, {
+    fields: [nftDeliveries.mintId],
+    references: [nftMints.id],
+  }),
+  user: one(users, {
+    fields: [nftDeliveries.userId],
+    references: [users.id],
+  }),
+  collection: one(nftCollections, {
+    fields: [nftDeliveries.collectionId],
+    references: [nftCollections.id],
+  }),
+}));
+
+// ============================================================================
+// NFT ZOD SCHEMAS & TYPES
+// ============================================================================
+
+export const insertNftCollectionSchema = createInsertSchema(nftCollections);
+export const insertNftTemplateSchema = createInsertSchema(nftTemplates);
+export const insertFandomlyBadgeTemplateSchema = createInsertSchema(fandomlyBadgeTemplates);
+export const insertNftMintSchema = createInsertSchema(nftMints);
+export const insertNftDeliverySchema = createInsertSchema(nftDeliveries);
+
+export type NftCollection = typeof nftCollections.$inferSelect;
+export type InsertNftCollection = typeof nftCollections.$inferInsert;
+export type NftTemplate = typeof nftTemplates.$inferSelect;
+export type InsertNftTemplate = typeof nftTemplates.$inferInsert;
+export type FandomlyBadgeTemplate = typeof fandomlyBadgeTemplates.$inferSelect;
+export type InsertFandomlyBadgeTemplate = typeof fandomlyBadgeTemplates.$inferInsert;
+export type NftMint = typeof nftMints.$inferSelect;
+export type InsertNftMint = typeof nftMints.$inferInsert;
+export type NftDelivery = typeof nftDeliveries.$inferSelect;
+export type InsertNftDelivery = typeof nftDeliveries.$inferInsert;
 
 

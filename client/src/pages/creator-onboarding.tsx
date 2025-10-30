@@ -34,6 +34,8 @@ import {
   Edit2
 } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { LocationPicker } from "@/components/ui/location-picker";
+import { PersonalLinksInput } from "@/components/ui/personal-links-input";
 
 const topSports = [
   "American Football", "Basketball", "Baseball", "Soccer", "Tennis", "Golf", 
@@ -42,6 +44,10 @@ const topSports = [
   "MMA", "Aerial Sports", "Snowboarding", "Skateboarding", "Surfing",
   "Cycling", "Marathon", "Triathlon", "Weightlifting", "Cheerleading",
   "Dance", "Equestrian", "Other"
+];
+
+const collegeCommitmentOptions = [
+  "Committed", "Signed", "Enrolled", "Interested", "Contacted", "Offered"
 ];
 
 const educationLevels = [
@@ -113,6 +119,70 @@ const contentTypes = [
   "Creative Video", "Podcast", "Influencer", "Gaming", "Educational", "Comedy",
   "Lifestyle", "Fashion", "Beauty", "Fitness", "Food", "Travel", "Technology",
   "Sports Commentary", "Music Reviews", "Art & Design", "DIY/Crafts", "Other"
+];
+
+const topicCategories = [
+  // Main categories and subcategories
+  { value: "sports", label: "Sports", isMain: true },
+  { value: "football", label: "Football", parent: "sports" },
+  { value: "soccer", label: "Soccer", parent: "sports" },
+  { value: "basketball", label: "Basketball", parent: "sports" },
+  { value: "hockey", label: "Hockey", parent: "sports" },
+  { value: "sports-betting", label: "Sports Betting", parent: "sports" },
+  
+  { value: "technology", label: "Technology", isMain: true },
+  { value: "blockchain-crypto", label: "Blockchain/Crypto", parent: "technology" },
+  { value: "ai", label: "AI", parent: "technology" },
+  { value: "coding", label: "Coding", parent: "technology" },
+  
+  { value: "entertainment", label: "Entertainment", isMain: true },
+  { value: "gaming", label: "Gaming", parent: "entertainment" },
+  { value: "music", label: "Music", parent: "entertainment" },
+  { value: "movies-tv", label: "Movies & TV", parent: "entertainment" },
+  
+  { value: "health-wellness", label: "Health & Wellness", isMain: true },
+  { value: "diet-fitness", label: "Diet/Fitness", parent: "health-wellness" },
+  { value: "mental-health", label: "Mental Health", parent: "health-wellness" },
+  { value: "meditation", label: "Meditation", parent: "health-wellness" },
+  
+  { value: "finance", label: "Finance", isMain: true },
+  { value: "stock-market", label: "Stock Market", parent: "finance" },
+  { value: "investing", label: "Investing", parent: "finance" },
+  { value: "personal-finance", label: "Personal Finance", parent: "finance" },
+  
+  { value: "science", label: "Science", isMain: true },
+  { value: "physics", label: "Physics", parent: "science" },
+  { value: "biology", label: "Biology", parent: "science" },
+  { value: "astronomy", label: "Astronomy", parent: "science" },
+  
+  { value: "writing", label: "Writing", isMain: true },
+  { value: "blogs", label: "Blogs", parent: "writing" },
+  { value: "journalism", label: "Journalism", parent: "writing" },
+  { value: "creative-writing", label: "Creative Writing", parent: "writing" },
+  
+  { value: "fashion", label: "Fashion", isMain: true },
+  { value: "modeling", label: "Modeling", parent: "fashion" },
+  { value: "streetwear", label: "Streetwear", parent: "fashion" },
+  { value: "luxury", label: "Luxury", parent: "fashion" },
+  
+  { value: "academics", label: "Academics", isMain: true },
+  { value: "tutoring", label: "Tutoring", parent: "academics" },
+  { value: "study-tips", label: "Study Tips", parent: "academics" },
+  
+  { value: "guides-how-tos", label: "Guides/How-Tos", isMain: true },
+  { value: "recipes", label: "Recipes", parent: "guides-how-tos" },
+  { value: "diy", label: "DIY", parent: "guides-how-tos" },
+  { value: "tutorials", label: "Tutorials", parent: "guides-how-tos" },
+  
+  { value: "travel", label: "Travel", isMain: true },
+  { value: "adventure", label: "Adventure", parent: "travel" },
+  { value: "budget-travel", label: "Budget Travel", parent: "travel" },
+  { value: "luxury-travel", label: "Luxury Travel", parent: "travel" },
+  
+  { value: "politics", label: "Politics", isMain: true },
+  { value: "news", label: "News", parent: "politics" },
+  { value: "predictions", label: "Predictions", parent: "politics" },
+  { value: "policy", label: "Policy", parent: "politics" },
 ];
 
 const socialPlatforms = [
@@ -189,7 +259,7 @@ export default function CreatorOnboardingPage() {
     creatorType,
     displayName: '',
     bio: '',
-    followerCount: '',
+    location: '',
     
     // Store Info
     name: '',
@@ -197,25 +267,28 @@ export default function CreatorOnboardingPage() {
     
     // Athlete specific
     sport: '',
-    ageRange: '',
     education: '',
     grade: '', // New field for education subcategory
     position: '',
     school: '',
-    graduationYear: '',
+    graduatingClass: '',
     currentSponsors: '',
-    nilCompliant: false,
+    personalLinks: [] as string[],
+    rivalsScore: '',
+    espnScoutGrade: '',
+    rating247: '',
+    collegeCommitmentStatus: '',
     
     // Musician specific
     bandArtistName: '',
     musicCatalogUrl: '',
-    totalFollowerCount: '',
     artistType: '',
     musicGenre: '',
     
     // Content Creator specific
     contentType: '',
-    topicsOfFocus: '',
+    topicsOfFocus: [] as string[], // Changed to array for multi-select
+    customTopics: [] as string[], // For user-input topics
     sponsorships: '',
     totalViews: '',
     platforms: [] as string[],
@@ -445,18 +518,27 @@ export default function CreatorOnboardingPage() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="bio" className="text-gray-300">Bio</Label>
-                <textarea
-                  id="bio"
-                  value={formData.bio}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                  placeholder="Tell your fans about yourself, your achievements, and what they can expect from your community..."
-                  className="w-full p-3 bg-white/10 border border-white/20 text-white rounded-lg resize-none h-24"
-                />
-              </div>
+              {/* Bio only for Athletes and Musicians */}
+              {creatorType !== 'content_creator' && (
+                <div>
+                  <Label htmlFor="bio" className="text-gray-300">Bio</Label>
+                  <textarea
+                    id="bio"
+                    value={formData.bio}
+                    onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+                    placeholder="Tell your fans about yourself, your achievements, and what they can expect from your community..."
+                    className="w-full p-3 bg-white/10 border border-white/20 text-white rounded-lg resize-none h-24"
+                  />
+                </div>
+              )}
 
-              <div>
+              {/* Location Picker */}
+              <LocationPicker
+                value={formData.location}
+                onChange={(location) => setFormData(prev => ({ ...prev, location }))}
+              />
+
+              <div className="hidden">
                 <Label htmlFor="followerCount" className="text-gray-300">Total Follower Count *</Label>
                 <Input
                   id="followerCount"
@@ -470,7 +552,7 @@ export default function CreatorOnboardingPage() {
 
               <Button 
                 onClick={() => setStep(2)}
-                disabled={!formData.username || !formData.displayName || !formData.followerCount || !isAvailable || isChecking}
+                disabled={!formData.username || !formData.displayName || !isAvailable || isChecking}
                 className="w-full gradient-primary text-[#101636] font-bold"
               >
                 Continue to {creatorType === 'athlete' ? 'Athletic' : creatorType === 'musician' ? 'Music' : 'Content'} Details
@@ -512,25 +594,6 @@ export default function CreatorOnboardingPage() {
                     </div>
 
                     <div>
-                      <Label className="text-gray-300">Age Range *</Label>
-                      <Select value={formData.ageRange} onValueChange={(value) => setFormData(prev => ({ ...prev, ageRange: value }))}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                          <SelectValue placeholder="Select age range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="13-15">13-15</SelectItem>
-                          <SelectItem value="16-18">16-18</SelectItem>
-                          <SelectItem value="19-22">19-22</SelectItem>
-                          <SelectItem value="23-26">23-26</SelectItem>
-                          <SelectItem value="27-30">27-30</SelectItem>
-                          <SelectItem value="31+">31+</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
                       <Label className="text-gray-300">Current Education *</Label>
                       <Select value={formData.education} onValueChange={(value) => setFormData(prev => ({ ...prev, education: value, grade: '' }))}>
                         <SelectTrigger className="bg-white/10 border-white/20 text-white">
@@ -543,7 +606,9 @@ export default function CreatorOnboardingPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
 
+                  <div className="grid md:grid-cols-2 gap-4">
                     {/* Grade Subcategory - Show if education level has subcategories */}
                     {formData.education && gradeSubcategories[formData.education as keyof typeof gradeSubcategories] && (
                       <div>
@@ -573,15 +638,45 @@ export default function CreatorOnboardingPage() {
                     </div>
                   </div>
 
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="school" className="text-gray-300">Current School/College/Institution</Label>
+                      <Input
+                        id="school"
+                        value={formData.school}
+                        onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
+                        placeholder="University of Oklahoma, St. John Bosco..."
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="graduatingClass" className="text-gray-300">Graduating Class</Label>
+                      <Input
+                        id="graduatingClass"
+                        type="number"
+                        value={formData.graduatingClass}
+                        onChange={(e) => setFormData(prev => ({ ...prev, graduatingClass: e.target.value }))}
+                        placeholder="2025"
+                        min={new Date().getFullYear()}
+                        max={new Date().getFullYear() + 10}
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <Label htmlFor="school" className="text-gray-300">School/University</Label>
-                    <Input
-                      id="school"
-                      value={formData.school}
-                      onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
-                      placeholder="e.g., University of Florida"
-                      className="bg-white/10 border-white/20 text-white"
-                    />
+                    <Label className="text-gray-300">College Commitment Status</Label>
+                    <Select value={formData.collegeCommitmentStatus} onValueChange={(value) => setFormData(prev => ({ ...prev, collegeCommitmentStatus: value }))}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Select status (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {collegeCommitmentOptions.map((status) => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -595,16 +690,62 @@ export default function CreatorOnboardingPage() {
                     />
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="nilCompliant"
-                      checked={formData.nilCompliant}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, nilCompliant: checked as boolean }))}
-                    />
-                    <Label htmlFor="nilCompliant" className="text-gray-300 text-sm">
-                      I understand NIL compliance requirements and agree to follow applicable regulations
-                    </Label>
+                  {/* Recruiting Metrics */}
+                  <div className="space-y-4 p-4 bg-white/5 rounded-lg">
+                    <h4 className="text-white font-semibold">Recruiting Metrics (Optional)</h4>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="rivalsScore" className="text-gray-300">Rivals Score</Label>
+                        <Input
+                          id="rivalsScore"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={formData.rivalsScore}
+                          onChange={(e) => setFormData(prev => ({ ...prev, rivalsScore: e.target.value }))}
+                          placeholder="0-100"
+                          className="bg-white/10 border-white/20 text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="espnScoutGrade" className="text-gray-300">ESPN Scout Grade</Label>
+                        <Input
+                          id="espnScoutGrade"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={formData.espnScoutGrade}
+                          onChange={(e) => setFormData(prev => ({ ...prev, espnScoutGrade: e.target.value }))}
+                          placeholder="0-100"
+                          className="bg-white/10 border-white/20 text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="rating247" className="text-gray-300">247 Rating</Label>
+                        <Input
+                          id="rating247"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={formData.rating247}
+                          onChange={(e) => setFormData(prev => ({ ...prev, rating247: e.target.value }))}
+                          placeholder="0-100"
+                          className="bg-white/10 border-white/20 text-white"
+                        />
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Personal Links */}
+                  <PersonalLinksInput
+                    value={formData.personalLinks}
+                    onChange={(links) => setFormData(prev => ({ ...prev, personalLinks: links }))}
+                  />
                 </>
               )}
 
@@ -668,42 +809,112 @@ export default function CreatorOnboardingPage() {
               {/* Content Creator Fields */}
               {creatorType === 'content_creator' && (
                 <>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-gray-300">Type of Content *</Label>
-                      <Select value={formData.contentType} onValueChange={(value) => setFormData(prev => ({ ...prev, contentType: value }))}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                          <SelectValue placeholder="Select content type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contentTypes.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="totalViews" className="text-gray-300">Total Views Across Platforms</Label>
-                      <Input
-                        id="totalViews"
-                        value={formData.totalViews}
-                        onChange={(e) => setFormData(prev => ({ ...prev, totalViews: e.target.value }))}
-                        placeholder="e.g., 1.5M total views"
-                        className="bg-white/10 border-white/20 text-white"
-                      />
-                    </div>
-                  </div>
-
+                  {/* Topics of Focus - Multi-select with limit of 5 */}
                   <div>
-                    <Label htmlFor="topicsOfFocus" className="text-gray-300">Topics of Focus</Label>
-                    <Input
-                      id="topicsOfFocus"
-                      value={formData.topicsOfFocus}
-                      onChange={(e) => setFormData(prev => ({ ...prev, topicsOfFocus: e.target.value }))}
-                      placeholder="What topics do you create content about?"
-                      className="bg-white/10 border-white/20 text-white"
-                    />
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-gray-300">Topics of Focus * (Select up to 5)</Label>
+                      <span className="text-sm text-gray-400">{formData.topicsOfFocus.length + formData.customTopics.length}/5 selected</span>
+                    </div>
+                    
+                    {/* Selected Topics Display */}
+                    {(formData.topicsOfFocus.length > 0 || formData.customTopics.length > 0) && (
+                      <div className="flex flex-wrap gap-2 mb-3 p-3 bg-white/5 rounded-lg border border-white/10">
+                        {formData.topicsOfFocus.map((topic) => (
+                          <Badge key={topic} className="bg-brand-primary text-white flex items-center gap-1 py-1 px-3">
+                            {topicCategories.find(t => t.value === topic)?.label}
+                            <button
+                              onClick={() => setFormData(prev => ({ ...prev, topicsOfFocus: prev.topicsOfFocus.filter(t => t !== topic) }))}
+                              className="ml-1 hover:text-red-300"
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                        {formData.customTopics.map((topic) => (
+                          <Badge key={topic} className="bg-purple-500 text-white flex items-center gap-1 py-1 px-3">
+                            {topic}
+                            <button
+                              onClick={() => setFormData(prev => ({ ...prev, customTopics: prev.customTopics.filter(t => t !== topic) }))}
+                              className="ml-1 hover:text-red-300"
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Topic Selection Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar p-2 bg-white/5 rounded-lg">
+                      {topicCategories.map((topic) => {
+                        const isSelected = formData.topicsOfFocus.includes(topic.value);
+                        const totalSelected = formData.topicsOfFocus.length + formData.customTopics.length;
+                        const isDisabled = !isSelected && totalSelected >= 5;
+                        
+                        return (
+                          <button
+                            key={topic.value}
+                            onClick={() => {
+                              if (isSelected) {
+                                setFormData(prev => ({ ...prev, topicsOfFocus: prev.topicsOfFocus.filter(t => t !== topic.value) }));
+                              } else if (totalSelected < 5) {
+                                setFormData(prev => ({ ...prev, topicsOfFocus: [...prev.topicsOfFocus, topic.value] }));
+                              }
+                            }}
+                            disabled={isDisabled}
+                            className={`p-2 rounded-lg text-sm font-medium transition-all ${
+                              isSelected 
+                                ? 'bg-brand-primary text-white border-2 border-brand-primary' 
+                                : isDisabled
+                                  ? 'bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed opacity-50'
+                                  : topic.isMain
+                                    ? 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                                    : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/15'
+                            } ${topic.isMain ? 'font-bold' : 'pl-4'}`}
+                          >
+                            {topic.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom Topic Input */}
+                    <div className="mt-3">
+                      <Label className="text-gray-400 text-sm">Add Your Own Topic</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          id="customTopic"
+                          placeholder="Enter a custom topic..."
+                          className="bg-white/10 border-white/20 text-white"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.currentTarget;
+                              const value = input.value.trim();
+                              if (value && !formData.customTopics.includes(value) && (formData.topicsOfFocus.length + formData.customTopics.length) < 5) {
+                                setFormData(prev => ({ ...prev, customTopics: [...prev.customTopics, value] }));
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={(e) => {
+                            const input = document.getElementById('customTopic') as HTMLInputElement;
+                            const value = input?.value.trim();
+                            if (value && !formData.customTopics.includes(value) && (formData.topicsOfFocus.length + formData.customTopics.length) < 5) {
+                              setFormData(prev => ({ ...prev, customTopics: [...prev.customTopics, value] }));
+                              input.value = '';
+                            }
+                          }}
+                          disabled={(formData.topicsOfFocus.length + formData.customTopics.length) >= 5}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -749,207 +960,18 @@ export default function CreatorOnboardingPage() {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back
                 </Button>
+                {/* Content Creators can skip this step */}
+                {creatorType === 'content_creator' && (
+                  <Button 
+                    onClick={() => setStep(3)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Skip Step
+                  </Button>
+                )}
                 <Button 
                   onClick={() => setStep(3)}
-                  className="flex-1 gradient-primary text-[#101636] font-bold"
-                >
-                  Continue to Store Setup
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 3: Store Setup */}
-        {step === 3 && (
-          <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-white text-2xl flex items-center gap-3">
-                <Store className="h-8 w-8 text-brand-primary" />
-                Store Setup
-              </CardTitle>
-              <p className="text-gray-300">Set up your fan loyalty store and branding</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label htmlFor="storeName" className="text-gray-300">Store Name *</Label>
-                <Input
-                  id="storeName"
-                  value={formData.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g., Aerial Ace Athletics, Luna Music, Thunder Squad"
-                  className="bg-white/10 border-white/20 text-white"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="storeSlug" className="text-gray-300">Store URL *</Label>
-                <p className="text-sm text-gray-400 mb-2">Your unique creator page URL</p>
-                
-                {!isEditingSlug ? (
-                  <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/10 rounded-lg">
-                    <span className="text-gray-400 text-sm">fandomly.com/@</span>
-                    <span className="text-white font-mono flex-1">{formData.slug || 'your-slug'}</span>
-                    <Button
-                      type="button"
-                      onClick={() => setIsEditingSlug(true)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-brand-primary hover:text-brand-primary/80 hover:bg-brand-primary/10"
-                    >
-                      <Edit2 className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-sm">fandomly.com/@</span>
-                      <div className="relative flex-1">
-                        <Input
-                          id="storeSlug"
-                          value={formData.slug}
-                          onChange={(e) => handleSlugChange(e.target.value)}
-                          placeholder="your-store-name"
-                          className={`bg-white/10 border-white/20 text-white pr-10 font-mono ${
-                            slugHasChecked && !slugAvailable ? 'border-red-500' : 
-                            slugHasChecked && slugAvailable ? 'border-green-500' : ''
-                          }`}
-                        />
-                        {slugChecking && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
-                          </div>
-                        )}
-                        {slugHasChecked && !slugChecking && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            {slugAvailable ? (
-                              <Check className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-red-500" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => setIsEditingSlug(false)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-gray-400 hover:text-white hover:bg-white/10"
-                      >
-                        Done
-                      </Button>
-                    </div>
-                    {slugError && (
-                      <p className="text-red-400 text-sm mt-1">{slugError}</p>
-                    )}
-                    {slugHasChecked && slugAvailable && (
-                      <p className="text-green-400 text-sm mt-1">✓ Slug is available!</p>
-                    )}
-                    {slugSuggestions.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-gray-400 text-sm mb-1">Suggestions:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {slugSuggestions.map((suggestion) => (
-                            <button
-                              key={suggestion}
-                              onClick={() => {
-                                setFormData(prev => ({ ...prev, slug: suggestion }));
-                              }}
-                              className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30 font-mono"
-                            >
-                              @{suggestion}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <p className="text-xs text-gray-500 mt-2">
-                  ⓘ Use lowercase letters, numbers, and hyphens only. This will be your permanent URL.
-                </p>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 mb-4 block">Brand Colors</Label>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-gray-400 text-sm">Primary</Label>
-                    <div className="flex items-center gap-3 mt-1">
-                      <input
-                        type="color"
-                        value={formData.primaryColor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
-                        className="w-12 h-10 rounded-lg border border-white/20"
-                      />
-                      <Input
-                        value={formData.primaryColor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
-                        className="bg-white/10 border-white/20 text-white text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400 text-sm">Secondary</Label>
-                    <div className="flex items-center gap-3 mt-1">
-                      <input
-                        type="color"
-                        value={formData.secondaryColor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                        className="w-12 h-10 rounded-lg border border-white/20"
-                      />
-                      <Input
-                        value={formData.secondaryColor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                        className="bg-white/10 border-white/20 text-white text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400 text-sm">Accent</Label>
-                    <div className="flex items-center gap-3 mt-1">
-                      <input
-                        type="color"
-                        value={formData.accentColor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, accentColor: e.target.value }))}
-                        className="w-12 h-10 rounded-lg border border-white/20"
-                      />
-                      <Input
-                        value={formData.accentColor}
-                        onChange={(e) => setFormData(prev => ({ ...prev, accentColor: e.target.value }))}
-                        className="bg-white/10 border-white/20 text-white text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Banner Image Upload */}
-              <div>
-                <Label className="text-gray-300 mb-4 block">Profile Banner</Label>
-                <ImageUpload
-                  type="banner"
-                  currentImageUrl={formData.bannerImage}
-                  onUploadSuccess={(url) => setFormData(prev => ({ ...prev, bannerImage: url }))}
-                  onRemove={() => setFormData(prev => ({ ...prev, bannerImage: '' }))}
-                />
-              </div>
-
-              <div className="flex gap-4">
-                <Button 
-                  onClick={() => setStep(2)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button 
-                  onClick={() => setStep(4)}
-                  disabled={!formData.name || !formData.slug || !slugAvailable || slugChecking}
                   className="flex-1 gradient-primary text-[#101636] font-bold"
                 >
                   Continue to Subscription
@@ -960,8 +982,8 @@ export default function CreatorOnboardingPage() {
           </Card>
         )}
 
-        {/* Step 4: Subscription Plan */}
-        {step === 4 && (
+        {/* Step 3: Subscription Plan */}
+        {step === 3 && (
           <div className="space-y-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-white mb-4">Choose Your Plan</h2>
@@ -1008,32 +1030,9 @@ export default function CreatorOnboardingPage() {
               })}
             </div>
 
-            <Card className="bg-white/10 border-white/20 max-w-2xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-white text-xl">Store Preview</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div 
-                    className="w-16 h-16 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: formData.primaryColor }}
-                  >
-                    <Store className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-semibold text-lg">{formData.name || "Your Store"}</h3>
-                    <p className="text-gray-400">fandomly.com/{formData.slug || "your-store"}</p>
-                  </div>
-                </div>
-                <div className="text-gray-300 text-sm">
-                  {formData.bio || "Your store description will appear here..."}
-                </div>
-              </CardContent>
-            </Card>
-
             <div className="flex gap-4 max-w-2xl mx-auto">
               <Button 
-                onClick={() => setStep(3)}
+                onClick={() => setStep(2)}
                 variant="outline"
                 className="flex-1"
               >

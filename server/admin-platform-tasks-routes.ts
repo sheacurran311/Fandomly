@@ -14,6 +14,9 @@ const createPlatformTaskSchema = z.object({
   points: z.number().min(1, "Points must be at least 1"),
   requiredFields: z.array(z.string()).optional().default([]),
   socialPlatform: z.string().optional(),
+  eligibleAccountTypes: z.array(z.enum(['fan', 'creator', 'creator-athlete', 'creator-musician', 'creator-content-creator']))
+    .optional()
+    .default(['fan']),
 });
 
 const updatePlatformTaskSchema = createPlatformTaskSchema.partial().extend({

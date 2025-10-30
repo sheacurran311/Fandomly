@@ -5,6 +5,12 @@ import DashboardCard from "@/components/dashboard/dashboard-card";
 import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
 import CreatorInstagramWidget from "@/components/social/creator-instagram-widget";
 import CreatorTwitterWidget from "@/components/social/creator-twitter-widget";
+import CreatorTikTokWidget from "@/components/social/creator-tiktok-widget";
+import CreatorYouTubeWidget from "@/components/social/creator-youtube-widget";
+import CreatorSpotifyWidget from "@/components/social/creator-spotify-widget";
+import RevenueWidget from "@/components/dashboard/revenue-widget";
+import LeaderboardWidget from "@/components/dashboard/leaderboard-widget";
+import NewFansWidget from "@/components/dashboard/new-fans-widget";
 import { useInstagramConnection } from "@/contexts/instagram-connection-context";
 import InstagramSDKManager from "@/lib/instagram";
 import { useEffect } from "react";
@@ -338,8 +344,9 @@ export default function CreatorDashboard() {
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Recent Activity */}
-            <div className="lg:col-span-2">
+            {/* Main Content - Recent Activity + Social Widgets */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Recent Activity */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center justify-between">
@@ -348,39 +355,84 @@ export default function CreatorDashboard() {
                       variant="outline" 
                       size="sm" 
                       className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
-                      onClick={() => window.location.href = '/creator-dashboard/campaigns'}
+                      onClick={() => window.location.href = '/creator-dashboard/activity'}
                     >
                       View All
                     </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      { user: "Sarah M.", action: "joined your loyalty program", time: "2 hours ago", type: "join" },
-                      { user: "Mike R.", action: "redeemed VIP Discord Access", time: "4 hours ago", type: "redeem" },
-                      { user: "Emma L.", action: "earned 500 points from Instagram follow", time: "6 hours ago", type: "earn" },
-                      { user: "Alex K.", action: "joined your loyalty program", time: "1 day ago", type: "join" },
-                    ].map((activity, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                          activity.type === 'join' ? 'bg-green-400' : 
-                          activity.type === 'redeem' ? 'bg-yellow-400' : 'bg-blue-400'
-                        }`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white">
-                            <span className="font-medium">{activity.user}</span> {activity.action}
-                          </p>
-                          <p className="text-xs text-gray-400">{activity.time}</p>
+                  <div className="max-h-[600px] overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                    {activityLoading ? (
+                      // Loading skeleton
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 animate-pulse">
+                          <div className="w-2 h-2 rounded-full mt-2 bg-gray-600" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-600 rounded w-3/4"></div>
+                            <div className="h-3 bg-gray-700 rounded w-1/4"></div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : recentActivity && recentActivity.length > 0 ? (
+                      recentActivity.slice(0, 10).map((activity, index) => (
+                        <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                            activity.type === 'join' ? 'bg-green-400' : 
+                            activity.type === 'redeem' ? 'bg-yellow-400' : 'bg-blue-400'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white">
+                              <span className="font-medium">{activity.user || activity.fanName || 'A fan'}</span> {activity.action || activity.description}
+                            </p>
+                            <p className="text-xs text-gray-400">{activity.time || activity.timestamp}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      // Fallback mock data
+                      [
+                        { user: "Sarah M.", action: "joined your loyalty program", time: "2 hours ago", type: "join" },
+                        { user: "Mike R.", action: "redeemed VIP Discord Access", time: "4 hours ago", type: "redeem" },
+                        { user: "Emma L.", action: "earned 500 points from Instagram follow", time: "6 hours ago", type: "earn" },
+                        { user: "Alex K.", action: "joined your loyalty program", time: "1 day ago", type: "join" },
+                        { user: "Taylor B.", action: "completed Twitter follow task", time: "1 day ago", type: "earn" },
+                        { user: "Jordan C.", action: "redeemed Exclusive Merch", time: "2 days ago", type: "redeem" },
+                        { user: "Casey D.", action: "joined your loyalty program", time: "2 days ago", type: "join" },
+                        { user: "Morgan E.", action: "earned 300 points from campaign", time: "3 days ago", type: "earn" },
+                        { user: "Riley F.", action: "completed Instagram follow task", time: "3 days ago", type: "earn" },
+                        { user: "Avery G.", action: "joined your loyalty program", time: "4 days ago", type: "join" },
+                      ].map((activity, index) => (
+                        <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                            activity.type === 'join' ? 'bg-green-400' : 
+                            activity.type === 'redeem' ? 'bg-yellow-400' : 'bg-blue-400'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white">
+                              <span className="font-medium">{activity.user}</span> {activity.action}
+                            </p>
+                            <p className="text-xs text-gray-400">{activity.time}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Social Media Integrations Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <CreatorFacebookConnect />
+                <CreatorTwitterWidget />
+                <CreatorInstagramWidget />
+                <CreatorTikTokWidget />
+                <CreatorYouTubeWidget />
+                <CreatorSpotifyWidget />
+              </div>
             </div>
 
-            {/* Quick Actions & Stats */}
+            {/* Right Sidebar - New Widgets */}
             <div className="space-y-6">
               {/* Creator Verification Status */}
               {!verificationLoading && creator && verificationData && (
@@ -392,10 +444,14 @@ export default function CreatorDashboard() {
                 />
               )}
               
-              {/* Social Media Integrations */}
-              <CreatorFacebookConnect />
-              <CreatorInstagramWidget />
-              <CreatorTwitterWidget />
+              {/* Revenue Widget */}
+              <RevenueWidget />
+              
+              {/* Leaderboard Widget */}
+              <LeaderboardWidget />
+              
+              {/* New Fans Widget */}
+              <NewFansWidget />
 
               {/* Quick Actions */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">

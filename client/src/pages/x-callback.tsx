@@ -20,29 +20,37 @@ export default function XCallback() {
       let result = await TwitterSDKManager.handleCallbackFromWindow();
       console.log('[X-Callback] handleCallbackFromWindow result:', result);
 
-      // If duplicate-callback was blocked, try to reuse the cached success
-      if (!result?.success && state) {
+      // If duplicate-callback was blocked OR if we got an error, try to reuse the cached success
+      // This handles React StrictMode double-rendering in development
+      if ((!result?.success || result?.error === 'Callback already processed') && state) {
+        console.log('[X-Callback] Got error/failure, checking for cached success...');
         try {
-          const cached = sessionStorage.getItem(`tw_cb_result_${state}`);
+          // First check immediately
+          let cached = sessionStorage.getItem(`tw_cb_result_${state}`);
           if (cached) {
             const parsed = JSON.parse(cached);
             if (parsed?.success) {
-              console.log('[X-Callback] Reusing cached success result for state');
+              console.log('[X-Callback] Found cached success result immediately');
               result = parsed;
             }
-          } else {
-            // brief wait to allow first run to store the result
-            await new Promise(r => setTimeout(r, 300));
-            const cached2 = sessionStorage.getItem(`tw_cb_result_${state}`);
-            if (cached2) {
-              const parsed2 = JSON.parse(cached2);
-              if (parsed2?.success) {
-                console.log('[X-Callback] Reusing cached success result after wait');
-                result = parsed2;
+          }
+          
+          // If still no success, wait and try again (for race conditions)
+          if (!result?.success) {
+            console.log('[X-Callback] No cached result yet, waiting 600ms...');
+            await new Promise(r => setTimeout(r, 600));
+            cached = sessionStorage.getItem(`tw_cb_result_${state}`);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (parsed?.success) {
+                console.log('[X-Callback] Found cached success result after wait');
+                result = parsed;
               }
             }
           }
-        } catch {}
+        } catch (e) {
+          console.error('[X-Callback] Error checking cached result:', e);
+        }
       }
 
       // Strip ?code&state after we've processed them to avoid re-trigger
@@ -90,5 +98,6 @@ export default function XCallback() {
     </div>
   );
 }
+
 
 

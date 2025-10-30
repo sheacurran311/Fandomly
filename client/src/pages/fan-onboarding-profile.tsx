@@ -43,16 +43,29 @@ export default function FanOnboardingProfile() {
   const onContinue = async () => {
     if (!userData || !username || !isAvailable) return;
     
-    await apiRequest("POST", "/api/auth/profile", {
-      userId: userData.id,
-      username: username,
-      profileData: {
-        name: name || undefined,
-        age: age ? Number(age) : undefined,
-      },
-    });
-    // Move to creators selection
-    setLocation("/fan-onboarding/choose-creators");
+    try {
+      const response = await apiRequest("POST", "/api/auth/profile", {
+        userId: userData.id,
+        username: username,
+        profileData: {
+          name: name || undefined,
+          age: age ? Number(age) : undefined,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Profile update failed:', errorData);
+        alert(errorData.error || 'Failed to save profile. Please try again.');
+        return;
+      }
+
+      // Successfully saved, move to creators selection
+      setLocation("/fan-onboarding/choose-creators");
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('An error occurred while saving your profile. Please try again.');
+    }
   };
 
   return (

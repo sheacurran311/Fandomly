@@ -10,11 +10,14 @@ const BUCKET_ID = "replit-objstore-b86a50a0-f1f5-4ba0-80ed-68fd70de5783";
 
 // Create singleton client instance
 let storageClient: Client | null = null;
+let clientInitialized = false;
 
-export function getStorageClient(): Client {
+export async function getStorageClient(): Promise<Client> {
   if (!storageClient) {
     storageClient = new Client();
+    clientInitialized = true;
   }
+  
   return storageClient;
 }
 
@@ -31,7 +34,7 @@ export async function uploadImage(
   contentType: string
 ): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
-    const client = getStorageClient();
+    const client = await getStorageClient();
     
     // Upload the image
     const result = await client.uploadFromBytes(filename, buffer);
@@ -61,7 +64,7 @@ export async function uploadImage(
  */
 export async function deleteImage(filename: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const client = getStorageClient();
+    const client = await getStorageClient();
     const result = await client.delete(filename);
     
     if (!result.ok) {
@@ -85,7 +88,7 @@ export async function deleteImage(filename: string): Promise<{ ok: boolean; erro
  */
 export async function imageExists(filename: string): Promise<boolean> {
   try {
-    const client = getStorageClient();
+    const client = await getStorageClient();
     const result = await client.exists(filename);
     return result.ok ? result.value : false;
   } catch (error) {
@@ -100,7 +103,7 @@ export async function imageExists(filename: string): Promise<boolean> {
  */
 export async function listImages(prefix?: string): Promise<string[]> {
   try {
-    const client = getStorageClient();
+    const client = await getStorageClient();
     const result = await client.list({ prefix });
     
     if (!result.ok) {
@@ -131,4 +134,58 @@ export function generateImageFilename(
   const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-]/g, '_');
   
   return `${type}s/${sanitizedUserId}/${timestamp}.${extension}`;
+}
+
+/**
+ * Upload a video file to Replit Object Storage
+ * @param buffer - Video file buffer
+ * @param filename - Destination filename (with path)
+ * @param contentType - MIME type of the video
+ * @returns URL to access the uploaded video
+ */
+export async function uploadVideo(
+  buffer: Buffer,
+  filename: string,
+  contentType: string
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const client = await getStorageClient();
+    
+    // Upload the video
+    const result = await client.uploadFromBytes(filename, buffer);
+    
+    if (!result.ok) {
+      console.error("Video upload failed:", result.error);
+      return { ok: false, error: result.error?.message || "Upload failed" };
+    }
+    
+    // Generate the public URL for the uploaded video
+    const url = `/api/storage/videos/${filename}`;
+    
+    return { ok: true, url };
+  } catch (error) {
+    console.error("Video upload error:", error);
+    return { 
+      ok: false, 
+      error: error instanceof Error ? error.message : "Unknown upload error" 
+    };
+  }
+}
+
+/**
+ * Generate a unique filename for an uploaded video
+ * @param userId - User ID for namespacing
+ * @param originalFilename - Original filename
+ * @param type - Video type (reward, sample, fulfillment)
+ */
+export function generateVideoFilename(
+  userId: string,
+  originalFilename: string,
+  type: 'reward' | 'sample' | 'fulfillment'
+): string {
+  const timestamp = Date.now();
+  const extension = originalFilename.split('.').pop()?.toLowerCase() || 'mp4';
+  const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-]/g, '_');
+  
+  return `videos/${type}s/${sanitizedUserId}/${timestamp}.${extension}`;
 }

@@ -1,3 +1,15 @@
+/**
+ * Complete Profile Task Builder
+ * 
+ * PLATFORM-ONLY TASK: This task is now managed exclusively by Fandomly admins
+ * through the admin dashboard platform tasks interface. Creators cannot create
+ * Complete Profile tasks directly - this ensures consistent onboarding rewards
+ * across the entire platform.
+ * 
+ * Admins can create Complete Profile tasks that reward fans and creators for
+ * completing their profiles with various required fields (bio, photo, socials, etc.)
+ */
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -66,6 +78,20 @@ const FAN_PROFILE_FIELDS = [
     id: "instagram" as const, 
     label: "Instagram", 
     description: "Connect your Instagram account",
+    category: "social",
+    defaultRequired: false
+  },
+  { 
+    id: "facebook" as const, 
+    label: "Facebook", 
+    description: "Connect your Facebook account",
+    category: "social",
+    defaultRequired: false
+  },
+  { 
+    id: "tiktok" as const, 
+    label: "TikTok", 
+    description: "Connect your TikTok account",
     category: "social",
     defaultRequired: false
   },

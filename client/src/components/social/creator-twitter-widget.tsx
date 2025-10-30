@@ -29,7 +29,7 @@ export default function CreatorTwitterWidget() {
     // Attempt to fetch stored connection
     const loadStatus = async () => {
       try {
-        const response = await fetch('/api/social/accounts', {
+        const response = await fetch('/api/social-connections/twitter', {
           headers: {
             'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
             'Content-Type': 'application/json'
@@ -37,11 +37,16 @@ export default function CreatorTwitterWidget() {
           credentials: 'include'
         });
         if (response.ok) {
-          const connections = await response.json();
-          const tw = connections.find((c: any) => c.platform === 'twitter');
-          if (tw) {
+          const data = await response.json();
+          if (data.connected && data.connection) {
             setIsConnected(true);
-            setUserInfo({ id: tw.accountId, name: tw.displayName, username: tw.username, followers_count: tw.followers });
+            const conn = data.connection;
+            setUserInfo({ 
+              id: conn.platformUserId, 
+              name: conn.platformDisplayName, 
+              username: conn.platformUsername, 
+              followers_count: conn.profileData?.followers_count || 0 
+            });
           } else {
             setIsConnected(false);
             setUserInfo(null);

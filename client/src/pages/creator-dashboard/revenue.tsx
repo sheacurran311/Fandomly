@@ -73,24 +73,42 @@ export default function CreatorRevenue() {
       }
 
       try {
-        // For now, calculate from available data until revenue endpoints are built
-        // Get fan count for average calculation
+        // Get subscription data (what creator pays to Fandomly)
+        const subscriptionResponse = await apiRequest('GET', '/api/subscription-status');
+        const subscription = await subscriptionResponse.json();
+        
+        // Map subscription tier to monthly cost
+        let monthlySubscriptionCost = 0;
+        if (subscription.subscriptionTier === 'starter') monthlySubscriptionCost = 29;
+        else if (subscription.subscriptionTier === 'pro') monthlySubscriptionCost = 99;
+        else if (subscription.subscriptionTier === 'enterprise') monthlySubscriptionCost = 299;
+
+        // Get fan count and membership data
         const membershipsResponse = await apiRequest('GET', `/api/tenant-memberships/${creator.tenantId}`);
         const memberships = await membershipsResponse.json();
         const fanCount = memberships.length;
 
-        // TODO: Replace with actual revenue API when available
-        // For now, return calculated data based on fan engagement
-        const totalPoints = memberships.reduce((sum: number, m: any) => sum + (m.memberData?.points || 0), 0);
-        const estimatedRevenue = totalPoints * 0.01; // $0.01 per point as example
+        // Calculate historical fan count from 30 days ago for growth rate
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const historicalFanCount = memberships.filter((m: any) => 
+          new Date(m.joinedAt) < thirtyDaysAgo
+        ).length;
 
+        let growthRate = 0;
+        if (historicalFanCount > 0 && fanCount !== historicalFanCount) {
+          growthRate = ((fanCount - historicalFanCount) / historicalFanCount) * 100;
+        }
+
+        // Note: This represents platform costs, not creator revenue
+        // Future: Implement actual creator revenue tracking when monetization features are added
         return {
-          totalRevenue: estimatedRevenue,
-          monthlyRevenue: estimatedRevenue * 0.3, // Assume 30% this month
-          averagePerFan: fanCount > 0 ? estimatedRevenue / fanCount : 0,
-          subscriptionRevenue: estimatedRevenue * 0.7, // 70% from subscriptions
-          campaignRevenue: estimatedRevenue * 0.3, // 30% from campaigns
-          growthRate: fanCount > 10 ? 15.3 : 0 // Show growth if enough fans
+          totalRevenue: monthlySubscriptionCost * 12, // Annual subscription value
+          monthlyRevenue: monthlySubscriptionCost,
+          averagePerFan: fanCount > 0 ? monthlySubscriptionCost / fanCount : 0,
+          subscriptionRevenue: monthlySubscriptionCost, // Creator's subscription cost
+          campaignRevenue: 0, // Placeholder for future campaign sponsorship revenue
+          growthRate: parseFloat(growthRate.toFixed(1))
         };
       } catch (error) {
         console.error('Failed to calculate revenue data:', error);
@@ -124,26 +142,44 @@ export default function CreatorRevenue() {
     }
   ] : [];
 
-  // Fetch recent transactions
+  // Fetch recent point award transactions (representing fan engagement activity)
   const { data: recentTransactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ['/api/transactions/creator', creator?.id],
     queryFn: async (): Promise<Transaction[]> => {
-      if (!creator?.id) return [];
+      if (!creator?.id ||!creator?.tenantId) return [];
       
       try {
-        // TODO: Replace with actual transaction API when available
-        // For now, generate based on fan activity
-        const membershipsResponse = await apiRequest('GET', `/api/tenant-memberships/${creator.tenantId}`);
-        const memberships = await membershipsResponse.json();
+        // Get recent point transactions from creator's loyalty programs
+        const programsResponse = await apiRequest('GET', `/api/loyalty-programs/creator/${creator.id}`);
+        const programs = await programsResponse.json();
         
-        return memberships.slice(0, 4).map((membership: any, index: number) => ({
-          id: membership.id,
-          type: index % 2 === 0 ? "Subscription" : "Campaign",
-          amount: (membership.memberData?.points || 0) * 0.01,
-          date: new Date(membership.joinedAt).toLocaleDateString(),
-          fan: membership.memberData?.displayName || membership.user?.username || 'Fan',
-          status: "completed"
-        }));
+        const allTransactions: Transaction[] = [];
+        
+        for (const program of programs.slice(0, 2)) { // Limit to first 2 programs for performance
+          try {
+            const transactionsResponse = await apiRequest('GET', `/api/point-transactions/program/${program.id}`);
+            const transactions = await transactionsResponse.json();
+            
+            // Convert to Transaction format
+            transactions.slice(0, 3).forEach((tx: any) => {
+              allTransactions.push({
+                id: tx.id,
+                type: tx.campaignName || "Points Awarded",
+                amount: tx.pointsAwarded || 0,
+                date: new Date(tx.timestamp).toLocaleDateString(),
+                fan: tx.fanId || 'Fan',
+                status: "completed"
+              });
+            });
+          } catch (error) {
+            console.warn(`Failed to fetch transactions for program ${program.id}:`, error);
+          }
+        }
+        
+        // Sort by date and return most recent 5
+        return allTransactions
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 5);
       } catch (error) {
         console.error('Failed to fetch transactions:', error);
         return [];

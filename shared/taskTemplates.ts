@@ -369,6 +369,149 @@ export const CORE_TASK_TEMPLATES = [
     isGlobal: true,
     isActive: true,
   },
+  {
+    id: "spotify-playlist",
+    name: "Follow Spotify Playlist",
+    description: "Fans follow a specific Spotify playlist",
+    platform: "spotify" as const,
+    taskType: "spotify_playlist" as const,
+    category: "social",
+    defaultConfig: {
+      points: 75,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 75,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Additional Facebook Templates
+  {
+    id: "facebook-follow",
+    name: "Follow on Facebook",
+    description: "Fans like your Facebook page",
+    platform: "facebook" as const,
+    taskType: "facebook_like_page" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-like",
+    name: "Like Facebook Post",
+    description: "Fans like a specific Facebook post",
+    platform: "facebook" as const,
+    taskType: "facebook_like_post" as const,
+    category: "social",
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Additional Instagram Templates
+  {
+    id: "instagram-follow",
+    name: "Follow on Instagram",
+    description: "Fans follow your Instagram account",
+    platform: "instagram" as const,
+    taskType: "instagram_follow" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "instagram-like",
+    name: "Like Instagram Post",
+    description: "Fans like a specific Instagram post",
+    platform: "instagram" as const,
+    taskType: "instagram_like_post" as const,
+    category: "social",
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Additional YouTube Templates
+  {
+    id: "youtube-subscribe",
+    name: "Subscribe on YouTube",
+    description: "Fans subscribe to your YouTube channel",
+    platform: "youtube" as const,
+    taskType: "youtube_subscribe" as const,
+    category: "social",
+    defaultConfig: {
+      points: 100,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 100,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "youtube-like",
+    name: "Like YouTube Video",
+    description: "Fans like a specific YouTube video",
+    platform: "youtube" as const,
+    taskType: "youtube_like" as const,
+    category: "social",
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // TikTok Templates
+  {
+    id: "tiktok-follow",
+    name: "Follow on TikTok",
+    description: "Fans follow your TikTok account",
+    platform: "tiktok" as const,
+    taskType: "tiktok_follow" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "tiktok-like",
+    name: "Like TikTok Video",
+    description: "Fans like a specific TikTok video",
+    platform: "tiktok" as const,
+    taskType: "tiktok_like" as const,
+    category: "social",
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
 ] as const;
 
 // Platform-to-task-types mapping for UI

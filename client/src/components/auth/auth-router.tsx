@@ -113,8 +113,15 @@ export default function AuthRouter({ children }: AuthRouterProps) {
       (window as any).__userType = userData?.userType || null;
     } catch {}
     
+    // Check loading state FIRST before any redirects
+    if (isLoading) {
+      // Still loading user data - don't make any routing decisions yet
+      console.log("AuthRouter - Loading user data...");
+      return;
+    }
+    
     if (!dynamicUser) {
-      // User not connected to Dynamic
+      // User not connected to Dynamic (and not loading)
       console.log("AuthRouter - No Dynamic user, checking if accessing protected route");
       
       // If trying to access protected route without authentication, redirect to home
@@ -122,12 +129,6 @@ export default function AuthRouter({ children }: AuthRouterProps) {
         console.log("AuthRouter - Unauthenticated user trying to access protected route, redirecting to home");
         setLocation('/');
       }
-      return;
-    }
-
-    if (isLoading) {
-      // Still loading user data
-      console.log("AuthRouter - Loading user data...");
       return;
     }
 

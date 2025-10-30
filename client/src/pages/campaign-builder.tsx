@@ -734,6 +734,13 @@ export default function CampaignBuilder() {
   const [likePost, setLikePost] = useState(false);
   const [retweet, setRetweet] = useState(false);
   const [points, setPoints] = useState(50);
+  const [selectedProgramId, setSelectedProgramId] = useState<string>("");
+
+  // Fetch programs for the creator
+  const { data: programs = [] } = useQuery({
+    queryKey: ["/api/programs"],
+    enabled: !!userData?.id,
+  });
 
   // Fetch available tasks for assignment
   const { data: availableTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
@@ -752,6 +759,7 @@ export default function CampaignBuilder() {
       const newCampaignRes = await apiRequest("POST", "/api/campaigns", {
         tenantId: creator.tenantId,
         creatorId: creator.id,
+        programId: selectedProgramId || undefined, // Include programId if selected
         name: "Social Engagement",
         description: "Earn points for social actions",
         campaignType: "direct",
@@ -903,6 +911,27 @@ export default function CampaignBuilder() {
               <CardTitle className="text-white">Quick Social Campaign</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Program Selector */}
+              <div>
+                <Label className="text-white mb-2 block">Select Program (Optional)</Label>
+                <Select value={selectedProgramId} onValueChange={(value) => setSelectedProgramId(value === "unassigned" ? "" : value)}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select a program (or leave unassigned)" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-white/10">
+                    <SelectItem value="unassigned" className="text-white hover:bg-white/10">No Program (Unassigned)</SelectItem>
+                    {programs.map((program: any) => (
+                      <SelectItem key={program.id} value={program.id} className="text-white hover:bg-white/10">
+                        {program.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Associate this campaign with a specific loyalty program
+                </p>
+              </div>
+
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <Button variant={followX ? 'default' : 'outline'} onClick={() => setFollowX(v => !v)} className={followX ? 'bg-brand-primary' : 'border-white/20 text-white'}>
                   Follow on X

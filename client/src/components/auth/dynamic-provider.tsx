@@ -1,12 +1,6 @@
 import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
-import { AlgorandWalletConnectors } from "@dynamic-labs/algorand";
-import { BitcoinWalletConnectors } from "@dynamic-labs/bitcoin";
-import { CosmosWalletConnectors } from "@dynamic-labs/cosmos";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-import { FlowWalletConnectors } from "@dynamic-labs/flow";
 import { SolanaWalletConnectors } from "@dynamic-labs/solana";
-import { StarknetWalletConnectors } from "@dynamic-labs/starknet";
-import { SuiWalletConnectors } from "@dynamic-labs/sui";
 const dynamicEnvironmentId = import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID || "";
 import { ReactNode } from "react";
 
@@ -33,14 +27,8 @@ export default function DynamicProvider({ children }: DynamicProviderProps) {
       settings={{
         environmentId: dynamicEnvironmentId,
         walletConnectors: [
-          AlgorandWalletConnectors,
-          BitcoinWalletConnectors,
-          CosmosWalletConnectors,
           EthereumWalletConnectors,
-          FlowWalletConnectors,
           SolanaWalletConnectors,
-          StarknetWalletConnectors,
-          SuiWalletConnectors,
         ],
         // Dynamic SDK owns authentication. We only mirror the userId for our API headers.
         events: {

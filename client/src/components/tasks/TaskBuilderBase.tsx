@@ -192,10 +192,10 @@ export default function TaskBuilderBase({
           </div>
 
           {/* Right Column - Preview & Help */}
-          <div className="space-y-6">
+          <div className="lg:sticky lg:top-24 space-y-6 self-start">
             {/* Live Preview */}
             {previewComponent && (
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10 sticky top-24">
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white text-sm flex items-center gap-2">
                     <Eye className="h-4 w-4" />

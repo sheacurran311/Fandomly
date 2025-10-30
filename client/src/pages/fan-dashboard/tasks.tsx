@@ -6,19 +6,49 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FanTaskCard } from '@/components/tasks/FanTaskCard';
+import { PlatformTaskCard } from '@/components/tasks/PlatformTaskCard';
 import { useUserTaskCompletions } from '@/hooks/useTaskCompletion';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/use-auth';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import type { Task, TaskCompletion } from '@shared/schema';
+import { TimeframeSelector, type Timeframe } from '@/components/charts/TimeframeSelector';
+import { LineChartCard } from '@/components/charts/LineChartCard';
+import { PieChartCard } from '@/components/charts/PieChartCard';
+import { BarChartCard } from '@/components/charts/BarChartCard';
 
 export default function FanTasksPage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [timeframe, setTimeframe] = useState<Timeframe>('weekly');
 
-  // Fetch all published tasks (you'll need to add this endpoint)
+  // Fetch platform tasks (Fandomly-issued)
+  const { data: platformTasksData, isLoading: isLoadingPlatformTasks } = useQuery({
+    queryKey: ['/api/platform-tasks'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/platform-tasks');
+      return response.json();
+    },
+    enabled: !!user,
+  });
+  const platformTasks = platformTasksData?.tasks || [];
+
+  // Fetch platform points balance
+  const { data: platformPointsData } = useQuery({
+    queryKey: ['/api/platform-points/balance'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/platform-points/balance');
+      return response.json();
+    },
+    enabled: !!user,
+  });
+  const platformPoints = platformPointsData?.balance || 0;
+
+  // Fetch all published creator tasks
   const { data: tasksData, isLoading: isLoadingTasks } = useTasks();
   const tasks = tasksData?.tasks || [];
 
@@ -68,6 +98,32 @@ export default function FanTasksPage() {
     inProgress: completions.filter(c => c.status === 'in_progress').length,
     totalPoints: completions.reduce((sum, c) => sum + (c.pointsEarned || 0), 0),
   };
+
+  // Fetch task completion stats for charts
+  const { data: taskStats } = useQuery({
+    queryKey: ['/api/fan/dashboard/task-completion-stats', timeframe],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/fan/dashboard/task-completion-stats?timeframe=${timeframe}`);
+      return response.json();
+    },
+    enabled: !!user,
+  });
+
+  // Calculate task type breakdown
+  const taskTypeBreakdown = tasks.reduce((acc: any, task: Task) => {
+    const type = task.type || 'other';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  const taskTypeData = Object.entries(taskTypeBreakdown).map(([type, count]) => ({
+    name: type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    value: count as number,
+    color: type === 'social_follow' ? '#3b82f6' :
+           type === 'social_like' ? '#8b5cf6' :
+           type === 'engagement' ? '#10b981' :
+           type === 'content' ? '#f59e0b' : '#6b7280'
+  }));
 
   const isLoading = isLoadingTasks || isLoadingCompletions;
 
@@ -142,6 +198,150 @@ export default function FanTasksPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Task Activity & Insights */}
+      <div className="mb-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white">Task Analytics</h2>
+          <TimeframeSelector selected={timeframe} onChange={setTimeframe} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Task Completion Over Time */}
+          <LineChartCard
+            title="Task Completions"
+            description="Your task completion activity over time"
+            data={taskStats?.completions?.map((item: any) => ({
+              period: item.period,
+              completed: item.completed,
+              inProgress: item.in_progress || 0
+            })) || []}
+            dataKeys={[
+              { key: 'completed', color: '#10b981', name: 'Completed' },
+              { key: 'inProgress', color: '#3b82f6', name: 'In Progress' }
+            ]}
+            xAxisKey="period"
+            height={300}
+          />
+
+          {/* Task Types Breakdown */}
+          <PieChartCard
+            title="Task Types"
+            description="Breakdown of available tasks by type"
+            data={taskTypeData}
+            height={300}
+          />
+
+          {/* Task Completion Rate */}
+          <BarChartCard
+            title="Completion Rate"
+            description="Track your completion progress"
+            data={[
+              {
+                status: 'Completed',
+                count: stats.completed,
+                color: '#10b981'
+              },
+              {
+                status: 'In Progress',
+                count: stats.inProgress,
+                color: '#3b82f6'
+              },
+              {
+                status: 'Available',
+                count: stats.total - stats.completed - stats.inProgress,
+                color: '#6b7280'
+              }
+            ]}
+            dataKeys={[
+              { key: 'count', color: '#8b5cf6', name: 'Tasks' }
+            ]}
+            xAxisKey="status"
+            height={300}
+          />
+
+          {/* Platform vs Creator Tasks */}
+          <Card className="bg-white/5 border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Task Distribution</CardTitle>
+              <p className="text-sm text-gray-400">Platform vs Creator tasks</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <div>
+                    <p className="text-sm text-gray-400">Platform Tasks</p>
+                    <p className="text-2xl font-bold text-white">{platformTasks.length}</p>
+                    <p className="text-xs text-gray-500 mt-1">Earn Fandomly Points</p>
+                  </div>
+                  <Star className="h-8 w-8 text-purple-400" />
+                </div>
+                <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div>
+                    <p className="text-sm text-gray-400">Creator Tasks</p>
+                    <p className="text-2xl font-bold text-white">{tasks.length}</p>
+                    <p className="text-xs text-gray-500 mt-1">Earn Creator Points</p>
+                  </div>
+                  <Trophy className="h-8 w-8 text-blue-400" />
+                </div>
+                <div className="flex items-center justify-between p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                  <div>
+                    <p className="text-sm text-gray-400">Points Balance</p>
+                    <p className="text-2xl font-bold text-white">{platformPoints.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 mt-1">Platform Points</p>
+                  </div>
+                  <Star className="h-8 w-8 text-yellow-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Platform Tasks Section */}
+      {platformTasks.length > 0 && (
+        <Card className="bg-gradient-to-r from-brand-primary/10 to-brand-secondary/10 border-brand-primary/30 mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center">
+                  <Star className="mr-2 h-5 w-5 text-brand-primary" />
+                  Platform Tasks
+                </CardTitle>
+                <p className="text-xs text-gray-400 mt-1">
+                  Earn Fandomly Points - Redeemable for platform rewards, NFTs, and special offers
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  NOTE: Not redeemable for any creator-issued rewards
+                </p>
+              </div>
+              <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/40">
+                {platformPoints} Points
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPlatformTasks ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-400">Loading platform tasks...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {platformTasks.map((task: Task) => (
+                  <PlatformTaskCard key={task.id} task={task} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Creator Tasks Section */}
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold text-white mb-2">Creator Tasks</h2>
+        <p className="text-sm text-gray-400">Complete tasks from creators you follow to earn creator-specific rewards</p>
       </div>
 
       {/* Filters & Search */}

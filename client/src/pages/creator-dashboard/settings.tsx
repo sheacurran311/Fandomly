@@ -19,10 +19,12 @@ import {
   Key,
   Trash2,
   Save,
-  BadgeCheck
+  BadgeCheck,
+  Users
 } from "lucide-react";
 import { useCreatorVerification } from "@/hooks/useCreatorVerification";
 import { CreatorVerificationProgress } from "@/components/creator/CreatorVerificationProgress";
+import UserTypeSwitcher from "@/components/auth/user-type-switcher";
 
 export default function CreatorSettings() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -91,8 +93,12 @@ export default function CreatorSettings() {
           </div>
 
           <div className="max-w-4xl">
-            <Tabs defaultValue="notifications" className="space-y-6">
+            <Tabs defaultValue="account" className="space-y-6">
               <TabsList className="bg-white/10 border-white/20">
+                <TabsTrigger value="account" className="data-[state=active]:bg-brand-primary">
+                  <Users className="h-4 w-4 mr-2" />
+                  Account
+                </TabsTrigger>
                 <TabsTrigger value="notifications" className="data-[state=active]:bg-brand-primary">
                   <Bell className="h-4 w-4 mr-2" />
                   Notifications
@@ -110,6 +116,29 @@ export default function CreatorSettings() {
                   Billing
                 </TabsTrigger>
               </TabsList>
+              
+              {/* Account Tab with User Type Switcher */}
+              <TabsContent value="account" className="space-y-6">
+                <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white">Account Type</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h4 className="text-white font-medium mb-2">Switch Account Mode</h4>
+                      <p className="text-sm text-gray-400 mb-4">
+                        Toggle between Creator and Fan modes to access different features of the platform.
+                      </p>
+                      {user && (
+                        <UserTypeSwitcher 
+                          userId={user.id}
+                          currentUserType={user.userType as "fan" | "creator"}
+                        />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
               
 
               <TabsContent value="notifications" className="space-y-6">

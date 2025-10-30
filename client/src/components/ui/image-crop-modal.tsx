@@ -190,6 +190,7 @@ export function ImageCropModal({
 
         <DialogFooter className="flex gap-2">
           <Button
+            type="button"
             variant="outline"
             onClick={onCancel}
             disabled={isProcessing}
@@ -198,6 +199,7 @@ export function ImageCropModal({
             Cancel
           </Button>
           <Button
+            type="button"
             onClick={handleCropConfirm}
             disabled={isProcessing}
             className="bg-blue-600 hover:bg-blue-700 text-white"

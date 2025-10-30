@@ -48,8 +48,24 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
   const handleTiktokConnect = async () => {
     try {
       setTiktokConnecting(true);
-      const authUrl = socialManager.getAuthUrl('tiktok');
-      window.location.href = authUrl;
+      const tiktokAPI = socialManager['tiktok'];
+      const result = await tiktokAPI.secureLogin();
+      
+      if (result.success) {
+        setTiktokConnected(true);
+        toast({
+          title: "TikTok Connected! 🎉",
+          description: "Successfully connected to TikTok.",
+        });
+        // Refresh connection status
+        checkTiktokStatus();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Failed to connect TikTok. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } catch (error: any) {
       console.error('TikTok connection error:', error);
       toast({
@@ -57,6 +73,7 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
         description: error.message || 'Failed to connect TikTok. Please try again.',
         variant: 'destructive',
       });
+    } finally {
       setTiktokConnecting(false);
     }
   };

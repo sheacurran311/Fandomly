@@ -31,7 +31,7 @@ export function useInstagramConnection() {
 }
 
 export function InstagramConnectionProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [state, setState] = useState<InstagramConnectionState>({
     isConnected: false,
     isConnecting: false,
@@ -43,9 +43,13 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
 
   // Initialize and check connection status (similar to Facebook pattern)
   useEffect(() => {
+    // Wait for user data to load before checking user type
+    if (isLoading) {
+      return;
+    }
+
     // Only initialize Instagram for authenticated creator users
     if (!user || user.userType !== 'creator') {
-      console.log('[Instagram] Not a creator user - skipping Instagram initialization');
       return;
     }
 
@@ -107,7 +111,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     };
 
     loadSavedConnection();
-  }, [user]);
+  }, [user, isLoading]);
 
   const saveConnection = useCallback(async (data: {
     userInfo: InstagramUser;
@@ -236,33 +240,10 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
         isConnecting: false,
       }));
 
-      saveConnection(connectionData);
-      console.log('[Instagram] Connection data saved to localStorage');
-
-      // Save Instagram Business Account to database
-      try {
-        console.log('[Instagram] Saving to database...');
-        const response = await fetch('/api/creators/instagram-account', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            instagramUserId: result.user.id,
-            username: result.user.username,
-            accessToken: result.accessToken,
-            accountType: result.user.account_type || 'BUSINESS'
-          })
-        });
-        
-        if (response.ok) {
-          console.log('[Instagram] Successfully saved to database');
-        } else {
-          console.error('[Instagram] Database save failed:', response.status);
-        }
-      } catch (dbError) {
-        console.error('[Instagram] Error saving to database:', dbError);
-        // Don't fail the connection for DB errors
-      }
-
+      // Save to database using the social_connections table
+      await saveConnection(connectionData);
+      console.log('[Instagram] Connection saved to database');
+      
       console.log('[Instagram] loadUserDataFromResult COMPLETE');
       return true;
     } catch (error) {

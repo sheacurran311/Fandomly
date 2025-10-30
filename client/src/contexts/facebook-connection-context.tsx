@@ -30,7 +30,7 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
   });
   
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const reinitForCreator = useCallback(async () => {
     try {
@@ -44,9 +44,13 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
   }, []);
 
   useEffect(() => {
+    // Wait for user data to load before checking user type
+    if (isLoading) {
+      return;
+    }
+
     // Only initialize Facebook for authenticated creator users
     if (!user || user.userType !== 'creator') {
-      console.log('[Creator FB] Not a creator user - skipping Facebook initialization');
       return;
     }
 
@@ -72,7 +76,7 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
     (window as any).handleCreatorFacebookLoginStatus = statusChangeCallback;
 
     console.log('[Creator FB] Creator user detected - Facebook provider ready');
-  }, [user]);
+  }, [user, isLoading]);
 
   const checkConnectionStatus = useCallback(async () => {
     try {

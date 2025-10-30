@@ -23,7 +23,13 @@ import {
   CheckCircle,
   Twitter,
   Repeat2,
+  Play,
+  Bell,
+  ThumbsUp,
+  Disc,
+  ListMusic,
 } from "lucide-react";
+import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube } from "react-icons/si";
 
 export type TaskTemplateType = 
   | 'complete_profile'
@@ -33,6 +39,16 @@ export type TaskTemplateType =
   | 'twitter_follow'
   | 'twitter_like'
   | 'twitter_retweet'
+  | 'facebook_follow'
+  | 'facebook_like'
+  | 'instagram_follow'
+  | 'instagram_like'
+  | 'youtube_subscribe'
+  | 'youtube_like'
+  | 'tiktok_follow'
+  | 'tiktok_like'
+  | 'spotify_follow'
+  | 'spotify_playlist'
   | 'social_follow'
   | 'social_like'
   | 'social_share'
@@ -54,27 +70,8 @@ interface TaskTemplate {
 }
 
 const TASK_TEMPLATES: TaskTemplate[] = [
-  {
-    id: 'complete_profile',
-    name: 'Complete Profile',
-    description: 'Reward fans for completing their profile with required fields',
-    icon: CheckCircle,
-    category: 'onboarding',
-    difficulty: 'easy',
-    status: 'ready',
-    popularityScore: 95,
-    estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Collect valuable fan data',
-      'Improve fan engagement',
-      'One-time reward structure',
-    ],
-    useCases: [
-      'Welcome new fans',
-      'Build fan database',
-      'Increase profile completeness',
-    ],
-  },
+  // Note: Complete Profile task is now a platform-only task managed by admins
+  // It has been moved to the admin platform tasks for better control and consistency
   {
     id: 'referral',
     name: 'Referral System',
@@ -201,6 +198,227 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Amplify content reach',
     ],
   },
+
+  // Facebook Templates
+  {
+    id: 'facebook_follow',
+    name: 'Follow on Facebook',
+    description: 'Reward fans for following your Facebook page',
+    icon: SiFacebook,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 90,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Grow Facebook following',
+      'Increase page engagement',
+      'Build fan community',
+    ],
+    useCases: [
+      'Build Facebook presence',
+      'Cross-platform growth',
+      'Fan engagement',
+    ],
+  },
+  {
+    id: 'facebook_like',
+    name: 'Like Facebook Post',
+    description: 'Reward fans for liking a specific Facebook post',
+    icon: ThumbsUp,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 88,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Boost post engagement',
+      'Increase visibility',
+      'Algorithm benefits',
+    ],
+    useCases: [
+      'Promote important posts',
+      'Increase engagement',
+      'Launch announcements',
+    ],
+  },
+
+  // Instagram Templates
+  {
+    id: 'instagram_follow',
+    name: 'Follow on Instagram',
+    description: 'Reward fans for following your Instagram account',
+    icon: SiInstagram,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 95,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Grow Instagram audience',
+      'Increase profile visibility',
+      'Build visual community',
+    ],
+    useCases: [
+      'Build Instagram presence',
+      'Visual storytelling',
+      'Fan engagement',
+    ],
+  },
+  {
+    id: 'instagram_like',
+    name: 'Like Instagram Post',
+    description: 'Reward fans for liking a specific Instagram post',
+    icon: Heart,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 92,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Boost post engagement',
+      'Increase discoverability',
+      'Algorithm optimization',
+    ],
+    useCases: [
+      'Promote key content',
+      'Feature highlights',
+      'Campaign launches',
+    ],
+  },
+
+  // YouTube Templates
+  {
+    id: 'youtube_subscribe',
+    name: 'Subscribe on YouTube',
+    description: 'Reward fans for subscribing to your YouTube channel',
+    icon: SiYoutube,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 93,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Grow subscriber base',
+      'Increase video reach',
+      'Build loyal audience',
+    ],
+    useCases: [
+      'Channel growth',
+      'Video marketing',
+      'Content creator expansion',
+    ],
+  },
+  {
+    id: 'youtube_like',
+    name: 'Like YouTube Video',
+    description: 'Reward fans for liking a specific YouTube video',
+    icon: ThumbsUp,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 89,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Boost video engagement',
+      'YouTube algorithm boost',
+      'Increase visibility',
+    ],
+    useCases: [
+      'Promote new videos',
+      'Launch campaigns',
+      'Viral content',
+    ],
+  },
+
+  // TikTok Templates
+  {
+    id: 'tiktok_follow',
+    name: 'Follow on TikTok',
+    description: 'Reward fans for following your TikTok account',
+    icon: SiTiktok,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 91,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Grow TikTok presence',
+      'Increase video reach',
+      'Build Gen-Z audience',
+    ],
+    useCases: [
+      'TikTok growth',
+      'Viral content creation',
+      'Youth engagement',
+    ],
+  },
+  {
+    id: 'tiktok_like',
+    name: 'Like TikTok Video',
+    description: 'Reward fans for liking a specific TikTok video',
+    icon: Heart,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 88,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Boost video engagement',
+      'FYP algorithm boost',
+      'Viral potential',
+    ],
+    useCases: [
+      'Promote videos',
+      'Trending content',
+      'Campaign launches',
+    ],
+  },
+
+  // Spotify Templates
+  {
+    id: 'spotify_follow',
+    name: 'Follow on Spotify',
+    description: 'Reward fans for following your Spotify artist profile',
+    icon: SiSpotify,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 87,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Grow Spotify following',
+      'Increase music discovery',
+      'Build music fanbase',
+    ],
+    useCases: [
+      'Music promotion',
+      'Artist growth',
+      'Release campaigns',
+    ],
+  },
+  {
+    id: 'spotify_playlist',
+    name: 'Follow Spotify Playlist',
+    description: 'Reward fans for following a specific Spotify playlist',
+    icon: ListMusic,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 85,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Playlist growth',
+      'Music curation',
+      'Fan engagement',
+    ],
+    useCases: [
+      'Promote playlists',
+      'Music discovery',
+      'Curated collections',
+    ],
+  },
+
   {
     id: 'social_follow',
     name: 'Follow Account',
@@ -337,6 +555,31 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
     return colors[category as keyof typeof colors] || colors.custom;
   };
 
+  const getPlatformIconBg = (templateId: TaskTemplateType) => {
+    const bgColors: Record<string, string> = {
+      // Twitter
+      twitter_follow: 'bg-black',
+      twitter_like: 'bg-black',
+      twitter_retweet: 'bg-black',
+      // Facebook
+      facebook_follow: 'bg-blue-600',
+      facebook_like: 'bg-blue-600',
+      // Instagram
+      instagram_follow: 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500',
+      instagram_like: 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500',
+      // YouTube
+      youtube_subscribe: 'bg-red-600',
+      youtube_like: 'bg-red-600',
+      // TikTok
+      tiktok_follow: 'bg-black',
+      tiktok_like: 'bg-black',
+      // Spotify
+      spotify_follow: 'bg-green-500',
+      spotify_playlist: 'bg-green-500',
+    };
+    return bgColors[templateId] || '';
+  };
+
   const getDifficultyColor = (difficulty: string) => {
     const colors = {
       easy: 'text-green-400',
@@ -404,6 +647,8 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {readyTemplates.map((template) => {
                 const Icon = template.icon;
+                const platformBg = getPlatformIconBg(template.id);
+                const iconBgClass = platformBg || getCategoryColor(template.category);
                 return (
                   <Card
                     key={template.id}
@@ -412,8 +657,8 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between mb-3">
-                        <div className={`w-12 h-12 rounded-lg ${getCategoryColor(template.category)} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                          <Icon className="h-6 w-6" />
+                        <div className={`w-12 h-12 rounded-lg ${iconBgClass} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <Icon className="h-6 w-6 text-white" />
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <Badge variant="outline" className={getCategoryColor(template.category)} size="sm">

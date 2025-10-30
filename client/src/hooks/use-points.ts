@@ -198,3 +198,35 @@ export const useRedeemReward = () => {
     },
   });
 };
+
+// ===========================
+// Platform Points Hooks
+// ===========================
+
+export const usePlatformPointsBalance = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['platform-points-balance', user?.id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/platform-points/balance');
+      return response.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 60000, // 1 minute
+  });
+};
+
+export const usePlatformPointsTransactions = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['platform-points-transactions', user?.id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/platform-points/transactions');
+      return response.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 60000, // 1 minute
+  });
+};

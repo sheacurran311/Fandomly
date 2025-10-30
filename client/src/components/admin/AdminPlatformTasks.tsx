@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Plus, 
   Settings, 
@@ -31,6 +32,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
+type AccountType = 'fan' | 'creator' | 'creator-athlete' | 'creator-musician' | 'creator-content-creator';
+
 interface PlatformTask {
   id: string;
   name: string;
@@ -41,6 +44,7 @@ interface PlatformTask {
   isActive: boolean;
   requiredFields?: string[];
   socialPlatform?: string;
+  eligibleAccountTypes?: AccountType[];
   createdAt: string;
 }
 
@@ -52,6 +56,7 @@ interface PlatformTaskForm {
   points: number;
   requiredFields: string[];
   socialPlatform?: string;
+  eligibleAccountTypes: AccountType[];
 }
 
 const PLATFORM_TASK_TEMPLATES = [
@@ -149,6 +154,7 @@ export default function AdminPlatformTasks() {
     points: 50,
     requiredFields: [],
     socialPlatform: undefined,
+    eligibleAccountTypes: ['fan'],
   });
 
   // Fetch platform tasks
@@ -239,6 +245,7 @@ export default function AdminPlatformTasks() {
       points: 50,
       requiredFields: [],
       socialPlatform: undefined,
+      eligibleAccountTypes: ['fan'],
     });
   };
 
@@ -251,6 +258,7 @@ export default function AdminPlatformTasks() {
       points: template.points,
       requiredFields: template.requiredFields || [],
       socialPlatform: template.socialPlatform,
+      eligibleAccountTypes: ['fan'],
     });
   };
 
@@ -272,6 +280,7 @@ export default function AdminPlatformTasks() {
       points: task.points,
       requiredFields: task.requiredFields || [],
       socialPlatform: task.socialPlatform,
+      eligibleAccountTypes: task.eligibleAccountTypes || ['fan'],
     });
     setIsCreateModalOpen(true);
   };
@@ -430,6 +439,111 @@ export default function AdminPlatformTasks() {
                   </Select>
                 </div>
               )}
+
+              {/* Eligible Account Types */}
+              <div className="space-y-3">
+                <Label className="text-white">Eligible Account Types</Label>
+                <p className="text-xs text-gray-400 mb-2">Select which account types can see and complete this task</p>
+                <div className="space-y-2 p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="account-type-fan"
+                      checked={formData.eligibleAccountTypes.includes('fan')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData({ ...formData, eligibleAccountTypes: [...formData.eligibleAccountTypes, 'fan'] });
+                        } else {
+                          setFormData({ ...formData, eligibleAccountTypes: formData.eligibleAccountTypes.filter(t => t !== 'fan') });
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="account-type-fan"
+                      className="text-sm text-white font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Fans
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="account-type-creator"
+                      checked={formData.eligibleAccountTypes.includes('creator')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData({ ...formData, eligibleAccountTypes: [...formData.eligibleAccountTypes, 'creator'] });
+                        } else {
+                          setFormData({ ...formData, eligibleAccountTypes: formData.eligibleAccountTypes.filter(t => t !== 'creator') });
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="account-type-creator"
+                      className="text-sm text-white font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      All Creators
+                    </label>
+                  </div>
+                  <div className="ml-6 space-y-2 border-l-2 border-white/10 pl-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="account-type-athlete"
+                        checked={formData.eligibleAccountTypes.includes('creator-athlete')}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({ ...formData, eligibleAccountTypes: [...formData.eligibleAccountTypes, 'creator-athlete'] });
+                          } else {
+                            setFormData({ ...formData, eligibleAccountTypes: formData.eligibleAccountTypes.filter(t => t !== 'creator-athlete') });
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="account-type-athlete"
+                        className="text-sm text-gray-300 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Athletes Only
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="account-type-musician"
+                        checked={formData.eligibleAccountTypes.includes('creator-musician')}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({ ...formData, eligibleAccountTypes: [...formData.eligibleAccountTypes, 'creator-musician'] });
+                          } else {
+                            setFormData({ ...formData, eligibleAccountTypes: formData.eligibleAccountTypes.filter(t => t !== 'creator-musician') });
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="account-type-musician"
+                        className="text-sm text-gray-300 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Musicians Only
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="account-type-content-creator"
+                        checked={formData.eligibleAccountTypes.includes('creator-content-creator')}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({ ...formData, eligibleAccountTypes: [...formData.eligibleAccountTypes, 'creator-content-creator'] });
+                          } else {
+                            setFormData({ ...formData, eligibleAccountTypes: formData.eligibleAccountTypes.filter(t => t !== 'creator-content-creator') });
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="account-type-content-creator"
+                        className="text-sm text-gray-300 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Content Creators Only
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">

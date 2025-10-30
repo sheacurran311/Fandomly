@@ -25,6 +25,7 @@ import {
   Star,
   Edit,
   Camera,
+  Upload,
   Facebook,
   Instagram,
   CheckCircle,
@@ -39,12 +40,15 @@ import {
   X,
   Check
 } from "lucide-react";
-import { Twitter } from "lucide-react";
+import { Twitter, Youtube } from "lucide-react";
+import { FaSpotify } from "react-icons/fa";
 import { TwitterSDKManager } from "@/lib/twitter";
+import { socialManager } from "@/lib/social-integrations";
 import { useCreatorVerification } from "@/hooks/useCreatorVerification";
 import CreatorReferralDashboard from "@/components/referrals/CreatorReferralDashboard";
 import { CreatorVerificationProgress } from "@/components/creator/CreatorVerificationProgress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import NFTGallery from "@/components/nft/NFTGallery";
 
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -80,11 +84,32 @@ export default function Profile() {
     disconnectInstagram = async () => {}
   } = instagramConnection || {};
   
+  // TikTok connection state
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokHandle, setTiktokHandle] = useState<string | null>(null);
+  const [isCheckingTiktokStatus, setIsCheckingTiktokStatus] = useState(true);
+  
+  // YouTube connection state
+  const [youtubeConnecting, setYoutubeConnecting] = useState(false);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [youtubeChannelName, setYoutubeChannelName] = useState<string | null>(null);
+  const [isCheckingYoutubeStatus, setIsCheckingYoutubeStatus] = useState(true);
+  
+  // Spotify connection state
+  const [spotifyConnecting, setSpotifyConnecting] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
+  const [isCheckingSpotifyStatus, setIsCheckingSpotifyStatus] = useState(true);
+  
   // Check social connections status when user becomes available
   useEffect(() => {
     if (user?.dynamicUserId) {
       checkFacebookStatus();
       checkTwitterStatus();
+      checkTiktokStatus();
+      checkYoutubeStatus();
+      checkSpotifyStatus();
     }
   }, [user?.dynamicUserId]);
 
@@ -92,8 +117,8 @@ export default function Profile() {
     try {
       setIsCheckingTwitterStatus(true);
       
-      // Fetch existing social connections from backend
-      const response = await fetch('/api/social/accounts', {
+      // Check Twitter connection status using consistent endpoint
+      const response = await fetch('/api/social-connections/twitter', {
         headers: {
           'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
           'Content-Type': 'application/json'
@@ -102,22 +127,20 @@ export default function Profile() {
       });
       
       if (response.ok) {
-        const connections = await response.json();
-        console.log('[Profile] Existing connections:', connections);
+        const data = await response.json();
+        console.log('[Profile] Twitter connection data:', data);
         
-        // Check if Twitter connection exists
-        const twitterConnection = connections.find((conn: any) => conn.platform === 'twitter');
-        if (twitterConnection) {
-          console.log('[Profile] Found existing Twitter connection:', twitterConnection);
+        if (data.connected && data.connection) {
+          console.log('[Profile] Found existing Twitter connection');
           setTwitterConnected(true);
-          setTwitterHandle(twitterConnection.username || twitterConnection.displayName);
+          setTwitterHandle(data.connection.platformUsername || data.connection.platformDisplayName);
         } else {
           console.log('[Profile] No Twitter connection found');
           setTwitterConnected(false);
           setTwitterHandle(null);
         }
       } else {
-        console.warn('[Profile] Failed to fetch connections:', response.statusText);
+        console.warn('[Profile] Failed to fetch Twitter connection:', response.statusText);
         setTwitterConnected(false);
         setTwitterHandle(null);
       }
@@ -155,6 +178,93 @@ export default function Profile() {
       console.error('Error checking Facebook status:', error);
       setIsConnectedToFacebook(false);
       setFacebookUser(null);
+    }
+  };
+  
+  const checkTiktokStatus = async () => {
+    try {
+      setIsCheckingTiktokStatus(true);
+      const response = await fetch('/api/social-connections/tiktok', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTiktokConnected(data.connected);
+        if (data.connected && data.connectionData?.profile) {
+          setTiktokHandle(data.connectionData.profile.display_name || null);
+        }
+      } else {
+        setTiktokConnected(false);
+        setTiktokHandle(null);
+      }
+    } catch (error) {
+      console.error('[Profile] Error checking TikTok status:', error);
+      setTiktokConnected(false);
+      setTiktokHandle(null);
+    } finally {
+      setIsCheckingTiktokStatus(false);
+    }
+  };
+  
+  const checkYoutubeStatus = async () => {
+    try {
+      setIsCheckingYoutubeStatus(true);
+      const response = await fetch('/api/social-connections/youtube', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setYoutubeConnected(data.connected);
+        if (data.connected && data.connectionData?.profile) {
+          setYoutubeChannelName(data.connectionData.profile.title || null);
+        }
+      } else {
+        setYoutubeConnected(false);
+        setYoutubeChannelName(null);
+      }
+    } catch (error) {
+      console.error('[Profile] Error checking YouTube status:', error);
+      setYoutubeConnected(false);
+      setYoutubeChannelName(null);
+    } finally {
+      setIsCheckingYoutubeStatus(false);
+    }
+  };
+  
+  const checkSpotifyStatus = async () => {
+    try {
+      setIsCheckingSpotifyStatus(true);
+      const response = await fetch('/api/social-connections/spotify', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSpotifyConnected(data.connected);
+        if (data.connected && data.connectionData?.profile) {
+          setSpotifyDisplayName(data.connectionData.profile.display_name || null);
+        }
+      } else {
+        setSpotifyConnected(false);
+        setSpotifyDisplayName(null);
+      }
+    } catch (error) {
+      console.error('[Profile] Error checking Spotify status:', error);
+      setSpotifyConnected(false);
+      setSpotifyDisplayName(null);
+    } finally {
+      setIsCheckingSpotifyStatus(false);
     }
   };
   
@@ -329,6 +439,159 @@ export default function Profile() {
     }
   };
   
+  const connectTiktok = async () => {
+    try {
+      setTiktokConnecting(true);
+      await socialManager.getAPI('tiktok').secureLogin();
+      // Connection status will be updated via checkTiktokStatus after successful OAuth
+      await checkTiktokStatus();
+    } catch (error) {
+      console.error('[Profile] TikTok connect error:', error);
+      toast({
+        title: "TikTok Connect Failed",
+        description: "Failed to connect to TikTok. Please try again.",
+        variant: 'destructive',
+      });
+    } finally {
+      setTiktokConnecting(false);
+    }
+  };
+  
+  const disconnectTiktok = async () => {
+    try {
+      const response = await fetch('/api/social-connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ platform: 'tiktok' }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setTiktokConnected(false);
+        setTiktokHandle(null);
+        toast({
+          title: "TikTok Disconnected",
+          description: "Successfully disconnected from TikTok",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('TikTok disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from TikTok. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const connectYoutube = async () => {
+    try {
+      setYoutubeConnecting(true);
+      await socialManager.getAPI('youtube').secureLogin();
+      // Connection status will be updated via checkYoutubeStatus after successful OAuth
+      await checkYoutubeStatus();
+    } catch (error) {
+      console.error('[Profile] YouTube connect error:', error);
+      toast({
+        title: "YouTube Connect Failed",
+        description: "Failed to connect to YouTube. Please try again.",
+        variant: 'destructive',
+      });
+    } finally {
+      setYoutubeConnecting(false);
+    }
+  };
+  
+  const disconnectYoutube = async () => {
+    try {
+      const response = await fetch('/api/social-connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ platform: 'youtube' }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setYoutubeConnected(false);
+        setYoutubeChannelName(null);
+        toast({
+          title: "YouTube Disconnected",
+          description: "Successfully disconnected from YouTube",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('YouTube disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from YouTube. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const connectSpotify = async () => {
+    try {
+      setSpotifyConnecting(true);
+      await socialManager.getAPI('spotify').secureLogin();
+      // Connection status will be updated via checkSpotifyStatus after successful OAuth
+      await checkSpotifyStatus();
+    } catch (error) {
+      console.error('[Profile] Spotify connect error:', error);
+      toast({
+        title: "Spotify Connect Failed",
+        description: "Failed to connect to Spotify. Please try again.",
+        variant: 'destructive',
+      });
+    } finally {
+      setSpotifyConnecting(false);
+    }
+  };
+  
+  const disconnectSpotify = async () => {
+    try {
+      const response = await fetch('/api/social-connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ platform: 'spotify' }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setSpotifyConnected(false);
+        setSpotifyDisplayName(null);
+        toast({
+          title: "Spotify Disconnected",
+          description: "Successfully disconnected from Spotify",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Spotify disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from Spotify. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+  
   // Simplified: Facebook integration handled by dedicated components
 
   if (isLoading) {
@@ -377,6 +640,10 @@ export default function Profile() {
                   <User className="h-4 w-4 mr-2" />
                   Profile
                 </TabsTrigger>
+                <TabsTrigger value="nfts" className="data-[state=active]:bg-brand-primary">
+                  <BadgeCheck className="h-4 w-4 mr-2" />
+                  My NFTs
+                </TabsTrigger>
                 <TabsTrigger value="referrals" className="data-[state=active]:bg-brand-primary">
                   <Share2 className="h-4 w-4 mr-2" />
                   Referrals
@@ -393,12 +660,34 @@ export default function Profile() {
                   {/* Left Column - Profile Card + Basic & Creator Info */}
                   <div className="lg:col-span-2 space-y-6">
                     {/* Profile Overview Card */}
-                    <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                      <CardHeader className="text-center">
+                    <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
+                      {/* Banner Image */}
+                      <div className="relative h-32 bg-gradient-to-r from-brand-primary/30 to-brand-secondary/30">
+                        {user.profileData?.bannerImage && (
+                          <img 
+                            src={transformImageUrl(user.profileData.bannerImage)} 
+                            alt="Profile Banner"
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                        {/* Upload Banner Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm"
+                          onClick={() => setIsEditModalOpen(true)}
+                          title="Upload Banner"
+                        >
+                          <Upload className="h-4 w-4 mr-1" />
+                          Banner
+                        </Button>
+                      </div>
+                      
+                      <CardHeader className="text-center -mt-16">
                         <div className="relative mx-auto mb-4">
                           {/* Profile Photo */}
-                          <div className="relative">
-                            <Avatar className="w-32 h-32 mx-auto" data-testid="img-profile-photo">
+                          <div className="relative inline-block">
+                            <Avatar className="w-32 h-32 mx-auto border-4 border-gray-900" data-testid="img-profile-photo">
                               <AvatarImage 
                                 src={transformImageUrl(user.profileData?.avatar) || undefined} 
                                 alt={user.profileData?.name || user.username || "Creator"} 
@@ -408,10 +697,14 @@ export default function Profile() {
                               </AvatarFallback>
                             </Avatar>
                             
-                            {/* Camera Icon Overlay */}
-                            <div className="absolute bottom-2 right-2 bg-white/20 backdrop-blur-sm rounded-full p-2">
+                            {/* Camera Icon Overlay - Now Clickable */}
+                            <button
+                              onClick={() => setIsEditModalOpen(true)}
+                              className="absolute bottom-2 right-2 bg-brand-primary hover:bg-brand-primary/80 backdrop-blur-sm rounded-full p-2 cursor-pointer transition-colors"
+                              title="Upload Profile Photo"
+                            >
                               <Camera className="h-4 w-4 text-white" />
-                            </div>
+                            </button>
                           </div>
                           
                           <Button
@@ -978,6 +1271,159 @@ export default function Profile() {
                       )}
                     </div>
                   )}
+
+                  {/* TikTok integration - only show for creators */}
+                  {user?.userType === 'creator' && (
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Video className="h-5 w-5 text-purple-400" />
+                        <div>
+                          <div className="text-white font-medium">TikTok</div>
+                          <div className="text-xs text-gray-400">
+                            {tiktokConnected && tiktokHandle ? 
+                              `Connected as ${tiktokHandle}` : 
+                              "Connect your TikTok account"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      {tiktokConnected ? (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={() => window.open(`https://tiktok.com/@${tiktokHandle}`, '_blank')}
+                          >
+                            Profile
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={disconnectTiktok}
+                            data-testid="button-disconnect-tiktok"
+                          >
+                            <Unlink className="h-4 w-4 mr-1" />
+                            Disconnect
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          className="bg-black text-white hover:bg-black/80"
+                          size="sm" 
+                          onClick={connectTiktok}
+                          disabled={tiktokConnecting}
+                          data-testid="button-connect-tiktok"
+                        >
+                          {tiktokConnecting ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* YouTube integration - only show for creators */}
+                  {user?.userType === 'creator' && (
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Youtube className="h-5 w-5 text-red-500" />
+                        <div>
+                          <div className="text-white font-medium">YouTube</div>
+                          <div className="text-xs text-gray-400">
+                            {youtubeConnected && youtubeChannelName ? 
+                              `Connected as ${youtubeChannelName}` : 
+                              "Connect your YouTube channel"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      {youtubeConnected ? (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={() => window.open('https://youtube.com', '_blank')}
+                          >
+                            Profile
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={disconnectYoutube}
+                            data-testid="button-disconnect-youtube"
+                          >
+                            <Unlink className="h-4 w-4 mr-1" />
+                            Disconnect
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          className="bg-red-600 text-white hover:bg-red-700"
+                          size="sm" 
+                          onClick={connectYoutube}
+                          disabled={youtubeConnecting}
+                          data-testid="button-connect-youtube"
+                        >
+                          {youtubeConnecting ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Spotify integration - only show for creators */}
+                  {user?.userType === 'creator' && (
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FaSpotify className="h-5 w-5 text-green-500" />
+                        <div>
+                          <div className="text-white font-medium">Spotify</div>
+                          <div className="text-xs text-gray-400">
+                            {spotifyConnected && spotifyDisplayName ? 
+                              `Connected as ${spotifyDisplayName}` : 
+                              "Connect your Spotify account"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      {spotifyConnected ? (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={() => window.open('https://spotify.com', '_blank')}
+                          >
+                            Profile
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={disconnectSpotify}
+                            data-testid="button-disconnect-spotify"
+                          >
+                            <Unlink className="h-4 w-4 mr-1" />
+                            Disconnect
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          className="bg-green-600 text-white hover:bg-green-700"
+                          size="sm" 
+                          onClick={connectSpotify}
+                          disabled={spotifyConnecting}
+                          data-testid="button-connect-spotify"
+                        >
+                          {spotifyConnecting ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1004,6 +1450,21 @@ export default function Profile() {
                         )}
                   </div>
                 </div>
+              </TabsContent>
+
+              {/* NFT Gallery Tab */}
+              <TabsContent value="nfts" className="space-y-6">
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <BadgeCheck className="h-5 w-5 text-brand-primary" />
+                      My NFT Collection
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <NFTGallery userId={user?.id} showFilters={true} />
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* Referrals Tab */}

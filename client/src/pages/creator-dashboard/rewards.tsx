@@ -12,21 +12,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye, Video as VideoIcon, AlertCircle, Image, ExternalLink } from "lucide-react";
 import type { Reward } from "@shared/schema";
 import { insertRewardSchema } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
+import { VideoUpload } from "@/components/ui/video-upload";
+import { useNftCollections, useNftTemplates, type NftCollection, type NftTemplate } from "@/hooks/useCrossmint";
+import { Link } from "wouter";
 
 // Form schema extending insertRewardSchema with additional validation
 const rewardCreationFormSchema = insertRewardSchema.extend({
   name: z.string().min(1, "Reward name is required").max(100, "Name too long"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   pointsCost: z.number().min(1, "Points cost must be at least 1"),
-  rewardType: z.enum(["raffle", "physical", "custom", "nft"], {
+  rewardType: z.enum(["raffle", "physical", "custom", "nft", "video"], {
     required_error: "Please select a reward type"
   }),
   maxRedemptions: z.number().min(1).optional().nullable(),
@@ -38,18 +42,20 @@ type RewardFormData = z.infer<typeof rewardCreationFormSchema>;
 // Utility functions for reward type icons and colors
 const getRewardTypeIcon = (type: string) => {
   switch (type) {
-    case 'raffle': return <Ticket className="h-5 w-5" />;
-    case 'physical': return <Package className="h-5 w-5" />;
-    case 'custom': return <Star className="h-5 w-5" />;
-    case 'nft': return <Gift className="h-5 w-5" />;
-    default: return <Gift className="h-5 w-5" />;
+    case 'raffle': return Ticket;
+    case 'physical': return Package;
+    case 'video': return VideoIcon;
+    case 'custom': return Star;
+    case 'nft': return Gift;
+    default: return Gift;
   }
-};
+}
 
 const getRewardTypeBadgeColor = (type: string) => {
   switch (type) {
     case 'raffle': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-    case 'physical': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';  
+    case 'physical': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    case 'video': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
     case 'custom': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     case 'nft': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
     default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
@@ -252,9 +258,27 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
             </div>
             <div>
               <CardTitle className="text-white text-lg">{reward.name}</CardTitle>
-              <Badge className={`text-xs mt-1 ${getRewardTypeBadgeColor(reward.rewardType)}`}>
-                {reward.rewardType.charAt(0).toUpperCase() + reward.rewardType.slice(1)}
-              </Badge>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className={`text-xs ${getRewardTypeBadgeColor(reward.rewardType)}`}>
+                  {reward.rewardType.charAt(0).toUpperCase() + reward.rewardType.slice(1)}
+                </Badge>
+                {reward.rewardType === 'physical' && reward.rewardData?.physicalData?.approvalStatus && (
+                  <Badge 
+                    variant="outline"
+                    className={
+                      reward.rewardData.physicalData.approvalStatus === 'approved'
+                        ? 'border-green-500/30 text-green-400'
+                        : reward.rewardData.physicalData.approvalStatus === 'rejected'
+                        ? 'border-red-500/30 text-red-400'
+                        : 'border-yellow-500/30 text-yellow-400'
+                    }
+                  >
+                    {reward.rewardData.physicalData.approvalStatus === 'approved' && '✓ Approved'}
+                    {reward.rewardData.physicalData.approvalStatus === 'rejected' && '✗ Rejected'}
+                    {reward.rewardData.physicalData.approvalStatus === 'pending' && '⏳ Pending Review'}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center space-x-1">
@@ -301,14 +325,39 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
           )}
           
           {reward.rewardType === 'physical' && reward.rewardData?.physicalData && (
-            <div className="text-xs text-blue-400 bg-blue-500/10 p-2 rounded">
-              {reward.rewardData.physicalData.shippingRequired ? '📦 Ships worldwide' : '📍 Local pickup'}
+            <div className="space-y-2">
+              <div className="text-xs text-blue-400 bg-blue-500/10 p-2 rounded">
+                {reward.rewardData.physicalData.shippingRequired ? '📦 Ships worldwide' : '📍 Local pickup'} • 
+                Condition: {reward.rewardData.physicalData.condition}
+              </div>
+              {reward.rewardData.physicalData.approvalStatus === 'pending' && (
+                <div className="text-xs text-yellow-400 bg-yellow-500/10 p-2 rounded">
+                  ⏳ Awaiting admin approval - item must be sent to P.O. Box for inspection
+                </div>
+              )}
+              {reward.rewardData.physicalData.approvalStatus === 'rejected' && reward.rewardData.physicalData.adminNotes && (
+                <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded">
+                  ✗ Rejected: {reward.rewardData.physicalData.adminNotes}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {reward.rewardType === 'video' && reward.rewardData?.videoData && (
+            <div className="text-xs text-pink-400 bg-pink-500/10 p-2 rounded">
+              🎥 {reward.rewardData.videoData.maxVideoDuration}s max • {reward.rewardData.videoData.turnaroundDays} day turnaround
             </div>
           )}
           
           {reward.rewardType === 'custom' && reward.rewardData?.customData && (
             <div className="text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded">
               {reward.rewardData.customData.serviceName} via {reward.rewardData.customData.deliveryMethod}
+            </div>
+          )}
+          
+          {reward.rewardType === 'nft' && reward.rewardData?.nftData && (
+            <div className="text-xs text-yellow-400 bg-yellow-500/10 p-2 rounded">
+              🎨 Digital NFT • Auto-mint on redemption
             </div>
           )}
         </div>
@@ -319,6 +368,18 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
 
 // Reward Creation Form Component with react-hook-form + zodResolver
 function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void; onCancel: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
+  
+  // Fetch NFT collections for the creator
+  const { data: collectionsData, isLoading: collectionsLoading } = useNftCollections();
+  const nftCollections = collectionsData?.collections || [];
+  
+  // Fetch templates for selected collection
+  const { data: templatesData, isLoading: templatesLoading } = useNftTemplates(selectedCollectionId);
+  const nftTemplates = templatesData?.templates || [];
+  
   const form = useForm<RewardFormData>({
     resolver: zodResolver(rewardCreationFormSchema),
     defaultValues: {
@@ -339,13 +400,30 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           itemName: '',
           itemDescription: '',
           shippingRequired: true,
-          stockQuantity: 0
+          stockQuantity: 0,
+          condition: 'new',
+          quantity: 1,
+          photos: [],
+          approvalStatus: 'pending'
         },
         customData: {
           serviceName: '',
           serviceDescription: '',
           deliveryMethod: 'email',
           requiresPersonalization: false
+        },
+        videoData: {
+          maxVideoDuration: 60,
+          deliveryInstructions: '',
+          turnaroundDays: 7,
+          requiresPersonalization: true,
+          personalizationInstructions: '',
+          sampleVideoUrl: ''
+        },
+        nftData: {
+          collectionId: '',
+          templateId: '',
+          autoMintOnRedeem: true
         }
       }
     }
@@ -360,11 +438,17 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
       // Ensure proper type-specific data structure
       rewardData: watchedRewardType === 'raffle' ? { raffleData: data.rewardData?.raffleData } :
                   watchedRewardType === 'physical' ? { physicalData: data.rewardData?.physicalData } :
+                  watchedRewardType === 'video' ? { videoData: data.rewardData?.videoData } :
                   watchedRewardType === 'custom' ? { customData: data.rewardData?.customData } :
+                  watchedRewardType === 'nft' ? { nftData: data.rewardData?.nftData } :
                   {}
     };
     onSubmit(processedData);
   };
+  
+  // Watch selected NFT template for preview
+  const selectedTemplateId = form.watch('rewardData.nftData.templateId');
+  const selectedTemplate = nftTemplates.find((t: NftTemplate) => t.id === selectedTemplateId);
 
   return (
     <Form {...form}>
@@ -425,6 +509,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                       <SelectContent>
                         <SelectItem value="raffle">Raffle Entry</SelectItem>
                         <SelectItem value="physical">Physical Item</SelectItem>
+                        <SelectItem value="video">Custom Video (Cameo)</SelectItem>
                         <SelectItem value="custom">Custom Service</SelectItem>
                         <SelectItem value="nft">Digital NFT</SelectItem>
                       </SelectContent>
@@ -530,16 +615,25 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
         {watchedRewardType === 'physical' && (
           <div className="space-y-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg" data-testid="section-physical-config">
             <h3 className="text-white font-medium">Physical Item Configuration</h3>
+            
+            {/* Important Notice about Approval Process */}
+            <Alert className="bg-yellow-500/10 border-yellow-500/20">
+              <AlertCircle className="h-4 w-4 text-yellow-400" />
+              <AlertDescription className="text-yellow-400 text-sm">
+                <strong>Approval Process:</strong> Physical items require admin approval. You must send the item to our P.O. Box for inspection before it can be offered as a reward.
+              </AlertDescription>
+            </Alert>
+            
             <FormField
               control={form.control}
               name="rewardData.physicalData.itemName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Item Name</FormLabel>
+                  <FormLabel className="text-white">Item Name *</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="e.g., T-Shirt, Signed Poster, Merchandise"
+                      placeholder="e.g., Autographed Photo, Game-Used Jersey, Ski Gloves"
                       className="mt-2 bg-white/10 border-white/20 text-white"
                       data-testid="input-physical-item"
                     />
@@ -548,28 +642,219 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 </FormItem>
               )}
             />
+            
             <FormField
               control={form.control}
-              name="rewardData.physicalData.stockQuantity"
+              name="rewardData.physicalData.itemDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Stock Quantity</FormLabel>
+                  <FormLabel className="text-white">Item Description *</FormLabel>
                   <FormControl>
-                    <Input
+                    <Textarea
                       {...field}
-                      type="number"
-                      min="0"
-                      placeholder="100"
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      placeholder="Provide detailed description of the item..."
                       className="mt-2 bg-white/10 border-white/20 text-white"
-                      data-testid="input-physical-stock"
+                      rows={3}
+                      data-testid="textarea-physical-description"
                     />
                   </FormControl>
                   <FormMessage className="text-red-400" />
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="rewardData.physicalData.condition"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Item Condition *</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Select condition" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="like-new">Like New</SelectItem>
+                          <SelectItem value="game-used">Game-Used</SelectItem>
+                          <SelectItem value="sponsor-item">Sponsor Item</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage className="text-red-400" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="rewardData.physicalData.quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Quantity Available *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                        className="mt-2 bg-white/10 border-white/20 text-white"
+                        data-testid="input-physical-quantity"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-400" />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* P.O. Box Information */}
+            <div className="p-4 bg-brand-dark-bg rounded-lg border border-white/10 space-y-2">
+              <h4 className="text-white font-semibold text-sm">Shipping Instructions</h4>
+              <p className="text-gray-300 text-sm">
+                After creating this listing, please send the physical item to:
+              </p>
+              <div className="p-3 bg-white/5 rounded border border-brand-primary/30 font-mono text-sm text-brand-primary">
+                Fandomly Physical Rewards<br />
+                P.O. Box [TO BE ASSIGNED]<br />
+                [City, State ZIP]
+              </div>
+              <p className="text-xs text-gray-400">
+                Your item will be inspected by our team and approved within 3-5 business days.
+              </p>
+            </div>
+
+            {/* Note: Photo upload would go here, using ImageUpload component */}
+            <div className="space-y-2">
+              <Label className="text-white">Item Photos (coming soon)</Label>
+              <div className="p-8 border-2 border-dashed border-gray-600 rounded-lg text-center">
+                <p className="text-sm text-gray-400">
+                  Photo upload for physical items coming soon. For now, item will be reviewed when received at our P.O. Box.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {watchedRewardType === 'video' && (
+          <div className="space-y-4 p-4 bg-pink-500/10 border border-pink-500/20 rounded-lg" data-testid="section-video-config">
+            <h3 className="text-white font-medium flex items-center gap-2">
+              <VideoIcon className="h-5 w-5" />
+              Custom Video (Cameo) Configuration
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="rewardData.videoData.maxVideoDuration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Max Video Duration (seconds)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="15"
+                        max="300"
+                        placeholder="60"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 60)}
+                        className="mt-2 bg-white/10 border-white/20 text-white"
+                        data-testid="input-video-duration"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-400" />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="rewardData.videoData.turnaroundDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white">Turnaround Time (days)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="1"
+                        max="30"
+                        placeholder="7"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 7)}
+                        className="mt-2 bg-white/10 border-white/20 text-white"
+                        data-testid="input-video-turnaround"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-400" />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="rewardData.videoData.deliveryInstructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Delivery Instructions</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Explain how fans will receive their custom video..."
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      rows={3}
+                      data-testid="textarea-video-delivery"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="rewardData.videoData.personalizationInstructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Personalization Instructions</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="What information do you need from fans? (e.g., name, occasion, special message)"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                      rows={3}
+                      data-testid="textarea-video-personalization"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+
+            <div className="pt-4 border-t border-white/10">
+              <Label className="text-white mb-3 block">Sample Video (Optional)</Label>
+              <p className="text-xs text-gray-400 mb-3">
+                Upload a sample video to show fans what to expect. This helps set expectations for quality and style.
+              </p>
+              <VideoUpload
+                onUploadSuccess={(url) => {
+                  form.setValue('rewardData.videoData.sampleVideoUrl', url);
+                  toast({
+                    title: "Sample Video Uploaded",
+                    description: "Your sample video has been saved.",
+                  });
+                }}
+                currentVideoUrl={form.watch('rewardData.videoData.sampleVideoUrl')}
+                maxSizeMB={50}
+                label=""
+              />
+            </div>
           </div>
         )}
 
@@ -617,6 +902,143 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 </FormItem>
               )}
             />
+          </div>
+        )}
+
+        {watchedRewardType === 'nft' && (
+          <div className="space-y-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg" data-testid="section-nft-config">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-medium flex items-center gap-2">
+                <Image className="h-5 w-5" />
+                NFT Reward Configuration
+              </h3>
+              <Link href="/creator-dashboard/nft-collections">
+                <Button type="button" variant="outline" size="sm" className="text-xs">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Create Collection
+                </Button>
+              </Link>
+            </div>
+            
+            {collectionsLoading ? (
+              <div className="text-center py-4 text-gray-400">Loading collections...</div>
+            ) : nftCollections.length === 0 ? (
+              <Alert className="bg-blue-500/10 border-blue-500/20">
+                <AlertCircle className="h-4 w-4 text-blue-400" />
+                <AlertDescription className="text-blue-400 text-sm">
+                  You haven't created any NFT collections yet. <Link href="/creator-dashboard/nft-collections" className="underline font-semibold">Create your first collection</Link> to offer NFTs as rewards.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="rewardData.nftData.collectionId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Select NFT Collection</FormLabel>
+                      <FormControl>
+                        <Select 
+                          value={field.value} 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            setSelectedCollectionId(value);
+                            form.setValue('rewardData.nftData.templateId', ''); // Reset template selection
+                          }}
+                          data-testid="select-nft-collection"
+                        >
+                          <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                            <SelectValue placeholder="Choose a collection" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {nftCollections.map((collection: NftCollection) => (
+                              <SelectItem key={collection.id} value={collection.id}>
+                                {collection.name} ({collection.chain})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage className="text-red-400" />
+                    </FormItem>
+                  )}
+                />
+
+                {selectedCollectionId && (
+                  <FormField
+                    control={form.control}
+                    name="rewardData.nftData.templateId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Select NFT Template</FormLabel>
+                        <FormControl>
+                          {templatesLoading ? (
+                            <div className="text-center py-4 text-gray-400">Loading templates...</div>
+                          ) : nftTemplates.length === 0 ? (
+                            <Alert className="bg-blue-500/10 border-blue-500/20">
+                              <AlertCircle className="h-4 w-4 text-blue-400" />
+                              <AlertDescription className="text-blue-400 text-sm">
+                                This collection has no templates yet. <Link href="/creator-dashboard/nft-collections" className="underline font-semibold">Add templates</Link> to your collection first.
+                              </AlertDescription>
+                            </Alert>
+                          ) : (
+                            <Select value={field.value} onValueChange={field.onChange} data-testid="select-nft-template">
+                              <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                                <SelectValue placeholder="Choose a template" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {nftTemplates.map((template: NftTemplate) => (
+                                  <SelectItem key={template.id} value={template.id}>
+                                    {template.name} - {template.currentSupply}/{template.maxSupply || '∞'} minted
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </FormControl>
+                        <FormMessage className="text-red-400" />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {selectedTemplate && (
+                  <div className="mt-4 p-4 bg-brand-dark-bg rounded-lg border border-white/10">
+                    <h4 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      NFT Preview
+                    </h4>
+                    <div className="flex gap-4">
+                      {selectedTemplate.metadata?.image && (
+                        <img 
+                          src={selectedTemplate.metadata.image} 
+                          alt={selectedTemplate.name}
+                          className="w-24 h-24 rounded-lg object-cover border border-white/10"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{selectedTemplate.name}</p>
+                        <p className="text-gray-400 text-sm mt-1">{selectedTemplate.description}</p>
+                        <div className="flex gap-2 mt-2">
+                          <Badge className="text-xs bg-purple-500/20 text-purple-400">
+                            {selectedTemplate.category}
+                          </Badge>
+                          <Badge className="text-xs bg-blue-500/20 text-blue-400">
+                            {selectedTemplate.currentSupply}/{selectedTemplate.maxSupply || '∞'} minted
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-white/10">
+                  <p className="text-xs text-gray-400">
+                    When a fan redeems this reward, the NFT will be automatically minted and sent to their connected wallet.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         )}
 

@@ -240,10 +240,96 @@ export default function SocialMediaConnect({
               body: JSON.stringify({ platform: 'twitter', accountData: { user: userInfo, connectedAt: new Date().toISOString() } })
             });
           } catch {}
+          toast({
+            title: "X Connected! 🎉",
+            description: "Successfully connected to X (Twitter).",
+          });
         } else if (!result.success) {
           throw new Error(result.error || 'Twitter connect failed');
         }
+      } else if (platformId === 'tiktok') {
+        // Use popup flow for TikTok
+        const tiktokAPI = socialManager['tiktok'];
+        const result = await tiktokAPI.secureLogin();
+        if (result.success) {
+          toast({
+            title: "TikTok Connected! 🎉",
+            description: "Successfully connected to TikTok.",
+          });
+          // Reload accounts to get the new connection
+          const res = await fetch('/api/social/accounts', { credentials: 'include' });
+          const accounts = await res.json();
+          const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+            platform: a.platform,
+            username: a.username,
+            displayName: a.displayName,
+            followers: Number(a.followers || 0),
+            verified: Boolean(a.verified || false),
+            profileUrl: a.profileUrl || '#',
+            lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+            status: a.isActive === false ? 'expired' : 'connected'
+          }));
+          setConnectedAccounts(mapped);
+          onAccountsChange?.(mapped);
+        } else {
+          throw new Error(result.error || 'TikTok connect failed');
+        }
+      } else if (platformId === 'youtube') {
+        // Use popup flow for YouTube
+        const youtubeAPI = socialManager['youtube'];
+        const result = await youtubeAPI.secureLogin();
+        if (result.success) {
+          toast({
+            title: "YouTube Connected! 🎉",
+            description: result.channelName ? `Successfully connected ${result.channelName}` : "Successfully connected to YouTube.",
+          });
+          // Reload accounts to get the new connection
+          const res = await fetch('/api/social/accounts', { credentials: 'include' });
+          const accounts = await res.json();
+          const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+            platform: a.platform,
+            username: a.username,
+            displayName: a.displayName,
+            followers: Number(a.followers || 0),
+            verified: Boolean(a.verified || false),
+            profileUrl: a.profileUrl || '#',
+            lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+            status: a.isActive === false ? 'expired' : 'connected'
+          }));
+          setConnectedAccounts(mapped);
+          onAccountsChange?.(mapped);
+        } else {
+          throw new Error(result.error || 'YouTube connect failed');
+        }
+      } else if (platformId === 'spotify') {
+        // Use popup flow for Spotify
+        const spotifyAPI = socialManager['spotify'];
+        const result = await spotifyAPI.secureLogin();
+        if (result.success) {
+          toast({
+            title: "Spotify Connected! 🎉",
+            description: result.displayName ? `Successfully connected ${result.displayName}` : "Successfully connected to Spotify.",
+          });
+          // Reload accounts to get the new connection
+          const res = await fetch('/api/social/accounts', { credentials: 'include' });
+          const accounts = await res.json();
+          const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+            platform: a.platform,
+            username: a.username,
+            displayName: a.displayName,
+            followers: Number(a.followers || 0),
+            verified: Boolean(a.verified || false),
+            profileUrl: a.profileUrl || '#',
+            lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+            status: a.isActive === false ? 'expired' : 'connected'
+          }));
+          setConnectedAccounts(mapped);
+          onAccountsChange?.(mapped);
+        } else {
+          throw new Error(result.error || 'Spotify connect failed');
+        }
       } else {
+        // Fallback for other platforms (Instagram, etc.)
         const authUrl = socialManager.getAuthUrl(platformId);
         window.location.href = authUrl;
       }
@@ -251,9 +337,10 @@ export default function SocialMediaConnect({
       console.error('Connect platform error:', error);
       toast({
         title: "Connection Error",
-        description: `Failed to initiate ${platformId} connection. Please check your API keys.`,
+        description: error instanceof Error ? error.message : `Failed to initiate ${platformId} connection. Please check your API keys.`,
         variant: "destructive"
       });
+    } finally {
       setConnectingPlatform(null);
     }
   };

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Trophy, 
@@ -19,8 +20,14 @@ import {
   Filter,
   TrendingUp,
   Gift,
-  Zap
+  Zap,
+  Loader2,
+  CheckCircle,
+  Clock,
+  Lock
 } from "lucide-react";
+import { BarChartCard } from "@/components/charts/BarChartCard";
+import { format } from 'date-fns';
 
 export default function FanAchievements() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -100,171 +107,33 @@ export default function FanAchievements() {
   const levelProgress = userLevel ? 
     Math.min((userLevel.levelPoints / userLevel.nextLevelThreshold) * 100, 100) : 0;
 
-  // Remove mock achievements - now using real data from API
-  const mockAchievementsOld = [
-    {
-      id: "1",
-      tenantId: "tenant1",
-      name: "First Steps",
-      description: "Join your first loyalty program",
-      icon: "star",
-      category: "milestones",
-      type: "bronze",
-      pointsRequired: 0,
-      actionRequired: "program_join",
-      actionCount: 1,
-      rewardPoints: 100,
-      rewardType: "points",
-      rewardValue: null,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "2", 
-      tenantId: "tenant1",
-      name: "Social Butterfly",
-      description: "Follow 5 different creators on social media",
-      icon: "heart",
-      category: "social",
-      type: "silver",
-      pointsRequired: 0,
-      actionRequired: "social_follow",
-      actionCount: 5,
-      rewardPoints: 250,
-      rewardType: "points",
-      rewardValue: null,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "3",
-      tenantId: "tenant1", 
-      name: "Point Collector",
-      description: "Earn your first 1,000 points",
-      icon: "trophy",
-      category: "engagement",
-      type: "gold",
-      pointsRequired: 1000,
-      actionRequired: "points_earned",
-      actionCount: 1000,
-      rewardPoints: 500,
-      rewardType: "points",
-      rewardValue: null,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "4",
-      tenantId: "tenant1",
-      name: "Campaign Master",
-      description: "Complete 10 different campaigns",
-      icon: "target",
-      category: "engagement",
-      type: "platinum",
-      pointsRequired: 0,
-      actionRequired: "campaign_complete",
-      actionCount: 10,
-      rewardPoints: 1000,
-      rewardType: "points",
-      rewardValue: null,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: "5",
-      tenantId: "tenant1",
-      name: "Ultimate Fan",
-      description: "Reach Level 25 and unlock elite status",
-      icon: "crown",
-      category: "special",
-      type: "diamond",
-      pointsRequired: 0,
-      actionRequired: "level_reached",
-      actionCount: 25,
-      rewardPoints: 2500,
-      rewardType: "nft",
-      rewardValue: '{"nft_type": "exclusive_badge", "rarity": "legendary"}',
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
-  ];
-
-  const mockUserAchievements = [
-    {
-      id: "1",
-      userId: user.id || "user1",
-      achievementId: "1",
-      progress: 1,
-      completed: true,
-      completedAt: new Date(),
-      claimed: true,
-      claimedAt: new Date(),
-      createdAt: new Date(),
-    },
-    {
-      id: "2",
-      userId: user.id || "user1", 
-      achievementId: "2",
-      progress: 3,
-      completed: false,
-      completedAt: null,
-      claimed: false,
-      claimedAt: null,
-      createdAt: new Date(),
-    },
-    {
-      id: "3",
-      userId: user.id || "user1",
-      achievementId: "3", 
-      progress: 1420,
-      completed: true,
-      completedAt: new Date(),
-      claimed: false,
-      claimedAt: null,
-      createdAt: new Date(),
-    },
-    {
-      id: "4",
-      userId: user.id || "user1",
-      achievementId: "4",
-      progress: 7,
-      completed: false,
-      completedAt: null,
-      claimed: false,
-      claimedAt: null,
-      createdAt: new Date(),
-    },
-    {
-      id: "5",
-      userId: user.id || "user1",
-      achievementId: "5",
-      progress: 12,
-      completed: false,
-      completedAt: null,
-      claimed: false,
-      claimedAt: null,
-      createdAt: new Date(),
-    }
-  ];
-
-  const getAchievementWithProgress = (achievement: any) => {
-    const userAchievement = mockUserAchievements.find(ua => ua.achievementId === achievement.id);
-    return { achievement, userAchievement };
-  };
-
-  // Filter achievements by status using real data
-  const completedAchievements = achievements.filter(achievement => achievement.isUnlocked);
-  const inProgressAchievements = achievements.filter(achievement => 
+  // Filter achievements by status using real data from API
+  const completedAchievements = achievements.filter((achievement: any) => achievement.isUnlocked);
+  const inProgressAchievements = achievements.filter((achievement: any) => 
     !achievement.isUnlocked && (achievement.progress || 0) > 0
   );
-  const availableAchievements = achievements.filter(achievement => 
+  const availableAchievements = achievements.filter((achievement: any) => 
     !achievement.isUnlocked && (achievement.progress || 0) === 0
   );
+
+  // Calculate total points earned from completed achievements
+  const totalPointsEarned = completedAchievements.reduce((sum: number, achievement: any) => 
+    sum + (achievement.pointsAwarded || achievement.rewardPoints || 0), 0
+  );
+
+  // Calculate achievement categories from real data
+  const categoryCounts = achievements.reduce((acc: any, achievement: any) => {
+    const category = achievement.category || 'other';
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {});
+
+  const achievementCategories = [
+    { name: "Milestones", icon: Trophy, count: categoryCounts.milestones || 0, color: "text-yellow-400" },
+    { name: "Social", icon: Heart, count: categoryCounts.social || 0, color: "text-pink-400" },
+    { name: "Engagement", icon: Users, count: categoryCounts.engagement || 0, color: "text-blue-400" },
+    { name: "Special", icon: Crown, count: categoryCounts.special || 0, color: "text-purple-400" },
+  ];
 
   return (
     <DashboardLayout userType="fan">
@@ -333,11 +202,127 @@ export default function FanAchievements() {
                   <Gift className="h-6 w-6 text-purple-400" />
                 </div>
                 <div className="text-2xl font-bold text-white mb-1">
-                  {mockUserAchievements.reduce((sum, ua) => sum + (ua.completed ? mockAchievements.find(a => a.id === ua.achievementId)?.rewardPoints || 0 : 0), 0)}
+                  {totalPointsEarned.toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-400">Points Earned</div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Achievement Progress Visualizations */}
+          <div className="mb-8 space-y-6">
+            {/* Progress Timeline */}
+            <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <Clock className="mr-2 h-5 w-5" />
+                  Achievement Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {inProgressAchievements.length === 0 && completedAchievements.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Trophy className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-400">No progress to show yet</p>
+                      <p className="text-sm text-gray-500 mt-1">Start completing tasks to track your progress</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Recently Completed */}
+                      {completedAchievements.slice(0, 3).map((achievement: any, index: number) => (
+                        <div key={achievement.id} className="flex items-center gap-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                          <CheckCircle className="h-6 w-6 text-green-400 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{achievement.name}</p>
+                            <p className="text-sm text-gray-400">{achievement.description}</p>
+                          </div>
+                          <div className="text-right">
+                            <Badge className="bg-green-500/20 text-green-400">
+                              +{achievement.pointsAwarded || achievement.rewardPoints || 0} pts
+                            </Badge>
+                            {achievement.unlockedAt && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                {format(new Date(achievement.unlockedAt), 'MMM dd, yyyy')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* In Progress */}
+                      {inProgressAchievements.slice(0, 5).map((achievement: any) => {
+                        const progress = achievement.progress || 0;
+                        const progressPercent = achievement.maxProgress 
+                          ? (progress / achievement.maxProgress) * 100 
+                          : 0;
+                        
+                        return (
+                          <div key={achievement.id} className="flex items-center gap-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                            <Clock className="h-6 w-6 text-yellow-400 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-white font-medium">{achievement.name}</p>
+                              <div className="mt-2 space-y-1">
+                                <Progress value={progressPercent} className="h-2" />
+                                <p className="text-xs text-gray-400">
+                                  {achievement.maxProgress 
+                                    ? `${progress} / ${achievement.maxProgress}` 
+                                    : `${Math.round(progressPercent)}% complete`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className="bg-yellow-500/20 text-yellow-400">
+                                {Math.round(progressPercent)}%
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Available (Locked) */}
+                      {availableAchievements.slice(0, 2).map((achievement: any) => (
+                        <div key={achievement.id} className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-lg opacity-60">
+                          <Lock className="h-6 w-6 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{achievement.name}</p>
+                            <p className="text-sm text-gray-400">{achievement.description}</p>
+                          </div>
+                          <Badge className="bg-white/10 text-gray-300">
+                            Locked
+                          </Badge>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Category Progress Chart */}
+            <BarChartCard
+              title="Progress by Category"
+              description="Your achievement completion across categories"
+              data={achievementCategories.map(cat => ({
+                category: cat.name,
+                completed: completedAchievements.filter((a: any) => 
+                  (a.category || 'other').toLowerCase() === cat.name.toLowerCase()
+                ).length,
+                inProgress: inProgressAchievements.filter((a: any) => 
+                  (a.category || 'other').toLowerCase() === cat.name.toLowerCase()
+                ).length,
+                available: availableAchievements.filter((a: any) => 
+                  (a.category || 'other').toLowerCase() === cat.name.toLowerCase()
+                ).length
+              }))}
+              dataKeys={[
+                { key: 'completed', color: '#10b981', name: 'Completed' },
+                { key: 'inProgress', color: '#f59e0b', name: 'In Progress' },
+                { key: 'available', color: '#6b7280', name: 'Available' }
+              ]}
+              xAxisKey="category"
+              height={300}
+            />
           </div>
 
           {/* Search and Filters */}
@@ -377,96 +362,141 @@ export default function FanAchievements() {
             </TabsList>
 
             <TabsContent value="all" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {mockAchievements.map((achievement) => {
-                  const { userAchievement } = getAchievementWithProgress(achievement);
-                  return (
+              {achievementsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : achievements.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <Trophy className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">No Achievements Yet</h3>
+                    <p className="text-gray-400">Start completing tasks to unlock achievements!</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {achievements.map((achievement: any) => (
                     <AchievementBadge
                       key={achievement.id}
                       achievement={achievement}
-                      userAchievement={userAchievement}
+                      userAchievement={{
+                        progress: achievement.progress || 0,
+                        completed: achievement.isUnlocked || false,
+                        claimed: achievement.isClaimed || false,
+                      }}
                       onClaim={() => console.log("Claiming achievement:", achievement.id)}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="completed" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {completedAchievements.map((achievement) => {
-                  const { userAchievement } = getAchievementWithProgress(achievement);
-                  return (
+              {completedAchievements.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <Star className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">No Completed Achievements</h3>
+                    <p className="text-gray-400">Complete tasks to unlock your first achievement!</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {completedAchievements.map((achievement: any) => (
                     <AchievementBadge
                       key={achievement.id}
                       achievement={achievement}
-                      userAchievement={userAchievement}
+                      userAchievement={{
+                        progress: achievement.progress || 0,
+                        completed: true,
+                        claimed: achievement.isClaimed || false,
+                      }}
                       onClaim={() => console.log("Claiming achievement:", achievement.id)}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="progress" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {inProgressAchievements.map((achievement) => {
-                  const { userAchievement } = getAchievementWithProgress(achievement);
-                  return (
+              {inProgressAchievements.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <TrendingUp className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">No Achievements In Progress</h3>
+                    <p className="text-gray-400">Start working on achievements to see your progress here!</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {inProgressAchievements.map((achievement: any) => (
                     <AchievementBadge
                       key={achievement.id}
                       achievement={achievement}
-                      userAchievement={userAchievement}
+                      userAchievement={{
+                        progress: achievement.progress || 0,
+                        completed: false,
+                        claimed: false,
+                      }}
                       onClaim={() => console.log("Claiming achievement:", achievement.id)}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="available" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {availableAchievements.map((achievement) => {
-                  const { userAchievement } = getAchievementWithProgress(achievement);
-                  return (
+              {availableAchievements.length === 0 ? (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <Target className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">No Available Achievements</h3>
+                    <p className="text-gray-400">You've started all available achievements!</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {availableAchievements.map((achievement: any) => (
                     <AchievementBadge
                       key={achievement.id}
                       achievement={achievement}
-                      userAchievement={userAchievement}
+                      userAchievement={{
+                        progress: 0,
+                        completed: false,
+                        claimed: false,
+                      }}
                       showProgress={false}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 
           {/* Achievement Categories */}
-          <Card className="bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 border border-brand-primary/30 mt-8">
-            <CardContent className="p-6">
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold text-white mb-2">Achievement Categories</h3>
-                <p className="text-gray-300">Explore different types of achievements you can unlock</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { name: "Milestones", icon: Trophy, count: 5, color: "text-yellow-400" },
-                  { name: "Social", icon: Heart, count: 8, color: "text-pink-400" },
-                  { name: "Engagement", icon: Users, count: 12, color: "text-blue-400" },
-                  { name: "Special", icon: Crown, count: 3, color: "text-purple-400" },
-                ].map((category, index) => {
-                  const Icon = category.icon;
-                  return (
-                    <div key={index} className="text-center p-4 rounded-lg bg-white/10">
-                      <Icon className={`h-8 w-8 ${category.color} mx-auto mb-2`} />
-                      <h4 className="text-white font-medium">{category.name}</h4>
-                      <p className="text-sm text-gray-400">{category.count} achievements</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          {achievements.length > 0 && (
+            <Card className="bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 border border-brand-primary/30 mt-8">
+              <CardContent className="p-6">
+                <div className="text-center mb-6">
+                  <h3 className="text-xl font-bold text-white mb-2">Achievement Categories</h3>
+                  <p className="text-gray-300">Explore different types of achievements you can unlock</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {achievementCategories.filter(cat => cat.count > 0).map((category, index) => {
+                    const Icon = category.icon;
+                    return (
+                      <div key={index} className="text-center p-4 rounded-lg bg-white/10">
+                        <Icon className={`h-8 w-8 ${category.color} mx-auto mb-2`} />
+                        <h4 className="text-white font-medium">{category.name}</h4>
+                        <p className="text-sm text-gray-400">{category.count} achievement{category.count !== 1 ? 's' : ''}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
     </DashboardLayout>
   );

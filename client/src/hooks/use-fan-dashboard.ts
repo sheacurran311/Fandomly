@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './use-auth';
 
 interface FanStats {
+  platformPoints: number;
+  creatorPoints: number;
   totalPoints: number;
   followingCount: number;
   activeCampaignsCount: number;
@@ -10,7 +12,7 @@ interface FanStats {
     value: number;
     type: 'increase' | 'decrease';
     period: string;
-  };
+  } | null;
 }
 
 interface Campaign {
@@ -34,60 +36,32 @@ interface Recommendation {
 }
 
 // API functions
-const fetchFanStats = async (fanId: string): Promise<FanStats> => {
+const fetchFanStats = async (): Promise<FanStats> => {
   try {
-    // Get fan programs for this user
-    const fanProgramsResponse = await fetch(`/api/fan-programs/user/${fanId}`);
-    if (!fanProgramsResponse.ok) {
-      throw new Error('Failed to fetch fan programs');
+    const response = await fetch('/api/fan/dashboard/stats', {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch fan stats');
     }
-    const fanPrograms = await fanProgramsResponse.json();
-
-    // Calculate total points from all fan programs
-    let totalPoints = 0;
-    const activeCampaignsCount = fanPrograms.length;
-
-    // Get point transactions for each fan program
-    for (const program of fanPrograms) {
-      try {
-        const pointsResponse = await fetch(`/api/point-transactions/fan-program/${program.id}`);
-        if (pointsResponse.ok) {
-          const transactions = await pointsResponse.json();
-          const programPoints = transactions.reduce((sum: number, tx: any) => sum + tx.pointsAwarded, 0);
-          totalPoints += programPoints;
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch points for program ${program.id}:`, error);
-      }
-    }
-
-    // Get reward redemptions
-    const rewardsResponse = await fetch(`/api/reward-redemptions/user/${fanId}`);
-    let rewardsEarned = 0;
-    if (rewardsResponse.ok) {
-      const redemptions = await rewardsResponse.json();
-      rewardsEarned = redemptions.length;
-    }
-
-    return {
-      totalPoints,
-      followingCount: fanPrograms.length, // Number of creators they're following
-      activeCampaignsCount,
-      rewardsEarned,
-      pointsChange: {
-        value: 8.5,
-        type: 'increase',
-        period: 'this week'
-      }
-    };
+    
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Failed to fetch fan stats:', error);
     // Return fallback data if API fails
     return {
+      platformPoints: 0,
+      creatorPoints: 0,
       totalPoints: 0,
       followingCount: 0,
       activeCampaignsCount: 0,
-      rewardsEarned: 0
+      rewardsEarned: 0,
+      pointsChange: null,
     };
   }
 };
@@ -164,7 +138,7 @@ export const useFanStats = () => {
   
   return useQuery({
     queryKey: ['fanStats', user?.id],
-    queryFn: () => fetchFanStats(user?.id || ''),
+    queryFn: fetchFanStats,
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,

@@ -14,6 +14,7 @@ import {
   FileText,
   Shield,
   Zap,
+  Image,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -68,10 +69,16 @@ const navigationSections = [
     items: [
       {
         title: "Platform Tasks",
-        href: "/admin-dashboard/tasks",
+        href: "/admin-dashboard/platform-tasks",
         icon: Target,
         description: "Global tasks and rewards",
         badge: "Admin Only",
+      },
+      {
+        title: "NFT Management",
+        href: "/admin-dashboard/nft-management",
+        icon: Image,
+        description: "Badges and platform NFTs",
       },
       {
         title: "Referrals",

@@ -100,26 +100,90 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       }
     }
 
+    // Calculate real percentage changes by comparing with previous period
+    let fansChange = undefined;
+    let revenueChange = undefined;
+    let engagementChange = undefined;
+
+    try {
+      // Try to get historical stats from 30 days ago for fan count and revenue
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      // Get historical fan count (count fans who joined before 30 days ago)
+      let previousFans = 0;
+      for (const program of programs) {
+        try {
+          const fansResponse = await fetch(`/api/fan-programs/program/${program.id}`);
+          if (fansResponse.ok) {
+            const programFans = await fansResponse.json();
+            previousFans += programFans.filter((fan: any) => 
+              new Date(fan.joinedAt) < thirtyDaysAgo
+            ).length;
+          }
+        } catch (error) {
+          console.warn(`Failed to calculate historical fans for program ${program.id}:`, error);
+        }
+      }
+
+      if (previousFans > 0 && totalFans !== previousFans) {
+        const fansChangeValue = ((totalFans - previousFans) / previousFans) * 100;
+        fansChange = {
+          value: Math.abs(parseFloat(fansChangeValue.toFixed(1))),
+          type: fansChangeValue >= 0 ? 'increase' : 'decrease',
+          period: 'vs last month'
+        };
+      }
+
+      // Calculate engagement change by comparing last 7 days vs previous 7 days
+      let previousWeekEngagementRate = 0;
+      if (totalFans > 0) {
+        for (const program of programs) {
+          try {
+            const transactionsResponse = await fetch(`/api/point-transactions/program/${program.id}`);
+            if (transactionsResponse.ok) {
+              const transactions = await transactionsResponse.json();
+              const twoWeeksAgo = new Date();
+              twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+              const oneWeekAgo = new Date();
+              oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+              
+              const previousWeekTransactions = transactions.filter((tx: any) => {
+                const txDate = new Date(tx.timestamp);
+                return txDate > twoWeeksAgo && txDate <= oneWeekAgo;
+              });
+              previousWeekEngagementRate += (previousWeekTransactions.length / totalFans) * 100;
+            }
+          } catch (error) {
+            console.warn('Failed to calculate previous engagement:', error);
+          }
+        }
+        previousWeekEngagementRate = Math.min(previousWeekEngagementRate, 100);
+
+        if (previousWeekEngagementRate > 0 && engagementRate !== previousWeekEngagementRate) {
+          const engagementChangeValue = ((engagementRate - previousWeekEngagementRate) / previousWeekEngagementRate) * 100;
+          engagementChange = {
+            value: Math.abs(parseFloat(engagementChangeValue.toFixed(1))),
+            type: engagementChangeValue >= 0 ? 'increase' : 'decrease',
+            period: 'vs last week'
+          };
+        }
+      }
+
+      // Note: Revenue change would require subscription history tracking
+      // For now, this will be undefined until subscription history is implemented
+    } catch (error) {
+      console.warn('Failed to calculate percentage changes:', error);
+    }
+
     return {
       totalFans,
       monthlyRevenue,
       engagementRate: parseFloat(engagementRate.toFixed(1)),
       activeCampaigns: campaigns.length,
-      fansChange: {
-        value: 12.5,
-        type: 'increase',
-        period: 'this month'
-      },
-      revenueChange: {
-        value: 8.2,
-        type: 'increase',
-        period: 'vs last month'
-      },
-      engagementChange: {
-        value: 3.1,
-        type: 'increase',
-        period: 'this week'
-      }
+      fansChange,
+      revenueChange,
+      engagementChange
     };
   } catch (error) {
     console.error('Failed to fetch creator stats:', error);
