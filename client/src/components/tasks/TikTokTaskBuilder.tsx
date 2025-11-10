@@ -21,7 +21,7 @@ interface TikTokTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'tiktok_follow' | 'tiktok_like';
+  taskType: 'tiktok_follow' | 'tiktok_like' | 'tiktok_comment';
   initialData?: any;
   isEditMode?: boolean;
 }
@@ -34,6 +34,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
   const [points, setPoints] = useState(50);
   const [username, setUsername] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [requiredText, setRequiredText] = useState(''); // For comment tasks
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
@@ -55,6 +56,14 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
         if (response.ok) {
           const data = await response.json();
           setTiktokConnected(data.connected);
+          
+          // Auto-fill username for follow tasks
+          if (data.connected && data.connection && taskType === 'tiktok_follow' && !username) {
+            const tiktokUsername = data.connection.platformUsername || data.connection.platformDisplayName;
+            if (tiktokUsername) {
+              setUsername(tiktokUsername);
+            }
+          }
         } else {
           setTiktokConnected(false);
         }
@@ -69,13 +78,24 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
     if (user?.id) {
       checkTikTokConnection();
     }
-  }, [user?.id, user?.dynamicUserId]);
+  }, [user?.id, user?.dynamicUserId, taskType]);
 
   useEffect(() => {
     if (!isEditMode && !taskName) {
-      const defaults = taskType === 'tiktok_follow' 
-        ? { name: 'Follow on TikTok', description: 'Follow us on TikTok!', points: 50 }
-        : { name: 'Like Our TikTok Video', description: 'Like our TikTok video!', points: 25 };
+      let defaults;
+      switch (taskType) {
+        case 'tiktok_follow':
+          defaults = { name: 'Follow on TikTok', description: 'Follow us on TikTok!', points: 50 };
+          break;
+        case 'tiktok_like':
+          defaults = { name: 'Like Our TikTok Video', description: 'Like our TikTok video!', points: 25 };
+          break;
+        case 'tiktok_comment':
+          defaults = { name: 'Comment on TikTok Video', description: 'Leave a comment on our TikTok video!', points: 50 };
+          break;
+        default:
+          defaults = { name: '', description: '', points: 50 };
+      }
       setTaskName(defaults.name);
       setDescription(defaults.description);
       setPoints(defaults.points);
@@ -94,16 +114,27 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
     if (!description.trim()) errors.push('Description is required');
     if (points < 1 || points > 10000) errors.push('Points must be between 1 and 10,000');
     if (taskType === 'tiktok_follow' && !username.trim()) errors.push('TikTok username is required');
-    if (taskType === 'tiktok_like' && !videoUrl.trim()) errors.push('TikTok video URL is required');
+    if ((taskType === 'tiktok_like' || taskType === 'tiktok_comment') && !videoUrl.trim()) errors.push('TikTok video URL is required');
     setValidationErrors(errors);
     setIsValid(errors.length === 0);
-  }, [taskName, description, points, username, videoUrl, taskType, tiktokConnected]);
+  }, [taskName, description, points, username, videoUrl, requiredText, taskType, tiktokConnected]);
 
   const handlePublishClick = () => {
     if (validationErrors.length > 0) {
       toast({ title: "Validation Error", description: validationErrors[0], variant: "destructive" });
       return;
     }
+    
+    let settings: any;
+    if (taskType === 'tiktok_follow') {
+      settings = { username: username.replace('@', '') };
+    } else {
+      settings = { videoUrl };
+      if (taskType === 'tiktok_comment' && requiredText.trim()) {
+        settings.requiredText = requiredText;
+      }
+    }
+    
     const config = {
       name: taskName,
       description,
@@ -112,12 +143,22 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       points,
       isDraft: false,
       verificationMethod: useApiVerification ? 'api' : 'manual',
-      settings: taskType === 'tiktok_follow' ? { username: username.replace('@', '') } : { videoUrl },
+      settings,
     };
     onPublish(config);
   };
 
   const handleSaveClick = () => {
+    let settings: any;
+    if (taskType === 'tiktok_follow') {
+      settings = { username: username.replace('@', '') };
+    } else {
+      settings = { videoUrl };
+      if (taskType === 'tiktok_comment' && requiredText.trim()) {
+        settings.requiredText = requiredText;
+      }
+    }
+    
     const config = {
       name: taskName,
       description,
@@ -126,7 +167,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       points,
       isDraft: true,
       verificationMethod: useApiVerification ? 'api' : 'manual',
-      settings: taskType === 'tiktok_follow' ? { username: username.replace('@', '') } : { videoUrl },
+      settings,
     };
     onSave(config);
   };
@@ -138,7 +179,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
         <h4 className="font-semibold text-white">Task Preview</h4>
       </div>
       <div className="space-y-2 text-sm">
-        <p><span className="text-pink-400">Type:</span> {taskType === 'tiktok_follow' ? 'Follow User' : 'Like Video'}</p>
+        <p><span className="text-pink-400">Type:</span> {taskType === 'tiktok_follow' ? 'Follow User' : taskType === 'tiktok_comment' ? 'Comment' : 'Like Video'}</p>
         <p><span className="text-pink-400">Name:</span> {taskName || 'Untitled Task'}</p>
         <p><span className="text-pink-400">Points:</span> {points} points</p>
         <p><span className="text-pink-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
@@ -223,7 +264,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       <Card className="bg-white/5 border-white/10">
         <CardHeader>
           <CardTitle className="text-white">
-            {taskType === 'tiktok_follow' ? 'Follow Configuration' : 'Like Video Configuration'}
+            {taskType === 'tiktok_follow' ? 'Follow Configuration' : taskType === 'tiktok_comment' ? 'Comment Configuration' : 'Like Video Configuration'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -245,9 +286,30 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
               <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" className="bg-white/5 border-white/10 text-white" />
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label className="text-white">TikTok Video URL</Label>
-              <Input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://tiktok.com/@user/video/..." className="bg-white/5 border-white/10 text-white" />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-white">TikTok Video URL</Label>
+                <Input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://tiktok.com/@user/video/..." className="bg-white/5 border-white/10 text-white" />
+                <p className="text-xs text-gray-400">
+                  The full URL of the TikTok video you want fans to {taskType === 'tiktok_comment' ? 'comment on' : 'like'}
+                </p>
+              </div>
+              
+              {/* Required Text for Comment Tasks */}
+              {taskType === 'tiktok_comment' && (
+                <div className="space-y-2">
+                  <Label className="text-white">Required Text (Optional)</Label>
+                  <Input
+                    value={requiredText}
+                    onChange={(e) => setRequiredText(e.target.value)}
+                    placeholder="e.g., #Fandomly or 'Great content!'"
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                  <p className="text-xs text-gray-400">
+                    If specified, fans must include this text in their comment
+                  </p>
+                </div>
+              )}
             </div>
           )}
           <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">

@@ -26,7 +26,7 @@ interface Task {
   ownershipLevel: 'platform' | 'creator';
   isDraft: boolean;
   isActive: boolean;
-  rewardValue?: number;
+  pointsToReward?: number;
   frequency?: string;
   createdAt: string;
   updatedAt: string;
@@ -368,7 +368,7 @@ function TaskCard({ task, onDelete, onTogglePublish, onEdit }: {
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1 text-emerald-400">
             <Target className="h-4 w-4" />
-            <span>{task.rewardValue || 0} pts</span>
+            <span>{task.pointsToReward || 0} pts</span>
           </div>
           <div className="text-gray-400">
             {task._count?.completions || 0} completions

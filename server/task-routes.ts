@@ -1,6 +1,8 @@
 import { Express, Request, Response } from "express";
 import { storage } from "./storage";
+import { db } from "./db";
 import { z } from "zod";
+import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 
 // Task configuration schemas based on our task builders
 const baseTaskSchema = z.object({
@@ -8,6 +10,8 @@ const baseTaskSchema = z.object({
   description: z.string().optional(),
   ownershipLevel: z.enum(['platform', 'creator']).default('creator'),
   section: z.enum(['user_onboarding', 'social_engagement', 'community_building', 'content_creation', 'streaming_music', 'token_activity', 'custom']).default('custom'),
+  programId: z.string().optional(), // Associate task with a loyalty program
+  campaignId: z.string().optional(), // Associate task with a campaign
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   isRequired: z.boolean().default(false),
@@ -84,7 +88,7 @@ const completeProfileTaskSchema = baseTaskSchema.extend({
 
 // Twitter task schemas
 const twitterTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet']),
+  taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet', 'twitter_quote_tweet']),
   platform: z.literal('twitter'),
   points: z.number().min(1).max(10000),
   verificationMethod: z.enum(['manual', 'api']).default('api'),
@@ -92,6 +96,74 @@ const twitterTaskSchema = baseTaskSchema.extend({
     handle: z.string().optional(),
     url: z.string().optional(),
     tweetUrl: z.string().optional(),
+    requiredText: z.string().optional(),
+  }),
+});
+
+// Facebook task schemas
+const facebookTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['facebook_like_page', 'facebook_like_post', 'facebook_comment_post', 'facebook_comment_photo']),
+  platform: z.literal('facebook'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.enum(['manual', 'api']).default('manual'),
+  settings: z.object({
+    pageId: z.string().optional(),
+    postUrl: z.string().optional(),
+    photoUrl: z.string().optional(),
+  }),
+});
+
+// Instagram task schemas
+const instagramTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['instagram_follow', 'instagram_like_post', 'comment_code', 'mention_story', 'keyword_comment']),
+  platform: z.literal('instagram'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.enum(['manual', 'automatic']).default('automatic'),
+  settings: z.object({
+    username: z.string().optional(),
+    postUrl: z.string().optional(),
+    mediaId: z.string().optional(),
+    mediaUrl: z.string().optional(),
+    keyword: z.string().optional(),
+    requireHashtag: z.string().optional(),
+  }),
+});
+
+// YouTube task schemas
+const youtubeTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['youtube_subscribe', 'youtube_like', 'youtube_comment']),
+  platform: z.literal('youtube'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.enum(['manual', 'api']).default('manual'),
+  settings: z.object({
+    channelUrl: z.string().optional(),
+    videoUrl: z.string().optional(),
+    requiredText: z.string().optional(),
+  }),
+});
+
+// TikTok task schemas
+const tiktokTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment']),
+  platform: z.literal('tiktok'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.enum(['manual', 'api']).default('manual'),
+  settings: z.object({
+    username: z.string().optional(),
+    videoUrl: z.string().optional(),
+    requiredText: z.string().optional(),
+  }),
+});
+
+// Spotify task schemas
+const spotifyTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['spotify_follow', 'spotify_playlist']),
+  platform: z.literal('spotify'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.enum(['manual', 'api']).default('manual'),
+  settings: z.object({
+    artistId: z.string().optional(),
+    playlistId: z.string().optional(),
   }),
 });
 
@@ -102,21 +174,83 @@ const createTaskSchema = z.discriminatedUnion('taskType', [
   followerMilestoneSchema,
   completeProfileTaskSchema,
   twitterTaskSchema,
+  facebookTaskSchema,
+  instagramTaskSchema,
+  youtubeTaskSchema,
+  tiktokTaskSchema,
+  spotifyTaskSchema,
 ]);
 
 export function registerTaskRoutes(app: Express) {
-  // Get all published tasks (for fans)
-  app.get("/api/tasks/published", async (req: Request, res: Response) => {
+  // Get all published tasks (for fans) - REQUIRES AUTH
+  // Returns ONLY tasks from programs the fan has joined
+  app.get("/api/tasks/published", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const tenantId = req.query.tenantId as string | undefined;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Import necessary modules
+      const { fanPrograms: fanProgramsTable } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      // Get the fan's joined programs to filter tasks
+      const fanPrograms = await db
+        .select()
+        .from(fanProgramsTable)
+        .where(eq(fanProgramsTable.fanId, userId));
+
+      console.log(`[Tasks API] Fan ${userId} joined programs:`, fanPrograms.map(fp => ({ 
+        programId: fp.programId, 
+        tenantId: fp.tenantId 
+      })));
+
+      // Extract tenant IDs AND program IDs from joined programs
+      const joinedTenantIds = fanPrograms.map(fp => fp.tenantId);
+      const joinedProgramIds = fanPrograms.map(fp => fp.programId);
+
+      console.log(`[Tasks API] Fan ${userId} has joined ${joinedTenantIds.length} programs (tenant IDs):`, joinedTenantIds);
+      console.log(`[Tasks API] Fan ${userId} has joined ${joinedProgramIds.length} programs (program IDs):`, joinedProgramIds);
+
+      // If fan hasn't joined any programs, return empty array
+      if (joinedTenantIds.length === 0) {
+        console.log(`[Tasks API] Fan ${userId} hasn't joined any programs yet`);
+        return res.json({ tasks: [] });
+      }
+
+      // Get all tasks from programs the fan has joined
+      // CRITICAL: Filter by program_id, not just tenant_id
+      let tasks = await db.query.tasks.findMany({
+        where: (tasks, { eq, and, inArray }) => and(
+          inArray(tasks.programId, joinedProgramIds), // Filter by program IDs
+          eq(tasks.isDraft, false),
+          eq(tasks.isActive, true),
+          eq(tasks.ownershipLevel, 'creator')
+        ),
+        with: {
+          tenant: {
+            with: {
+              creator: true
+            }
+          },
+          program: true,
+        },
+      });
       
-      // Get all tasks
-      let tasks = tenantId 
-        ? await storage.getTasksByTenantId(tenantId)
-        : await storage.getAllTasks();
+      console.log(`[Tasks API] Query filter: programId IN [${joinedProgramIds.join(', ')}], isDraft=false, isActive=true, ownershipLevel='creator'`);
+      console.log(`[Tasks API] Found ${tasks.length} published tasks for fan ${userId}`);
       
-      // Filter to only published (non-draft) tasks
-      tasks = tasks.filter(task => !task.isDraft);
+      if (tasks.length > 0) {
+        console.log(`[Tasks API] Task details:`, tasks.map(t => ({
+          id: t.id,
+          name: t.name,
+          programId: t.programId,
+          tenantId: t.tenantId,
+          isDraft: t.isDraft,
+          isActive: t.isActive
+        })));
+      }
       
       // Filter by time availability
       const now = new Date();
@@ -130,7 +264,20 @@ export function registerTaskRoutes(app: Express) {
         return true;
       });
       
-      res.json({ tasks });
+      console.log(`[Tasks API] After time filtering: ${tasks.length} tasks available`);
+      
+      // Enrich tasks with creator information
+      const enrichedTasks = tasks.map(task => ({
+        ...task,
+        creatorName: task.tenant?.creator?.displayName || task.tenant?.name || 'Unknown Creator',
+        creatorImage: task.tenant?.creator?.profileImage || task.tenant?.logo || null,
+        programName: task.program?.name || null,
+        programSlug: task.program?.slug || null,
+        platform: task.platform || 'other', // Use the platform field directly
+        type: task.taskType || task.type || 'other', // Use taskType field for consistency
+      }));
+      
+      res.json({ tasks: enrichedTasks });
     } catch (error) {
       console.error('Error fetching published tasks:', error);
       res.status(500).json({ error: 'Failed to fetch tasks' });
@@ -142,29 +289,35 @@ export function registerTaskRoutes(app: Express) {
     try {
       const { creatorId } = req.params;
       
-      // Get all tasks for this creator
-      const allTasks = await storage.getTasksByCreator(creatorId);
+      // Get creator to find their tenant
+      const creator = await storage.getCreator(creatorId);
+      if (!creator) {
+        return res.status(404).json({ error: 'Creator not found' });
+      }
       
-      // Filter to only published, active tasks
+      // Query tasks directly using Drizzle
       const now = new Date();
-      const publishedTasks = allTasks.filter(task => {
-        // Must be published (not draft) and active
-        if (task.isDraft || !task.isActive) {
-          return false;
-        }
-        
-        // Check time constraints
+      const publishedTasks = await db.query.tasks.findMany({
+        where: (tasks, { eq, and }) => and(
+          eq(tasks.tenantId, creator.tenantId),
+          eq(tasks.isDraft, false),
+          eq(tasks.isActive, true),
+          eq(tasks.ownershipLevel, 'creator')
+        ),
+      });
+      
+      // Filter by time constraints
+      const filteredTasks = publishedTasks.filter(task => {
         if (task.startTime && new Date(task.startTime) > now) {
           return false;
         }
         if (task.endTime && new Date(task.endTime) < now) {
           return false;
         }
-        
         return true;
       });
       
-      res.json(publishedTasks);
+      res.json(filteredTasks);
     } catch (error) {
       console.error('Error fetching creator tasks:', error);
       res.status(500).json({ error: 'Failed to fetch creator tasks' });
@@ -172,9 +325,9 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Create new task
-  app.post("/api/tasks", async (req: Request, res: Response) => {
+  app.post("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+      const userId = req.user?.id; // Use internal database user ID
       
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
@@ -195,6 +348,22 @@ export function registerTaskRoutes(app: Express) {
       // Platform tasks can only be created by Fandomly admins
       if (isPlatformTask && user.role !== 'fandomly_admin') {
         return res.status(403).json({ error: "Only Fandomly admins can create platform tasks" });
+      }
+
+      // Creator tasks MUST have programId (enforced at DB level, but validate early for better UX)
+      if (!isPlatformTask && !validatedData.programId) {
+        return res.status(400).json({ 
+          error: "Creator tasks must be associated with a program. Please create a program first.",
+          code: "PROGRAM_REQUIRED"
+        });
+      }
+
+      // Platform tasks must NOT have programId or campaignId
+      if (isPlatformTask && (validatedData.programId || validatedData.campaignId)) {
+        return res.status(400).json({ 
+          error: "Platform tasks cannot be associated with programs or campaigns.",
+          code: "INVALID_PLATFORM_TASK"
+        });
       }
 
       // Creator tasks require a creator profile
@@ -222,6 +391,8 @@ export function registerTaskRoutes(app: Express) {
         ownershipLevel: validatedData.ownershipLevel,
         tenantId,
         creatorId,
+        programId: validatedData.programId || null, // Save program association
+        campaignId: validatedData.campaignId || null, // Save campaign association
         name: validatedData.name,
         description: validatedData.description || '',
         taskType: validatedData.taskType,
@@ -281,9 +452,9 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Get all tasks for a creator
-  app.get("/api/tasks", async (req: Request, res: Response) => {
+  app.get("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+      const userId = req.user?.id; // Use internal database user ID
       
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
@@ -313,45 +484,10 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Get single task by ID
-  app.get("/api/tasks/:taskId", async (req: Request, res: Response) => {
+  app.get("/api/tasks/:taskId", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { taskId } = req.params;
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
-
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const task = await storage.getTask(taskId);
-      
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      // Verify ownership
-      const user = await storage.getUser(userId);
-      if (user?.userType === 'creator') {
-        const creator = await storage.getCreatorByUserId(userId);
-        if (creator && task.tenantId !== creator.tenantId) {
-          return res.status(403).json({ error: "Access denied" });
-        }
-      }
-
-      res.json(task);
-    } catch (error: any) {
-      console.error('Error fetching task:', error);
-      res.status(500).json({
-        error: "Failed to fetch task",
-        message: error.message,
-      });
-    }
-  });
-
-  // Get single task by ID
-  app.get("/api/tasks/:taskId", async (req: Request, res: Response) => {
-    try {
-      const { taskId } = req.params;
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+      const userId = req.user?.id; // Use internal database user ID
 
       const task = await storage.getTask(taskId);
       if (!task) {
@@ -379,10 +515,10 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Update task
-  app.put("/api/tasks/:taskId", async (req: Request, res: Response) => {
+  app.put("/api/tasks/:taskId", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { taskId } = req.params;
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+      const userId = req.user?.id; // Use internal database user ID
 
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
@@ -450,10 +586,10 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Delete task
-  app.delete("/api/tasks/:taskId", async (req: Request, res: Response) => {
+  app.delete("/api/tasks/:taskId", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { taskId } = req.params;
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+      const userId = req.user?.id; // Use internal database user ID
 
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
@@ -494,10 +630,10 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Publish draft task (change isDraft to false)
-  app.post("/api/tasks/:taskId/publish", async (req: Request, res: Response) => {
+  app.post("/api/tasks/:taskId/publish", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { taskId } = req.params;
-      const userId = (req.headers['x-dynamic-user-id'] || req.headers['x-user-id']) as string;
+      const userId = req.user?.id; // Use internal database user ID
 
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });

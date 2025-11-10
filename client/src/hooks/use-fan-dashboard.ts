@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './use-auth';
+import { apiRequest } from '@/lib/queryClient';
 
 interface FanStats {
   platformPoints: number;
@@ -38,12 +39,7 @@ interface Recommendation {
 // API functions
 const fetchFanStats = async (): Promise<FanStats> => {
   try {
-    const response = await fetch('/api/fan/dashboard/stats', {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await apiRequest('GET', '/api/fan/dashboard/stats');
     
     if (!response.ok) {
       throw new Error('Failed to fetch fan stats');
@@ -69,7 +65,7 @@ const fetchFanStats = async (): Promise<FanStats> => {
 const fetchActiveCampaigns = async (fanId: string): Promise<Campaign[]> => {
   try {
     // Get fan programs to find which creators they follow
-    const fanProgramsResponse = await fetch(`/api/fan-programs/user/${fanId}`);
+    const fanProgramsResponse = await apiRequest('GET', `/api/fan-programs/user/${fanId}`);
     if (!fanProgramsResponse.ok) {
       throw new Error('Failed to fetch fan programs');
     }
@@ -80,7 +76,7 @@ const fetchActiveCampaigns = async (fanId: string): Promise<Campaign[]> => {
     // For each fan program, get the active campaigns from that creator
     for (const program of fanPrograms) {
       try {
-        const campaignsResponse = await fetch(`/api/campaigns/creator/${program.creatorId}`);
+        const campaignsResponse = await apiRequest('GET', `/api/campaigns/creator/${program.creatorId}`);
         if (campaignsResponse.ok) {
           const creatorCampaigns = await campaignsResponse.json();
           
@@ -112,7 +108,7 @@ const fetchActiveCampaigns = async (fanId: string): Promise<Campaign[]> => {
 
 const fetchRecommendations = async (): Promise<Recommendation[]> => {
   try {
-    const response = await fetch('/api/creators');
+    const response = await apiRequest('GET', '/api/creators');
     if (!response.ok) {
       throw new Error('Failed to fetch creators');
     }

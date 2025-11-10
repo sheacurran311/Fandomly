@@ -1,6 +1,6 @@
 import { Express } from "express";
 import { db } from "./db";
-import { users, fanPrograms, campaigns, platformTaskCompletions, pointTransactions, rewardRedemptions } from "@shared/schema";
+import { users, fanPrograms, campaigns, platformTaskCompletions, platformPointsTransactions, pointTransactions, rewardRedemptions, loyaltyPrograms } from "@shared/schema";
 import { eq, and, sql, count } from "drizzle-orm";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 import { platformPointsService } from "./platform-points-service";
@@ -353,7 +353,7 @@ export function registerFanDashboardRoutes(app: Express) {
       startDate.setDate(startDate.getDate() - daysBack);
 
       // Platform task completions over time
-      const platformTaskCompletions = await db.execute(sql`
+      const completionStats = await db.execute(sql`
         SELECT 
           TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'created_at'))}, ${dateFormat}) as period,
           COUNT(*) as completed
@@ -366,7 +366,7 @@ export function registerFanDashboardRoutes(app: Express) {
 
       res.json({
         timeframe,
-        completions: platformTaskCompletions.rows || [],
+        completions: completionStats.rows || [],
       });
     } catch (error) {
       console.error("Error fetching task completion stats:", error);
@@ -395,12 +395,13 @@ export function registerFanDashboardRoutes(app: Express) {
       // Creator points by program
       const creatorBreakdown = await db.execute(sql`
         SELECT 
-          fp.program_name as source,
+          lp.name as source,
           COALESCE(SUM(CASE WHEN pt.type = 'earned' THEN pt.points ELSE 0 END), 0) as total_points
         FROM ${pointTransactions} pt
         JOIN ${fanPrograms} fp ON pt.fan_program_id = fp.id
+        JOIN ${loyaltyPrograms} lp ON fp.program_id = lp.id
         WHERE fp.fan_id = ${userId}
-        GROUP BY fp.program_name
+        GROUP BY lp.name
       `);
 
       res.json({

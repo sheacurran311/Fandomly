@@ -1,107 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
-import { TwitterSDKManager } from '@/lib/twitter';
+import { useTwitterConnection } from '@/hooks/use-twitter-connection';
 import { Twitter, Users, MessageSquare, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-
-interface TwitterUserInfo {
-  id?: string;
-  name?: string;
-  username?: string;
-  followers_count?: number;
-}
 
 export default function FanTwitterWidget() {
   const { user } = useAuth();
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [userInfo, setUserInfo] = useState<TwitterUserInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { isConnected, isConnecting, userInfo, error, connect, disconnect } = useTwitterConnection();
 
   // Only show for fans
   if (user?.userType !== 'fan') {
     return null;
   }
-
-  useEffect(() => {
-    // Check Twitter connection status - use consistent endpoint
-    const loadStatus = async () => {
-      try {
-        const response = await fetch('/api/social-connections/twitter', {
-          headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.connected && data.connection) {
-            setIsConnected(true);
-            const conn = data.connection;
-            setUserInfo({
-              id: conn.platformUserId,
-              name: conn.platformDisplayName,
-              username: conn.platformUsername,
-              followers_count: conn.profileData?.followers_count || 0
-            });
-          } else {
-            setIsConnected(false);
-            setUserInfo(null);
-          }
-        }
-      } catch (e) {
-        console.error('[Fan Twitter Widget] Error loading status:', e);
-      }
-    };
-    
-    if (user?.dynamicUserId || user?.id) {
-      loadStatus();
-    }
-  }, [user?.dynamicUserId, user?.id]);
-
-  const connectTwitter = async () => {
-    try {
-      setIsConnecting(true);
-      setError(null);
-      const result = await TwitterSDKManager.secureLogin('fan', (user as any)?.dynamicUserId || user?.id);
-      if (result.success && result.user) {
-        setIsConnected(true);
-        setUserInfo({
-          id: result.user.id,
-          name: result.user.name,
-          username: result.user.username,
-          followers_count: result.user.followers_count
-        });
-      } else {
-        setError(result.error || 'Failed to connect');
-      }
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const disconnectTwitter = async () => {
-    try {
-      const response = await fetch('/api/social/twitter', {
-        method: 'DELETE',
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        setIsConnected(false);
-        setUserInfo(null);
-      }
-    } catch (e) {
-      console.error('[Fan Twitter Widget] Error disconnecting:', e);
-    }
-  };
 
   if (isConnected && userInfo) {
     return (
@@ -137,7 +49,7 @@ export default function FanTwitterWidget() {
                 <Users className="h-4 w-4 text-blue-400" />
                 <div>
                   <p className="text-xs text-gray-400">Followers</p>
-                  <p className="text-sm font-medium text-white">{(userInfo.followers_count || 0).toLocaleString()}</p>
+                  <p className="text-sm font-medium text-white">{(userInfo.followersCount || userInfo.followers_count || 0).toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -166,7 +78,7 @@ export default function FanTwitterWidget() {
               variant="outline" 
               size="sm" 
               className="border-white/20 text-white hover:bg-white/10"
-              onClick={disconnectTwitter}
+              onClick={disconnect}
             >
               Disconnect
             </Button>
@@ -200,7 +112,7 @@ export default function FanTwitterWidget() {
         </div>
         <Button 
           className="w-full bg-black text-white hover:bg-black/80"
-          onClick={connectTwitter}
+          onClick={connect}
           disabled={isConnecting}
         >
           {isConnecting ? (
@@ -228,4 +140,3 @@ export default function FanTwitterWidget() {
     </Card>
   );
 }
-

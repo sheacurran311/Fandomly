@@ -26,7 +26,7 @@ interface YouTubeTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'youtube_subscribe' | 'youtube_like';
+  taskType: 'youtube_subscribe' | 'youtube_like' | 'youtube_comment';
   initialData?: any;
   isEditMode?: boolean;
 }
@@ -39,6 +39,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
   const [points, setPoints] = useState(100);
   const [channelUrl, setChannelUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [requiredText, setRequiredText] = useState(''); // For comment tasks
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
@@ -61,11 +62,15 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
         if (response.ok) {
           const data = await response.json();
           setYoutubeConnected(data.connected || false);
-          if (data.connected && (data.channelTitle || data.channelUrl)) {
-            setYoutubeChannel(data.channelTitle || 'Your Channel');
+          if (data.connected && data.connection) {
+            const ytData = data.connection.profileData || {};
+            const channelTitle = ytData.title || ytData.channelTitle || data.connection.platformDisplayName;
+            const channelId = ytData.channelId || ytData.id || data.connection.platformUserId;
+            
+            setYoutubeChannel(channelTitle || 'Your Channel');
             // Auto-populate channel URL for subscribe tasks
-            if (taskType === 'youtube_subscribe' && !channelUrl && data.channelUrl) {
-              setChannelUrl(data.channelUrl);
+            if (taskType === 'youtube_subscribe' && !channelUrl && channelId) {
+              setChannelUrl(`https://youtube.com/channel/${channelId}`);
             }
           }
         } else {
@@ -126,6 +131,12 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
           description: 'Show some love by liking our YouTube video!',
           points: 25,
         };
+      case 'youtube_comment':
+        return {
+          name: 'Comment on YouTube Video',
+          description: 'Leave a comment on our YouTube video!',
+          points: 50,
+        };
       default:
         return { name: '', description: '', points: 100 };
     }
@@ -167,7 +178,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
   // Validate on config changes
   useEffect(() => {
     validateForm();
-  }, [taskName, description, points, channelUrl, videoUrl, taskType]);
+  }, [taskName, description, points, channelUrl, videoUrl, requiredText, taskType]);
 
   const buildTaskConfig = (isDraft: boolean) => {
     const baseConfig = {
@@ -188,11 +199,18 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
         },
       };
     } else {
+      const settings: any = {
+        videoUrl,
+      };
+      
+      // Add optional requiredText for comment tasks
+      if (taskType === 'youtube_comment' && requiredText.trim()) {
+        settings.requiredText = requiredText;
+      }
+      
       return {
         ...baseConfig,
-        settings: {
-          videoUrl,
-        },
+        settings,
       };
     }
   };
@@ -230,7 +248,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
         <h4 className="font-semibold text-white">Task Preview</h4>
       </div>
       <div className="space-y-2 text-sm">
-        <p><span className="text-red-400">Type:</span> {taskType === 'youtube_subscribe' ? 'Subscribe' : 'Like Video'}</p>
+        <p><span className="text-red-400">Type:</span> {taskType === 'youtube_subscribe' ? 'Subscribe' : taskType === 'youtube_comment' ? 'Comment' : 'Like Video'}</p>
         <p><span className="text-red-400">Name:</span> {taskName || 'Untitled Task'}</p>
         <p><span className="text-red-400">Points:</span> {points} points</p>
         <p><span className="text-red-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
@@ -325,6 +343,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
             <CardTitle className="text-white">
               {taskType === 'youtube_subscribe' && 'Subscribe Configuration'}
               {taskType === 'youtube_like' && 'Like Video Configuration'}
+              {taskType === 'youtube_comment' && 'Comment Configuration'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -381,17 +400,35 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label className="text-white">YouTube Video URL</Label>
-                <Input
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=..."
-                  className="bg-white/5 border-white/10 text-white"
-                />
-                <p className="text-xs text-gray-400">
-                  The full URL of the YouTube video you want fans to like
-                </p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-white">YouTube Video URL</Label>
+                  <Input
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                  <p className="text-xs text-gray-400">
+                    The full URL of the YouTube video you want fans to {taskType === 'youtube_comment' ? 'comment on' : 'like'}
+                  </p>
+                </div>
+                
+                {/* Required Text for Comment Tasks */}
+                {taskType === 'youtube_comment' && (
+                  <div className="space-y-2">
+                    <Label className="text-white">Required Text (Optional)</Label>
+                    <Input
+                      value={requiredText}
+                      onChange={(e) => setRequiredText(e.target.value)}
+                      placeholder="e.g., #Fandomly or 'Great video!'"
+                      className="bg-white/5 border-white/10 text-white"
+                    />
+                    <p className="text-xs text-gray-400">
+                      If specified, fans must include this text in their comment
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

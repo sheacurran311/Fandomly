@@ -18,6 +18,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 
 export default function TaskBuilder() {
@@ -32,10 +35,21 @@ export default function TaskBuilder() {
   const isEditMode = !!params.id;
 
   // Fetch programs for the creator
-  const { data: programs = [] } = useQuery({
+  const { data: programs = [], isLoading: programsLoading } = useQuery({
     queryKey: ["/api/programs"],
     enabled: !!user?.id,
   });
+
+  // Auto-select most recently created program
+  useEffect(() => {
+    if (programs.length > 0 && !selectedProgramId && !isEditMode) {
+      // Sort by createdAt DESC and select the most recent
+      const sortedPrograms = [...programs].sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setSelectedProgramId(sortedPrograms[0].id);
+    }
+  }, [programs, selectedProgramId, isEditMode]);
 
   // Fetch campaigns for the selected program
   const { data: campaigns = [] } = useQuery({
@@ -49,7 +63,15 @@ export default function TaskBuilder() {
     queryFn: async () => {
       if (!params.id) return null;
       const response = await apiRequest('GET', `/api/tasks/${params.id}`);
-      return response.json();
+      const task = await response.json();
+      
+      // Transform database fields to match task builder expectations
+      return {
+        ...task,
+        points: task.pointsToReward || task.points || 50,
+        settings: task.customSettings || task.settings || {},
+        verificationMethod: task.customSettings?.verificationMethod || task.verificationMethod || 'manual',
+      };
     },
     enabled: isEditMode,
   });
@@ -110,19 +132,35 @@ export default function TaskBuilder() {
   });
 
   const handleSave = (config: any) => {
+    if (!selectedProgramId) {
+      toast({
+        title: "Program Required",
+        description: "Please select a program before saving the task.",
+        variant: "destructive",
+      });
+      return;
+    }
     createTaskMutation.mutate({ 
       ...config, 
       isDraft: true,
-      programId: selectedProgramId || undefined,
+      programId: selectedProgramId,
       campaignId: selectedCampaignId || undefined,
     });
   };
 
   const handlePublish = (config: any) => {
+    if (!selectedProgramId) {
+      toast({
+        title: "Program Required",
+        description: "Please select a program before publishing the task.",
+        variant: "destructive",
+      });
+      return;
+    }
     createTaskMutation.mutate({ 
       ...config, 
       isDraft: false,
-      programId: selectedProgramId || undefined,
+      programId: selectedProgramId,
       campaignId: selectedCampaignId || undefined,
     });
   };
@@ -135,6 +173,41 @@ export default function TaskBuilder() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
             <p className="text-gray-300">Loading task...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Check if creator has any programs - required for creating tasks
+  if (!isEditMode && !programsLoading && programs.length === 0) {
+    return (
+      <DashboardLayout userType="creator">
+        <div className="min-h-screen bg-brand-dark-bg p-6">
+          <div className="max-w-2xl mx-auto mt-12">
+            <Alert className="border-yellow-500/50 bg-yellow-500/10">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              <AlertTitle className="text-yellow-500 text-lg font-semibold mb-2">
+                Program Required
+              </AlertTitle>
+              <AlertDescription className="text-gray-300 mb-4">
+                You must create a loyalty program before adding tasks. Tasks are always associated with a program to help organize your fan engagement strategy.
+              </AlertDescription>
+              <div className="flex gap-3 mt-4">
+                <Button 
+                  onClick={() => setLocation("/creator-dashboard/program-builder")}
+                  className="bg-brand-primary hover:bg-brand-primary/80"
+                >
+                  Create Program
+                </Button>
+                <Button 
+                  onClick={() => setLocation("/creator-dashboard/tasks")}
+                  variant="outline"
+                >
+                  Back to Tasks
+                </Button>
+              </div>
+            </Alert>
           </div>
         </div>
       </DashboardLayout>
@@ -168,16 +241,15 @@ export default function TaskBuilder() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="text-white mb-2 block">Select Program (Optional)</Label>
+              <Label className="text-white mb-2 block">Select Program <span className="text-red-400">*</span></Label>
               <Select value={selectedProgramId} onValueChange={(value) => {
-                setSelectedProgramId(value === "unassigned" ? "" : value);
+                setSelectedProgramId(value);
                 setSelectedCampaignId(""); // Reset campaign when program changes
               }}>
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue placeholder="Select a program (or leave unassigned)" />
+                  <SelectValue placeholder="Select a program (required)" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-white/10">
-                  <SelectItem value="unassigned" className="text-white hover:bg-white/10">No Program (Unassigned)</SelectItem>
                   {programs.map((program: any) => (
                     <SelectItem key={program.id} value={program.id} className="text-white hover:bg-white/10">
                       {program.name}
@@ -186,7 +258,7 @@ export default function TaskBuilder() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-400 mt-1">
-                Associate this task with a specific loyalty program
+                All tasks must be associated with a loyalty program
               </p>
             </div>
 
@@ -275,6 +347,7 @@ export default function TaskBuilder() {
     case 'twitter_follow':
     case 'twitter_like':
     case 'twitter_retweet':
+    case 'twitter_quote_tweet':
       return (
         <ProgramCampaignSelector>
           <TwitterTaskBuilder
@@ -288,8 +361,10 @@ export default function TaskBuilder() {
         </ProgramCampaignSelector>
       );
 
-    case 'facebook_follow':
-    case 'facebook_like':
+    case 'facebook_like_page':
+    case 'facebook_like_post':
+    case 'facebook_comment_post':
+    case 'facebook_comment_photo':
       return (
         <ProgramCampaignSelector>
           <FacebookTaskBuilder
@@ -304,7 +379,10 @@ export default function TaskBuilder() {
       );
 
     case 'instagram_follow':
-    case 'instagram_like':
+    case 'instagram_like_post':
+    case 'comment_code':
+    case 'mention_story':
+    case 'keyword_comment':
       return (
         <ProgramCampaignSelector>
           <InstagramTaskBuilder
@@ -320,6 +398,7 @@ export default function TaskBuilder() {
 
     case 'youtube_subscribe':
     case 'youtube_like':
+    case 'youtube_comment':
       return (
         <ProgramCampaignSelector>
           <YouTubeTaskBuilder
@@ -335,6 +414,7 @@ export default function TaskBuilder() {
 
     case 'tiktok_follow':
     case 'tiktok_like':
+    case 'tiktok_comment':
       return (
         <ProgramCampaignSelector>
           <TikTokTaskBuilder

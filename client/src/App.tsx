@@ -15,6 +15,8 @@ import Marketplace from "@/pages/marketplace";
 import FindCreators from "@/pages/find-creators";
 import UserTypeSelection from "@/pages/user-type-selection";
 import CreatorTypeSelection from "@/pages/creator-type-selection";
+import BrandTypeSelection from "@/pages/brand-type-selection";
+import BrandOnboarding from "@/pages/brand-onboarding";
 import CreatorOnboarding from "@/pages/creator-onboarding";
 import CampaignBuilder from "@/pages/campaign-builder";
 import TenantSetup from "@/pages/tenant-setup";
@@ -39,7 +41,7 @@ import FanDashboard from "@/pages/fan-dashboard";
 import FanCampaigns from "@/pages/fan-dashboard/campaigns";
 import FanTasks from "@/pages/fan-dashboard/tasks";
 import FanSocial from "@/pages/fan-dashboard/social";
-import FanFollowing from "@/pages/fan-dashboard/following";
+import FanJoined from "@/pages/fan-dashboard/joined";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
 import FanPoints from "@/pages/fan-dashboard/points";
 import FanNotifications from "@/pages/fan-dashboard/notifications";
@@ -72,11 +74,13 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import AdminOverview from "@/pages/admin-dashboard/overview";
 import AdminUsers from "@/pages/admin-dashboard/users";
 import AdminCreators from "@/pages/admin-dashboard/creators";
+import AdminAgencies from "@/pages/admin-dashboard/agencies";
 import AdminTasks from "@/pages/admin-dashboard/tasks";
 import AdminPlatformTaskCreate from "@/pages/admin-dashboard/platform-tasks/create";
 import AdminProfile from "@/pages/admin-dashboard/profile";
 import AdminAnalytics from "@/pages/admin-dashboard/analytics";
 import AdminNftManagement from "@/pages/admin-dashboard/nft-management";
+import AgencyDashboard from "@/pages/agency-dashboard";
 
 function Router() {
   return (
@@ -86,6 +90,8 @@ function Router() {
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/user-type-selection" component={UserTypeSelection} />
       <Route path="/creator-type-selection" component={CreatorTypeSelection} />
+      <Route path="/brand-type-selection" component={BrandTypeSelection} />
+      <Route path="/brand-onboarding" component={BrandOnboarding} />
       <Route path="/creator-onboarding" component={CreatorOnboarding} />
       <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />
@@ -112,7 +118,14 @@ function Router() {
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
       <Route path="/fan-dashboard/tasks" component={FanTasks} />
       <Route path="/fan-dashboard/social" component={FanSocial} />
-      <Route path="/fan-dashboard/following" component={FanFollowing} />
+      <Route path="/fan-dashboard/joined" component={FanJoined} />
+      {/* Redirect old route to new route */}
+      <Route path="/fan-dashboard/following">
+        {() => {
+          window.location.href = "/fan-dashboard/joined";
+          return null;
+        }}
+      </Route>
       <Route path="/fan-dashboard/nfts" component={FanNftCollection} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
@@ -143,6 +156,7 @@ function Router() {
       <Route path="/admin-dashboard/overview" component={AdminOverview} />
       <Route path="/admin-dashboard/users" component={AdminUsers} />
       <Route path="/admin-dashboard/creators" component={AdminCreators} />
+      <Route path="/admin-dashboard/agencies" component={AdminAgencies} />
       <Route path="/admin-dashboard/platform-tasks" component={AdminTasks} />
       <Route path="/admin-dashboard/platform-tasks/create" component={AdminPlatformTaskCreate} />
       <Route path="/admin-dashboard/platform-tasks/edit/:id" component={AdminPlatformTaskCreate} />
@@ -150,6 +164,9 @@ function Router() {
       <Route path="/admin-dashboard/profile" component={AdminProfile} />
       <Route path="/admin-dashboard/nft-management" component={AdminNftManagement} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
+      
+      {/* Agency Dashboard */}
+      <Route path="/agency-dashboard" component={AgencyDashboard} />
       
       {/* Program Public Page */}
       <Route path="/programs/:slug" component={ProgramPublic} />

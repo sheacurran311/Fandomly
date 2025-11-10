@@ -189,7 +189,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
       targetUrl,
       customInstructions,
       rewardType: 'points' as const,
-      rewardValue: Number(config.points || selectedTaskType.points) || 0,
+      pointsToReward: Number(config.points || selectedTaskType.points) || 0,
       isActive: connected,
     };
 

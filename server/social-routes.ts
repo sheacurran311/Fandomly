@@ -440,7 +440,8 @@ async function refreshTwitterToken(
 }
 
 // Verify webhook signature
-function verifyWebhookSignature(body: any, signature: string): boolean {
+// Note: This requires access to the raw body buffer, which needs special middleware
+function verifyWebhookSignature(body: any, signature: string, rawBody?: Buffer): boolean {
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
   
   if (!signature || !appSecret) {
@@ -451,8 +452,9 @@ function verifyWebhookSignature(body: any, signature: string): boolean {
     return false;
   }
   
-  // Convert body to string for signature verification
-  const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+  // Use raw body if available, otherwise stringify (less reliable)
+  const bodyString = rawBody ? rawBody.toString('utf8') : 
+                     typeof body === 'string' ? body : JSON.stringify(body);
   
   const expectedSignature = crypto
     .createHmac('sha256', appSecret)
@@ -464,17 +466,22 @@ function verifyWebhookSignature(body: any, signature: string): boolean {
   console.log('[Instagram Webhooks] Signature comparison:', {
     expected: expectedSignature.substring(0, 10) + '...',
     received: receivedSignature.substring(0, 10) + '...',
-    bodyType: typeof body,
+    bodyType: rawBody ? 'buffer' : typeof body,
     bodyLength: bodyString.length
   });
   
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(expectedSignature, 'hex'),
-    Buffer.from(receivedSignature, 'hex')
-  );
-  
-  console.log('[Instagram Webhooks] Signature verification:', isValid ? 'VALID' : 'INVALID');
-  return isValid;
+  try {
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(expectedSignature, 'hex'),
+      Buffer.from(receivedSignature, 'hex')
+    );
+    
+    console.log('[Instagram Webhooks] Signature verification:', isValid ? 'VALID' : 'INVALID');
+    return isValid;
+  } catch (error) {
+    console.error('[Instagram Webhooks] Signature verification error:', error);
+    return false;
+  }
 }
 
 export function registerSocialRoutes(app: Express) {
@@ -489,49 +496,66 @@ export function registerSocialRoutes(app: Express) {
       message: 'Instagram webhook endpoint is accessible',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV,
-      hasVerifyToken: !!process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+      hasVerifyToken: !!process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
+      verifyTokenPreview: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN 
+        ? `${process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN.substring(0, 10)}...` 
+        : 'NOT_SET'
     });
   });
   
   // Webhook verification endpoint (GET request from Meta)
   app.get('/webhooks/instagram', (req: Request, res: Response) => {
-    console.log('[Instagram Webhooks] Verification request received from:', req.ip);
-    console.log('[Instagram Webhooks] Full query params:', req.query);
+    console.log('\n========================================');
+    console.log('[Instagram Webhooks] 🔔 VERIFICATION REQUEST RECEIVED');
+    console.log('[Instagram Webhooks] From IP:', req.ip);
+    console.log('[Instagram Webhooks] Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('[Instagram Webhooks] Full query params:', JSON.stringify(req.query, null, 2));
+    console.log('========================================\n');
     
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
     
-    console.log('[Instagram Webhooks] Verification params:', {
-      mode,
-      token: token ? 'present' : 'missing',
-      challenge: challenge ? 'present' : 'missing',
-      expectedToken: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN ? 'configured' : 'NOT_CONFIGURED'
-    });
+    const expectedToken = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
+    
+    console.log('[Instagram Webhooks] Verification comparison:');
+    console.log('  - Mode:', mode, '(expected: subscribe)');
+    console.log('  - Token received:', token);
+    console.log('  - Token expected:', expectedToken);
+    console.log('  - Challenge:', challenge);
+    console.log('  - Tokens match:', token === expectedToken);
     
     // Check if a token and mode were sent
     if (mode && token) {
       // Check the mode and token sent are correct
-      if (mode === 'subscribe' && token === process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN) {
-        console.log('[Instagram Webhooks] ✅ Webhook verified successfully - sending challenge back');
+      if (mode === 'subscribe' && token === expectedToken) {
+        console.log('[Instagram Webhooks] ✅ VERIFICATION SUCCESSFUL - Sending challenge back');
+        console.log('[Instagram Webhooks] Challenge value:', challenge);
         res.status(200).send(challenge);
       } else {
-        console.error('[Instagram Webhooks] ❌ Verification failed - invalid token or mode:', {
+        console.error('[Instagram Webhooks] ❌ VERIFICATION FAILED - Token or mode mismatch');
+        console.error('  Details:', {
           receivedMode: mode,
+          expectedMode: 'subscribe',
+          modeMatch: mode === 'subscribe',
           receivedToken: token,
-          expectedToken: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
-          tokensMatch: token === process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+          expectedToken: expectedToken,
+          tokenMatch: token === expectedToken,
+          tokenLengthReceived: token?.length,
+          tokenLengthExpected: expectedToken?.length
         });
         res.sendStatus(403);
       }
     } else {
-      console.error('[Instagram Webhooks] ❌ Verification failed - missing parameters');
+      console.error('[Instagram Webhooks] ❌ VERIFICATION FAILED - Missing parameters');
+      console.error('  Mode present:', !!mode);
+      console.error('  Token present:', !!token);
       res.sendStatus(400);
     }
   });
 
   // Webhook event notifications endpoint (POST request from Meta)
-  app.post('/webhooks/instagram', (req: Request, res: Response) => {
+  app.post('/webhooks/instagram', async (req: Request, res: Response) => {
     console.log('[Instagram Webhooks] Event notification received');
     console.log('[Instagram Webhooks] Headers:', req.headers);
     
@@ -557,36 +581,80 @@ export function registerSocialRoutes(app: Express) {
       console.warn('[Instagram Webhooks] ⚠️  No signature header - processing anyway (development mode)');
     }
     
-    console.log('[Instagram Webhooks] Processing events (signature verification temporarily disabled)');
+    console.log('[Instagram Webhooks] Processing events...');
     
     // Process the webhook payload
     if (body.object === 'instagram') {
-      body.entry?.forEach((entry: any) => {
+      for (const entry of (body.entry || [])) {
         console.log('[Instagram Webhooks] Processing entry:', entry.id);
         
-        // Handle messaging events
-        if (entry.messaging) {
-          entry.messaging.forEach((messagingEvent: any) => {
-            console.log('[Instagram Webhooks] 📩 Messaging event:', {
-              sender: messagingEvent.sender?.id,
-              recipient: messagingEvent.recipient?.id,
-              message: messagingEvent.message?.text,
-              timestamp: messagingEvent.timestamp,
-              isEcho: messagingEvent.message?.is_echo
-            });
-          });
-        }
-        
-        // Handle comment events
+        // Handle webhook changes
         if (entry.changes) {
-          entry.changes.forEach((change: any) => {
-            console.log('[Instagram Webhooks] 💬 Change event:', {
+          for (const change of entry.changes) {
+            console.log('[Instagram Webhooks] Change event:', {
               field: change.field,
-              value: change.value
+              valueKeys: Object.keys(change.value || {})
             });
-          });
+            
+            // Handle comment events (for nonce/keyword verification)
+            if (change.field === 'comments' && change.value) {
+              const { handleInstagramCommentEvent } = await import('./services/instagram-verification-service');
+              
+              const commentEvent = {
+                comment_id: change.value.id || change.value.comment_id,
+                media_id: change.value.media?.id || change.value.media_id,
+                text: change.value.text || '',
+                from: {
+                  id: change.value.from?.id || '',
+                  username: change.value.from?.username || ''
+                }
+              };
+              
+              console.log('[Instagram Webhooks] 💬 Processing comment event:', {
+                comment_id: commentEvent.comment_id,
+                media_id: commentEvent.media_id,
+                username: commentEvent.from.username
+              });
+              
+              try {
+                await handleInstagramCommentEvent(commentEvent);
+              } catch (error) {
+                console.error('[Instagram Webhooks] Error processing comment:', error);
+              }
+            }
+            
+            // Handle mention events (for story mention verification)
+            if (change.field === 'mentions' && change.value) {
+              const { handleInstagramMentionEvent } = await import('./services/instagram-verification-service');
+              
+              const mentionEvent = {
+                mention_id: change.value.id || change.value.mention_id,
+                from: {
+                  id: change.value.from?.id || change.value.sender?.id || '',
+                  username: change.value.from?.username || change.value.sender?.username || ''
+                },
+                target: {
+                  id: change.value.target?.id || entry.id,
+                  username: change.value.target?.username || ''
+                },
+                caption: change.value.caption || change.value.text
+              };
+              
+              console.log('[Instagram Webhooks] 👋 Processing mention event:', {
+                mention_id: mentionEvent.mention_id,
+                fan_username: mentionEvent.from.username,
+                creator_username: mentionEvent.target.username
+              });
+              
+              try {
+                await handleInstagramMentionEvent(mentionEvent);
+              } catch (error) {
+                console.error('[Instagram Webhooks] Error processing mention:', error);
+              }
+            }
+          }
         }
-      });
+      }
     }
     
     // Acknowledge receipt of the event

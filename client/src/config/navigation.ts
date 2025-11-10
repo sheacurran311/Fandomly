@@ -79,7 +79,7 @@ export const creatorNavItems: NavigationItem[] = [
 
 export const fanNavItems: NavigationItem[] = [
   { label: "Overview", href: "/fan-dashboard", icon: Home, showInBottomNav: true },
-  { label: "Creators", href: "/fan-dashboard/following", icon: Users, color: "text-brand-primary", showInBottomNav: true },
+  { label: "Joined", href: "/fan-dashboard/joined", icon: Users, color: "text-brand-primary", showInBottomNav: true },
   { label: "Tasks", href: "/fan-dashboard/tasks", icon: Target, color: "text-brand-accent", showInBottomNav: true },
   { label: "Campaigns", href: "/fan-dashboard/campaigns", icon: Trophy, color: "text-yellow-400", showInBottomNav: true },
   { label: "Social Accounts", href: "/fan-dashboard/social", icon: Instagram, color: "text-pink-400" },

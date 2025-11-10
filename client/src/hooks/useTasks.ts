@@ -1,23 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Task } from '@shared/schema';
+import { apiRequest } from '@/lib/queryClient';
 
 /**
  * Fetch all published tasks (for fans)
+ * Server-side filters to only return tasks from programs the fan has joined
  */
 async function fetchPublishedTasks(tenantId?: string): Promise<{ tasks: Task[] }> {
   const url = tenantId 
     ? `/api/tasks/published?tenantId=${tenantId}`
     : '/api/tasks/published';
   
-  const response = await fetch(url, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch tasks');
-  }
-
+  const response = await apiRequest('GET', url);
   return response.json();
 }
 

@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
-import CreatorInstagramConnect from "@/components/social/creator-instagram-connect";
-import InstagramMessageTest from "@/components/social/instagram-message-test";
-import InstagramWebhookSetup from "@/components/social/instagram-webhook-setup";
 import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +33,7 @@ import {
 import { FaSpotify } from "react-icons/fa";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { socialManager } from "@/lib/social-integrations";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 
 export default function CreatorSocial() {
   // Format follower counts: comma format below 10k, K-format at 10k+
@@ -68,11 +65,18 @@ export default function CreatorSocial() {
   const [activePage, setActivePage] = useState<FacebookPage | null>(null);
   const [isCheckingFacebookStatus, setIsCheckingFacebookStatus] = useState(true);
   const [showPageModal, setShowPageModal] = useState(false);
-  const [twitterConnected, setTwitterConnected] = useState(false);
-  const [twitterConnecting, setTwitterConnecting] = useState(false);
-  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
-  const [twitterFollowers, setTwitterFollowers] = useState<number>(0);
-  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  
+  // Twitter connection using unified hook
+  const {
+    isConnected: twitterConnected,
+    isConnecting: twitterConnecting,
+    userInfo: twitterUserInfo,
+    connect: connectTwitter,
+    disconnect: disconnectTwitter
+  } = useTwitterConnection();
+  
+  const twitterHandle = twitterUserInfo?.username || null;
+  const twitterFollowers = twitterUserInfo?.followersCount || twitterUserInfo?.followers_count || 0;
   
   // TikTok connection state
   const [tiktokConnected, setTiktokConnected] = useState(false);
@@ -120,6 +124,15 @@ export default function CreatorSocial() {
       }
 
       const data = event.data;
+      
+      // Ignore non-OAuth messages (like MetaMask, browser extensions, etc.)
+      if (!data || !data.type || 
+          (!data.type.includes('OAUTH') && 
+           !data.type.includes('AUTH_SUCCESS') &&
+           !data.type.includes('TIKTOK'))) {
+        return;
+      }
+
       console.log('[Creator Social] Received message from OAuth callback:', data);
 
       // Refresh connection status based on the platform
@@ -141,46 +154,10 @@ export default function CreatorSocial() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Twitter status checking is now handled by useTwitterConnection hook
   const checkTwitterStatus = async () => {
-    try {
-      setIsCheckingTwitterStatus(true);
-      
-      // Check Twitter connection status using consistent endpoint
-      const response = await fetch('/api/social-connections/twitter', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Creator Social] Twitter connection data:', data);
-        
-        if (data.connected && data.connection) {
-          console.log('[Creator Social] Found existing Twitter connection');
-          setTwitterConnected(true);
-          setTwitterHandle(data.connection.platformUsername || data.connection.platformDisplayName);
-          setTwitterFollowers(data.connection.profileData?.followers_count || 0);
-        } else {
-          console.log('[Creator Social] No Twitter connection found');
-          setTwitterConnected(false);
-          setTwitterHandle(null);
-          setTwitterFollowers(0);
-        }
-      } else {
-        console.warn('[Creator Social] Failed to fetch Twitter connection:', response.statusText);
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-      }
-    } catch (error) {
-      console.error('[Creator Social] Error checking Twitter status:', error);
-      setTwitterConnected(false);
-      setTwitterHandle(null);
-    } finally {
-      setIsCheckingTwitterStatus(false);
-    }
+    // This function is no longer needed - useTwitterConnection hook handles status automatically
+    console.log('[Creator Social] Twitter status is managed by useTwitterConnection hook');
   };
 
   const checkTiktokStatus = async () => {
@@ -377,68 +354,7 @@ export default function CreatorSocial() {
     }
   };
 
-  const connectTwitter = async () => {
-    try {
-      setTwitterConnecting(true);
-      const result = await TwitterSDKManager.secureLogin('creator', user?.dynamicUserId || user?.id);
-      if (result.success && result.user) {
-        setTwitterConnected(true);
-        setTwitterHandle(result.user.username);
-        setTwitterFollowers(result.user.followersCount || 0);
-        // Refresh connections to get latest data
-        await checkTwitterStatus();
-        toast({
-          title: "X Connected! 🐦",
-          description: `Connected @${result.user.username}`,
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Twitter login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e: any) {
-      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect X', variant: 'destructive' });
-    } finally {
-      setTwitterConnecting(false);
-    }
-  };
-
-  const disconnectTwitter = async () => {
-    try {
-      // Call backend to remove connection
-      const response = await fetch('/api/social/twitter', {
-        method: 'DELETE',
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-        setTwitterFollowers(0);
-        toast({
-          title: "X Disconnected",
-          description: "Successfully disconnected from X",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('Twitter disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from X. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
+  // Twitter connect/disconnect are now handled by useTwitterConnection hook
 
   const connectTiktok = async () => {
     // Prevent duplicate calls
@@ -1226,27 +1142,6 @@ export default function CreatorSocial() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Social Media Integrations */}
-          <Card className="bg-white/5 backdrop_blur-lg border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white">Facebook Integration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CreatorFacebookConnect />
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 backdrop_blur-lg border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white">Instagram Integration</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <CreatorInstagramConnect />
-              <InstagramWebhookSetup />
-              <InstagramMessageTest />
-            </CardContent>
-          </Card>
         </div>
       
       {/* Facebook Page Selection Modal */}

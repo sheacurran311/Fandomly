@@ -30,12 +30,12 @@ interface TwitterTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'twitter_follow' | 'twitter_like' | 'twitter_retweet';
+  taskType: 'twitter_follow' | 'twitter_like' | 'twitter_retweet' | 'twitter_quote_tweet';
   initialData?: any;
   isEditMode?: boolean;
 }
 
-type TwitterTaskType = 'twitter_follow' | 'twitter_like' | 'twitter_retweet';
+type TwitterTaskType = 'twitter_follow' | 'twitter_like' | 'twitter_retweet' | 'twitter_quote_tweet';
 
 interface PartnerAccount {
   id: string;
@@ -192,6 +192,12 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
           name: 'Retweet Our Post',
           description: 'Help us spread the word by retweeting!',
           points: 75,
+        };
+      case 'twitter_quote_tweet':
+        return {
+          name: 'Quote Tweet',
+          description: 'Quote tweet our post with your thoughts!',
+          points: 150,
         };
       default:
         return { name: '', description: '', points: 50 };
@@ -497,6 +503,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
               {taskType === 'twitter_follow' && 'Follow Task Configuration'}
               {taskType === 'twitter_like' && 'Like Tweet Configuration'}
               {taskType === 'twitter_retweet' && 'Retweet Configuration'}
+              {taskType === 'twitter_quote_tweet' && 'Quote Tweet Configuration'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -688,7 +695,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                   </div>
                 )}
                 <p className="text-xs text-gray-400">
-                  The full URL of the tweet you want fans to {taskType === 'twitter_like' ? 'like' : 'retweet'}
+                  The full URL of the tweet you want fans to {taskType === 'twitter_like' ? 'like' : taskType === 'twitter_quote_tweet' ? 'quote tweet' : 'retweet'}
                 </p>
               </div>
             )}

@@ -26,7 +26,7 @@ interface FacebookTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'facebook_follow' | 'facebook_like';
+  taskType: 'facebook_like_page' | 'facebook_like_post' | 'facebook_comment_post' | 'facebook_comment_photo';
   initialData?: any;
   isEditMode?: boolean;
 }
@@ -39,6 +39,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
   const [points, setPoints] = useState(50);
   const [pageUrl, setPageUrl] = useState('');
   const [postUrl, setPostUrl] = useState('');
+  const [requiredText, setRequiredText] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
@@ -67,11 +68,14 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       if (initialData.settings?.postUrl) {
         setPostUrl(initialData.settings.postUrl);
       }
+      if (initialData.settings?.requiredText) {
+        setRequiredText(initialData.settings.requiredText);
+      }
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [initialData, isEditMode]);
 
-  // Check if Facebook is connected
+  // Check if Facebook is connected and get page URL
   useEffect(() => {
     const checkFacebookConnection = async () => {
       try {
@@ -86,6 +90,22 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
         if (response.ok) {
           const data = await response.json();
           setFacebookConnected(data.connected);
+          
+          // Auto-fill page URL for follow tasks if available
+          if (data.connected && data.connection?.profileData) {
+            const fbData = data.connection.profileData;
+            // Try to get page URL from profile data or construct from username/id
+            if (taskType === 'facebook_like_page' && !pageUrl) {
+              // If we have pages, use the first page's URL
+              if (fbData.pages && fbData.pages.length > 0) {
+                const firstPage = fbData.pages[0];
+                setPageUrl(`https://facebook.com/${firstPage.id}`);
+              } else if (fbData.id) {
+                // Fall back to user profile URL
+                setPageUrl(`https://facebook.com/${fbData.id}`);
+              }
+            }
+          }
         } else {
           setFacebookConnected(false);
         }
@@ -99,22 +119,36 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     
     if (user?.id) {
       checkFacebookConnection();
+    } else {
+      setCheckingConnection(false);
     }
-  }, [user?.id, user?.dynamicUserId]);
+  }, [user?.id, user?.dynamicUserId, taskType]);
 
   const getDefaultValues = () => {
     switch (taskType) {
-      case 'facebook_follow':
+      case 'facebook_like_page':
         return {
-          name: 'Follow on Facebook',
+          name: 'Like Our Facebook Page',
           description: 'Like our Facebook page to stay connected!',
           points: 50,
         };
-      case 'facebook_like':
+      case 'facebook_like_post':
         return {
           name: 'Like Our Facebook Post',
           description: 'Show some love by liking our Facebook post!',
           points: 25,
+        };
+      case 'facebook_comment_post':
+        return {
+          name: 'Comment on Facebook Post',
+          description: 'Share your thoughts by commenting on our Facebook post!',
+          points: 30,
+        };
+      case 'facebook_comment_photo':
+        return {
+          name: 'Comment on Facebook Photo',
+          description: 'Tell us what you think about our Facebook photo!',
+          points: 30,
         };
       default:
         return { name: '', description: '', points: 50 };
@@ -139,7 +173,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       errors.push('Points must be between 1 and 10,000');
     }
     
-    if (taskType === 'facebook_follow') {
+    if (taskType === 'facebook_like_page') {
       if (!pageUrl.trim()) {
         errors.push('Facebook page URL is required');
       } else if (!pageUrl.includes('facebook.com')) {
@@ -162,7 +196,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
   // Validate on config changes
   useEffect(() => {
     validateForm();
-  }, [taskName, description, points, pageUrl, postUrl, taskType, facebookConnected]);
+  }, [taskName, description, points, pageUrl, postUrl, requiredText, taskType, facebookConnected]);
 
   const buildTaskConfig = (isDraft: boolean) => {
     const baseConfig = {
@@ -175,11 +209,19 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       verificationMethod: useApiVerification ? 'api' : 'manual',
     };
 
-    if (taskType === 'facebook_follow') {
+    if (taskType === 'facebook_like_page') {
       return {
         ...baseConfig,
         settings: {
           pageUrl,
+        },
+      };
+    } else if (taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo') {
+      return {
+        ...baseConfig,
+        settings: {
+          postUrl,
+          requiredText: requiredText || undefined,
         },
       };
     } else {
@@ -218,6 +260,21 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     onPublish(buildTaskConfig(false));
   };
 
+  const getTaskTypeLabel = () => {
+    switch (taskType) {
+      case 'facebook_like_page':
+        return 'Like Page';
+      case 'facebook_like_post':
+        return 'Like Post';
+      case 'facebook_comment_post':
+        return 'Comment';
+      case 'facebook_comment_photo':
+        return 'Comment';
+      default:
+        return 'Facebook Task';
+    }
+  };
+
   const previewComponent = (
     <div className="p-4 bg-gradient-to-r from-blue-600/10 to-blue-400/10 rounded-lg border border-blue-500/20">
       <div className="flex items-center gap-3 mb-3">
@@ -225,7 +282,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
         <h4 className="font-semibold text-white">Task Preview</h4>
       </div>
       <div className="space-y-2 text-sm">
-        <p><span className="text-blue-400">Type:</span> {taskType === 'facebook_follow' ? 'Follow Page' : 'Like Post'}</p>
+        <p><span className="text-blue-400">Type:</span> {getTaskTypeLabel()}</p>
         <p><span className="text-blue-400">Name:</span> {taskName || 'Untitled Task'}</p>
         <p><span className="text-blue-400">Points:</span> {points} points</p>
         <p><span className="text-blue-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
@@ -263,7 +320,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                   onClick={async () => {
                     try {
                       await FacebookSDKManager.ensureFBReady('creator');
-                      const result = await FacebookSDKManager.handleCreatorLogin();
+                      const result = await FacebookSDKManager.secureLogin('creator');
                       
                       if (result.success) {
                         toast({ title: "Facebook Connected! 📘" });
@@ -315,8 +372,10 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
         <Card className="bg-white/5 border-white/10">
           <CardHeader>
             <CardTitle className="text-white">
-              {taskType === 'facebook_follow' && 'Follow Page Configuration'}
-              {taskType === 'facebook_like' && 'Like Post Configuration'}
+              {taskType === 'facebook_like_page' && 'Like Page Configuration'}
+              {taskType === 'facebook_like_post' && 'Like Post Configuration'}
+              {taskType === 'facebook_comment_post' && 'Comment on Post Configuration'}
+              {taskType === 'facebook_comment_photo' && 'Comment on Photo Configuration'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -362,7 +421,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
             </div>
 
             {/* Task-Specific Fields */}
-            {taskType === 'facebook_follow' ? (
+            {taskType === 'facebook_like_page' ? (
               <div className="space-y-2">
                 <Label className="text-white">Facebook Page URL</Label>
                 <Input
@@ -377,18 +436,39 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label className="text-white">Facebook Post URL</Label>
-                <Input
-                  value={postUrl}
-                  onChange={(e) => setPostUrl(e.target.value)}
-                  placeholder="https://facebook.com/username/posts/1234567890"
-                  className={`bg-white/5 border-white/10 text-white ${!facebookConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={!facebookConnected}
-                />
-                <p className="text-xs text-gray-400">
-                  The full URL of the Facebook post you want fans to like
-                </p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-white">
+                    {taskType === 'facebook_comment_photo' ? 'Facebook Photo URL' : 'Facebook Post URL'}
+                  </Label>
+                  <Input
+                    value={postUrl}
+                    onChange={(e) => setPostUrl(e.target.value)}
+                    placeholder="https://facebook.com/username/posts/1234567890"
+                    className={`bg-white/5 border-white/10 text-white ${!facebookConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!facebookConnected}
+                  />
+                  <p className="text-xs text-gray-400">
+                    The full URL of the Facebook {taskType === 'facebook_comment_photo' ? 'photo' : 'post'} you want fans to {taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo' ? 'comment on' : 'like'}
+                  </p>
+                </div>
+
+                {/* Required Text field for comment tasks */}
+                {(taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo') && (
+                  <div className="space-y-2">
+                    <Label className="text-white">Required Text (Optional)</Label>
+                    <Input
+                      value={requiredText}
+                      onChange={(e) => setRequiredText(e.target.value)}
+                      placeholder="e.g., #MyBrand or specific keyword"
+                      className={`bg-white/5 border-white/10 text-white ${!facebookConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={!facebookConnected}
+                    />
+                    <p className="text-xs text-gray-400">
+                      If specified, fans must include this text in their comment
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

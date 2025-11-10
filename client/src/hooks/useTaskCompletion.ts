@@ -13,16 +13,9 @@ async function fetchUserTaskCompletions(tenantId?: string): Promise<{ completion
     ? `/api/task-completions/me?tenantId=${tenantId}`
     : '/api/task-completions/me';
   
-  const response = await fetch(url, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch task completions');
-  }
-
-  return response.json();
+  // Use apiRequest for proper authentication
+  const { apiRequest } = await import('@/lib/queryClient');
+  return await apiRequest('GET', url);
 }
 
 /**

@@ -10,6 +10,7 @@ import UserTypeSwitcher from "@/components/auth/user-type-switcher";
 import { useAuth } from "@/hooks/use-auth";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
 import { transformImageUrl } from "@/lib/image-utils";
+import { BrandSwitcher } from "@/components/brand-switcher";
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -71,7 +72,10 @@ export default function Navigation() {
               )}
               {dynamicUser ? (
                 <div className="flex items-center space-x-4">
-                  {userData?.userType === 'creator' ? (
+                  {/* Brand Switcher for Agency Users */}
+                  {userData?.brandType === 'agency' && <BrandSwitcher />}
+                  
+                  {userData?.userType === 'creator' || userData?.brandType ? (
                     <Link href="/creator-dashboard">
                       <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
                         Dashboard

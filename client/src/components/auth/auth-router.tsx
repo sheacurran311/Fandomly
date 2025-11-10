@@ -157,8 +157,14 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (currentPath === '/rbac-dashboard' || currentPath === '/dashboard') {
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Creator needs onboarding, redirecting from RBAC to creator type selection');
-          setLocation('/creator-type-selection');
+          // Check if brand user
+          if (userData?.brandType) {
+            console.log('Brand user needs onboarding, redirecting from RBAC to brand type selection');
+            setLocation('/brand-type-selection');
+          } else {
+            console.log('Creator needs onboarding, redirecting from RBAC to creator type selection');
+            setLocation('/creator-type-selection');
+          }
         } else {
           console.log('Redirecting from RBAC to creator dashboard');
           setLocation('/creator-dashboard');
@@ -187,8 +193,14 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     if (currentPath === '/user-type-selection') {
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('Creator needs onboarding, redirecting to creator type selection');
-          setLocation('/creator-type-selection');
+          // Check if brand user
+          if (userData?.brandType) {
+            console.log('Brand user needs onboarding, redirecting to brand type selection');
+            setLocation('/brand-type-selection');
+          } else {
+            console.log('Creator needs onboarding, redirecting to creator type selection');
+            setLocation('/creator-type-selection');
+          }
         } else {
           console.log('Creator already onboarded, redirecting to creator dashboard');
           setLocation('/creator-dashboard');
@@ -206,11 +218,22 @@ export default function AuthRouter({ children }: AuthRouterProps) {
     }
     
     // If creator hasn't completed onboarding, allow creator type selection and onboarding routes
+    // If brand user hasn't completed onboarding, allow brand type selection and onboarding routes
     if (userData?.userType === 'creator' && !userData?.onboardingState?.isCompleted) {
-      const allowedCreatorOnboardingRoutes = ['/creator-type-selection', '/creator-onboarding'];
-      if (!allowedCreatorOnboardingRoutes.includes(currentPath)) {
-        console.log('Creator needs onboarding, redirecting to creator type selection');
-        setLocation('/creator-type-selection');
+      if (userData?.brandType) {
+        // Brand user
+        const allowedBrandOnboardingRoutes = ['/brand-type-selection', '/brand-onboarding'];
+        if (!allowedBrandOnboardingRoutes.includes(currentPath)) {
+          console.log('Brand user needs onboarding, redirecting to brand type selection');
+          setLocation('/brand-type-selection');
+        }
+      } else {
+        // Regular creator
+        const allowedCreatorOnboardingRoutes = ['/creator-type-selection', '/creator-onboarding'];
+        if (!allowedCreatorOnboardingRoutes.includes(currentPath)) {
+          console.log('Creator needs onboarding, redirecting to creator type selection');
+          setLocation('/creator-type-selection');
+        }
       }
       return;
     }
@@ -226,8 +249,14 @@ export default function AuthRouter({ children }: AuthRouterProps) {
       
       if (userData?.userType === 'creator') {
         if (!userData?.onboardingState?.isCompleted) {
-          console.log('AuthRouter - Creator needs onboarding, redirecting to creator type selection');
-          setLocation('/creator-type-selection');
+          // Check if brand user
+          if (userData?.brandType) {
+            console.log('AuthRouter - Brand user needs onboarding, redirecting to brand type selection');
+            setLocation('/brand-type-selection');
+          } else {
+            console.log('AuthRouter - Creator needs onboarding, redirecting to creator type selection');
+            setLocation('/creator-type-selection');
+          }
         } else {
           console.log('AuthRouter - Authenticated creator on homepage, redirecting to creator dashboard');
           // Preserve Instagram callback parameters if present

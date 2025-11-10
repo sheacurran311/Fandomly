@@ -17,6 +17,14 @@ import { registerNotificationRoutes } from "./notification-routes";
 import { registerCrossmintRoutes } from "./crossmint-routes";
 import { registerProgramRoutes } from "./program-routes";
 import { registerAnnouncementRoutes } from "./announcement-routes";
+import { registerAgencyRoutes } from "./agency-routes";
+import { registerFacebookWebhooks } from "./facebook-webhooks";
+import { registerInstagramWebhooks } from "./instagram-webhooks";
+import { registerInstagramTaskRoutes } from "./instagram-task-routes";
+import { registerTwitterTaskRoutes } from "./twitter-task-routes";
+import { registerYouTubeTaskRoutes } from "./youtube-task-routes";
+import { registerSpotifyTaskRoutes } from "./spotify-task-routes";
+import { registerTikTokTaskRoutes } from "./tiktok-task-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -462,7 +470,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         accentColor,
         bannerImage, // New field replacing social links
         subscriptionTier,
-        location // Add location field
+        location, // Add location field
+        // Brand-specific fields
+        brandType, // 'single' | 'agency'
+        brandName, // Brand/Company Name
+        brandWebsite, // Brand/Company Website
+        brandDescription, // Brand/Company Description
+        agencyName, // Agency Name (if applicable)
+        agencyWebsite, // Agency Website (if applicable)
+        brandIdentifiers, // Topics/categories for brand
+        dataIsolationLevel // 'strict' | 'aggregated' | 'shared'
       } = req.body;
 
       // Validate and update username if provided
@@ -527,6 +544,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             platforms: Array.isArray(platforms) ? platforms : (typeof platforms === 'string' ? platforms.split(',').map(s => s.trim()) : [])
           }
         };
+      } else if (creatorType === 'brand') {
+        typeSpecificData = {
+          brand: {
+            brandName: brandName || '',
+            brandWebsite: brandWebsite || '',
+            brandDescription: brandDescription || '',
+            brandType: brandType || 'single',
+            agencyName: agencyName || undefined,
+            agencyWebsite: agencyWebsite || undefined,
+            brandIdentifiers: brandIdentifiers || []
+          }
+        };
+      }
+      
+      // Handle agency creation for brand users
+      let agencyId = null;
+      if (creatorType === 'brand' && brandType === 'agency' && agencyName) {
+        try {
+          const { db } = await import("./db");
+          const { agencies } = await import("@shared/schema");
+          
+          const [agency] = await db.insert(agencies).values({
+            ownerUserId: userId,
+            name: agencyName,
+            website: agencyWebsite || null,
+            businessInfo: {
+              companyType: 'agency',
+              primaryIndustry: brandIdentifiers?.[0] || undefined
+            },
+            allowCrossBrandAnalytics: true,
+            dataIsolationLevel: dataIsolationLevel || 'strict',
+          }).returning();
+          
+          agencyId = agency.id;
+          console.log(`✅ Created agency: ${agency.name} (ID: ${agency.id}) for user ${userId}`);
+        } catch (error) {
+          console.error("Failed to create agency during onboarding:", error);
+          // Continue even if agency creation fails
+        }
       }
 
       // Handle subscription and payment processing
@@ -568,12 +624,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update user onboarding state and profile data
-      const updatedUser = await storage.updateUser(user.id, {
+      const userUpdateData: any = {
         username: username || user.username, // Update username
         profileData: {
           ...(user.profileData || {}),
-          name: displayName || name, // Use 'name' field instead of 'displayName'
-          bio: bio || '',
+          name: displayName || name || brandName, // Use brand name for brand users
+          bio: bio || brandDescription || '',
           location: location || undefined,
           bannerImage: bannerImage || undefined,
           // Athlete-specific fields
@@ -586,7 +642,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Content Creator-specific fields
           contentType: contentType || undefined,
           platforms: platforms || undefined,
-          topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : undefined
+          topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : undefined,
+          // Brand-specific fields
+          brandName: brandName || undefined,
+          brandWebsite: brandWebsite || undefined
         } as any, // Type assertion to allow flexibility with profileData
         onboardingState: {
           currentStep: 3, // Updated to 3 steps (was 5)
@@ -594,7 +653,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedSteps: ["1", "2", "3"],
           isCompleted: true
         }
-      });
+      };
+      
+      // Add brand type and agency ID for brand users
+      if (creatorType === 'brand') {
+        userUpdateData.brandType = brandType || 'single';
+        if (agencyId) {
+          userUpdateData.agencyId = agencyId;
+        }
+      }
+      
+      const updatedUser = await storage.updateUser(user.id, userUpdateData);
 
       // Update creator and tenant if user is a creator
       if (user.userType === 'creator') {
@@ -607,7 +676,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const updateData: any = {
             subscriptionTier: subscriptionTier || tenant.subscriptionTier || 'starter',
             businessInfo: {
-              businessType: creatorType || tenant.businessInfo?.businessType || 'athlete'
+              businessType: creatorType || tenant.businessInfo?.businessType || 'athlete',
+              ...(creatorType === 'brand' && brandName ? { companyName: brandName } : {})
             },
             settings: {
               timezone: tenant.settings?.timezone || 'UTC',
@@ -622,8 +692,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           
           // Only update name if provided (store setup optional)
-          if (name) {
-            updateData.name = name;
+          if (name || (creatorType === 'brand' && brandName)) {
+            updateData.name = name || brandName;
           }
           
           // Only update branding if colors provided (store setup optional)
@@ -681,11 +751,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateCreator(creator.id, creatorUpdate);
         } else if (tenant) {
           // Create creator profile if it doesn't exist (only if tenant exists)
+          const creatorDisplayName = creatorType === 'brand' ? 
+            (brandName || name || username || 'Brand') : 
+            (displayName || name || username || 'Creator');
+          
           await storage.createCreator({
             userId: user.id,
             tenantId: tenant.id,
-            displayName: displayName || name || username || 'Creator',
-            bio: bio || '',
+            displayName: creatorDisplayName,
+            bio: bio || brandDescription || '',
             category: creatorType || 'athlete',
             followerCount: parseInt(followerCount) || 0,
             typeSpecificData: typeSpecificData,
@@ -967,6 +1041,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let user = null;
           try {
             user = await storage.getUser(c.userId);
+            // Debug log for image data
+            if (user && c.displayName === 'Shea Curran') {
+              console.log(`🖼️ Image data for ${c.displayName}:`, {
+                userId: c.userId,
+                hasUser: !!user,
+                hasProfileData: !!user.profileData,
+                avatar: user.profileData?.avatar,
+                bannerImage: user.profileData?.bannerImage,
+                creatorImageUrl: c.imageUrl
+              });
+            }
           } catch (userError) {
             console.warn(`Failed to fetch user for creator ${c.id}:`, userError);
           }
@@ -985,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             activeCampaignsCount: activeCampaigns.length,
             publishedTasksCount: publishedTasks.length,
             isLive: activeCampaigns.length > 0 || publishedTasks.length > 0,
-            user: user ? { username: user.username } : null,
+            user: user ? { username: user.username, profileData: user.profileData } : null,
             tenant: tenant ? { slug: tenant.slug, branding: tenant.branding } : null,
           };
         } catch (enrichError) {
@@ -1056,7 +1141,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         displayName,
         bio,
-        bannerImage,
         imageUrl,
         storeColors,
         typeSpecificData,
@@ -1067,7 +1151,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (displayName !== undefined) updates.displayName = displayName;
       if (bio !== undefined) updates.bio = bio;
-      if (bannerImage !== undefined) updates.bannerImage = bannerImage;
       if (imageUrl !== undefined) updates.imageUrl = imageUrl;
       if (storeColors !== undefined) updates.storeColors = storeColors;
       if (typeSpecificData !== undefined) updates.typeSpecificData = typeSpecificData;
@@ -1236,11 +1319,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =====================================
-  // TASK MANAGEMENT API ROUTES (New Workflow)
+  // TASK MANAGEMENT API ROUTES
+  // NOTE: Task routes have been moved to /server/task-routes.ts
   // =====================================
 
-  // Get all tasks for a creator (with tenant isolation)
-  app.get("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // =====================================
+  // TASK TEMPLATE API ROUTES
+  // =====================================
+
+  // Get task templates (with core templates + tenant-specific)
+  app.get("/api/task-templates", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -1254,212 +1342,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const tasks = await storage.getTasks(creator.id, creator.tenantId);
-      res.json(tasks);
+      
+      // Transform database field names to client field names for compatibility
+      const transformedTasks = tasks.map(task => ({
+        ...task,
+        points: task.pointsToReward,
+        settings: task.customSettings,
+      }));
+      
+      res.json(transformedTasks);
     } catch (error) {
       console.error("Failed to fetch tasks:", error);
       res.status(500).json({ error: "Failed to fetch tasks" });
-    }
-  });
-
-  // Get specific task by ID (with tenant isolation)
-  app.get("/api/tasks/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: "Creator profile required" });
-      }
-
-      const task = await storage.getTask(req.params.id, creator.tenantId);
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      res.json(task);
-    } catch (error) {
-      console.error("Failed to fetch task:", error);
-      res.status(500).json({ error: "Failed to fetch task" });
-    }
-  });
-
-  // Create new task (with input validation)
-  app.post("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: "Creator profile required to create tasks" });
-      }
-
-      // Validate input using Zod schema
-      const taskData = insertTaskSchema.parse({
-        ...req.body,
-        creatorId: creator.id,
-        tenantId: creator.tenantId
-      });
-
-      const task = await storage.createTask(taskData);
-      res.json(task);
-    } catch (error) {
-      console.error("Task creation error:", error);
-      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create task" });
-    }
-  });
-
-  // Update existing task (with tenant isolation)
-  app.put("/api/tasks/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: "Creator profile required" });
-      }
-
-      // Create secure update schema that omits immutable fields
-      const updateTaskSchema = insertTaskSchema.partial();
-      
-      const updates = updateTaskSchema.parse(req.body);
-      const task = await storage.updateTask(req.params.id, updates, creator.tenantId);
-      
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      res.json(task);
-    } catch (error) {
-      console.error("Task update error:", error);
-      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update task" });
-    }
-  });
-
-  // Delete task (with tenant isolation)
-  app.delete("/api/tasks/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: "Creator profile required" });
-      }
-
-      await storage.deleteTask(req.params.id, creator.tenantId);
-      res.json({ success: true, message: "Task deleted successfully" });
-    } catch (error) {
-      console.error("Task deletion error:", error);
-      res.status(500).json({ error: "Failed to delete task" });
-    }
-  });
-
-  // Get tasks assigned to a campaign
-  app.get("/api/campaigns/:campaignId/assigned-tasks", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const tasks = await storage.getCampaignTasks(req.params.campaignId);
-      res.json(tasks);
-    } catch (error) {
-      console.error("Failed to fetch campaign tasks:", error);
-      res.status(500).json({ error: "Failed to fetch campaign tasks" });
-    }
-  });
-
-  // Assign task to campaign
-  app.post("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: "Creator profile required" });
-      }
-
-      const { campaignId } = req.body;
-      if (!campaignId) {
-        return res.status(400).json({ error: "Campaign ID required" });
-      }
-
-      // Validate task and campaign exist and belong to same tenant
-      const task = await storage.getTask(req.params.taskId, creator.tenantId);
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      // Validate campaign belongs to same tenant/creator
-      const campaigns = await storage.getCampaignsByCreator(creator.id, creator.tenantId);
-      const campaign = campaigns.find(c => c.id === campaignId);
-      if (!campaign) {
-        return res.status(404).json({ error: "Campaign not found" });
-      }
-
-      const assignment = await storage.assignTaskToCampaign(
-        req.params.taskId, 
-        campaignId, 
-        creator.tenantId
-      );
-      res.json(assignment);
-    } catch (error) {
-      console.error("Task assignment error:", error);
-      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to assign task" });
-    }
-  });
-
-  // Unassign task from campaign
-  app.delete("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: "Creator profile required" });
-      }
-
-      const { campaignId } = req.body;
-      if (!campaignId) {
-        return res.status(400).json({ error: "Campaign ID required" });
-      }
-
-      // Validate task and campaign exist and belong to same tenant
-      const task = await storage.getTask(req.params.taskId, creator.tenantId);
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      // Validate campaign belongs to same tenant/creator
-      const campaigns = await storage.getCampaignsByCreator(creator.id, creator.tenantId);
-      const campaign = campaigns.find(c => c.id === campaignId);
-      if (!campaign) {
-        return res.status(404).json({ error: "Campaign not found" });
-      }
-
-      await storage.unassignTaskFromCampaign(req.params.taskId, campaignId, creator.tenantId);
-      res.json({ success: true, message: "Task unassigned successfully" });
-    } catch (error) {
-      console.error("Task unassignment error:", error);
-      res.status(500).json({ error: "Failed to unassign task" });
     }
   });
 
@@ -2047,6 +1941,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Creator profile required to create campaigns" });
       }
 
+      // REQUIRED: All campaigns must belong to a program
+      if (!req.body.programId) {
+        return res.status(400).json({ 
+          error: "All campaigns must be associated with a program. Please select a program.",
+          code: "PROGRAM_REQUIRED"
+        });
+      }
+
       const payload = insertCampaignSchema.parse({
         ...req.body,
         tenantId: creator.tenantId,
@@ -2087,10 +1989,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Campaign name and type are required" });
       }
 
+      // REQUIRED: All campaigns must belong to a program
+      if (!campaignData.programId) {
+        return res.status(400).json({ 
+          error: "All campaigns must be associated with a program. Please select a program.",
+          code: "PROGRAM_REQUIRED"
+        });
+      }
+
       // Create the main campaign with proper tenant scoping
       const campaignPayload = {
         tenantId: creator.tenantId,
         creatorId: creator.id,
+        programId: campaignData.programId, // Required
         name: campaignData.name,
         description: campaignData.description || '',
         campaignType: 'direct' as const,
@@ -2119,7 +2030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inviteCode: task.inviteCode,
           customInstructions: task.customInstructions,
           rewardType: task.rewardType || 'points',
-          rewardValue: task.rewardValue || 50,
+          pointsToReward: task.pointsToReward || 50,
           rewardMetadata: task.rewardMetadata,
           displayOrder: task.displayOrder || 1
         };
@@ -2380,9 +2291,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Follow tenant (create membership) for a fan
   app.post("/api/tenants/:tenantId/follow", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const { userId } = req.body;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
+      
       const { tenantId } = req.params;
-      if (!userId) return res.status(400).json({ error: "userId required" });
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      
       const membership = await storage.createTenantMembership({ tenantId, userId, role: 'member' });
       res.json(membership);
     } catch (error) {
@@ -2419,6 +2333,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching tenant memberships:', error);
       res.status(500).json({ error: "Failed to fetch tenant members" });
+    }
+  });
+
+  // Get user's tenant memberships (tenants the user is following)
+  app.get("/api/tenants/user/memberships", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
+      
+      const memberships = await storage.getUserMemberships(userId);
+      res.json(memberships);
+    } catch (error) {
+      console.error('Error fetching user memberships:', error);
+      res.status(500).json({ error: "Failed to fetch user memberships" });
     }
   });
 
@@ -2681,9 +2609,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fan program routes
-  app.post("/api/fan-programs", async (req, res) => {
+  app.post("/api/fan-programs", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const fanProgramData = insertFanProgramSchema.parse(req.body);
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
+      
+      // Use authenticated user ID as fanId
+      const fanProgramData = insertFanProgramSchema.parse({
+        ...req.body,
+        fanId: userId, // Override any fanId in body with authenticated user ID
+      });
       
       // Check if fan is already enrolled
       const existing = await storage.getFanProgram(fanProgramData.fanId, fanProgramData.programId);
@@ -2700,9 +2635,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/fan-programs/user/:fanId", async (req, res) => {
     try {
-      const fanPrograms = await storage.getFanProgramsByUser(req.params.fanId);
-      res.json(fanPrograms);
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const { fanPrograms: fanProgramsTable, loyaltyPrograms } = await import("@shared/schema");
+      
+      // Fetch fan programs with program details including creatorId
+      const fanProgramsWithDetails = await db
+        .select({
+          fanProgram: fanProgramsTable,
+          program: loyaltyPrograms,
+        })
+        .from(fanProgramsTable)
+        .leftJoin(loyaltyPrograms, eq(fanProgramsTable.programId, loyaltyPrograms.id))
+        .where(eq(fanProgramsTable.fanId, req.params.fanId));
+      
+      // Transform to include creatorId at top level for easy access
+      const enrichedFanPrograms = fanProgramsWithDetails.map(({ fanProgram, program }) => ({
+        ...fanProgram,
+        creatorId: program?.creatorId,
+        programName: program?.name,
+        programSlug: program?.slug,
+        totalPoints: fanProgram.totalPointsEarned || 0,
+        joinedAt: fanProgram.joinedAt,
+      }));
+      
+      console.log(`[API] Returning ${enrichedFanPrograms.length} fan programs for user ${req.params.fanId}`);
+      res.json(enrichedFanPrograms);
     } catch (error) {
+      console.error("Failed to fetch fan programs:", error);
       res.status(500).json({ error: "Failed to fetch fan programs" });
     }
   });
@@ -2950,6 +2910,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register social media routes (includes Instagram webhooks)
   registerSocialRoutes(app);
 
+  // Register Facebook webhooks (Pages and Users)
+  registerFacebookWebhooks(app);
+
+  // Register Instagram webhook management API
+  registerInstagramWebhooks(app);
+  
+  // Register Instagram task API routes
+  registerInstagramTaskRoutes(app);
+
+  // Register social media task verification routes
+  registerTwitterTaskRoutes(app);
+  registerYouTubeTaskRoutes(app);
+  registerSpotifyTaskRoutes(app);
+  registerTikTokTaskRoutes(app);
+
   // Register tenant routes
   registerTenantRoutes(app);
 
@@ -2991,6 +2966,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register announcement routes
   registerAnnouncementRoutes(app);
+
+  // Register agency routes
+  registerAgencyRoutes(app);
 
   // Register task routes
   const { registerTaskRoutes } = await import("./task-routes");

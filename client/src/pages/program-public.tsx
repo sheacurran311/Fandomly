@@ -133,7 +133,7 @@ export default function ProgramPublic() {
   };
 
   const activeCampaigns = campaigns.filter(c => c.status === 'active');
-  const activeTasks = tasks.filter(t => t.isActive);
+  const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
 
   // Transform image URLs
   const profileImageUrl = transformImageUrl(profileImage);
@@ -802,7 +802,7 @@ function TasksTab({
   brandColors: any;
   isThemeDark: boolean;
 }) {
-  const activeTasks = tasks.filter(t => t.isActive);
+  const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
 
   return (
     <div className="space-y-4">

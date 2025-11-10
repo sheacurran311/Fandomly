@@ -165,9 +165,13 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   walletAddress: text("wallet_address"),
   walletChain: text("wallet_chain"),
-  userType: text("user_type").notNull().default("fan"), // "creator" | "fan" - legacy field
+  userType: text("user_type").notNull().default("fan"), // "creator" | "fan" | "brand"
   
-  // Optional profile data collected during onboarding (fan/creator)
+  // Brand/Agency Support
+  brandType: text("brand_type"), // 'single' | 'agency' | null (for non-brand users)
+  agencyId: varchar("agency_id"), // Reference to agencies table (added via relation below)
+  
+  // Optional profile data collected during onboarding (fan/creator/brand)
   profileData: jsonb("profile_data").$type<{
     name?: string;
     age?: number;
@@ -365,6 +369,10 @@ export const tenantMemberships = pgTable("tenant_memberships", {
   // Status
   status: text("status").notNull().default('active'), // 'active' | 'inactive' | 'banned'
   
+  // Agency Support
+  isAgencyManager: boolean("is_agency_manager").default(false), // True if managing tenant on behalf of agency
+  managedBy: varchar("managed_by"), // User ID of agency owner managing this tenant
+  
   joinedAt: timestamp("joined_at").defaultNow(),
   lastActiveAt: timestamp("last_active_at").defaultNow(),
 });
@@ -375,7 +383,7 @@ export const creators = pgTable("creators", {
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Each creator belongs to a tenant
   displayName: text("display_name").notNull(),
   bio: text("bio"),
-  category: text("category").notNull(), // "athlete" | "musician" | "content_creator"
+  category: text("category").notNull(), // "athlete" | "musician" | "content_creator" | "brand"
   imageUrl: text("image_url"),
   followerCount: integer("follower_count").default(0),
   
@@ -472,6 +480,44 @@ export const creatorFacebookPages = pgTable("creator_facebook_pages", {
   lastSyncedAt: timestamp("last_synced_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// AGENCY & MULTI-BRAND MANAGEMENT
+// ============================================================================
+
+// Agencies table for multi-brand management
+export const agencies = pgTable("agencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  ownerUserId: varchar("owner_user_id").references(() => users.id).notNull(),
+  website: text("website"),
+  
+  businessInfo: jsonb("business_info").$type<{
+    companyType?: 'agency' | 'holding_company' | 'brand_network';
+    teamSize?: number;
+    managedBrandCount?: number;
+    primaryIndustry?: string;
+  }>().default({}),
+  
+  allowCrossBrandAnalytics: boolean("allow_cross_brand_analytics").default(false),
+  dataIsolationLevel: text("data_isolation_level").default('strict'), // 'strict' | 'aggregated' | 'shared'
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Links agencies to their managed brands (tenants)
+export const agencyTenants = pgTable("agency_tenants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: varchar("agency_id").references(() => agencies.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  
+  relationshipType: text("relationship_type").default('full_management'), // 'full_management' | 'white_label' | 'consulting'
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Programs are the highest level container (one per creator)
@@ -744,15 +790,15 @@ export const rewardFrequencyEnum = pgEnum('reward_frequency', ['one_time', 'dail
 // Enhanced task type enum with consistent platform-specific naming
 export const taskTypeEnum = pgEnum('task_type', [
   // Twitter/X tasks (consistent prefixing)
-  'twitter_follow', 'twitter_mention', 'twitter_retweet', 'twitter_like', 'twitter_include_name', 'twitter_include_bio', 'twitter_hashtag_post',
+  'twitter_follow', 'twitter_mention', 'twitter_retweet', 'twitter_like', 'twitter_include_name', 'twitter_include_bio', 'twitter_hashtag_post', 'twitter_quote_tweet',
   // Facebook tasks  
   'facebook_like_page', 'facebook_like_photo', 'facebook_like_post', 'facebook_share_post', 'facebook_share_page', 'facebook_comment_post', 'facebook_comment_photo',
   // Instagram tasks
-  'instagram_follow', 'instagram_like_post',
+  'instagram_follow', 'instagram_like_post', 'comment_code', 'mention_story', 'keyword_comment',
   // YouTube tasks
-  'youtube_like', 'youtube_subscribe', 'youtube_share',
+  'youtube_like', 'youtube_subscribe', 'youtube_share', 'youtube_comment',
   // TikTok tasks
-  'tiktok_follow', 'tiktok_like', 'tiktok_share',
+  'tiktok_follow', 'tiktok_like', 'tiktok_share', 'tiktok_comment',
   // Spotify tasks  
   'spotify_follow', 'spotify_playlist', 'spotify_album',
   // Engagement & Rewards tasks (new)
@@ -766,7 +812,7 @@ export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
   creatorId: varchar("creator_id").references(() => creators.id).notNull(),
-  programId: varchar("program_id").references(() => loyaltyPrograms.id), // Belongs to a Program (optional for now)
+  programId: varchar("program_id").references(() => loyaltyPrograms.id), // REQUIRED - all campaigns must belong to a program (enforced by DB constraint)
   
   // Basic Info
   name: text("name").notNull(),
@@ -885,7 +931,6 @@ export const socialCampaignTasks = pgTable("social_campaign_tasks", {
   
   // Reward Configuration
   rewardType: rewardTypeEnum("reward_type").notNull().default('points'),
-  rewardValue: integer("reward_value").notNull().default(50),
   rewardMetadata: jsonb("reward_metadata").$type<{
     nftContractAddress?: string;
     badgeImageUrl?: string;
@@ -914,8 +959,8 @@ export const tasks = pgTable("tasks", {
   creatorId: varchar("creator_id").references(() => creators.id), // NULL for platform tasks
   
   // Program & Campaign Association
-  programId: varchar("program_id").references(() => loyaltyPrograms.id), // Belongs to a Program (optional)
-  campaignId: varchar("campaign_id").references(() => campaigns.id), // Belongs to a Campaign (optional)
+  programId: varchar("program_id").references(() => loyaltyPrograms.id), // REQUIRED for creator tasks (enforced by DB constraint), NULL for platform tasks
+  campaignId: varchar("campaign_id").references(() => campaigns.id), // OPTIONAL - tasks can belong to a campaign
   
   // ============================================
   // SECTION 1: BASIC DETAILS
@@ -951,9 +996,6 @@ export const tasks = pgTable("tasks", {
   multiplierValue: decimal("multiplier_value", { precision: 4, scale: 2 }), // e.g., 1.50, 2.00, 3.00
   currenciesToApply: jsonb("currencies_to_apply").$type<string[]>(), // Which currencies the multiplier applies to
   applyToExistingBalance: boolean("apply_to_existing_balance").default(false),
-  
-  // Legacy field (keeping for backwards compatibility)
-  rewardValue: integer("reward_value").default(50),
   
   // ============================================
   // SECTION 3: TIMING CONFIGURATION (Snag-Inspired)
@@ -1182,6 +1224,18 @@ export const platformTaskCompletions = pgTable("platform_task_completions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Platform Points Transactions - Track platform-wide points separate from creator programs
+export const platformPointsTransactions = pgTable("platform_points_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  points: integer("points").notNull(),
+  source: varchar("source").notNull(), // 'task_completion' | 'daily_bonus' | 'referral' | 'admin_grant'
+  description: text("description"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Reward Distribution Log - Track all point awards
 export const rewardDistributions = pgTable("reward_distributions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1271,6 +1325,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   fanPrograms: many(fanPrograms),
   rewardRedemptions: many(rewardRedemptions),
   socialConnections: many(socialConnections),
+  agency: one(agencies, {
+    fields: [users.agencyId],
+    references: [agencies.id],
+  }),
+  ownedAgencies: many(agencies),
 }));
 
 export const socialConnectionsRelations = relations(socialConnections, ({ one }) => ({
@@ -1302,6 +1361,26 @@ export const creatorsRelations = relations(creators, ({ one, many }) => ({
   }),
   loyaltyPrograms: many(loyaltyPrograms),
   campaigns: many(campaigns),
+}));
+
+// Agency Relations
+export const agenciesRelations = relations(agencies, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [agencies.ownerUserId],
+    references: [users.id],
+  }),
+  agencyTenants: many(agencyTenants),
+}));
+
+export const agencyTenantsRelations = relations(agencyTenants, ({ one }) => ({
+  agency: one(agencies, {
+    fields: [agencyTenants.agencyId],
+    references: [agencies.id],
+  }),
+  tenant: one(tenants, {
+    fields: [agencyTenants.tenantId],
+    references: [tenants.id],
+  }),
 }));
 
 export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many }) => ({
@@ -1512,6 +1591,23 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Creator = typeof creators.$inferSelect;
 export type InsertCreator = z.infer<typeof insertCreatorSchema>;
+
+// Agency Types
+export const insertAgencySchema = createInsertSchema(agencies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAgencyTenantSchema = createInsertSchema(agencyTenants).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Agency = typeof agencies.$inferSelect;
+export type InsertAgency = z.infer<typeof insertAgencySchema>;
+export type AgencyTenant = typeof agencyTenants.$inferSelect;
+export type InsertAgencyTenant = z.infer<typeof insertAgencyTenantSchema>;
 
 export type LoyaltyProgram = typeof loyaltyPrograms.$inferSelect;
 export type InsertLoyaltyProgram = z.infer<typeof insertLoyaltyProgramSchema>;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest } from "@/lib/queryClient";
 import { transformImageUrl } from "@/lib/image-utils";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Heart, 
   Share2, 
@@ -65,8 +67,10 @@ interface CreatorPublicData {
 
 export default function CreatorPublic() {
   const { creatorUrl } = useParams<{ creatorUrl: string }>();
-  const [isFollowing, setIsFollowing] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch creator public data
   const { data: creatorData, isLoading } = useQuery<CreatorPublicData>({
@@ -81,6 +85,70 @@ export default function CreatorPublic() {
       return response.json();
     },
     enabled: !!creatorUrl,
+  });
+
+  // Fetch user's fan programs to check join status
+  const { data: userPrograms = [] } = useQuery({
+    queryKey: ["/api/fan-programs/user", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await apiRequest("GET", `/api/fan-programs/user/${user.id}`);
+      return await response.json();
+    },
+    enabled: !!user?.id && !!creatorData,
+  });
+
+  // Check if user has joined this creator's program
+  const hasJoinedProgram = userPrograms.some((program: any) => 
+    program.creatorId === creatorData?.creator?.id
+  );
+
+  // Join program mutation
+  const joinProgramMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Must be authenticated to join");
+      if (!creatorData) throw new Error("Creator data not loaded");
+      
+      // Fetch creator's loyalty programs
+      const programsResponse = await fetch(`/api/loyalty-programs/creator/${creatorData.creator.id}`, {
+        credentials: 'include',
+      });
+      
+      if (!programsResponse.ok) {
+        throw new Error("No loyalty programs available");
+      }
+      
+      const programs = await programsResponse.json();
+      
+      if (programs.length === 0) {
+        throw new Error("This creator hasn't created a loyalty program yet");
+      }
+      
+      // Join the first active program
+      const program = programs[0];
+      const response = await apiRequest("POST", "/api/fan-programs", {
+        tenantId: program.tenantId,
+        programId: program.id,
+      });
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success!",
+        description: `You've joined ${creatorData?.creator?.displayName}'s loyalty program!`,
+      });
+      // Invalidate queries to refresh join state
+      queryClient.invalidateQueries({ queryKey: ["/api/fan-programs/user", user?.id] });
+    },
+    onError: (error) => {
+      console.error("Join program error:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to join program",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -122,8 +190,8 @@ export default function CreatorPublic() {
   };
   const branding = creator.tenant?.branding;
 
-  // Filter published tasks
-  const publishedTasks = tasks.filter(t => t.status === 'published');
+  // Filter published tasks (not draft and is active)
+  const publishedTasks = tasks.filter(t => !t.isDraft && t.isActive);
   const activeCampaigns = campaigns.filter(c => c.status === 'active');
 
   return (
@@ -213,20 +281,23 @@ export default function CreatorPublic() {
                 </Button>
                 <Button
                   size="lg"
-                  className={isFollowing 
-                    ? "bg-white/10 text-white hover:bg-white/20" 
+                  disabled={joinProgramMutation.isPending || hasJoinedProgram}
+                  className={hasJoinedProgram
+                    ? "bg-green-500 hover:bg-green-500/80 text-white" 
                     : "bg-brand-primary hover:bg-brand-primary/90 text-white"}
-                  onClick={() => setIsFollowing(!isFollowing)}
+                  onClick={() => joinProgramMutation.mutate()}
                 >
-                  {isFollowing ? (
+                  {joinProgramMutation.isPending ? (
+                    "Joining..."
+                  ) : hasJoinedProgram ? (
                     <>
                       <CheckCircle className="h-5 w-5 mr-2" />
-                      Following
+                      Joined
                     </>
                   ) : (
                     <>
                       <Heart className="h-5 w-5 mr-2" />
-                      Follow
+                      Join Program
                     </>
                   )}
                 </Button>
@@ -243,8 +314,8 @@ export default function CreatorPublic() {
         </div>
       </section>
 
-      {/* Premium Banner for Non-Subscribers */}
-      {!isFollowing && (
+      {/* Premium Banner for Non-Members */}
+      {!hasJoinedProgram && (
         <section className="py-8 px-4 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-y border-purple-500/20">
           <div className="container mx-auto max-w-6xl">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">

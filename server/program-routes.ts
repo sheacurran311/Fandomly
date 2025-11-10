@@ -464,10 +464,10 @@ export function registerProgramRoutes(app: Express) {
   app.get("/api/programs/public/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
-      const { creators: creatorsTable, users } = await import("@shared/schema");
+      const { creators: creatorsTable, users, tenants } = await import("@shared/schema");
 
-      // Get published program by slug with creator and user data
-      const result = await db.select({
+      // Try 1: Get published program by program slug with creator and user data
+      let result = await db.select({
         program: loyaltyPrograms,
         creator: creatorsTable,
         user: users,
@@ -480,6 +480,35 @@ export function registerProgramRoutes(app: Express) {
           eq(loyaltyPrograms.status, 'published')
         ))
         .limit(1);
+
+      // Try 2: If not found, lookup by tenant slug
+      if (!result || result.length === 0) {
+        // Find tenant by slug
+        const tenantResult = await db.select()
+          .from(tenants)
+          .where(eq(tenants.slug, slug))
+          .limit(1);
+
+        if (tenantResult && tenantResult.length > 0) {
+          const tenant = tenantResult[0];
+          
+          // Find most recent published program for this tenant
+          result = await db.select({
+            program: loyaltyPrograms,
+            creator: creatorsTable,
+            user: users,
+          })
+            .from(loyaltyPrograms)
+            .leftJoin(creatorsTable, eq(loyaltyPrograms.creatorId, creatorsTable.id))
+            .leftJoin(users, eq(creatorsTable.userId, users.id))
+            .where(and(
+              eq(loyaltyPrograms.tenantId, tenant.id),
+              eq(loyaltyPrograms.status, 'published')
+            ))
+            .orderBy(desc(loyaltyPrograms.createdAt))
+            .limit(1);
+        }
+      }
 
       if (!result || result.length === 0) {
         return res.status(404).json({ error: "Program not found" });
@@ -496,11 +525,12 @@ export function registerProgramRoutes(app: Express) {
         ))
         .orderBy(campaigns.displayOrder);
 
-      // Get active tasks for this program
+      // Get active, published tasks for this program
       const programTasks = await db.select()
         .from(tasks)
         .where(and(
           eq(tasks.programId, program.id),
+          eq(tasks.isDraft, false),
           eq(tasks.isActive, true)
         ))
         .orderBy(desc(tasks.createdAt));

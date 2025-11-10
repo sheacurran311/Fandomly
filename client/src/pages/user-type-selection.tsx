@@ -14,14 +14,15 @@ import {
   Sparkles,
   ArrowRight,
   UserCheck,
-  Crown
+  Crown,
+  Building
 } from "lucide-react";
 
 export default function UserTypeSelection() {
   const [, setLocation] = useLocation();
   const { user: dynamicUser } = useDynamicContext();
   const { registerUser, isRegistering } = useAuth();
-  const [selectedType, setSelectedType] = useState<"fan" | "creator" | null>(null);
+  const [selectedType, setSelectedType] = useState<"fan" | "creator" | "brand" | null>(null);
 
   console.log("UserTypeSelection - Dynamic user:", !!dynamicUser, "Is registering:", isRegistering);
 
@@ -42,18 +43,21 @@ export default function UserTypeSelection() {
     );
   }
 
-  const handleTypeSelection = async (userType: "fan" | "creator") => {
+  const handleTypeSelection = async (userType: "fan" | "creator" | "brand") => {
     console.log("User selected type:", userType);
     setSelectedType(userType);
     
     try {
       console.log("Starting registration process...");
-      const result = await registerUser(userType);
+      // For brand users, register as creator type
+      const result = await registerUser(userType === "brand" ? "creator" : userType);
       console.log("Registration successful:", result);
       
       // Redirect based on type
       if (userType === "fan") {
         setLocation("/fan-onboarding/profile");
+      } else if (userType === "brand") {
+        setLocation("/brand-type-selection");
       } else {
         setLocation("/creator-type-selection");
       }
@@ -88,13 +92,13 @@ export default function UserTypeSelection() {
             </h1>
             
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Join the Web3 loyalty revolution. Whether you're here to support your favorite creators 
-              or build your own community, we've got you covered.
+              Join the Web3 loyalty revolution. Whether you're here to support your favorite creators,
+              build your own community, or manage multiple brands, we've got you covered.
             </p>
           </div>
 
-          {/* User Type Cards - Creator Left, Fan Right */}
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
+          {/* User Type Cards - 3 Column Layout */}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
             {/* Creator Card - LEFT SIDE */}
             <Card 
               className={`bg-white/5 backdrop-blur-lg border-white/10 cursor-pointer transition-all duration-300 hover:bg-white/10 hover:border-brand-primary/50 hover:transform hover:scale-105 ${
@@ -220,12 +224,74 @@ export default function UserTypeSelection() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Brand Card - RIGHT SIDE */}
+            <Card 
+              className={`bg-white/5 backdrop-blur-lg border-white/10 cursor-pointer transition-all duration-300 hover:bg-white/10 hover:border-purple-500/50 hover:transform hover:scale-105 ${
+                selectedType === "brand" ? "border-purple-500 bg-purple-500/10" : ""
+              }`}
+              onClick={() => !isRegistering && handleTypeSelection("brand")}
+            >
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mb-4">
+                  <Building className="h-8 w-8 text-purple-400" />
+                </div>
+                <CardTitle className="text-2xl text-white flex items-center justify-center gap-2">
+                  I'm a Brand
+                  <Badge className="bg-purple-500/20 text-purple-400">
+                    Pro
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-gray-300">
+                  Manage one or multiple brands with agency-level tools
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-gray-200">
+                    <Building className="h-5 w-5 text-purple-400" />
+                    <span>Multi-brand management</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-gray-200">
+                    <Users className="h-5 w-5 text-purple-400" />
+                    <span>Agency dashboard</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-gray-200">
+                    <Trophy className="h-5 w-5 text-purple-400" />
+                    <span>Advanced analytics</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-gray-200">
+                    <Star className="h-5 w-5 text-purple-400" />
+                    <span>White-label options</span>
+                  </div>
+                </div>
+                
+                <Button 
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold"
+                  disabled={isRegistering}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log("Brand button clicked");
+                    handleTypeSelection("brand");
+                  }}
+                >
+                  {isRegistering && selectedType === "brand" ? (
+                    "Setting up your brand..."
+                  ) : (
+                    <>
+                      Start Managing <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Additional Info */}
           <div className="text-center">
             <p className="text-gray-400 text-sm">
-              You can switch between fan and creator modes anytime in your dashboard
+              You can manage multiple user types and switch between them anytime in your dashboard
             </p>
           </div>
         </div>

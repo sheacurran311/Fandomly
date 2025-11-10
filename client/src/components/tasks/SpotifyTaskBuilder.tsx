@@ -55,6 +55,10 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
         if (response.ok) {
           const data = await response.json();
           setSpotifyConnected(data.connected);
+          
+          // Note: Spotify tasks require specific artist/playlist URLs that the creator must provide
+          // We can't auto-fill these as they depend on which artist/playlist the creator wants fans to follow
+          // The connection status is enough to enable the task builder
         } else {
           setSpotifyConnected(false);
         }

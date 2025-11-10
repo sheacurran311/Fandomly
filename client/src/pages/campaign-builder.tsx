@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { type Task } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Calendar, Clock, Users, Target, Gift, Zap, 
   TrendingUp, Heart, Share2, Trophy, Star, Coins,
@@ -23,6 +24,7 @@ import {
   AlertCircle, Wallet
 } from "lucide-react";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
+import { useLocation } from "wouter";
 
 // OpenLoyalty-style Campaign Templates
 const campaignTemplates = [
@@ -735,12 +737,24 @@ export default function CampaignBuilder() {
   const [retweet, setRetweet] = useState(false);
   const [points, setPoints] = useState(50);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
+  const [, setLocation] = useLocation();
 
   // Fetch programs for the creator
-  const { data: programs = [] } = useQuery({
+  const { data: programs = [], isLoading: programsLoading } = useQuery({
     queryKey: ["/api/programs"],
     enabled: !!userData?.id,
   });
+
+  // Auto-select most recently created program
+  useEffect(() => {
+    if (programs.length > 0 && !selectedProgramId) {
+      // Sort by createdAt DESC and select the most recent
+      const sortedPrograms = [...programs].sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setSelectedProgramId(sortedPrograms[0].id);
+    }
+  }, [programs, selectedProgramId]);
 
   // Fetch available tasks for assignment
   const { data: availableTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
@@ -755,11 +769,17 @@ export default function CampaignBuilder() {
   const createCampaign = useMutation({
     mutationFn: async () => {
       if (!creator) throw new Error("Creator profile not found");
+      
+      // REQUIRED: All campaigns must belong to a program
+      if (!selectedProgramId) {
+        throw new Error("All campaigns must be associated with a program. Please select a program.");
+      }
+      
       const now = new Date().toISOString();
       const newCampaignRes = await apiRequest("POST", "/api/campaigns", {
         tenantId: creator.tenantId,
         creatorId: creator.id,
-        programId: selectedProgramId || undefined, // Include programId if selected
+        programId: selectedProgramId, // Required
         name: "Social Engagement",
         description: "Earn points for social actions",
         campaignType: "direct",
@@ -839,6 +859,39 @@ export default function CampaignBuilder() {
     },
   });
 
+  // Check if creator has any programs - required for creating campaigns
+  if (!programsLoading && programs.length === 0) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg p-6">
+        <div className="max-w-2xl mx-auto mt-12">
+          <Alert className="border-yellow-500/50 bg-yellow-500/10">
+            <AlertCircle className="h-5 w-5 text-yellow-500" />
+            <AlertTitle className="text-yellow-500 text-lg font-semibold mb-2">
+              Program Required
+            </AlertTitle>
+            <AlertDescription className="text-gray-300 mb-4">
+              You must create a loyalty program before adding campaigns. Campaigns are always associated with a program to help organize your fan engagement strategy.
+            </AlertDescription>
+            <div className="flex gap-3 mt-4">
+              <Button 
+                onClick={() => setLocation("/creator-dashboard/program-builder")}
+                className="bg-brand-primary hover:bg-brand-primary/80"
+              >
+                Create Program
+              </Button>
+              <Button 
+                onClick={() => setLocation("/creator-dashboard/campaigns")}
+                variant="outline"
+              >
+                Back to Campaigns
+              </Button>
+            </div>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-brand-dark-bg p-6">
       <div className="max-w-7xl mx-auto">
@@ -913,13 +966,12 @@ export default function CampaignBuilder() {
             <CardContent className="space-y-4">
               {/* Program Selector */}
               <div>
-                <Label className="text-white mb-2 block">Select Program (Optional)</Label>
-                <Select value={selectedProgramId} onValueChange={(value) => setSelectedProgramId(value === "unassigned" ? "" : value)}>
+                <Label className="text-white mb-2 block">Select Program <span className="text-red-400">*</span></Label>
+                <Select value={selectedProgramId} onValueChange={(value) => setSelectedProgramId(value)}>
                   <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Select a program (or leave unassigned)" />
+                    <SelectValue placeholder="Select a program (required)" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-white/10">
-                    <SelectItem value="unassigned" className="text-white hover:bg-white/10">No Program (Unassigned)</SelectItem>
                     {programs.map((program: any) => (
                       <SelectItem key={program.id} value={program.id} className="text-white hover:bg-white/10">
                         {program.name}
@@ -928,7 +980,7 @@ export default function CampaignBuilder() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-400 mt-1">
-                  Associate this campaign with a specific loyalty program
+                  All campaigns must be associated with a loyalty program
                 </p>
               </div>
 

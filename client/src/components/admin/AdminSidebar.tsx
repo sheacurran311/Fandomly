@@ -15,6 +15,7 @@ import {
   Shield,
   Zap,
   Image,
+  Building2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -55,6 +56,12 @@ const navigationSections = [
         href: "/admin-dashboard/creators",
         icon: Store,
         description: "Creator accounts and tenants",
+      },
+      {
+        title: "Agencies",
+        href: "/admin-dashboard/agencies",
+        icon: Building2,
+        description: "Multi-brand agency accounts",
       },
       {
         title: "Fans",

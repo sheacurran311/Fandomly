@@ -11,6 +11,7 @@ import {
   UserPlus,
   Share2,
   MessageCircle,
+  MessageSquare,
   Heart,
   Video,
   Music,
@@ -28,6 +29,8 @@ import {
   ThumbsUp,
   Disc,
   ListMusic,
+  Camera,
+  Hash,
 } from "lucide-react";
 import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube } from "react-icons/si";
 
@@ -39,14 +42,22 @@ export type TaskTemplateType =
   | 'twitter_follow'
   | 'twitter_like'
   | 'twitter_retweet'
-  | 'facebook_follow'
-  | 'facebook_like'
+  | 'twitter_quote_tweet'
+  | 'facebook_like_page'
+  | 'facebook_like_post'
+  | 'facebook_comment_post'
+  | 'facebook_comment_photo'
   | 'instagram_follow'
-  | 'instagram_like'
+  | 'instagram_like_post'
+  | 'comment_code'
+  | 'mention_story'
+  | 'keyword_comment'
   | 'youtube_subscribe'
   | 'youtube_like'
+  | 'youtube_comment'
   | 'tiktok_follow'
   | 'tiktok_like'
+  | 'tiktok_comment'
   | 'spotify_follow'
   | 'spotify_playlist'
   | 'social_follow'
@@ -198,12 +209,33 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Amplify content reach',
     ],
   },
+  {
+    id: 'twitter_quote_tweet',
+    name: 'Quote Tweet',
+    description: 'Reward fans for quote tweeting your post with their thoughts',
+    icon: MessageCircle,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 90,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Amplify reach with commentary',
+      'Build conversations',
+      'Viral potential',
+    ],
+    useCases: [
+      'Start discussions',
+      'Thought leadership',
+      'Community engagement',
+    ],
+  },
 
   // Facebook Templates
   {
-    id: 'facebook_follow',
-    name: 'Follow on Facebook',
-    description: 'Reward fans for following your Facebook page',
+    id: 'facebook_like_page',
+    name: 'Like Facebook Page',
+    description: 'Reward fans for liking your Facebook page',
     icon: SiFacebook,
     category: 'social',
     difficulty: 'easy',
@@ -222,7 +254,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     ],
   },
   {
-    id: 'facebook_like',
+    id: 'facebook_like_post',
     name: 'Like Facebook Post',
     description: 'Reward fans for liking a specific Facebook post',
     icon: ThumbsUp,
@@ -240,6 +272,48 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Promote important posts',
       'Increase engagement',
       'Launch announcements',
+    ],
+  },
+  {
+    id: 'facebook_comment_post',
+    name: 'Comment on Facebook Post',
+    description: 'Reward fans for commenting on a specific Facebook post',
+    icon: MessageCircle,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 85,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Drive meaningful engagement',
+      'Build community discussion',
+      'Increase post reach',
+    ],
+    useCases: [
+      'Start conversations',
+      'Gather feedback',
+      'Community building',
+    ],
+  },
+  {
+    id: 'facebook_comment_photo',
+    name: 'Comment on Facebook Photo',
+    description: 'Reward fans for commenting on a specific Facebook photo',
+    icon: MessageSquare,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 83,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Drive photo engagement',
+      'Build community',
+      'Increase visibility',
+    ],
+    useCases: [
+      'Promote photo content',
+      'Community interaction',
+      'Visual storytelling',
     ],
   },
 
@@ -266,7 +340,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     ],
   },
   {
-    id: 'instagram_like',
+    id: 'instagram_like_post',
     name: 'Like Instagram Post',
     description: 'Reward fans for liking a specific Instagram post',
     icon: Heart,
@@ -284,6 +358,69 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Promote key content',
       'Feature highlights',
       'Campaign launches',
+    ],
+  },
+  {
+    id: 'comment_code',
+    name: 'Comment with Code (Instagram)',
+    description: 'Fans comment a unique code on your Instagram post - automatic verification',
+    icon: MessageSquare,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 88,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Automatic verification via webhook',
+      'No manual checking required',
+      'Instant point rewards',
+    ],
+    useCases: [
+      'Boost post engagement',
+      'Contest entries',
+      'Community interaction',
+    ],
+  },
+  {
+    id: 'mention_story',
+    name: 'Mention in Instagram Story',
+    description: 'Fans mention you in their Instagram Story - automatic verification',
+    icon: Camera,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 91,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Automatic webhook verification',
+      'Viral potential',
+      'User-generated content',
+    ],
+    useCases: [
+      'Brand awareness',
+      'UGC campaigns',
+      'Viral marketing',
+    ],
+  },
+  {
+    id: 'keyword_comment',
+    name: 'Comment with Keyword (Instagram)',
+    description: 'Fans comment a specific keyword on your Instagram post - automatic verification',
+    icon: Hash,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 86,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Automatic webhook verification',
+      'Custom keywords/hashtags',
+      'Instant rewards',
+    ],
+    useCases: [
+      'Campaign hashtags',
+      'Contest entries',
+      'Community challenges',
     ],
   },
 
@@ -330,6 +467,27 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Viral content',
     ],
   },
+  {
+    id: 'youtube_comment',
+    name: 'Comment on YouTube Video',
+    description: 'Reward fans for commenting on a specific YouTube video',
+    icon: MessageCircle,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 87,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Drive video discussion',
+      'Boost engagement metrics',
+      'Build community',
+    ],
+    useCases: [
+      'Start conversations',
+      'Gather feedback',
+      'Community engagement',
+    ],
+  },
 
   // TikTok Templates
   {
@@ -372,6 +530,27 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Promote videos',
       'Trending content',
       'Campaign launches',
+    ],
+  },
+  {
+    id: 'tiktok_comment',
+    name: 'Comment on TikTok Video',
+    description: 'Reward fans for commenting on a specific TikTok video',
+    icon: MessageCircle,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 85,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Drive engagement',
+      'Build community',
+      'Boost visibility',
+    ],
+    useCases: [
+      'Start conversations',
+      'Community building',
+      'Viral content',
     ],
   },
 
@@ -562,11 +741,11 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
       twitter_like: 'bg-black',
       twitter_retweet: 'bg-black',
       // Facebook
-      facebook_follow: 'bg-blue-600',
-      facebook_like: 'bg-blue-600',
+      facebook_like_page: 'bg-blue-600',
+      facebook_like_post: 'bg-blue-600',
       // Instagram
       instagram_follow: 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500',
-      instagram_like: 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500',
+      instagram_like_post: 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500',
       // YouTube
       youtube_subscribe: 'bg-red-600',
       youtube_like: 'bg-red-600',

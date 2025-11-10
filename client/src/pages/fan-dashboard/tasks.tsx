@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FanTaskCard } from '@/components/tasks/FanTaskCard';
 import { PlatformTaskCard } from '@/components/tasks/PlatformTaskCard';
+import { CreatorTasksTable } from '@/components/tasks/CreatorTasksTable';
 import { useUserTaskCompletions } from '@/hooks/useTaskCompletion';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/use-auth';
@@ -48,7 +49,7 @@ export default function FanTasksPage() {
   });
   const platformPoints = platformPointsData?.balance || 0;
 
-  // Fetch all published creator tasks
+  // Fetch published creator tasks (server filters by joined programs)
   const { data: tasksData, isLoading: isLoadingTasks } = useTasks();
   const tasks = tasksData?.tasks || [];
 
@@ -372,7 +373,7 @@ export default function FanTasksPage() {
         </CardContent>
       </Card>
 
-      {/* Tasks Grid */}
+      {/* Tasks Table */}
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -386,32 +387,23 @@ export default function FanTasksPage() {
             <p className="text-muted-foreground mb-4">
               {searchQuery 
                 ? 'Try adjusting your search or filters'
-                : 'Check back soon for new tasks!'}
+                : 'Join creators to see their tasks!'}
             </p>
             {!searchQuery && (
-              <p className="text-muted-foreground">
-                or{' '}
-                <Link href="/find-creators">
-                  <span className="text-brand-primary hover:text-brand-primary/80 underline cursor-pointer">
-                    search for more Creators
-                  </span>
-                </Link>
-                {' '}to find active tasks!
-              </p>
+              <Link href="/find-creators">
+                <Button className="bg-brand-primary hover:bg-brand-primary/80 mt-4">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Find Creators
+                </Button>
+              </Link>
             )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTasks.map((task: Task) => (
-            <FanTaskCard
-              key={task.id}
-              task={task}
-              completion={completionMap.get(task.id)}
-              tenantId={task.tenantId}
-            />
-          ))}
-        </div>
+        <CreatorTasksTable 
+          tasks={filteredTasks as any} 
+          completionMap={completionMap}
+        />
       )}
       </div>
     </DashboardLayout>

@@ -260,7 +260,6 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
           displayName: data.displayName,
           bio: data.bio,
           imageUrl: data.avatar,  // Save profile photo to creator.imageUrl for verification
-          bannerImage: data.bannerImage,
           storeColors: data.storeColors,  // Preserve store colors (managed in program builder)
           typeSpecificData,
           publicFields: data.publicFields

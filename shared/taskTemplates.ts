@@ -44,6 +44,13 @@ export const twitterTaskSchema = z.discriminatedUnion("taskType", [
     points: z.number().min(1).default(100),
     verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
   }),
+  z.object({
+    taskType: z.literal("twitter_quote_tweet"),
+    tweetUrl: z.string().url("Valid tweet URL is required"),
+    requiredText: z.string().optional(),
+    points: z.number().min(1).default(150),
+    verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
+  }),
 ]);
 
 export const facebookTaskSchema = z.discriminatedUnion("taskType", [
@@ -107,6 +114,27 @@ export const instagramTaskSchema = z.discriminatedUnion("taskType", [
     points: z.number().min(1).default(25),
     verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
   }),
+  z.object({
+    taskType: z.literal("comment_code"),
+    mediaId: z.string().min(1, "Instagram media ID is required"),
+    mediaUrl: z.string().url("Valid Instagram post URL is required"),
+    points: z.number().min(1).default(30),
+    verificationMethod: z.literal("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("mention_story"),
+    requireHashtag: z.string().optional(),
+    points: z.number().min(1).default(75),
+    verificationMethod: z.literal("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("keyword_comment"),
+    mediaId: z.string().min(1, "Instagram media ID is required"),
+    mediaUrl: z.string().url("Valid Instagram post URL is required"),
+    keyword: z.string().min(1, "Keyword is required"),
+    points: z.number().min(1).default(30),
+    verificationMethod: z.literal("automatic"),
+  }),
 ]);
 
 export const youtubeTaskSchema = z.discriminatedUnion("taskType", [
@@ -129,6 +157,13 @@ export const youtubeTaskSchema = z.discriminatedUnion("taskType", [
     points: z.number().min(1).default(75),
     verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
   }),
+  z.object({
+    taskType: z.literal("youtube_comment"),
+    videoUrl: z.string().url("Valid YouTube video URL is required"),
+    requiredText: z.string().optional(),
+    points: z.number().min(1).default(50),
+    verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
+  }),
 ]);
 
 export const tiktokTaskSchema = z.discriminatedUnion("taskType", [
@@ -148,6 +183,13 @@ export const tiktokTaskSchema = z.discriminatedUnion("taskType", [
     taskType: z.literal("tiktok_share"),
     videoUrl: z.string().url("Valid TikTok video URL is required"),
     points: z.number().min(1).default(75),
+    verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
+  }),
+  z.object({
+    taskType: z.literal("tiktok_comment"),
+    videoUrl: z.string().url("Valid TikTok video URL is required"),
+    requiredText: z.string().optional(),
+    points: z.number().min(1).default(50),
     verificationMethod: z.enum(["manual", "automatic"]).default("manual"),
   }),
 ]);
@@ -512,6 +554,128 @@ export const CORE_TASK_TEMPLATES = [
     isGlobal: true,
     isActive: true,
   },
+
+  // Comment Task Templates
+  {
+    id: "twitter-quote-tweet",
+    name: "Quote Tweet",
+    description: "Fans quote tweet a specific post",
+    platform: "twitter" as const,
+    taskType: "twitter_quote_tweet" as const,
+    category: "social",
+    defaultConfig: {
+      points: 150,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 150,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-comment-post",
+    name: "Comment on Facebook Post",
+    description: "Fans comment on a specific Facebook post",
+    platform: "facebook" as const,
+    taskType: "facebook_comment_post" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-comment-photo",
+    name: "Comment on Facebook Photo",
+    description: "Fans comment on a specific Facebook photo",
+    platform: "facebook" as const,
+    taskType: "facebook_comment_photo" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "instagram-comment-code",
+    name: "Comment with Code on Instagram",
+    description: "Fans comment with unique verification code (automatic verification)",
+    platform: "instagram" as const,
+    taskType: "comment_code" as const,
+    category: "social",
+    defaultConfig: {
+      points: 30,
+      verificationMethod: "automatic" as const,
+    },
+    defaultPoints: 30,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "instagram-mention-story",
+    name: "Mention in Instagram Story",
+    description: "Fans mention you in their Instagram Story (automatic verification)",
+    platform: "instagram" as const,
+    taskType: "mention_story" as const,
+    category: "social",
+    defaultConfig: {
+      points: 75,
+      verificationMethod: "automatic" as const,
+    },
+    defaultPoints: 75,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "instagram-keyword-comment",
+    name: "Comment with Keyword on Instagram",
+    description: "Fans comment with specific keyword (automatic verification)",
+    platform: "instagram" as const,
+    taskType: "keyword_comment" as const,
+    category: "social",
+    defaultConfig: {
+      points: 30,
+      verificationMethod: "automatic" as const,
+    },
+    defaultPoints: 30,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "youtube-comment",
+    name: "Comment on YouTube Video",
+    description: "Fans comment on a specific YouTube video",
+    platform: "youtube" as const,
+    taskType: "youtube_comment" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "tiktok-comment",
+    name: "Comment on TikTok Video",
+    description: "Fans comment on a specific TikTok video",
+    platform: "tiktok" as const,
+    taskType: "tiktok_comment" as const,
+    category: "social",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
 ] as const;
 
 // Platform-to-task-types mapping for UI
@@ -521,6 +685,7 @@ export const PLATFORM_TASK_TYPES = {
     { value: "mention", label: "Mention in Post", icon: "AtSign" },
     { value: "retweet", label: "Retweet", icon: "Repeat" },
     { value: "like", label: "Like Tweet", icon: "Heart" },
+    { value: "quote_tweet", label: "Quote Tweet", icon: "Quote" },
     { value: "include_in_name", label: "Include in Name", icon: "User" },
     { value: "include_in_bio", label: "Include in Bio", icon: "FileText" },
     { value: "hashtag_post", label: "Post with Hashtag", icon: "Hash" },
@@ -537,16 +702,21 @@ export const PLATFORM_TASK_TYPES = {
   instagram: [
     { value: "instagram_follow", label: "Follow Account", icon: "UserPlus" },
     { value: "instagram_like_post", label: "Like Post", icon: "Heart" },
+    { value: "comment_code", label: "Comment with Code", icon: "MessageSquare" },
+    { value: "mention_story", label: "Mention in Story", icon: "Camera" },
+    { value: "keyword_comment", label: "Comment with Keyword", icon: "Hash" },
   ],
   youtube: [
     { value: "youtube_like", label: "Like Video", icon: "ThumbsUp" },
     { value: "youtube_subscribe", label: "Subscribe", icon: "Bell" },
     { value: "youtube_share", label: "Share Video", icon: "Share" },
+    { value: "youtube_comment", label: "Comment on Video", icon: "MessageCircle" },
   ],
   tiktok: [
     { value: "tiktok_follow", label: "Follow Account", icon: "UserPlus" },
     { value: "tiktok_like", label: "Like Video", icon: "Heart" },
     { value: "tiktok_share", label: "Share Video", icon: "Share" },
+    { value: "tiktok_comment", label: "Comment on Video", icon: "MessageCircle" },
   ],
   spotify: [
     { value: "spotify_follow", label: "Follow Artist", icon: "UserPlus" },

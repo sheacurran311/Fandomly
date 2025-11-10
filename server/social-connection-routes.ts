@@ -166,8 +166,9 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     // Also sync to old storage system for backwards compatibility
     try {
       const { storage } = await import('./storage');
+      const { users } = await import('@shared/schema');
       const user = await db.query.users.findFirst({
-        where: eq(socialConnections.userId, userId)
+        where: eq(users.id, userId)
       });
       if (user && (user as any).dynamicUserId) {
         // Create accountData format expected by storage system
@@ -234,8 +235,9 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
     // Also remove from old storage system for consistency
     try {
       const { storage } = await import('./storage');
+      const { users } = await import('@shared/schema');
       const user = await db.query.users.findFirst({
-        where: eq(socialConnections.userId, userId)
+        where: eq(users.id, userId)
       });
       if (user && (user as any).dynamicUserId) {
         await storage.removeSocialAccount((user as any).dynamicUserId, platform);

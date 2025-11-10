@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   CheckCircle2, Clock, Star, Trophy, Users, Target,
-  Flame, Gift, ArrowRight, Lock
+  Flame, Gift, ArrowRight, Lock, Shield
 } from 'lucide-react';
 import type { Task, TaskCompletion } from '@shared/schema';
 import { 
@@ -18,6 +18,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 
 interface FanTaskCardProps {
   task: Task;
@@ -28,16 +30,23 @@ interface FanTaskCardProps {
 export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const queryClient = useQueryClient();
   
   const startTask = useStartTask();
   const completeTask = useCompleteTask();
   const checkIn = useCheckIn();
+
+  // Check if task is a social media task that can be verified
+  const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
+  const needsVerification = isSocialTask && inProgress && !completed;
 
   const completed = isTaskCompleted(completion);
   const inProgress = isTaskInProgress(completion);
   const progress = completion?.progress || 0;
   const streak = getCurrentStreak(completion);
   const canCheckIn = canCheckInToday(completion);
+  const isVerified = completion?.verifiedAt != null;
 
   // Task icon mapping
   const getTaskIcon = () => {
@@ -136,6 +145,48 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
     }
   };
 
+  // Handle social task verification
+  const handleVerify = async () => {
+    if (!completion) return;
+    
+    try {
+      setIsVerifying(true);
+      
+      // Call verification endpoint
+      const response = await apiRequest('POST', `/api/task-completions/${completion.id}/verify`, {
+        platform: task.platform,
+        taskType: task.taskType,
+        targetData: task.targetData || {}, // Task metadata with IDs to verify
+      });
+      
+      const result = await response.json();
+      
+      if (result.verified) {
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
+        
+        toast({
+          title: '✅ Task Verified!',
+          description: result.message || 'Your task has been successfully verified',
+        });
+      } else {
+        toast({
+          title: 'Verification Failed',
+          description: result.message || result.error || 'Could not verify task completion',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Verification Error',
+        description: error.message || 'Failed to verify task',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   // Check if task is available
   const isAvailable = () => {
     if (task.startTime && new Date() < new Date(task.startTime)) {
@@ -173,7 +224,13 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
           </div>
 
           {/* Status Badge */}
-          {completed && (
+          {completed && isVerified && (
+            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+              <Shield className="w-3 h-3 mr-1" />
+              Verified
+            </Badge>
+          )}
+          {completed && !isVerified && (
             <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
               <CheckCircle2 className="w-3 h-3 mr-1" />
               Completed
@@ -295,7 +352,7 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
             </Button>
           )}
 
-          {available && task.taskType !== 'check_in' && inProgress && !completed && (
+          {available && task.taskType !== 'check_in' && inProgress && !completed && !needsVerification && (
             <Button
               onClick={handleComplete}
               disabled={isProcessing || progress < 100}
@@ -303,6 +360,18 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
             >
               {isProcessing ? 'Completing...' : 'Complete Task'}
               <CheckCircle2 className="w-4 h-4 ml-2" />
+            </Button>
+          )}
+
+          {available && needsVerification && !isVerified && (
+            <Button
+              onClick={handleVerify}
+              disabled={isVerifying}
+              variant="default"
+              className="w-full"
+            >
+              {isVerifying ? 'Verifying...' : 'Verify Task'}
+              <Shield className="w-4 h-4 ml-2" />
             </Button>
           )}
 

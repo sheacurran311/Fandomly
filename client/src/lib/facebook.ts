@@ -267,8 +267,8 @@ class FacebookSDKManager {
     }, (userResponse) => {
       if (userResponse && !userResponse.error) {
         // Verify permissions
-        window.FB.api('/me/permissions', 'GET', {}, (permResponse) => {
-          const result = this.processPermissions(userResponse, permResponse, requiredScopes);
+        window.FB.api('/me/permissions', 'GET', {}, async (permResponse) => {
+          const result = await this.processPermissions(userResponse, permResponse, requiredScopes);
           resolve(result);
         });
       } else {
@@ -282,11 +282,11 @@ class FacebookSDKManager {
     });
   }
 
-  private static processPermissions(
+  private static async processPermissions(
     userResponse: any,
     permResponse: any,
     requiredScopes: string[]
-  ): FacebookLoginResult {
+  ): Promise<FacebookLoginResult> {
     const grantedScopes: string[] = [];
     const deniedScopes: string[] = [];
 
@@ -305,6 +305,62 @@ class FacebookSDKManager {
     
     if (missingScopes.length > 0) {
       console.warn('[FB Manager] Missing required permissions:', missingScopes);
+    }
+
+    // Save connection to database
+    try {
+      const dynamicUserId = localStorage.getItem('dynamic_user_id') || (window as any).__dynamicUserId;
+      console.log('[FB Manager] Saving connection to database...');
+      
+      if (dynamicUserId) {
+        // Try to get user's Facebook pages if they have page permissions
+        let pages: any[] = [];
+        try {
+          await new Promise<void>((resolve) => {
+            window.FB.api('/me/accounts', 'GET', { fields: 'id,name,access_token' }, (pagesResponse) => {
+              if (pagesResponse && !pagesResponse.error && pagesResponse.data) {
+                pages = pagesResponse.data;
+                console.log(`[FB Manager] Found ${pages.length} Facebook pages`);
+              }
+              resolve();
+            });
+          });
+        } catch (pageError) {
+          console.log('[FB Manager] Could not fetch pages (user may not have page permissions)');
+        }
+
+        const response = await fetch('/api/social-connections', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-dynamic-user-id': dynamicUserId
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            platform: 'facebook',
+            platformUserId: userResponse.id,
+            platformUsername: userResponse.name,
+            platformDisplayName: userResponse.name,
+            profileData: {
+              id: userResponse.id,
+              name: userResponse.name,
+              email: userResponse.email,
+              picture: userResponse.picture,
+              pages: pages
+            }
+          })
+        });
+
+        if (response.ok) {
+          console.log('[FB Manager] Connection saved successfully');
+        } else {
+          console.warn('[FB Manager] Failed to save connection:', await response.text());
+        }
+      } else {
+        console.warn('[FB Manager] No dynamicUserId found, skipping connection save');
+      }
+    } catch (error) {
+      console.error('[FB Manager] Error saving connection:', error);
     }
 
     return {

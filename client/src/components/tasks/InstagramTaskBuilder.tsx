@@ -26,7 +26,7 @@ interface InstagramTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'instagram_follow' | 'instagram_like';
+  taskType: 'instagram_follow' | 'instagram_like_post' | 'comment_code' | 'mention_story' | 'keyword_comment';
   initialData?: any;
   isEditMode?: boolean;
 }
@@ -39,12 +39,16 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
   const [points, setPoints] = useState(50);
   const [username, setUsername] = useState('');
   const [postUrl, setPostUrl] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [requireHashtag, setRequireHashtag] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
   const [instagramConnected, setInstagramConnected] = useState(false);
   const [instagramHandle, setInstagramHandle] = useState<string | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(true);
+  const [instagramPosts, setInstagramPosts] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   // Check if Instagram is connected and auto-populate username
   useEffect(() => {
@@ -61,11 +65,12 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
         if (response.ok) {
           const data = await response.json();
           setInstagramConnected(data.connected || false);
-          if (data.connected && data.username) {
-            setInstagramHandle(data.username);
+          if (data.connected && data.connection) {
+            const instagramUsername = data.connection.platformUsername || data.connection.platformDisplayName;
+            setInstagramHandle(instagramUsername);
             // Auto-populate username for follow tasks
-            if (taskType === 'instagram_follow' && !username) {
-              setUsername(data.username);
+            if (taskType === 'instagram_follow' && !username && instagramUsername) {
+              setUsername(instagramUsername);
             }
           }
         } else {
@@ -108,6 +113,12 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
       if (initialData.settings?.postUrl) {
         setPostUrl(initialData.settings.postUrl);
       }
+      if (initialData.settings?.keyword) {
+        setKeyword(initialData.settings.keyword);
+      }
+      if (initialData.settings?.requireHashtag) {
+        setRequireHashtag(initialData.settings.requireHashtag);
+      }
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [initialData, isEditMode]);
@@ -120,11 +131,29 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
           description: 'Follow us on Instagram to see our latest content!',
           points: 50,
         };
-      case 'instagram_like':
+      case 'instagram_like_post':
         return {
           name: 'Like Our Instagram Post',
           description: 'Show some love by liking our Instagram post!',
           points: 25,
+        };
+      case 'comment_code':
+        return {
+          name: 'Comment on Instagram Post',
+          description: 'Comment with your unique code on our Instagram post!',
+          points: 30,
+        };
+      case 'mention_story':
+        return {
+          name: 'Mention in Instagram Story',
+          description: 'Post an Instagram Story and mention us!',
+          points: 75,
+        };
+      case 'keyword_comment':
+        return {
+          name: 'Comment with Keyword',
+          description: 'Comment with the special keyword on our Instagram post!',
+          points: 30,
         };
       default:
         return { name: '', description: '', points: 50 };
@@ -148,11 +177,22 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
       if (!username.trim()) {
         errors.push('Instagram username is required');
       }
+    } else if (taskType === 'mention_story') {
+      // Mention story doesn't need post URL, just creator's handle
+      if (!instagramHandle) {
+        errors.push('Instagram account must be connected for mention story tasks');
+      }
     } else {
+      // comment_code, keyword_comment, instagram_like all need post URL
       if (!postUrl.trim()) {
         errors.push('Instagram post URL is required');
       } else if (!postUrl.includes('instagram.com')) {
         errors.push('Invalid Instagram post URL');
+      }
+      
+      // keyword_comment needs keyword
+      if (taskType === 'keyword_comment' && !keyword.trim()) {
+        errors.push('Keyword is required for keyword comment tasks');
       }
     }
 
@@ -165,7 +205,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
   // Validate on config changes
   useEffect(() => {
     validateForm();
-  }, [taskName, description, points, username, postUrl, taskType]);
+  }, [taskName, description, points, username, postUrl, keyword, taskType, instagramHandle]);
 
   const buildTaskConfig = (isDraft: boolean) => {
     const baseConfig = {
@@ -185,7 +225,39 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
           username: username.startsWith('@') ? username.substring(1) : username,
         },
       };
+    } else if (taskType === 'mention_story') {
+      return {
+        ...baseConfig,
+        settings: {
+          creatorUsername: instagramHandle,
+          requireHashtag: requireHashtag || undefined,
+        },
+      };
+    } else if (taskType === 'comment_code') {
+      // Extract media ID from URL for comment code tasks
+      const mediaId = extractMediaIdFromUrl(postUrl);
+      return {
+        ...baseConfig,
+        settings: {
+          postUrl,
+          mediaUrl: postUrl,
+          mediaId,
+        },
+      };
+    } else if (taskType === 'keyword_comment') {
+      // Extract media ID from URL for keyword comment tasks
+      const mediaId = extractMediaIdFromUrl(postUrl);
+      return {
+        ...baseConfig,
+        settings: {
+          postUrl,
+          mediaUrl: postUrl,
+          mediaId,
+          keyword,
+        },
+      };
     } else {
+      // instagram_like
       return {
         ...baseConfig,
         settings: {
@@ -193,6 +265,23 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
         },
       };
     }
+  };
+
+  // Helper function to extract media ID from Instagram URL
+  const extractMediaIdFromUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const pathSegments = urlObj.pathname.split('/').filter(s => s);
+      // Instagram URLs are like /p/{mediaId}/ or /reel/{mediaId}/
+      const mediaIdIndex = (pathSegments.indexOf('p') + 1) || (pathSegments.indexOf('reel') + 1);
+      if (mediaIdIndex > 0 && pathSegments[mediaIdIndex]) {
+        return pathSegments[mediaIdIndex];
+      }
+    } catch (error) {
+      console.error('Error extracting media ID from URL:', url, error);
+    }
+    // Fallback: return the last segment of the path
+    return url.split('/').filter(s => s).pop() || '';
   };
 
   const handleSaveClick = () => {
@@ -221,6 +310,23 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     onPublish(buildTaskConfig(false));
   };
 
+  const getTaskTypeLabel = () => {
+    switch (taskType) {
+      case 'instagram_follow':
+        return 'Follow Account';
+      case 'instagram_like':
+        return 'Like Post';
+      case 'comment_code':
+        return 'Comment';
+      case 'mention_story':
+        return 'Mention';
+      case 'keyword_comment':
+        return 'Comment';
+      default:
+        return 'Instagram Task';
+    }
+  };
+
   const previewComponent = (
     <div className="p-4 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 rounded-lg border border-pink-500/20">
       <div className="flex items-center gap-3 mb-3">
@@ -228,7 +334,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
         <h4 className="font-semibold text-white">Task Preview</h4>
       </div>
       <div className="space-y-2 text-sm">
-        <p><span className="text-pink-400">Type:</span> {taskType === 'instagram_follow' ? 'Follow Account' : 'Like Post'}</p>
+        <p><span className="text-pink-400">Type:</span> {getTaskTypeLabel()}</p>
         <p><span className="text-pink-400">Name:</span> {taskName || 'Untitled Task'}</p>
         <p><span className="text-pink-400">Points:</span> {points} points</p>
         <p><span className="text-pink-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
@@ -323,6 +429,9 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
             <CardTitle className="text-white">
               {taskType === 'instagram_follow' && 'Follow Account Configuration'}
               {taskType === 'instagram_like' && 'Like Post Configuration'}
+              {taskType === 'comment_code' && 'Comment with Code Configuration'}
+              {taskType === 'mention_story' && 'Mention in Story Configuration'}
+              {taskType === 'keyword_comment' && 'Comment with Keyword Configuration'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -378,18 +487,58 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
                   Your Instagram username (with or without @)
                 </p>
               </div>
-            ) : (
+            ) : taskType === 'mention_story' ? (
               <div className="space-y-2">
-                <Label className="text-white">Instagram Post URL</Label>
-                <Input
-                  value={postUrl}
-                  onChange={(e) => setPostUrl(e.target.value)}
-                  placeholder="https://instagram.com/p/ABC123..."
-                  className="bg-white/5 border-white/10 text-white"
-                />
-                <p className="text-xs text-gray-400">
-                  The full URL of the Instagram post you want fans to like
-                </p>
+                <Alert className="bg-blue-500/10 border-blue-500/20 text-blue-400">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Fans will post an Instagram Story mentioning your connected Instagram account (@{instagramHandle || 'your_username'}).
+                    No post URL is required - the task verifies automatically when they mention you.
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2 mt-4">
+                  <Label className="text-white">Required Hashtag (Optional)</Label>
+                  <Input
+                    value={requireHashtag}
+                    onChange={(e) => setRequireHashtag(e.target.value)}
+                    placeholder="#MyBrand (optional)"
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                  <p className="text-xs text-gray-400">
+                    If specified, fans must also include this hashtag in their Story
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-white">Instagram Post URL</Label>
+                  <Input
+                    value={postUrl}
+                    onChange={(e) => setPostUrl(e.target.value)}
+                    placeholder="https://instagram.com/p/ABC123..."
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                  <p className="text-xs text-gray-400">
+                    The full URL of the Instagram post you want fans to {taskType === 'comment_code' || taskType === 'keyword_comment' ? 'comment on' : 'like'}
+                  </p>
+                </div>
+
+                {/* Keyword field for keyword_comment tasks */}
+                {taskType === 'keyword_comment' && (
+                  <div className="space-y-2">
+                    <Label className="text-white">Required Keyword</Label>
+                    <Input
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder="e.g., #Fandomly or 'Awesome!'"
+                      className="bg-white/5 border-white/10 text-white"
+                    />
+                    <p className="text-xs text-gray-400">
+                      Fans must include this exact keyword or hashtag in their comment
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

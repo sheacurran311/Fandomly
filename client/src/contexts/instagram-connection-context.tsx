@@ -82,28 +82,40 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
 
     (window as any).handleInstagramConnectionResult = instagramStatusCallback;
     
-    // Load saved connection data from database
+    // Load saved connection data from database on mount and hot reload
     const loadSavedConnection = async () => {
       try {
-        const { getSocialConnection } = await import('@/lib/social-connection-api');
-        const { connected, connection } = await getSocialConnection('instagram');
-        
-        if (connected && connection) {
-          setState(prev => ({
-            ...prev,
-            isConnected: true,
-            userInfo: {
-              id: connection.platformUserId || '',
-              username: connection.platformUsername || '',
-              name: connection.platformDisplayName || '',
-              profile_picture_url: connection.profileData?.profilePictureUrl,
-              followers_count: connection.profileData?.followers,
-              media_count: connection.profileData?.following,
-            },
-            businessAccountId: connection.platformUserId || '',
-            accessToken: '', // Don't store token in state for security
-          }));
-          console.log('[Instagram] Loaded saved connection for user:', connection.platformUsername);
+        console.log('[Instagram] Loading saved connection from database...');
+        const response = await fetch('/api/social-connections/instagram', {
+          headers: {
+            'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.connected && data.connection) {
+            const connection = data.connection;
+            setState(prev => ({
+              ...prev,
+              isConnected: true,
+              userInfo: {
+                id: connection.platformUserId || '',
+                username: connection.platformUsername || '',
+                name: connection.platformDisplayName || '',
+                profile_picture_url: connection.profileData?.profilePictureUrl,
+                followers_count: connection.profileData?.followers,
+                media_count: connection.profileData?.following,
+              },
+              businessAccountId: connection.platformUserId || '',
+              accessToken: '', // Don't store token in state for security
+            }));
+            console.log('[Instagram] ✅ Loaded saved connection for user:', connection.platformUsername);
+          } else {
+            console.log('[Instagram] No saved connection found');
+          }
         }
       } catch (error) {
         console.error('[Instagram] Error loading saved connection:', error);

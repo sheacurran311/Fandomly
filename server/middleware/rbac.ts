@@ -44,7 +44,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     }
 
     // Fetch user with role information using Dynamic user ID
-    const [user] = await db
+    let [user] = await db
       .select({
         id: users.id,
         role: users.role,
@@ -56,8 +56,30 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
       .where(eq(users.dynamicUserId, dynamicUserId))
       .limit(1);
 
+    // Auto-create user if they don't exist (Dynamic authenticated but not in our DB)
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      console.log('[Auth] User not found, auto-creating for dynamicUserId:', dynamicUserId);
+      
+      // Create a basic fan user account
+      const [newUser] = await db.insert(users).values({
+        dynamicUserId,
+        username: `user_${dynamicUserId.substring(0, 8)}`,
+        email: null,
+        userType: 'fan',
+        role: 'customer_end_user',
+        walletAddress: '',
+        walletChain: '',
+      } as any).returning();
+      
+      user = {
+        id: newUser.id,
+        role: newUser.role as 'fandomly_admin' | 'customer_admin' | 'customer_end_user',
+        customerTier: newUser.customerTier,
+        adminPermissions: newUser.adminPermissions,
+        customerAdminData: newUser.customerAdminData,
+      };
+      
+      console.log('[Auth] Auto-created user:', user.id);
     }
 
     req.user = {

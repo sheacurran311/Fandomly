@@ -384,5 +384,137 @@ export function createTaskCompletionRoutes(storage: IStorage) {
     }
   });
 
+  // ==============================================
+  // POST /api/task-completions/:taskCompletionId/verify
+  // Trigger verification for a task completion
+  // ==============================================
+  router.post('/:taskCompletionId/verify', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { taskCompletionId } = req.params;
+      const { platform, taskType, targetData } = req.body;
+
+      if (!platform || !taskType) {
+        return res.status(400).json({ error: 'Platform and taskType are required' });
+      }
+
+      console.log('[Task Verification] Verification requested:', {
+        userId: req.user.id,
+        taskCompletionId,
+        platform,
+        taskType,
+        targetData
+      });
+
+      // Import verification functions dynamically
+      const {
+        verifyTwitterFollow,
+        verifyTwitterLike,
+        verifyTwitterRetweet,
+        verifyYouTubeSubscription,
+        verifyYouTubeLike,
+        verifyYouTubeComment,
+        verifySpotifyFollowArtist,
+        verifySpotifyFollowPlaylist,
+        verifyTikTokFollow,
+        verifyTikTokLike,
+        verifyTikTokComment,
+        updateTaskCompletion
+      } = await import('./services/social-verification-service');
+
+      let result;
+
+      // Route to appropriate verification function based on platform and task type
+      switch (platform) {
+        case 'twitter':
+          switch (taskType) {
+            case 'follow':
+              result = await verifyTwitterFollow(req.user.id, targetData.creatorTwitterId);
+              break;
+            case 'like':
+              result = await verifyTwitterLike(req.user.id, targetData.tweetId);
+              break;
+            case 'retweet':
+              result = await verifyTwitterRetweet(req.user.id, targetData.tweetId);
+              break;
+            default:
+              return res.status(400).json({ error: 'Invalid Twitter task type' });
+          }
+          break;
+
+        case 'youtube':
+          switch (taskType) {
+            case 'subscribe':
+              result = await verifyYouTubeSubscription(req.user.id, targetData.channelId);
+              break;
+            case 'like':
+              result = await verifyYouTubeLike(req.user.id, targetData.videoId);
+              break;
+            case 'comment':
+              result = await verifyYouTubeComment(req.user.id, targetData.videoId);
+              break;
+            default:
+              return res.status(400).json({ error: 'Invalid YouTube task type' });
+          }
+          break;
+
+        case 'spotify':
+          switch (taskType) {
+            case 'follow_artist':
+              result = await verifySpotifyFollowArtist(req.user.id, targetData.artistId);
+              break;
+            case 'follow_playlist':
+              result = await verifySpotifyFollowPlaylist(req.user.id, targetData.playlistId);
+              break;
+            default:
+              return res.status(400).json({ error: 'Invalid Spotify task type' });
+          }
+          break;
+
+        case 'tiktok':
+          switch (taskType) {
+            case 'follow':
+              result = await verifyTikTokFollow(req.user.id, targetData.creatorTikTokId);
+              break;
+            case 'like':
+              result = await verifyTikTokLike(req.user.id, targetData.videoId);
+              break;
+            case 'comment':
+              result = await verifyTikTokComment(req.user.id, targetData.videoId);
+              break;
+            default:
+              return res.status(400).json({ error: 'Invalid TikTok task type' });
+          }
+          break;
+
+        default:
+          return res.status(400).json({ error: 'Unsupported platform' });
+      }
+
+      // Update task completion with verification result
+      if (result.verified) {
+        await updateTaskCompletion(taskCompletionId, result, 'api_poll');
+      }
+
+      res.json({
+        success: result.verified,
+        verified: result.verified,
+        message: result.message,
+        proof: result.proof,
+        error: result.error
+      });
+    } catch (error) {
+      console.error('[Task Verification] Error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to verify task',
+        message: String(error)
+      });
+    }
+  });
+
   return router;
 }

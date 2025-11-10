@@ -39,6 +39,18 @@ export default function FindCreators() {
     selectedCategory,
     sortBy 
   });
+  
+  // Debug: Log banner image data for first few creators
+  if (creators.length > 0) {
+    console.log('Find Creators - Image data sample:', creators.slice(0, 3).map(c => ({
+      displayName: c.displayName,
+      imageUrl: c.imageUrl,
+      userProfileAvatar: c.user?.profileData?.avatar,
+      userProfileBanner: c.user?.profileData?.bannerImage,
+      tenantBrandingBanner: c.tenant?.branding?.bannerUrl,
+      tenantBrandingLogo: c.tenant?.branding?.logoUrl
+    })));
+  }
 
   const handleUnauthenticatedClick = () => {
     // Trigger Dynamic auth modal for unauthenticated users
@@ -82,7 +94,7 @@ export default function FindCreators() {
     }
   });
 
-  const categories = ["athlete", "musician", "creator"];
+  const categories = ["athlete", "musician", "creator", "brand"];
 
   if (isLoading) {
     const loadingContent = (
@@ -178,7 +190,7 @@ export default function FindCreators() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-6 text-center">
                   <Users className="h-8 w-8 text-brand-secondary mx-auto mb-2" />
@@ -204,7 +216,14 @@ export default function FindCreators() {
                 <CardContent className="p-6 text-center">
                   <TrendingUp className="h-8 w-8 text-green-400 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">{creators.filter(c => c.category === 'creator').length}</div>
-                  <div className="text-sm text-gray-400">Creators</div>
+                  <div className="text-sm text-gray-400">Content Creators</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="p-6 text-center">
+                  <Zap className="h-8 w-8 text-purple-400 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-white">{creators.filter(c => c.category === 'brand').length}</div>
+                  <div className="text-sm text-gray-400">Brands</div>
                 </CardContent>
               </Card>
             </div>

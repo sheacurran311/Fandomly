@@ -4,7 +4,7 @@ import { type Creator } from "@shared/schema";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import { Trophy, Target } from "lucide-react";
 import { transformImageUrl } from "@/lib/image-utils";
@@ -13,6 +13,10 @@ interface CreatorCardProps {
   creator: Creator & {
     user?: {
       username: string;
+      profileData?: {
+        avatar?: string;
+        bannerImage?: string;
+      };
     };
     tenant?: {
       slug: string;
@@ -27,7 +31,7 @@ interface CreatorCardProps {
 }
 
 export default function CreatorCard({ creator, showJoinButton = true, onUnauthenticatedClick }: CreatorCardProps) {
-  const { user } = useDynamicContext();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -47,34 +51,19 @@ export default function CreatorCard({ creator, showJoinButton = true, onUnauthen
   // Get tenantId from creator or fetched data
   const tenantId = creator.tenantId || creatorData?.creator?.tenantId;
 
-  // Follow creator mutation
-  const followMutation = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error("Must be authenticated to follow");
-      if (!tenantId) throw new Error("Creator tenant not found");
-      
-      const response = await apiRequest("POST", `/api/tenants/${tenantId}/follow`, {
-        userId: user.userId,
-      });
+  // Fetch user's fan programs to check join status
+  const { data: userPrograms = [] } = useQuery({
+    queryKey: ["/api/fan-programs/user", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await apiRequest("GET", `/api/fan-programs/user/${user.id}`);
       return await response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Following!",
-        description: `You're now following ${creator.displayName}`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
-    },
-    onError: (error) => {
-      console.error("Follow error:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to follow creator",
-        variant: "destructive",
-      });
-    },
+    enabled: !!user?.id,
   });
+
+  // Check if user has joined a program for this creator
+  const hasJoinedProgram = userPrograms.some((program: any) => program.creatorId === creator.id || program.tenantId === tenantId);
 
   // Join program mutation
   const joinProgramMutation = useMutation({
@@ -98,9 +87,9 @@ export default function CreatorCard({ creator, showJoinButton = true, onUnauthen
       
       // Join the first active program
       const program = programs[0];
+      // No need to send fanId - backend uses authenticated user
       const response = await apiRequest("POST", "/api/fan-programs", {
         tenantId: program.tenantId,
-        fanId: user.id,
         programId: program.id,
       });
       
@@ -111,6 +100,8 @@ export default function CreatorCard({ creator, showJoinButton = true, onUnauthen
         title: "Success!",
         description: `You've joined ${creator.displayName}'s loyalty program!`,
       });
+      // Invalidate queries to refresh join state immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/fan-programs/user", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/fan-programs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
     },
@@ -146,24 +137,30 @@ export default function CreatorCard({ creator, showJoinButton = true, onUnauthen
 
   // Get branding from creator or fetched data
   const branding = creator.tenant?.branding || creatorData?.creator?.tenant?.branding;
-  const bannerUrl = transformImageUrl(branding?.bannerUrl);
-  const profilePhotoUrl = transformImageUrl(creator.profileData?.avatar || branding?.logoUrl);
-  const creatorUrl = creator.user?.username || creator.tenant?.slug;
+  
+  // Get banner image from user profileData or tenant branding
+  const userBannerUrl = creator.user?.profileData?.bannerImage || creatorData?.user?.profileData?.bannerImage;
+  const bannerUrl = transformImageUrl(userBannerUrl || branding?.bannerUrl);
+  
+  // Get profile photo from creator imageUrl, user profileData avatar, or tenant branding logo
+  const userAvatar = creator.user?.profileData?.avatar || creatorData?.user?.profileData?.avatar;
+  const profilePhotoUrl = transformImageUrl(creator.imageUrl || userAvatar || branding?.logoUrl);
+  
+  const creatorUrl = creator.tenant?.slug || creator.user?.username;
 
   const handleCardClick = () => {
     if (!user && onUnauthenticatedClick) {
       onUnauthenticatedClick();
     } else if (creatorUrl) {
-      window.location.href = `/${creatorUrl}`;
+      // Use /programs/:slug URL structure for consistent routing
+      window.location.href = `/programs/${creatorUrl}`;
     }
   };
 
-  const handleFollowClick = (e: React.MouseEvent) => {
+  const handleVisitProgramClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user && onUnauthenticatedClick) {
-      onUnauthenticatedClick();
-    } else {
-      followMutation.mutate();
+    if (creatorUrl) {
+      window.location.href = `/programs/${creatorUrl}`;
     }
   };
 
@@ -256,19 +253,22 @@ export default function CreatorCard({ creator, showJoinButton = true, onUnauthen
         {showJoinButton && (
           <div className="flex gap-2">
             <Button 
-              onClick={handleFollowClick}
-              disabled={followMutation.isPending}
+              onClick={handleVisitProgramClick}
               variant="outline"
               className="flex-1 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white transition-colors"
             >
-              {followMutation.isPending ? "Following..." : "Follow"}
+              Visit Program
             </Button>
             <Button 
               onClick={handleJoinClick}
-              disabled={joinProgramMutation.isPending}
-              className="flex-1 bg-brand-primary hover:bg-brand-primary/80 text-white transition-colors"
+              disabled={joinProgramMutation.isPending || hasJoinedProgram}
+              className={`flex-1 transition-colors ${
+                hasJoinedProgram
+                  ? "bg-green-500 hover:bg-green-500/80 text-white"
+                  : "bg-brand-primary hover:bg-brand-primary/80 text-white"
+              }`}
             >
-              {joinProgramMutation.isPending ? "Joining..." : "Join"}
+              {joinProgramMutation.isPending ? "Joining..." : hasJoinedProgram ? "Joined" : "Join"}
             </Button>
           </div>
         )}

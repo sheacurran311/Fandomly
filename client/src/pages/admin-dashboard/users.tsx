@@ -34,6 +34,7 @@ interface User {
   username: string;
   email: string;
   userType: 'fan' | 'creator';
+  brandType?: 'single' | 'agency' | null;
   role: 'fandomly_admin' | 'customer_admin' | 'customer_end_user';
   createdAt: string;
   lastActive?: string;
@@ -43,15 +44,17 @@ interface User {
 export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
+  const [brandTypeFilter, setBrandTypeFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ['/api/admin/users', { search: searchQuery, userType: userTypeFilter, role: roleFilter, status: statusFilter }],
+    queryKey: ['/api/admin/users', { search: searchQuery, userType: userTypeFilter, brandType: brandTypeFilter, role: roleFilter, status: statusFilter }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (userTypeFilter !== 'all') params.append('userType', userTypeFilter);
+      if (brandTypeFilter !== 'all') params.append('brandType', brandTypeFilter);
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       
@@ -131,6 +134,18 @@ export default function AdminUsers() {
               </SelectContent>
             </Select>
 
+            <Select value={brandTypeFilter} onValueChange={setBrandTypeFilter}>
+              <SelectTrigger className="w-[160px] bg-white/5 border-white/10">
+                <SelectValue placeholder="Brand Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brand Types</SelectItem>
+                <SelectItem value="single">Single Brand</SelectItem>
+                <SelectItem value="agency">Agency</SelectItem>
+                <SelectItem value="none">Non-Brand</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-[140px] bg-white/5 border-white/10">
                 <SelectValue placeholder="Role" />
@@ -163,6 +178,7 @@ export default function AdminUsers() {
                 <TableRow className="border-white/10 hover:bg-white/5">
                   <TableHead className="text-gray-400">User</TableHead>
                   <TableHead className="text-gray-400">Type</TableHead>
+                  <TableHead className="text-gray-400">Brand Type</TableHead>
                   <TableHead className="text-gray-400">Role</TableHead>
                   <TableHead className="text-gray-400">Status</TableHead>
                   <TableHead className="text-gray-400">Joined</TableHead>
@@ -176,6 +192,7 @@ export default function AdminUsers() {
                     <TableRow key={i} className="border-white/10">
                       <TableCell><Skeleton className="h-8 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -196,6 +213,18 @@ export default function AdminUsers() {
                         <Badge variant="outline" className="border-white/20 capitalize">
                           {user.userType}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.brandType ? (
+                          <Badge 
+                            variant="outline" 
+                            className={user.brandType === 'agency' ? "border-purple-500/50 text-purple-400" : "border-blue-500/50 text-blue-400"}
+                          >
+                            {user.brandType === 'agency' ? 'Agency' : 'Single Brand'}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-500 text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {getRoleBadge(user.role)}
