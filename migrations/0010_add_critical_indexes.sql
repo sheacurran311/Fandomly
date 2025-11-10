@@ -7,13 +7,15 @@
 -- USER INDEXES
 -- ============================================================================
 
--- Email lookups (login, forgot password)
+-- Email lookups (admin search, notifications, support queries)
+-- Note: Authentication is handled by Dynamic (no password resets here)
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
--- Username lookups (profile pages, @mentions)
+-- Username lookups (profile pages, @mentions, public URLs)
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
--- Dynamic auth queries
+-- Dynamic auth queries (primary authentication lookup)
+-- This is the main auth index - Dynamic uses this for user session verification
 CREATE INDEX IF NOT EXISTS idx_users_dynamic_user_id ON users(dynamic_user_id);
 
 -- User type filtering (fan vs creator queries)
