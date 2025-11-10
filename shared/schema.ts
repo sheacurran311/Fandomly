@@ -346,8 +346,8 @@ export const users = pgTable("users", {
 // Tenant Memberships - Users can be members of multiple tenants
 export const tenantMemberships = pgTable("tenant_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   
   // Role within this specific tenant
   role: text("role").notNull().default('member'), // 'owner' | 'admin' | 'moderator' | 'member'
@@ -379,8 +379,8 @@ export const tenantMemberships = pgTable("tenant_memberships", {
 
 export const creators = pgTable("creators", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Each creator belongs to a tenant
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Each creator belongs to a tenant
   displayName: text("display_name").notNull(),
   bio: text("bio"),
   category: text("category").notNull(), // "athlete" | "musician" | "content_creator" | "brand"
@@ -524,8 +524,8 @@ export const agencyTenants = pgTable("agency_tenants", {
 // Previously called "loyalty_programs" - now serves as the Program Page
 export const loyaltyPrograms = pgTable("loyalty_programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
-  creatorId: varchar("creator_id").references(() => creators.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Belongs to tenant
+  creatorId: varchar("creator_id").references(() => creators.id, { onDelete: 'cascade' }).notNull(),
   
   // Basic Program Info
   name: text("name").notNull(),
@@ -597,8 +597,8 @@ export const loyaltyPrograms = pgTable("loyalty_programs", {
 
 export const rewards = pgTable("rewards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
-  programId: varchar("program_id").references(() => loyaltyPrograms.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Belongs to tenant
+  programId: varchar("program_id").references(() => loyaltyPrograms.id, { onDelete: 'cascade' }).notNull(),
   name: text("name").notNull(),
   description: text("description"),
   pointsCost: integer("points_cost").notNull(),
@@ -670,9 +670,9 @@ export const rewards = pgTable("rewards", {
 
 export const fanPrograms = pgTable("fan_programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
-  fanId: varchar("fan_id").references(() => users.id).notNull(),
-  programId: varchar("program_id").references(() => loyaltyPrograms.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Belongs to tenant
+  fanId: varchar("fan_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  programId: varchar("program_id").references(() => loyaltyPrograms.id, { onDelete: 'cascade' }).notNull(),
   currentPoints: integer("current_points").default(0),
   totalPointsEarned: integer("total_points_earned").default(0),
   currentTier: text("current_tier"),
@@ -681,8 +681,8 @@ export const fanPrograms = pgTable("fan_programs", {
 
 export const pointTransactions = pgTable("point_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
-  fanProgramId: varchar("fan_program_id").references(() => fanPrograms.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Belongs to tenant - financial audit trail
+  fanProgramId: varchar("fan_program_id").references(() => fanPrograms.id, { onDelete: 'cascade' }).notNull(),
   points: integer("points").notNull(),
   type: text("type").notNull(), // "earned" | "spent"
   source: text("source").notNull(), // "social_follow" | "reward_redemption" | "referral" | etc.
@@ -697,9 +697,9 @@ export const pointTransactions = pgTable("point_transactions", {
 
 export const rewardRedemptions = pgTable("reward_redemptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
-  fanId: varchar("fan_id").references(() => users.id).notNull(),
-  rewardId: varchar("reward_id").references(() => rewards.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Belongs to tenant - financial audit trail
+  fanId: varchar("fan_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  rewardId: varchar("reward_id").references(() => rewards.id, { onDelete: 'restrict' }).notNull(),
   pointsSpent: integer("points_spent").notNull(),
   status: text("status").default("pending"), // "pending" | "completed" | "failed"
   redemptionData: jsonb("redemption_data").$type<{
@@ -810,9 +810,9 @@ export const taskTypeEnum = pgEnum('task_type', [
 // Campaigns belong to a Program (second level in hierarchy)
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(), // Belongs to tenant
-  creatorId: varchar("creator_id").references(() => creators.id).notNull(),
-  programId: varchar("program_id").references(() => loyaltyPrograms.id), // REQUIRED - all campaigns must belong to a program (enforced by DB constraint)
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }).notNull(), // Belongs to tenant
+  creatorId: varchar("creator_id").references(() => creators.id, { onDelete: 'cascade' }).notNull(),
+  programId: varchar("program_id").references(() => loyaltyPrograms.id, { onDelete: 'restrict' }), // REQUIRED - all campaigns must belong to a program (enforced by DB constraint)
   
   // Basic Info
   name: text("name").notNull(),
@@ -955,12 +955,12 @@ export const tasks = pgTable("tasks", {
   
   // Ownership
   ownershipLevel: taskOwnershipEnum("ownership_level").notNull().default('creator'),
-  tenantId: varchar("tenant_id").references(() => tenants.id), // NULL for platform tasks
-  creatorId: varchar("creator_id").references(() => creators.id), // NULL for platform tasks
-  
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'restrict' }), // NULL for platform tasks
+  creatorId: varchar("creator_id").references(() => creators.id, { onDelete: 'cascade' }), // NULL for platform tasks
+
   // Program & Campaign Association
-  programId: varchar("program_id").references(() => loyaltyPrograms.id), // REQUIRED for creator tasks (enforced by DB constraint), NULL for platform tasks
-  campaignId: varchar("campaign_id").references(() => campaigns.id), // OPTIONAL - tasks can belong to a campaign
+  programId: varchar("program_id").references(() => loyaltyPrograms.id, { onDelete: 'cascade' }), // REQUIRED for creator tasks (enforced by DB constraint), NULL for platform tasks
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }), // OPTIONAL - tasks can belong to a campaign
   
   // ============================================
   // SECTION 1: BASIC DETAILS
