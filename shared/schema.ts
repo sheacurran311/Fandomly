@@ -1302,11 +1302,14 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   creators: many(creators),
   loyaltyPrograms: many(loyaltyPrograms),
   campaigns: many(campaigns),
+  tasks: many(tasks),
   rewards: many(rewards),
   fanPrograms: many(fanPrograms),
   pointTransactions: many(pointTransactions),
   rewardRedemptions: many(rewardRedemptions),
   campaignParticipations: many(campaignParticipations),
+  taskCompletions: many(taskCompletions),
+  taskAssignments: many(taskAssignments),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -1330,6 +1333,9 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [agencies.id],
   }),
   ownedAgencies: many(agencies),
+  taskCompletions: many(taskCompletions),
+  taskAssignments: many(taskAssignments),
+  platformTaskCompletions: many(platformTaskCompletions),
 }));
 
 export const socialConnectionsRelations = relations(socialConnections, ({ one }) => ({
@@ -1361,6 +1367,8 @@ export const creatorsRelations = relations(creators, ({ one, many }) => ({
   }),
   loyaltyPrograms: many(loyaltyPrograms),
   campaigns: many(campaigns),
+  tasks: many(tasks),
+  platformTasks: many(platformTasks),
 }));
 
 // Agency Relations
@@ -1394,6 +1402,8 @@ export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many 
   }),
   rewards: many(rewards),
   fanPrograms: many(fanPrograms),
+  tasks: many(tasks),
+  taskCompletions: many(taskCompletions),
 }));
 
 export const rewardsRelations = relations(rewards, ({ one, many }) => ({
@@ -1462,6 +1472,8 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   }),
   rules: many(campaignRules),
   participations: many(campaignParticipations),
+  tasks: many(tasks),
+  taskCompletions: many(taskCompletions),
 }));
 
 export const campaignRulesRelations = relations(campaignRules, ({ one }) => ({
@@ -1486,7 +1498,87 @@ export const campaignParticipationsRelations = relations(campaignParticipations,
   }),
 }));
 
+// ============================================================================
+// TASK RELATIONS
+// ============================================================================
 
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [tasks.tenantId],
+    references: [tenants.id],
+  }),
+  creator: one(creators, {
+    fields: [tasks.creatorId],
+    references: [creators.id],
+  }),
+  program: one(loyaltyPrograms, {
+    fields: [tasks.programId],
+    references: [loyaltyPrograms.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [tasks.campaignId],
+    references: [campaigns.id],
+  }),
+  completions: many(taskCompletions),
+  assignments: many(taskAssignments),
+}));
+
+export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskCompletions.taskId],
+    references: [tasks.id],
+  }),
+  user: one(users, {
+    fields: [taskCompletions.userId],
+    references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [taskCompletions.tenantId],
+    references: [tenants.id],
+  }),
+  program: one(loyaltyPrograms, {
+    fields: [taskCompletions.programId],
+    references: [loyaltyPrograms.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [taskCompletions.campaignId],
+    references: [campaigns.id],
+  }),
+}));
+
+export const platformTasksRelations = relations(platformTasks, ({ one, many }) => ({
+  creator: one(creators, {
+    fields: [platformTasks.creatorId],
+    references: [creators.id],
+  }),
+  completions: many(platformTaskCompletions),
+}));
+
+export const platformTaskCompletionsRelations = relations(platformTaskCompletions, ({ one }) => ({
+  task: one(platformTasks, {
+    fields: [platformTaskCompletions.taskId],
+    references: [platformTasks.id],
+  }),
+  user: one(users, {
+    fields: [platformTaskCompletions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const taskAssignmentsRelations = relations(taskAssignments, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskAssignments.taskId],
+    references: [tasks.id],
+  }),
+  user: one(users, {
+    fields: [taskAssignments.userId],
+    references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [taskAssignments.tenantId],
+    references: [tenants.id],
+  }),
+}));
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
