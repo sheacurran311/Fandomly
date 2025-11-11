@@ -3,6 +3,22 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { z } from "zod";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
+import {
+  socialTaskSettings,
+  twitterTaskSettings,
+  instagramTaskSettings,
+  tiktokTaskSettings,
+  youtubeTaskSettings,
+  facebookTaskSettings,
+  spotifyTaskSettings,
+  twitchTaskSettings,
+  discordTaskSettings,
+  migrateLegacyTaskSettings,
+  validateTaskSettings,
+  normalizeUsername,
+  extractContentId,
+  type SocialTaskSettings,
+} from "@shared/taskFieldSchemas";
 
 // Task configuration schemas based on our task builders
 const baseTaskSchema = z.object({
@@ -86,85 +102,63 @@ const completeProfileTaskSchema = baseTaskSchema.extend({
   }),
 });
 
-// Twitter task schemas
+// Social media task schemas - NOW USING UNIFIED SCHEMAS
+// These extend baseTaskSchema with standardized social settings
+
 const twitterTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet', 'twitter_quote_tweet']),
+  taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet', 'twitter_quote_tweet', 'twitter_reply']),
   platform: z.literal('twitter'),
   points: z.number().min(1).max(10000),
-  verificationMethod: z.enum(['manual', 'api']).default('api'),
-  settings: z.object({
-    handle: z.string().optional(),
-    url: z.string().optional(),
-    tweetUrl: z.string().optional(),
-    requiredText: z.string().optional(),
-  }),
+  settings: twitterTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
-// Facebook task schemas
 const facebookTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['facebook_like_page', 'facebook_like_post', 'facebook_comment_post', 'facebook_comment_photo']),
+  taskType: z.enum(['facebook_like_page', 'facebook_like_post', 'facebook_comment_post', 'facebook_comment_photo', 'facebook_share', 'facebook_join_group']),
   platform: z.literal('facebook'),
   points: z.number().min(1).max(10000),
-  verificationMethod: z.enum(['manual', 'api']).default('manual'),
-  settings: z.object({
-    pageId: z.string().optional(),
-    postUrl: z.string().optional(),
-    photoUrl: z.string().optional(),
-  }),
+  settings: facebookTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
-// Instagram task schemas
 const instagramTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['instagram_follow', 'instagram_like_post', 'comment_code', 'mention_story', 'keyword_comment']),
   platform: z.literal('instagram'),
   points: z.number().min(1).max(10000),
-  verificationMethod: z.enum(['manual', 'automatic']).default('automatic'),
-  settings: z.object({
-    username: z.string().optional(),
-    postUrl: z.string().optional(),
-    mediaId: z.string().optional(),
-    mediaUrl: z.string().optional(),
-    keyword: z.string().optional(),
-    requireHashtag: z.string().optional(),
-  }),
+  settings: instagramTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
-// YouTube task schemas
 const youtubeTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['youtube_subscribe', 'youtube_like', 'youtube_comment']),
+  taskType: z.enum(['youtube_subscribe', 'youtube_like', 'youtube_comment', 'youtube_watch', 'youtube_share']),
   platform: z.literal('youtube'),
   points: z.number().min(1).max(10000),
-  verificationMethod: z.enum(['manual', 'api']).default('manual'),
-  settings: z.object({
-    channelUrl: z.string().optional(),
-    videoUrl: z.string().optional(),
-    requiredText: z.string().optional(),
-  }),
+  settings: youtubeTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
-// TikTok task schemas
 const tiktokTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment']),
+  taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment', 'tiktok_share', 'tiktok_duet', 'tiktok_stitch']),
   platform: z.literal('tiktok'),
   points: z.number().min(1).max(10000),
-  verificationMethod: z.enum(['manual', 'api']).default('manual'),
-  settings: z.object({
-    username: z.string().optional(),
-    videoUrl: z.string().optional(),
-    requiredText: z.string().optional(),
-  }),
+  settings: tiktokTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
-// Spotify task schemas
 const spotifyTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['spotify_follow', 'spotify_playlist']),
+  taskType: z.enum(['spotify_follow', 'spotify_playlist', 'spotify_save_track', 'spotify_save_album']),
   platform: z.literal('spotify'),
   points: z.number().min(1).max(10000),
-  verificationMethod: z.enum(['manual', 'api']).default('manual'),
-  settings: z.object({
-    artistId: z.string().optional(),
-    playlistId: z.string().optional(),
-  }),
+  settings: spotifyTaskSettings.omit({ platform: true }), // Use unified schema
+});
+
+const twitchTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['twitch_follow', 'twitch_subscribe', 'twitch_watch']),
+  platform: z.literal('twitch'),
+  points: z.number().min(1).max(10000),
+  settings: twitchTaskSettings.omit({ platform: true }), // Use unified schema
+});
+
+const discordTaskSchema = baseTaskSchema.extend({
+  taskType: z.enum(['discord_join', 'discord_verify', 'discord_react', 'discord_message']),
+  platform: z.literal('discord'),
+  points: z.number().min(1).max(10000),
+  settings: discordTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 // Union of all task schemas
@@ -179,6 +173,8 @@ const createTaskSchema = z.discriminatedUnion('taskType', [
   youtubeTaskSchema,
   tiktokTaskSchema,
   spotifyTaskSchema,
+  twitchTaskSchema,
+  discordTaskSchema,
 ]);
 
 export function registerTaskRoutes(app: Express) {
@@ -341,6 +337,36 @@ export function registerTaskRoutes(app: Express) {
 
       // Validate task data
       const validatedData = createTaskSchema.parse(req.body);
+
+      // Normalize and migrate task settings if it's a social task
+      if ('settings' in validatedData && 'platform' in validatedData) {
+        const platform = validatedData.platform;
+        const rawSettings = validatedData.settings;
+
+        // Migrate legacy fields and normalize
+        const migratedSettings = migrateLegacyTaskSettings(rawSettings, platform);
+
+        // Auto-extract username and contentId from URLs if provided
+        if (migratedSettings.username) {
+          migratedSettings.username = normalizeUsername(migratedSettings.username);
+        }
+
+        if (migratedSettings.contentUrl && !migratedSettings.contentId) {
+          const extractedId = extractContentId(migratedSettings.contentUrl, platform);
+          if (extractedId) {
+            migratedSettings.contentId = extractedId;
+          }
+        }
+
+        // Update validatedData with migrated settings
+        (validatedData as any).settings = migratedSettings;
+
+        console.log('[Task Creation] Normalized settings:', {
+          platform,
+          before: rawSettings,
+          after: migratedSettings,
+        });
+      }
 
       // Check if this is a platform task
       const isPlatformTask = validatedData.ownershipLevel === 'platform';
