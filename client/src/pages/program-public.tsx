@@ -143,42 +143,182 @@ export default function ProgramPublic() {
   const themeColors = getThemeColors(programData.pageConfig?.theme);
   const isThemeDark = isDarkTheme(programData.pageConfig?.theme);
 
-  // Inject CSS variables for branding
+  // Inject CSS variables for branding (Phase 1: Enhanced Theming)
   useEffect(() => {
     const root = document.documentElement;
+    const theme = programData.pageConfig?.theme;
 
-    // Inject brand colors as CSS variables
-    if (brandColors.primary) {
-      root.style.setProperty('--color-brand-primary', brandColors.primary);
-    }
-    if (brandColors.secondary) {
-      root.style.setProperty('--color-brand-secondary', brandColors.secondary);
-    }
-    if (brandColors.accent) {
-      root.style.setProperty('--color-brand-accent', brandColors.accent);
+    // === COLORS ===
+    // Check for Phase 1 enhanced theme structure
+    if (theme?.colors) {
+      // Brand colors
+      root.style.setProperty('--color-primary', theme.colors.primary);
+      root.style.setProperty('--color-secondary', theme.colors.secondary);
+      root.style.setProperty('--color-accent', theme.colors.accent);
+
+      // Surface colors
+      root.style.setProperty('--color-background', theme.colors.background);
+      root.style.setProperty('--color-surface', theme.colors.surface);
+      root.style.setProperty('--color-surface-hover', theme.colors.surfaceHover);
+
+      // Text colors
+      root.style.setProperty('--color-text-primary', theme.colors.text.primary);
+      root.style.setProperty('--color-text-secondary', theme.colors.text.secondary);
+      root.style.setProperty('--color-text-tertiary', theme.colors.text.tertiary);
+
+      // UI state colors
+      root.style.setProperty('--color-border', theme.colors.border);
+      root.style.setProperty('--color-success', theme.colors.success);
+      root.style.setProperty('--color-warning', theme.colors.warning);
+      root.style.setProperty('--color-error', theme.colors.error);
+      root.style.setProperty('--color-info', theme.colors.info);
+    } else {
+      // Fallback to Phase 0 basic colors for backward compatibility
+      if (brandColors.primary) {
+        root.style.setProperty('--color-primary', brandColors.primary);
+        root.style.setProperty('--color-brand-primary', brandColors.primary);
+      }
+      if (brandColors.secondary) {
+        root.style.setProperty('--color-secondary', brandColors.secondary);
+        root.style.setProperty('--color-brand-secondary', brandColors.secondary);
+      }
+      if (brandColors.accent) {
+        root.style.setProperty('--color-accent', brandColors.accent);
+        root.style.setProperty('--color-brand-accent', brandColors.accent);
+      }
     }
 
-    // Inject theme colors
-    if (themeColors.background) {
-      root.style.setProperty('--color-theme-bg', themeColors.background);
-    }
-    if (themeColors.text) {
-      root.style.setProperty('--color-theme-text', themeColors.text);
-    }
-    if (themeColors.card) {
-      root.style.setProperty('--color-theme-card', themeColors.card);
+    // === TYPOGRAPHY ===
+    if (theme?.typography) {
+      // Font families
+      if (theme.typography.fontFamily) {
+        root.style.setProperty('--font-heading', theme.typography.fontFamily.heading);
+        root.style.setProperty('--font-body', theme.typography.fontFamily.body);
+        root.style.setProperty('--font-mono', theme.typography.fontFamily.mono);
+      }
+
+      // Font sizes
+      if (theme.typography.fontSize) {
+        root.style.setProperty('--font-size-xs', theme.typography.fontSize.xs);
+        root.style.setProperty('--font-size-sm', theme.typography.fontSize.sm);
+        root.style.setProperty('--font-size-base', theme.typography.fontSize.base);
+        root.style.setProperty('--font-size-lg', theme.typography.fontSize.lg);
+        root.style.setProperty('--font-size-xl', theme.typography.fontSize.xl);
+        root.style.setProperty('--font-size-2xl', theme.typography.fontSize['2xl']);
+        root.style.setProperty('--font-size-3xl', theme.typography.fontSize['3xl']);
+        root.style.setProperty('--font-size-4xl', theme.typography.fontSize['4xl']);
+        root.style.setProperty('--font-size-5xl', theme.typography.fontSize['5xl']);
+      }
+
+      // Font weights
+      if (theme.typography.fontWeight) {
+        root.style.setProperty('--font-weight-light', String(theme.typography.fontWeight.light));
+        root.style.setProperty('--font-weight-normal', String(theme.typography.fontWeight.normal));
+        root.style.setProperty('--font-weight-medium', String(theme.typography.fontWeight.medium));
+        root.style.setProperty('--font-weight-semibold', String(theme.typography.fontWeight.semibold));
+        root.style.setProperty('--font-weight-bold', String(theme.typography.fontWeight.bold));
+        root.style.setProperty('--font-weight-extrabold', String(theme.typography.fontWeight.extrabold));
+      }
+
+      // Line heights
+      if (theme.typography.lineHeight) {
+        root.style.setProperty('--line-height-tight', String(theme.typography.lineHeight.tight));
+        root.style.setProperty('--line-height-normal', String(theme.typography.lineHeight.normal));
+        root.style.setProperty('--line-height-relaxed', String(theme.typography.lineHeight.relaxed));
+        root.style.setProperty('--line-height-loose', String(theme.typography.lineHeight.loose));
+      }
     }
 
-    // Cleanup on unmount - restore defaults
+    // === LAYOUT ===
+    if (theme?.layout) {
+      // Border radius
+      if (theme.layout.borderRadius) {
+        root.style.setProperty('--border-radius-none', theme.layout.borderRadius.none);
+        root.style.setProperty('--border-radius-sm', theme.layout.borderRadius.sm);
+        root.style.setProperty('--border-radius-md', theme.layout.borderRadius.md);
+        root.style.setProperty('--border-radius-lg', theme.layout.borderRadius.lg);
+        root.style.setProperty('--border-radius-xl', theme.layout.borderRadius.xl);
+        root.style.setProperty('--border-radius-2xl', theme.layout.borderRadius['2xl']);
+        root.style.setProperty('--border-radius-full', theme.layout.borderRadius.full);
+      }
+
+      // Spacing scale
+      if (theme.layout.spacing) {
+        root.style.setProperty('--spacing-scale', String(theme.layout.spacing.scale));
+      }
+
+      // Shadows
+      if (theme.layout.shadow) {
+        root.style.setProperty('--shadow-sm', theme.layout.shadow.sm);
+        root.style.setProperty('--shadow-md', theme.layout.shadow.md);
+        root.style.setProperty('--shadow-lg', theme.layout.shadow.lg);
+        root.style.setProperty('--shadow-xl', theme.layout.shadow.xl);
+        root.style.setProperty('--shadow-inner', theme.layout.shadow.inner);
+      }
+    }
+
+    // Cleanup on unmount - remove all CSS variables
     return () => {
+      // Colors
+      root.style.removeProperty('--color-primary');
+      root.style.removeProperty('--color-secondary');
+      root.style.removeProperty('--color-accent');
+      root.style.removeProperty('--color-background');
+      root.style.removeProperty('--color-surface');
+      root.style.removeProperty('--color-surface-hover');
+      root.style.removeProperty('--color-text-primary');
+      root.style.removeProperty('--color-text-secondary');
+      root.style.removeProperty('--color-text-tertiary');
+      root.style.removeProperty('--color-border');
+      root.style.removeProperty('--color-success');
+      root.style.removeProperty('--color-warning');
+      root.style.removeProperty('--color-error');
+      root.style.removeProperty('--color-info');
+      // Legacy Phase 0 colors
       root.style.removeProperty('--color-brand-primary');
       root.style.removeProperty('--color-brand-secondary');
       root.style.removeProperty('--color-brand-accent');
-      root.style.removeProperty('--color-theme-bg');
-      root.style.removeProperty('--color-theme-text');
-      root.style.removeProperty('--color-theme-card');
+
+      // Typography
+      root.style.removeProperty('--font-heading');
+      root.style.removeProperty('--font-body');
+      root.style.removeProperty('--font-mono');
+      root.style.removeProperty('--font-size-xs');
+      root.style.removeProperty('--font-size-sm');
+      root.style.removeProperty('--font-size-base');
+      root.style.removeProperty('--font-size-lg');
+      root.style.removeProperty('--font-size-xl');
+      root.style.removeProperty('--font-size-2xl');
+      root.style.removeProperty('--font-size-3xl');
+      root.style.removeProperty('--font-size-4xl');
+      root.style.removeProperty('--font-size-5xl');
+      root.style.removeProperty('--font-weight-light');
+      root.style.removeProperty('--font-weight-normal');
+      root.style.removeProperty('--font-weight-medium');
+      root.style.removeProperty('--font-weight-semibold');
+      root.style.removeProperty('--font-weight-bold');
+      root.style.removeProperty('--font-weight-extrabold');
+      root.style.removeProperty('--line-height-tight');
+      root.style.removeProperty('--line-height-normal');
+      root.style.removeProperty('--line-height-relaxed');
+      root.style.removeProperty('--line-height-loose');
+
+      // Layout
+      root.style.removeProperty('--border-radius-none');
+      root.style.removeProperty('--border-radius-sm');
+      root.style.removeProperty('--border-radius-md');
+      root.style.removeProperty('--border-radius-lg');
+      root.style.removeProperty('--border-radius-xl');
+      root.style.removeProperty('--border-radius-2xl');
+      root.style.removeProperty('--border-radius-full');
+      root.style.removeProperty('--spacing-scale');
+      root.style.removeProperty('--shadow-sm');
+      root.style.removeProperty('--shadow-md');
+      root.style.removeProperty('--shadow-lg');
+      root.style.removeProperty('--shadow-xl');
+      root.style.removeProperty('--shadow-inner');
     };
-  }, [brandColors, themeColors]);
+  }, [programData.pageConfig?.theme, brandColors]);
 
   // Debug logging
   console.log('[ProgramPublic] Image URLs:', {
