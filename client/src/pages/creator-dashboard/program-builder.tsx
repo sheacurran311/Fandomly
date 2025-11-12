@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
 import type { Program, Campaign, Task } from "@shared/schema";
+import { THEME_TEMPLATES, getAllThemeTemplates, type ThemeTemplate } from "@shared/theme-templates";
 
 interface ProgramWithDetails extends Program {
   campaigns?: Campaign[];
@@ -541,156 +542,161 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
-      {/* Page Theme */}
+      {/* Theme Templates Gallery */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <Palette className="h-5 w-5" />
-            Page Theme
+            Theme Templates
           </CardTitle>
-          <p className="text-sm text-gray-400">Choose a preset theme or customize your own</p>
+          <p className="text-sm text-gray-400">Choose from 12 professional themes - instantly apply a complete design</p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Theme Mode Selector */}
+          {/* Theme Template Gallery */}
           <div>
-            <Label className="text-white mb-3 block">Theme Preset</Label>
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                onClick={() => setCustomizeData({ 
-                  ...customizeData, 
-                  theme: { mode: 'light', backgroundColor: '#ffffff', textColor: '#111827' }
-                })}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  customizeData.theme.mode === 'light' 
-                    ? 'border-brand-primary bg-brand-primary/10' 
-                    : 'border-white/20 bg-white/5 hover:border-white/40'
-                }`}
-              >
-                <div className="w-full h-20 rounded bg-white border border-gray-300 mb-2"></div>
-                <p className="text-white font-medium text-sm">Light</p>
-                <p className="text-gray-400 text-xs">White background</p>
-              </button>
-              
-              <button
-                onClick={() => setCustomizeData({ 
-                  ...customizeData, 
-                  theme: { mode: 'dark', backgroundColor: '#0f172a', textColor: '#ffffff' }
-                })}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  customizeData.theme.mode === 'dark' 
-                    ? 'border-brand-primary bg-brand-primary/10' 
-                    : 'border-white/20 bg-white/5 hover:border-white/40'
-                }`}
-              >
-                <div className="w-full h-20 rounded bg-slate-900 border border-gray-700 mb-2"></div>
-                <p className="text-white font-medium text-sm">Dark</p>
-                <p className="text-gray-400 text-xs">Dark background</p>
-              </button>
-              
-              <button
-                onClick={() => setCustomizeData({ 
-                  ...customizeData, 
-                  theme: { ...customizeData.theme, mode: 'custom' }
-                })}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  customizeData.theme.mode === 'custom' 
-                    ? 'border-brand-primary bg-brand-primary/10' 
-                    : 'border-white/20 bg-white/5 hover:border-white/40'
-                }`}
-              >
-                <div className="w-full h-20 rounded bg-gradient-to-br from-purple-500 to-pink-500 mb-2"></div>
-                <p className="text-white font-medium text-sm">Custom</p>
-                <p className="text-gray-400 text-xs">Your colors</p>
-              </button>
+            <div className="flex items-center justify-between mb-3">
+              <Label className="text-white">Select a Theme</Label>
+              {customizeData.theme?.name && (
+                <span className="text-xs text-gray-400">
+                  Current: <span className="text-brand-primary font-medium">{customizeData.theme.name}</span>
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {getAllThemeTemplates().map((template) => {
+                const isSelected = customizeData.theme?.templateId === template.templateId;
+                return (
+                  <button
+                    key={template.templateId}
+                    onClick={() => {
+                      // Apply the selected theme template
+                      setCustomizeData({
+                        ...customizeData,
+                        theme: template as any,
+                        brandColors: {
+                          primary: template.colors.primary,
+                          secondary: template.colors.secondary,
+                          accent: template.colors.accent
+                        }
+                      });
+                    }}
+                    className={`group p-3 rounded-lg border-2 transition-all text-left hover:scale-105 ${
+                      isSelected
+                        ? 'border-brand-primary bg-brand-primary/10 shadow-lg'
+                        : 'border-white/20 bg-white/5 hover:border-brand-primary/50 hover:bg-white/10'
+                    }`}
+                  >
+                    {/* Theme Preview */}
+                    <div
+                      className="w-full h-20 rounded mb-2 border border-white/10 overflow-hidden relative"
+                      style={{
+                        background: `linear-gradient(135deg, ${template.colors.primary}, ${template.colors.secondary})`,
+                      }}
+                    >
+                      <div className="w-full h-full flex items-center justify-center p-2" style={{ backgroundColor: template.colors.background + 'CC' }}>
+                        <div className="w-full space-y-1">
+                          <div
+                            className="h-1 rounded-full"
+                            style={{ backgroundColor: template.colors.text.primary, width: '70%' }}
+                          />
+                          <div
+                            className="h-1 rounded-full"
+                            style={{ backgroundColor: template.colors.text.secondary, width: '50%' }}
+                          />
+                          <div
+                            className="h-1 rounded-full"
+                            style={{ backgroundColor: template.colors.text.tertiary, width: '60%' }}
+                          />
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div className="absolute top-1 right-1">
+                          <div className="bg-brand-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            ✓
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Theme Info */}
+                    <div className="space-y-1">
+                      <p className="text-white font-semibold text-sm truncate">{template.name}</p>
+                      <p className="text-gray-400 text-xs line-clamp-1">{template.description}</p>
+
+                      {/* Color Dots */}
+                      <div className="flex gap-1 pt-1">
+                        <div
+                          className="w-3 h-3 rounded-full border border-white/30"
+                          style={{ backgroundColor: template.colors.primary }}
+                          title="Primary"
+                        />
+                        <div
+                          className="w-3 h-3 rounded-full border border-white/30"
+                          style={{ backgroundColor: template.colors.secondary }}
+                          title="Secondary"
+                        />
+                        <div
+                          className="w-3 h-3 rounded-full border border-white/30"
+                          style={{ backgroundColor: template.colors.accent }}
+                          title="Accent"
+                        />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Custom Color Pickers (shown when Custom is selected) */}
-          {customizeData.theme.mode === 'custom' && (
-            <div className="space-y-4 pt-4 border-t border-white/10">
-              <div>
-                <Label className="text-white mb-2 block">Background Color</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="color"
-                    value={customizeData.theme.backgroundColor}
-                    onChange={(e) => setCustomizeData({ 
-                      ...customizeData, 
-                      theme: { ...customizeData.theme, backgroundColor: e.target.value }
-                    })}
-                    className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme.backgroundColor}
-                    onChange={(e) => setCustomizeData({ 
-                      ...customizeData, 
-                      theme: { ...customizeData.theme, backgroundColor: e.target.value }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#ffffff"
-                  />
+          {/* Applied Template Info */}
+          {customizeData.theme?.templateId && (
+            <div className="pt-4 border-t border-white/10">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <p className="text-white font-medium mb-1">Applied Theme</p>
+                  <p className="text-gray-400 text-sm mb-2">{customizeData.theme.name} - {customizeData.theme.description}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className="bg-white/10 text-white border-white/20 text-xs">
+                      {customizeData.theme.mode === 'light' ? '☀️ Light' : '🌙 Dark'} Mode
+                    </Badge>
+                    <Badge className="bg-white/10 text-white border-white/20 text-xs">
+                      14 Colors
+                    </Badge>
+                    <Badge className="bg-white/10 text-white border-white/20 text-xs">
+                      Typography Included
+                    </Badge>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Main page background color</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  onClick={() => {
+                    // Reset to default theme
+                    setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        name: 'Default Light',
+                        mode: 'light',
+                        templateId: 'default-light',
+                        backgroundColor: '#ffffff',
+                        textColor: '#111827'
+                      }
+                    });
+                  }}
+                >
+                  Reset
+                </Button>
               </div>
-
-              <div>
-                <Label className="text-white mb-2 block">Text Color</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="color"
-                    value={customizeData.theme.textColor}
-                    onChange={(e) => setCustomizeData({ 
-                      ...customizeData, 
-                      theme: { ...customizeData.theme, textColor: e.target.value }
-                    })}
-                    className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme.textColor}
-                    onChange={(e) => setCustomizeData({ 
-                      ...customizeData, 
-                      theme: { ...customizeData.theme, textColor: e.target.value }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#111827"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Primary text color for headings and body</p>
-              </div>
-
-              <Alert className="border-yellow-500/20 bg-yellow-500/10">
-                <AlertCircle className="h-4 w-4 text-yellow-400" />
-                <AlertDescription className="text-gray-300 text-sm">
-                  <strong>Tip:</strong> Ensure good contrast between background and text colors for readability. Light backgrounds pair best with dark text, and dark backgrounds with light text.
-                </AlertDescription>
-              </Alert>
             </div>
           )}
-          
-          {/* Preview Box */}
-          <div className="p-6 rounded-lg border-2 border-white/20" style={{
-            backgroundColor: customizeData.theme.backgroundColor,
-            color: customizeData.theme.textColor
-          }}>
-            <h3 className="font-bold text-lg mb-2">Preview</h3>
-            <p className="text-sm opacity-80">This is how your text will look on your page background.</p>
-            <div className="flex gap-2 mt-3">
-              <Badge style={{ 
-                backgroundColor: customizeData.brandColors.primary + '20', 
-                color: customizeData.brandColors.primary,
-                borderColor: customizeData.brandColors.primary + '40'
-              }}>
-                Primary Badge
-              </Badge>
-              <Badge style={{ 
-                backgroundColor: customizeData.brandColors.secondary + '20', 
-                color: customizeData.brandColors.secondary,
-                borderColor: customizeData.brandColors.secondary + '40'
-              }}>
-                Secondary Badge
-              </Badge>
-            </div>
-          </div>
+
+          <Alert className="border-blue-500/20 bg-blue-500/10">
+            <AlertCircle className="h-4 w-4 text-blue-400" />
+            <AlertDescription className="text-gray-300 text-sm">
+              <strong>Pro Tip:</strong> Select a template to instantly apply colors, typography, and layout. Then customize individual colors in the Brand Colors section below.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
 
