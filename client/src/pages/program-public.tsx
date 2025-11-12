@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -143,8 +143,45 @@ export default function ProgramPublic() {
   const themeColors = getThemeColors(programData.pageConfig?.theme);
   const isThemeDark = isDarkTheme(programData.pageConfig?.theme);
 
+  // Inject CSS variables for branding
+  useEffect(() => {
+    const root = document.documentElement;
+
+    // Inject brand colors as CSS variables
+    if (brandColors.primary) {
+      root.style.setProperty('--color-brand-primary', brandColors.primary);
+    }
+    if (brandColors.secondary) {
+      root.style.setProperty('--color-brand-secondary', brandColors.secondary);
+    }
+    if (brandColors.accent) {
+      root.style.setProperty('--color-brand-accent', brandColors.accent);
+    }
+
+    // Inject theme colors
+    if (themeColors.background) {
+      root.style.setProperty('--color-theme-bg', themeColors.background);
+    }
+    if (themeColors.text) {
+      root.style.setProperty('--color-theme-text', themeColors.text);
+    }
+    if (themeColors.card) {
+      root.style.setProperty('--color-theme-card', themeColors.card);
+    }
+
+    // Cleanup on unmount - restore defaults
+    return () => {
+      root.style.removeProperty('--color-brand-primary');
+      root.style.removeProperty('--color-brand-secondary');
+      root.style.removeProperty('--color-brand-accent');
+      root.style.removeProperty('--color-theme-bg');
+      root.style.removeProperty('--color-theme-text');
+      root.style.removeProperty('--color-theme-card');
+    };
+  }, [brandColors, themeColors]);
+
   // Debug logging
-  console.log('[ProgramPublic] Image URLs:', { 
+  console.log('[ProgramPublic] Image URLs:', {
     programLogo: programData.pageConfig?.logo,
     programBanner: programData.pageConfig?.headerImage,
     creatorImage: creator.imageUrl,
@@ -152,11 +189,12 @@ export default function ProgramPublic() {
     finalProfile: profileImageUrl,
     finalBanner: bannerImageUrl
   });
-  console.log('[ProgramPublic] Theme:', { 
+  console.log('[ProgramPublic] Theme:', {
     theme: programData.pageConfig?.theme,
     colors: themeColors,
     isDark: isThemeDark
   });
+  console.log('[ProgramPublic] Brand Colors Injected:', brandColors);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: themeColors.background }}>
