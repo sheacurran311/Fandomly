@@ -340,7 +340,15 @@ export const users = pgTable("users", {
     monthlyReport: false,
   }),
   
+  // Soft delete columns
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+  
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  lastActiveAt: timestamp("last_active_at"),
 });
 
 // Tenant Memberships - Users can be members of multiple tenants
@@ -373,6 +381,9 @@ export const tenantMemberships = pgTable("tenant_memberships", {
   isAgencyManager: boolean("is_agency_manager").default(false), // True if managing tenant on behalf of agency
   managedBy: varchar("managed_by"), // User ID of agency owner managing this tenant
   
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   joinedAt: timestamp("joined_at").defaultNow(),
   lastActiveAt: timestamp("last_active_at").defaultNow(),
 });
@@ -1041,6 +1052,9 @@ export const platformTasks = pgTable("platform_tasks", {
   type: text("type").notNull(), // 'profile', 'social', 'engagement'
   category: text("category").notNull(), // 'Profile Completion', 'Social Connection', etc.
   
+  // Optional creator relationship (NULL for system-wide tasks)
+  creatorId: varchar("creator_id"),
+  
   // Reward Configuration
   points: integer("points").notNull().default(50), // Fandomly Points to award
   
@@ -1050,6 +1064,11 @@ export const platformTasks = pgTable("platform_tasks", {
   
   // Status
   isActive: boolean("is_active").default(true),
+  
+  // Soft delete columns
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
   
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
@@ -1093,6 +1112,7 @@ export const taskAssignments = pgTable("task_assignments", {
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
   taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id"), // Optional user assignment
   
   // Assignment Configuration
   displayOrder: integer("display_order").default(1),
@@ -1200,7 +1220,7 @@ export const taskCompletions = pgTable("task_completions", {
 // Platform Task Completions - Track platform-wide task completions (separate from creator tasks)
 export const platformTaskCompletions = pgTable("platform_task_completions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  taskId: varchar("task_id").references(() => platformTasks.id, { onDelete: 'cascade' }).notNull(),
   userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   
   // Completion Status
@@ -1536,14 +1556,8 @@ export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => 
     fields: [taskCompletions.tenantId],
     references: [tenants.id],
   }),
-  program: one(loyaltyPrograms, {
-    fields: [taskCompletions.programId],
-    references: [loyaltyPrograms.id],
-  }),
-  campaign: one(campaigns, {
-    fields: [taskCompletions.campaignId],
-    references: [campaigns.id],
-  }),
+  // Note: programId and campaignId don't exist on task_completions table
+  // Access these via task.program and task.campaign instead
 }));
 
 export const platformTasksRelations = relations(platformTasks, ({ one, many }) => ({
@@ -1782,9 +1796,18 @@ export const userAchievements = pgTable("user_achievements", {
   progress: integer("progress").default(0), // Current progress towards achievement
   completed: boolean("completed").default(false),
   completedAt: timestamp("completed_at"),
+  earnedAt: timestamp("earned_at"), // When achievement was earned
   claimed: boolean("claimed").default(false),
   claimedAt: timestamp("claimed_at"),
+  
+  // Soft delete columns
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+  
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const userLevels = pgTable("user_levels", {
@@ -1853,7 +1876,13 @@ export const creatorReferrals = pgTable("creator_referrals", {
   // Revenue Tracking
   totalRevenueGenerated: decimal("total_revenue_generated", { precision: 10, scale: 2 }).default('0'),
   totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default('0'),
+  commissionEarned: decimal("commission_earned", { precision: 10, scale: 2 }).default('0'), // Actual commission amount
   commissionPercentage: decimal("commission_percentage", { precision: 5, scale: 2 }).default('10.00'),
+  
+  // Soft delete columns
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
   
   // Status
   status: referralStatusEnum("status").default('active'),

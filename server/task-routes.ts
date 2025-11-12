@@ -225,11 +225,8 @@ export function registerTaskRoutes(app: Express) {
           eq(tasks.ownershipLevel, 'creator')
         ),
         with: {
-          tenant: {
-            with: {
-              creator: true
-            }
-          },
+          tenant: true,
+          creator: true,  // Direct creator relation from task
           program: true,
         },
       });
@@ -265,8 +262,8 @@ export function registerTaskRoutes(app: Express) {
       // Enrich tasks with creator information
       const enrichedTasks = tasks.map(task => ({
         ...task,
-        creatorName: task.tenant?.creator?.displayName || task.tenant?.name || 'Unknown Creator',
-        creatorImage: task.tenant?.creator?.profileImage || task.tenant?.logo || null,
+        creatorName: task.creator?.displayName || task.tenant?.name || 'Unknown Creator',
+        creatorImage: task.creator?.profileImage || task.tenant?.logo || null,
         programName: task.program?.name || null,
         programSlug: task.program?.slug || null,
         platform: task.platform || 'other', // Use the platform field directly
