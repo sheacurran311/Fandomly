@@ -516,34 +516,59 @@ export function registerProgramRoutes(app: Express) {
 
       const { program, creator, user } = result[0];
 
-      // Get published campaigns for this program
-      const programCampaigns = await db.select()
-        .from(campaigns)
-        .where(and(
-          eq(campaigns.programId, program.id),
-          eq(campaigns.status, 'active')
-        ))
-        .orderBy(campaigns.displayOrder);
+      // Get visibility settings from pageConfig
+      const visibility = (program.pageConfig as any)?.visibility || {};
+      const profileDataVisibility = visibility.profileData || {};
 
-      // Get active, published tasks for this program
-      const programTasks = await db.select()
-        .from(tasks)
-        .where(and(
-          eq(tasks.programId, program.id),
-          eq(tasks.isDraft, false),
-          eq(tasks.isActive, true)
-        ))
-        .orderBy(desc(tasks.createdAt));
+      // Get published campaigns for this program (only if showCampaigns is not explicitly false)
+      const programCampaigns = visibility.showCampaigns !== false
+        ? await db.select()
+            .from(campaigns)
+            .where(and(
+              eq(campaigns.programId, program.id),
+              eq(campaigns.status, 'active')
+            ))
+            .orderBy(campaigns.displayOrder)
+        : [];
+
+      // Get active, published tasks for this program (only if showTasks is not explicitly false)
+      const programTasks = visibility.showTasks !== false
+        ? await db.select()
+            .from(tasks)
+            .where(and(
+              eq(tasks.programId, program.id),
+              eq(tasks.isDraft, false),
+              eq(tasks.isActive, true)
+            ))
+            .orderBy(desc(tasks.createdAt))
+        : [];
+
+      // Build creator data with granular visibility controls
+      const creatorData: any = {
+        id: creator?.id,
+        displayName: creator?.displayName,
+        imageUrl: creator?.imageUrl,
+        publicPageSettings: creator?.publicPageSettings,
+      };
+
+      // Add bio only if showBio is not explicitly false
+      if (profileDataVisibility.showBio !== false && creator?.bio) {
+        creatorData.bio = creator.bio;
+      }
+
+      // Add social links only if showSocialLinks is not explicitly false
+      if (profileDataVisibility.showSocialLinks !== false && creator?.socialLinks) {
+        creatorData.socialLinks = creator.socialLinks;
+      }
+
+      // Add banner image only if profile visibility is enabled
+      if (profileDataVisibility.showBio !== false && user?.profileData?.bannerImage) {
+        creatorData.bannerImage = user.profileData.bannerImage;
+      }
 
       res.json({
         ...program,
-        creator: {
-          ...creator,
-          imageUrl: creator?.imageUrl,
-          bannerImage: user?.profileData?.bannerImage,
-          socialLinks: creator?.socialLinks,
-          publicPageSettings: creator?.publicPageSettings,
-        },
+        creator: creatorData,
         campaigns: programCampaigns,
         tasks: programTasks,
       });
@@ -562,6 +587,24 @@ export function registerProgramRoutes(app: Express) {
       const { programId } = req.params;
       const { taskCompletions, users } = await import("@shared/schema");
 
+      // Get program to check visibility settings
+      const [program] = await db.select()
+        .from(loyaltyPrograms)
+        .where(eq(loyaltyPrograms.id, programId))
+        .limit(1);
+
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+
+      // Check if activity feed is enabled (default to true if not set)
+      const visibility = (program.pageConfig as any)?.visibility || {};
+      if (visibility.showActivityFeed === false) {
+        return res.status(403).json({
+          error: "Activity feed is not enabled for this program"
+        });
+      }
+
       // Fetch recent task completions with user data
       const activity = await db.select({
         completion: taskCompletions,
@@ -571,7 +614,7 @@ export function registerProgramRoutes(app: Express) {
         .from(taskCompletions)
         .leftJoin(users, eq(taskCompletions.userId, users.id))
         .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-        .where(eq(tasks.creatorId, programId))
+        .where(eq(tasks.programId, programId))
         .orderBy(desc(taskCompletions.createdAt))
         .limit(20);
 
@@ -590,6 +633,24 @@ export function registerProgramRoutes(app: Express) {
     try {
       const { programId } = req.params;
       const { fanPrograms, users } = await import("@shared/schema");
+
+      // Get program to check visibility settings
+      const [program] = await db.select()
+        .from(loyaltyPrograms)
+        .where(eq(loyaltyPrograms.id, programId))
+        .limit(1);
+
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+
+      // Check if leaderboard is enabled (default to true if not set)
+      const visibility = (program.pageConfig as any)?.visibility || {};
+      if (visibility.showLeaderboard === false) {
+        return res.status(403).json({
+          error: "Leaderboard is not enabled for this program"
+        });
+      }
 
       const leaderboard = await db.select({
         userId: fanPrograms.fanId,
