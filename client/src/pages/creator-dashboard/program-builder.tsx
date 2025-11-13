@@ -270,7 +270,7 @@ function ProgramCustomizer({
   });
 
   const handleSave = () => {
-    updateProgramMutation.mutate({
+    const saveData = {
       name: customizeData.displayName,
       description: customizeData.bio,
       pageConfig: {
@@ -290,7 +290,23 @@ function ProgramCustomizer({
           profileData: customizeData.profileData,
         }
       }
+    };
+
+    console.log('🔍 SAVING PROGRAM DATA:', JSON.stringify(saveData, null, 2));
+    console.log('🎨 Brand Colors:', customizeData.brandColors);
+    console.log('🎨 Theme:', customizeData.theme);
+    console.log('👁️ Visibility:', {
+      showProfile: customizeData.showProfile,
+      showCampaigns: customizeData.showCampaigns,
+      showTasks: customizeData.showTasks,
+      showRewards: customizeData.showRewards,
+      showLeaderboard: customizeData.showLeaderboard,
+      showActivityFeed: customizeData.showActivityFeed,
+      showFanWidget: customizeData.showFanWidget,
+      profileData: customizeData.profileData,
     });
+
+    updateProgramMutation.mutate(saveData);
   };
 
   return (
