@@ -1063,25 +1063,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (tenantError) {
             console.warn(`Failed to fetch tenant for creator ${c.id}:`, tenantError);
           }
-          
-          return { 
-            ...c, 
+
+          // Check if creator has at least one published program
+          let hasPublishedProgram = false;
+          try {
+            const { loyaltyPrograms } = await import("@shared/schema");
+            const { eq, and } = await import("drizzle-orm");
+            const db = (await import("./db")).db;
+
+            const publishedPrograms = await db.select()
+              .from(loyaltyPrograms)
+              .where(and(
+                eq(loyaltyPrograms.creatorId, c.id),
+                eq(loyaltyPrograms.status, 'published')
+              ))
+              .limit(1);
+
+            hasPublishedProgram = publishedPrograms.length > 0;
+          } catch (programError) {
+            console.warn(`Failed to check published programs for creator ${c.id}:`, programError);
+          }
+
+          return {
+            ...c,
             hasActiveCampaign: activeCampaigns.length > 0,
             activeCampaignsCount: activeCampaigns.length,
             publishedTasksCount: publishedTasks.length,
             isLive: activeCampaigns.length > 0 || publishedTasks.length > 0,
+            hasPublishedProgram,
             user: user ? { username: user.username, profileData: user.profileData } : null,
             tenant: tenant ? { slug: tenant.slug, branding: tenant.branding } : null,
           };
         } catch (enrichError) {
           // If enrichment completely fails, still return the creator with defaults
           console.error(`Failed to enrich creator ${c.id}:`, enrichError);
-          return { 
-            ...c, 
+          return {
+            ...c,
             hasActiveCampaign: false,
             activeCampaignsCount: 0,
             publishedTasksCount: 0,
             isLive: false,
+            hasPublishedProgram: false,
             user: null,
             tenant: null,
           };

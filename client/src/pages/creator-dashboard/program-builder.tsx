@@ -466,82 +466,6 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
-      {/* Brand Colors */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Brand Colors
-          </CardTitle>
-          <p className="text-sm text-gray-400">Customize colors used throughout your program page</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-white">Primary Color</Label>
-                <span className="text-xs text-gray-500 italic">Banner, Buttons, Highlights</span>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={customizeData.brandColors.primary}
-                  onChange={(e) => setCustomizeData({ 
-                    ...customizeData, 
-                    brandColors: { ...customizeData.brandColors, primary: e.target.value }
-                  })}
-                  className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
-                />
-                <Input
-                  value={customizeData.brandColors.primary}
-                  onChange={(e) => setCustomizeData({ 
-                    ...customizeData, 
-                    brandColors: { ...customizeData.brandColors, primary: e.target.value }
-                  })}
-                  className="flex-1 bg-white/5 border-white/10 text-white"
-                  placeholder="#6366f1"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Used for primary CTAs, badges, and active states</p>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-white">Secondary Color</Label>
-                <span className="text-xs text-gray-500 italic">Banner Gradient, Accents</span>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={customizeData.brandColors.secondary}
-                  onChange={(e) => setCustomizeData({ 
-                    ...customizeData, 
-                    brandColors: { ...customizeData.brandColors, secondary: e.target.value }
-                  })}
-                  className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
-                />
-                <Input
-                  value={customizeData.brandColors.secondary}
-                  onChange={(e) => setCustomizeData({ 
-                    ...customizeData, 
-                    brandColors: { ...customizeData.brandColors, secondary: e.target.value }
-                  })}
-                  className="flex-1 bg-white/5 border-white/10 text-white"
-                  placeholder="#8b5cf6"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Used in banner gradients and secondary accents</p>
-            </div>
-          </div>
-          
-          <Alert className="border-blue-500/20 bg-blue-500/10">
-            <AlertCircle className="h-4 w-4 text-blue-400" />
-            <AlertDescription className="text-gray-300 text-sm">
-              <strong>Brand Colors:</strong> These colors are applied to buttons, badges, banners, and interactive elements throughout your program page.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-
       {/* Theme Templates Gallery */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
         <CardHeader>
@@ -700,6 +624,113 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
+      {/* Brand Colors */}
+      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Brand Colors
+          </CardTitle>
+          <p className="text-sm text-gray-400">Customize colors used throughout your program page</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Primary Color */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-white">Primary Color</Label>
+                <span className="text-xs text-gray-500 italic">Banner, Buttons, Highlights</span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="color"
+                  value={customizeData.brandColors.primary}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    brandColors: { ...customizeData.brandColors, primary: e.target.value }
+                  })}
+                  className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
+                />
+                <Input
+                  value={customizeData.brandColors.primary}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    brandColors: { ...customizeData.brandColors, primary: e.target.value }
+                  })}
+                  className="flex-1 bg-white/5 border-white/10 text-white"
+                  placeholder="#6366f1"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Used for primary CTAs, badges, and active states</p>
+            </div>
+
+            {/* Secondary Color */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-white">Secondary Color</Label>
+                <span className="text-xs text-gray-500 italic">Banner Gradient, Accents</span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="color"
+                  value={customizeData.brandColors.secondary}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    brandColors: { ...customizeData.brandColors, secondary: e.target.value }
+                  })}
+                  className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
+                />
+                <Input
+                  value={customizeData.brandColors.secondary}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    brandColors: { ...customizeData.brandColors, secondary: e.target.value }
+                  })}
+                  className="flex-1 bg-white/5 border-white/10 text-white"
+                  placeholder="#8b5cf6"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Used in banner gradients and secondary accents</p>
+            </div>
+
+            {/* Accent Color */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-white">Accent Color</Label>
+                <span className="text-xs text-gray-500 italic">Links, Hover States</span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="color"
+                  value={customizeData.brandColors.accent}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    brandColors: { ...customizeData.brandColors, accent: e.target.value }
+                  })}
+                  className="w-16 h-10 p-1 bg-white/5 border-white/10 cursor-pointer"
+                />
+                <Input
+                  value={customizeData.brandColors.accent}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    brandColors: { ...customizeData.brandColors, accent: e.target.value }
+                  })}
+                  className="flex-1 bg-white/5 border-white/10 text-white"
+                  placeholder="#f59e0b"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Used for links, hover states, and call-to-actions</p>
+            </div>
+          </div>
+
+          <Alert className="border-blue-500/20 bg-blue-500/10">
+            <AlertCircle className="h-4 w-4 text-blue-400" />
+            <AlertDescription className="text-gray-300 text-sm">
+              <strong>Brand Colors:</strong> These colors are applied to buttons, badges, banners, and interactive elements throughout your program page. Changes here will override the theme template colors.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
 
       {/* Page Visibility */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
