@@ -65,14 +65,14 @@ export default function ProgramPublic() {
 
   // Fetch program public data (or preview data)
   const { data: programData, isLoading } = useQuery<ProgramPublicData>({
-    queryKey: isPreviewMode 
-      ? [`/api/programs/${programId}/preview`] 
+    queryKey: isPreviewMode
+      ? [`/api/programs/${programId}/preview`]
       : [`/api/programs/public/${slug}`],
     queryFn: async () => {
-      const endpoint = isPreviewMode 
-        ? `/api/programs/${programId}/preview` 
+      const endpoint = isPreviewMode
+        ? `/api/programs/${programId}/preview`
         : `/api/programs/public/${slug}`;
-      
+
       const response = await fetch(endpoint, {
         credentials: 'include',
       });
@@ -84,69 +84,14 @@ export default function ProgramPublic() {
     enabled: !!(slug || programId),
   });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading program...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!programData) {
-    return (
-      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔍</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Program Not Found</h2>
-          <p className="text-gray-400 mb-6">The program page you're looking for doesn't exist.</p>
-          <Link href="/find-creators">
-            <Button variant="outline" className="border-brand-primary text-brand-primary">
-              Browse Creators
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const { creator, campaigns, tasks } = programData;
-  
-  // Prioritize program-specific images over creator profile images
-  const bannerImage = programData.pageConfig?.headerImage || creator.bannerImage;
-  const profileImage = programData.pageConfig?.logo || creator.imageUrl;
-  
-  const brandColors = programData.pageConfig?.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
-  const socialLinks = programData.pageConfig?.socialLinks || creator.socialLinks || {};
-  
-  // Get visibility settings from pageConfig
-  const visibility = programData.pageConfig?.visibility || {
-    showProfile: true,
-    showCampaigns: true,
-    showTasks: true,
-    showRewards: true,
-    showLeaderboard: true,
-    showActivityFeed: true,
-    showFanWidget: true,
-  };
-
-  const activeCampaigns = campaigns.filter(c => c.status === 'active');
-  const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
-
-  // Transform image URLs
-  const profileImageUrl = transformImageUrl(profileImage);
-  const bannerImageUrl = transformImageUrl(bannerImage);
-
-  // Get theme colors
-  const themeColors = getThemeColors(programData.pageConfig?.theme);
-  const isThemeDark = isDarkTheme(programData.pageConfig?.theme);
-
   // Inject CSS variables for branding (Phase 1: Enhanced Theming)
+  // IMPORTANT: This must be called BEFORE any conditional returns to avoid hooks error
   useEffect(() => {
+    if (!programData) return;
+
     const root = document.documentElement;
     const theme = programData.pageConfig?.theme;
+    const brandColors = programData.pageConfig?.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
 
     // === COLORS ===
     // Check for Phase 1 enhanced theme structure
@@ -318,7 +263,66 @@ export default function ProgramPublic() {
       root.style.removeProperty('--shadow-xl');
       root.style.removeProperty('--shadow-inner');
     };
-  }, [programData.pageConfig?.theme, brandColors]);
+  }, [programData]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading program...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!programData) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔍</div>
+          <h2 className="text-2xl font-bold text-white mb-2">Program Not Found</h2>
+          <p className="text-gray-400 mb-6">The program page you're looking for doesn't exist.</p>
+          <Link href="/find-creators">
+            <Button variant="outline" className="border-brand-primary text-brand-primary">
+              Browse Creators
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { creator, campaigns, tasks } = programData;
+  
+  // Prioritize program-specific images over creator profile images
+  const bannerImage = programData.pageConfig?.headerImage || creator.bannerImage;
+  const profileImage = programData.pageConfig?.logo || creator.imageUrl;
+  
+  const brandColors = programData.pageConfig?.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
+  const socialLinks = programData.pageConfig?.socialLinks || creator.socialLinks || {};
+  
+  // Get visibility settings from pageConfig
+  const visibility = programData.pageConfig?.visibility || {
+    showProfile: true,
+    showCampaigns: true,
+    showTasks: true,
+    showRewards: true,
+    showLeaderboard: true,
+    showActivityFeed: true,
+    showFanWidget: true,
+  };
+
+  const activeCampaigns = campaigns.filter(c => c.status === 'active');
+  const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
+
+  // Transform image URLs
+  const profileImageUrl = transformImageUrl(profileImage);
+  const bannerImageUrl = transformImageUrl(bannerImage);
+
+  // Get theme colors
+  const themeColors = getThemeColors(programData.pageConfig?.theme);
+  const isThemeDark = isDarkTheme(programData.pageConfig?.theme);
 
   // Debug logging
   console.log('[ProgramPublic] Image URLs:', {

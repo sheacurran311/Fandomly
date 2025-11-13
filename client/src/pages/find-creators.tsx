@@ -58,18 +58,22 @@ export default function FindCreators() {
   };
 
   const filteredCreators = creators.filter((creator: any) => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       creator.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       creator.bio?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || creator.category === selectedCategory;
-    
+
     // Filter by active status - only apply if toggle is ON
     const matchesActive = !showActiveOnly || creator.isLive;
-    
+
     // Filter by verified status - only apply if toggle is ON
     const matchesVerified = !showVerifiedOnly || creator.isVerified;
-    
-    return matchesSearch && matchesCategory && matchesActive && matchesVerified;
+
+    // IMPORTANT: Only show creators who have at least one published program
+    // This prevents showing creators who haven't set up their program yet
+    const hasPublishedProgram = creator.hasPublishedProgram === true;
+
+    return matchesSearch && matchesCategory && matchesActive && matchesVerified && hasPublishedProgram;
   });
 
   console.log('Find Creators - After filtering:', filteredCreators.length);
