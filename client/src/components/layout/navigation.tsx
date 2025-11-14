@@ -74,19 +74,26 @@ export default function Navigation() {
                 <div className="flex items-center space-x-4">
                   {/* Brand Switcher for Agency Users */}
                   {userData?.brandType === 'agency' && <BrandSwitcher />}
-                  
-                  {userData?.userType === 'creator' || userData?.brandType ? (
-                    <Link href="/creator-dashboard">
-                      <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
-                        Dashboard
-                      </Button>
-                    </Link>
+
+                  {/* Only show Dashboard button once userData is loaded to prevent showing wrong user type */}
+                  {!isLoading && userData ? (
+                    userData?.userType === 'creator' || userData?.brandType ? (
+                      <Link href="/creator-dashboard">
+                        <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
+                          Dashboard
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href="/fan-dashboard">
+                        <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
+                          Dashboard
+                        </Button>
+                      </Link>
+                    )
                   ) : (
-                    <Link href="/fan-dashboard">
-                      <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-2 rounded-xl font-semibold transition-all duration-200">
-                        Dashboard
-                      </Button>
-                    </Link>
+                    <Button disabled className="bg-brand-primary/50 text-white/50 px-6 py-2 rounded-xl font-semibold cursor-not-allowed">
+                      Loading...
+                    </Button>
                   )}
                   
                   {/* User Menu */}
@@ -117,18 +124,22 @@ export default function Navigation() {
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
                       {/* Role Dashboard removed - users use type-specific dashboards */}
                       {/* NIL Dashboard hidden from menu but page remains accessible */}
-                      <Link href={userData?.userType === 'creator' ? '/profile' : '/fan-profile'}>
-                        <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
-                          <User className="mr-2 h-4 w-4" />
-                          Profile
-                        </DropdownMenuItem>
-                      </Link>
-                      <Link href={userData?.userType === 'creator' ? '/creator-dashboard/settings' : '/fan-dashboard/settings'}>
-                        <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
-                          <Settings className="mr-2 h-4 w-4" />
-                          Settings
-                        </DropdownMenuItem>
-                      </Link>
+                      {!isLoading && userData && (
+                        <>
+                          <Link href={userData.userType === 'creator' ? '/profile' : '/fan-profile'}>
+                            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
+                              <User className="mr-2 h-4 w-4" />
+                              Profile
+                            </DropdownMenuItem>
+                          </Link>
+                          <Link href={userData.userType === 'creator' ? '/creator-dashboard/settings' : '/fan-dashboard/settings'}>
+                            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-brand-primary/60">
+                              <Settings className="mr-2 h-4 w-4" />
+                              Settings
+                            </DropdownMenuItem>
+                          </Link>
+                        </>
+                      )}
                       <DropdownMenuSeparator className="bg-brand-primary/20" />
                       {userData && (
                         <div className="px-2 py-1">
