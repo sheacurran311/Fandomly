@@ -93,9 +93,14 @@ export default function ProgramPublic() {
     const theme = programData.pageConfig?.theme;
     const brandColors = programData.pageConfig?.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
 
+    console.log('🎨 [FRONTEND] Applying theme CSS variables');
+    console.log('🎨 [FRONTEND] Theme object:', theme);
+    console.log('🎨 [FRONTEND] Brand colors:', brandColors);
+
     // === COLORS ===
     // Check for Phase 1 enhanced theme structure
     if (theme?.colors) {
+      console.log('✨ [FRONTEND] Using Phase 1 enhanced theme structure');
       // Brand colors
       root.style.setProperty('--color-primary', theme.colors.primary);
       root.style.setProperty('--color-secondary', theme.colors.secondary);
@@ -118,6 +123,7 @@ export default function ProgramPublic() {
       root.style.setProperty('--color-error', theme.colors.error);
       root.style.setProperty('--color-info', theme.colors.info);
     } else {
+      console.log('📦 [FRONTEND] Using Phase 0 basic theme structure');
       // Fallback to Phase 0 basic colors for backward compatibility
       if (brandColors.primary) {
         root.style.setProperty('--color-primary', brandColors.primary);
@@ -130,6 +136,16 @@ export default function ProgramPublic() {
       if (brandColors.accent) {
         root.style.setProperty('--color-accent', brandColors.accent);
         root.style.setProperty('--color-brand-accent', brandColors.accent);
+      }
+
+      // Phase 0: Apply backgroundColor and textColor if provided
+      if (theme?.backgroundColor) {
+        root.style.setProperty('--color-background', theme.backgroundColor);
+        console.log('🎨 [FRONTEND] Set background color:', theme.backgroundColor);
+      }
+      if (theme?.textColor) {
+        root.style.setProperty('--color-text-primary', theme.textColor);
+        console.log('🎨 [FRONTEND] Set text color:', theme.textColor);
       }
     }
 

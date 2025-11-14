@@ -32,7 +32,10 @@ export function getThemeColors(theme?: ThemeConfig): ThemeColors {
   // Default to light theme
   const mode = theme?.mode || 'light';
 
-  if (mode === 'light') {
+  // Check if custom colors are provided (Phase 0 customization)
+  const hasCustomColors = !!(theme?.backgroundColor || theme?.textColor);
+
+  if (mode === 'light' && !hasCustomColors) {
     return {
       background: '#ffffff',
       text: {
@@ -51,7 +54,7 @@ export function getThemeColors(theme?: ThemeConfig): ThemeColors {
     };
   }
 
-  if (mode === 'dark') {
+  if (mode === 'dark' && !hasCustomColors) {
     return {
       background: '#0f172a',  // slate-900
       text: {
@@ -70,21 +73,25 @@ export function getThemeColors(theme?: ThemeConfig): ThemeColors {
     };
   }
 
-  // Custom mode
+  // Custom mode OR preset mode with custom colors (Phase 0 customization)
+  // This handles both: mode='custom' AND mode='dark' with backgroundColor/textColor overrides
+  const backgroundColor = theme?.backgroundColor || (mode === 'dark' ? '#0f172a' : '#ffffff');
+  const textColor = theme?.textColor || (mode === 'dark' ? '#ffffff' : '#111827');
+
   return {
-    background: theme?.backgroundColor || '#ffffff',
+    background: backgroundColor,
     text: {
-      primary: theme?.textColor || '#111827',
-      secondary: theme?.textColor || '#111827',
-      tertiary: theme?.textColor || '#111827',
+      primary: textColor,
+      secondary: textColor,
+      tertiary: textColor,
     },
     card: {
-      background: theme?.backgroundColor || '#ffffff',
-      border: adjustColorOpacity(theme?.textColor || '#111827', 0.2),
+      background: backgroundColor,
+      border: adjustColorOpacity(textColor, 0.2),
     },
     badge: {
-      background: adjustColorOpacity(theme?.textColor || '#111827', 0.1),
-      text: theme?.textColor || '#111827',
+      background: adjustColorOpacity(textColor, 0.1),
+      text: textColor,
     },
   };
 }

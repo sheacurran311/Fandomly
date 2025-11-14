@@ -18,6 +18,38 @@ const createProgramSchema = z.object({
       secondary: z.string(),
       accent: z.string(),
     }).optional(),
+    // Theme settings - supports both Phase 0 (basic) and Phase 1 (enhanced) structures
+    theme: z.object({
+      mode: z.enum(['light', 'dark', 'custom']).optional(),
+      backgroundColor: z.string().optional(),
+      textColor: z.string().optional(),
+      // Phase 1 enhanced theme structure (optional)
+      templateId: z.string().optional(),
+      name: z.string().optional(),
+      colors: z.any().optional(), // Complex nested structure, validated by schema.ts
+      typography: z.any().optional(),
+      layout: z.any().optional(),
+    }).optional(),
+    // Visibility settings
+    visibility: z.object({
+      showProfile: z.boolean().optional(),
+      showCampaigns: z.boolean().optional(),
+      showTasks: z.boolean().optional(),
+      showRewards: z.boolean().optional(),
+      showLeaderboard: z.boolean().optional(),
+      showActivityFeed: z.boolean().optional(),
+      showFanWidget: z.boolean().optional(),
+      profileData: z.object({
+        showBio: z.boolean().optional(),
+        showLocation: z.boolean().optional(),
+        showWebsite: z.boolean().optional(),
+        showSocialLinks: z.boolean().optional(),
+        showJoinDate: z.boolean().optional(),
+        showFollowerCount: z.boolean().optional(),
+        showVerificationBadge: z.boolean().optional(),
+        showTiers: z.boolean().optional(),
+      }).optional(),
+    }).optional(),
     customDomain: z.string().optional(),
     socialLinks: z.object({
       twitter: z.string().optional(),
@@ -195,7 +227,7 @@ export function registerProgramRoutes(app: Express) {
     try {
       const { id } = req.params;
       const userId = req.user?.id;
-      
+
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
@@ -203,13 +235,20 @@ export function registerProgramRoutes(app: Express) {
       // Get creator record
       const { creators } = await import("@shared/schema");
       const [creator] = await db.select().from(creators).where(eq(creators.userId, userId)).limit(1);
-      
+
       if (!creator) {
         return res.status(404).json({ error: "Creator not found" });
       }
 
+      // Debug logging - log incoming request
+      console.log('🔧 [BACKEND] Updating program:', id);
+      console.log('📥 [BACKEND] Request body pageConfig:', JSON.stringify(req.body.pageConfig, null, 2));
+
       // Validate request body
       const validatedData = updateProgramSchema.parse(req.body);
+
+      // Debug logging - log validated data
+      console.log('✅ [BACKEND] Validated pageConfig:', JSON.stringify(validatedData.pageConfig, null, 2));
 
       // Update program
       const [updatedProgram] = await db.update(loyaltyPrograms)
@@ -227,12 +266,16 @@ export function registerProgramRoutes(app: Express) {
         return res.status(404).json({ error: "Program not found" });
       }
 
+      // Debug logging - log what was saved to DB
+      console.log('💾 [BACKEND] Saved to DB pageConfig:', JSON.stringify(updatedProgram.pageConfig, null, 2));
+
       res.json(updatedProgram);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error('❌ [BACKEND] Validation error:', error.errors);
         return res.status(400).json({ error: "Validation error", details: error.errors });
       }
-      
+
       console.error("Error updating program:", error);
       res.status(500).json({ error: "Failed to update program" });
     }
@@ -516,9 +559,15 @@ export function registerProgramRoutes(app: Express) {
 
       const { program, creator, user } = result[0];
 
+      // Debug logging for public endpoint
+      console.log('🌍 [PUBLIC API] Fetching program:', slug);
+      console.log('📤 [PUBLIC API] Program pageConfig from DB:', JSON.stringify(program.pageConfig, null, 2));
+
       // Get visibility settings from pageConfig
       const visibility = (program.pageConfig as any)?.visibility || {};
       const profileDataVisibility = visibility.profileData || {};
+
+      console.log('👁️ [PUBLIC API] Visibility settings:', JSON.stringify(visibility, null, 2));
 
       // Get published campaigns for this program (only if showCampaigns is not explicitly false)
       const programCampaigns = visibility.showCampaigns !== false
