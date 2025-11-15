@@ -3,7 +3,7 @@ import {
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
   tasks, taskAssignments, taskTemplates, taskCompletions, rewardDistributions,
-  notifications, auditLogs,
+  notifications, auditLog,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -1203,8 +1203,8 @@ export class DatabaseStorage implements IStorage {
 
   // Audit Log operations
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
-    const [auditLog] = await db.insert(auditLogs).values(log).returning();
-    return auditLog;
+    const [newLog] = await db.insert(auditLog).values(log).returning();
+    return newLog;
   }
 
   async getAuditLogs(filters?: {
@@ -1220,31 +1220,31 @@ export class DatabaseStorage implements IStorage {
     const conditions: any[] = [];
 
     if (filters?.userId) {
-      conditions.push(eq(auditLogs.userId, filters.userId));
+      conditions.push(eq(auditLog.userId, filters.userId));
     }
     if (filters?.resource) {
-      conditions.push(eq(auditLogs.resource, filters.resource as any));
+      conditions.push(eq(auditLog.resource, filters.resource as any));
     }
     if (filters?.action) {
-      conditions.push(eq(auditLogs.action, filters.action as any));
+      conditions.push(eq(auditLog.action, filters.action as any));
     }
     if (filters?.tenantId) {
-      conditions.push(eq(auditLogs.tenantId, filters.tenantId));
+      conditions.push(eq(auditLog.tenantId, filters.tenantId));
     }
     if (filters?.startDate) {
-      conditions.push(sql`${auditLogs.createdAt} >= ${filters.startDate}`);
+      conditions.push(sql`${auditLog.createdAt} >= ${filters.startDate}`);
     }
     if (filters?.endDate) {
-      conditions.push(sql`${auditLogs.createdAt} <= ${filters.endDate}`);
+      conditions.push(sql`${auditLog.createdAt} <= ${filters.endDate}`);
     }
 
-    let query = db.select().from(auditLogs);
+    let query = db.select().from(auditLog);
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
 
-    query = query.orderBy(desc(auditLogs.createdAt)) as any;
+    query = query.orderBy(desc(auditLog.createdAt)) as any;
 
     if (filters?.limit) {
       query = query.limit(filters.limit) as any;
@@ -1257,7 +1257,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAuditLogById(id: string): Promise<AuditLog | undefined> {
-    const [log] = await db.select().from(auditLogs).where(eq(auditLogs.id, id));
+    const [log] = await db.select().from(auditLog).where(eq(auditLog.id, id));
     return log || undefined;
   }
 }

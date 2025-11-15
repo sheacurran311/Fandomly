@@ -117,7 +117,12 @@ export const tenants = pgTable("tenants", {
     requireEmailVerification: false,
     enableSocialLogin: true
   }),
-  
+
+  // Soft-delete fields (SaaS industry standard)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -473,8 +478,14 @@ export const creators = pgTable("creators", {
     showRewards: true,
     showCommunity: true
   }),
-  
+
+  // Soft-delete fields (SaaS industry standard)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Creator Facebook Pages (stores page tokens and metrics per creator)
@@ -601,7 +612,12 @@ export const loyaltyPrograms = pgTable("loyalty_programs", {
   status: text("status").notNull().default('draft'), // 'draft' | 'published' | 'archived'
   publishedAt: timestamp("published_at"),
   slug: text("slug"), // URL-friendly identifier for public page
-  
+
+  // Soft-delete fields (SaaS industry standard)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -688,6 +704,13 @@ export const fanPrograms = pgTable("fan_programs", {
   totalPointsEarned: integer("total_points_earned").default(0),
   currentTier: text("current_tier"),
   joinedAt: timestamp("joined_at").defaultNow(),
+
+  // Soft-delete fields (SaaS industry standard)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const pointTransactions = pgTable("point_transactions", {
@@ -1037,7 +1060,12 @@ export const tasks = pgTable("tasks", {
   isActive: boolean("is_active").default(true),
   isDraft: boolean("is_draft").default(false),
   totalCompletions: integer("total_completions").default(0),
-  
+
+  // Soft-delete fields (SaaS industry standard)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1918,10 +1946,15 @@ export const fanReferrals = pgTable("fan_referrals", {
   percentageRewardsEnabled: boolean("percentage_rewards_enabled").default(false),
   percentageValue: decimal("percentage_value", { precision: 5, scale: 2 }).default('0'),
   percentageExpiresAt: timestamp("percentage_expires_at"),
-  
+
   // Status
   status: referralStatusEnum("status").default('pending'),
-  
+
+  // Soft-delete fields (SaaS industry standard)
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2390,7 +2423,7 @@ export const auditResourceEnum = pgEnum('audit_resource', [
   'badge_template'
 ]);
 
-export const auditLogs = pgTable("audit_logs", {
+export const auditLog = pgTable("audit_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
 
   // Who performed the action
@@ -2428,20 +2461,20 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+export const auditLogRelations = relations(auditLog, ({ one }) => ({
   user: one(users, {
-    fields: [auditLogs.userId],
+    fields: [auditLog.userId],
     references: [users.id],
   }),
   tenant: one(tenants, {
-    fields: [auditLogs.tenantId],
+    fields: [auditLog.tenantId],
     references: [tenants.id],
   }),
 }));
 
-export const insertAuditLogSchema = createInsertSchema(auditLogs);
-export type AuditLog = typeof auditLogs.$inferSelect;
-export type InsertAuditLog = typeof auditLogs.$inferInsert;
+export const insertAuditLogSchema = createInsertSchema(auditLog);
+export type AuditLog = typeof auditLog.$inferSelect;
+export type InsertAuditLog = typeof auditLog.$inferInsert;
 
 // ============================================================================
 // NFT ZOD SCHEMAS & TYPES
