@@ -36,7 +36,7 @@ import {
   twitterTaskSchema, facebookTaskSchema, instagramTaskSchema,
   youtubeTaskSchema, tiktokTaskSchema, spotifyTaskSchema
 } from "@shared/taskTemplates";
-import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, AuthenticatedRequest } from "./middleware/rbac";
+import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, requireFandomlyAdmin, AuthenticatedRequest } from "./middleware/rbac";
 import { z } from "zod";
 import multer from 'multer';
 import path from 'path';
@@ -87,6 +87,7 @@ import uploadRoutes from "./upload-routes";
 import videoUploadRoutes from "./video-upload-routes";
 import socialConnectionRoutes from "./social-connection-routes";
 import creatorVerificationRoutes from "./creator-verification-routes";
+import { createAuditRoutes } from "./audit-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -187,6 +188,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register creator verification routes
   app.use('/api/creator-verification', creatorVerificationRoutes);
+
+  // Register audit log routes (admin only)
+  app.use('/api/audit-logs', createAuditRoutes(storage));
 
   // Check username availability
   app.get('/api/auth/check-username/:username', async (req, res) => {
@@ -2519,15 +2523,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin physical rewards approval routes
-  app.get("/api/admin/physical-rewards", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/admin/physical-rewards", authenticateUser, requireFandomlyAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
-
-      // TODO: Add admin role check here
-      // For now, any authenticated user can access (update this with proper admin check)
 
       // Get all physical rewards using storage layer
       const creator = await storage.getCreatorByUserId(userId);
@@ -2545,14 +2546,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/physical-rewards/:id/approve", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/physical-rewards/:id/approve", authenticateUser, requireFandomlyAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
-
-      // TODO: Add admin role check here
 
       const { id } = req.params;
       const { adminNotes, approvedAt } = req.body;
@@ -2586,14 +2585,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/physical-rewards/:id/reject", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/physical-rewards/:id/reject", authenticateUser, requireFandomlyAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
-
-      // TODO: Add admin role check here
 
       const { id } = req.params;
       const { adminNotes } = req.body;
@@ -2714,7 +2711,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // In production, implement pagination and filtering
       const users = await storage.getAllUsers();
-      res.json(users);
+
+      // Filter out PII for GDPR/CCPA compliance
+      const sanitizedUsers = users.map(user => ({
+        id: user.id,
+        username: user.username,
+        userType: user.userType,
+        role: user.role,
+        customerTier: user.customerTier,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        // Exclude: email, walletAddress, walletChain, profileData (contains PII)
+      }));
+
+      res.json(sanitizedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users" });

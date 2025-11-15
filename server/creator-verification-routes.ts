@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { creators } from '@shared/schema';
-import { authenticateUser, AuthenticatedRequest } from './middleware/rbac';
+import { authenticateUser, requireFandomlyAdmin, AuthenticatedRequest } from './middleware/rbac';
 import { calculateCreatorVerification, getMissingFieldsDisplay } from '@shared/creatorVerificationSchema';
 
 const router = Router();
@@ -114,15 +114,10 @@ router.post('/check', authenticateUser, async (req: AuthenticatedRequest, res) =
  * POST /api/creator-verification/manual-verify
  * Manually verify a creator (admin only - future feature)
  */
-router.post('/manual-verify/:creatorId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.post('/manual-verify/:creatorId', authenticateUser, requireFandomlyAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const { creatorId } = req.params;
     const userId = req.user?.id;
-
-    // TODO: Add admin role check
-    // if (req.user?.role !== 'fandomly_admin') {
-    //   return res.status(403).json({ error: 'Admin access required' });
-    // }
 
     const creator = await db.query.creators.findFirst({
       where: eq(creators.id, creatorId),
@@ -164,14 +159,9 @@ router.post('/manual-verify/:creatorId', authenticateUser, async (req: Authentic
  * POST /api/creator-verification/remove-verification/:creatorId
  * Remove verification from a creator (admin only - future feature)
  */
-router.post('/remove-verification/:creatorId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.post('/remove-verification/:creatorId', authenticateUser, requireFandomlyAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const { creatorId } = req.params;
-
-    // TODO: Add admin role check
-    // if (req.user?.role !== 'fandomly_admin') {
-    //   return res.status(403).json({ error: 'Admin access required' });
-    // }
 
     const creator = await db.query.creators.findFirst({
       where: eq(creators.id, creatorId),

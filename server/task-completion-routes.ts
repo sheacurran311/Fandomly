@@ -20,6 +20,41 @@ const completeTaskSchema = z.object({
   verificationMethod: z.enum(['auto', 'manual', 'api']).default('auto'),
 });
 
+// Validation schemas for task verification
+const twitterTargetDataSchema = z.object({
+  creatorTwitterId: z.string().optional(),
+  tweetId: z.string().optional(),
+}).refine(data => data.creatorTwitterId || data.tweetId, {
+  message: 'Either creatorTwitterId or tweetId is required'
+});
+
+const youtubeTargetDataSchema = z.object({
+  channelId: z.string().optional(),
+  videoId: z.string().optional(),
+}).refine(data => data.channelId || data.videoId, {
+  message: 'Either channelId or videoId is required'
+});
+
+const spotifyTargetDataSchema = z.object({
+  artistId: z.string().optional(),
+  playlistId: z.string().optional(),
+}).refine(data => data.artistId || data.playlistId, {
+  message: 'Either artistId or playlistId is required'
+});
+
+const tiktokTargetDataSchema = z.object({
+  creatorTikTokId: z.string().optional(),
+  videoId: z.string().optional(),
+}).refine(data => data.creatorTikTokId || data.videoId, {
+  message: 'Either creatorTikTokId or videoId is required'
+});
+
+const verifyTaskSchema = z.object({
+  platform: z.enum(['twitter', 'youtube', 'spotify', 'tiktok']),
+  taskType: z.string().min(1),
+  targetData: z.record(z.any()),
+});
+
 export function createTaskCompletionRoutes(storage: IStorage) {
   const router = Router();
 
@@ -395,10 +430,58 @@ export function createTaskCompletionRoutes(storage: IStorage) {
       }
 
       const { taskCompletionId } = req.params;
-      const { platform, taskType, targetData } = req.body;
 
-      if (!platform || !taskType) {
-        return res.status(400).json({ error: 'Platform and taskType are required' });
+      // Validate request body
+      const validation = verifyTaskSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Invalid request data',
+          details: validation.error.issues
+        });
+      }
+
+      const { platform, taskType, targetData } = validation.data;
+
+      // Validate platform-specific targetData
+      let targetDataValidation;
+      switch (platform) {
+        case 'twitter':
+          targetDataValidation = twitterTargetDataSchema.safeParse(targetData);
+          break;
+        case 'youtube':
+          targetDataValidation = youtubeTargetDataSchema.safeParse(targetData);
+          break;
+        case 'spotify':
+          targetDataValidation = spotifyTargetDataSchema.safeParse(targetData);
+          break;
+        case 'tiktok':
+          targetDataValidation = tiktokTargetDataSchema.safeParse(targetData);
+          break;
+      }
+
+      if (targetDataValidation && !targetDataValidation.success) {
+        return res.status(400).json({
+          error: 'Invalid target data for platform',
+          details: targetDataValidation.error.issues
+        });
+      }
+
+      // SECURITY: Check ownership before verification
+      const taskCompletion = await storage.getTaskCompletion(taskCompletionId);
+      if (!taskCompletion) {
+        return res.status(404).json({ error: 'Task completion not found' });
+      }
+
+      if (taskCompletion.userId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to verify this task completion' });
+      }
+
+      // SECURITY: Prevent duplicate verification
+      if (taskCompletion.status === 'completed' && taskCompletion.verifiedAt) {
+        return res.status(400).json({
+          error: 'Task already verified',
+          verifiedAt: taskCompletion.verifiedAt
+        });
       }
 
       console.log('[Task Verification] Verification requested:', {

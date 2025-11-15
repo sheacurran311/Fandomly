@@ -1,9 +1,9 @@
-import { 
-  users, creators, loyaltyPrograms, rewards, fanPrograms, 
+import {
+  users, creators, loyaltyPrograms, rewards, fanPrograms,
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
   campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
   tasks, taskAssignments, taskTemplates, taskCompletions, rewardDistributions,
-  notifications,
+  notifications, auditLogs,
   type User, type InsertUser, type Creator, type InsertCreator,
   type LoyaltyProgram, type InsertLoyaltyProgram,
   type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
@@ -13,6 +13,7 @@ import {
   type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
   type Task, type InsertTask, type TaskTemplate, type InsertTaskTemplate, type TaskAssignment, type InsertTaskAssignment,
   type TaskCompletion, type InsertTaskCompletion, type RewardDistribution, type InsertRewardDistribution,
+  type AuditLog, type InsertAuditLog,
   insertSocialCampaignTaskSchema,
   creatorFacebookPages
 } from "@shared/schema";
@@ -168,6 +169,20 @@ export interface IStorage {
   // Social OAuth token storage
   saveSocialTokenBundle(dynamicUserId: string, platform: string, tokenBundle: any): Promise<void>;
   getSocialTokenBundle(dynamicUserId: string, platform: string): Promise<any | undefined>;
+
+  // Audit Log operations
+  createAuditLog(log: any): Promise<any>;
+  getAuditLogs(filters?: {
+    userId?: string;
+    resource?: string;
+    action?: string;
+    tenantId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<any[]>;
+  getAuditLogById(id: string): Promise<any | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1184,6 +1199,66 @@ export class DatabaseStorage implements IStorage {
       console.error(`[Storage] Failed to get ${platform} token bundle:`, error);
       return undefined;
     }
+  }
+
+  // Audit Log operations
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [auditLog] = await db.insert(auditLogs).values(log).returning();
+    return auditLog;
+  }
+
+  async getAuditLogs(filters?: {
+    userId?: string;
+    resource?: string;
+    action?: string;
+    tenantId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    const conditions: any[] = [];
+
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+    if (filters?.resource) {
+      conditions.push(eq(auditLogs.resource, filters.resource as any));
+    }
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action as any));
+    }
+    if (filters?.tenantId) {
+      conditions.push(eq(auditLogs.tenantId, filters.tenantId));
+    }
+    if (filters?.startDate) {
+      conditions.push(sql`${auditLogs.createdAt} >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${auditLogs.createdAt} <= ${filters.endDate}`);
+    }
+
+    let query = db.select().from(auditLogs);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    query = query.orderBy(desc(auditLogs.createdAt)) as any;
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  async getAuditLogById(id: string): Promise<AuditLog | undefined> {
+    const [log] = await db.select().from(auditLogs).where(eq(auditLogs.id, id));
+    return log || undefined;
   }
 }
 
