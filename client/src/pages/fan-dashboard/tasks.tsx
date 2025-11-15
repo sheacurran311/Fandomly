@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FanTaskCard } from '@/components/tasks/FanTaskCard';
 import { PlatformTaskCard } from '@/components/tasks/PlatformTaskCard';
-import { CreatorTasksTable } from '@/components/tasks/CreatorTasksTable';
 import { useUserTaskCompletions } from '@/hooks/useTaskCompletion';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/use-auth';
@@ -400,10 +399,16 @@ export default function FanTasksPage() {
           </CardContent>
         </Card>
       ) : (
-        <CreatorTasksTable 
-          tasks={filteredTasks as any} 
-          completionMap={completionMap}
-        />
+        <div className="grid grid-cols-1 gap-4">
+          {filteredTasks.map((task: Task) => (
+            <FanTaskCard
+              key={task.id}
+              task={task}
+              completion={completionMap.get(task.id)}
+              tenantId={task.tenantId}
+            />
+          ))}
+        </div>
       )}
       </div>
     </DashboardLayout>
