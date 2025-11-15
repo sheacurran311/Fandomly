@@ -228,11 +228,20 @@ function ProgramCustomizer({
     // Program-specific images
     headerImage: program.pageConfig?.headerImage || '',
     logo: program.pageConfig?.logo || '',
-    brandColors: program.pageConfig?.brandColors || { 
-      primary: '#8B5CF6', 
-      secondary: '#EC4899', 
-      accent: '#F59E0B' 
+    brandColors: program.pageConfig?.brandColors || {
+      primary: '#8B5CF6',
+      secondary: '#EC4899',
+      accent: '#F59E0B'
     },
+    // Social links
+    socialLinks: program.pageConfig?.socialLinks || {
+      twitter: '',
+      instagram: '',
+      discord: '',
+      website: '',
+    },
+    // Custom domain
+    customDomain: program.pageConfig?.customDomain || '',
     // Theme settings
     theme: program.pageConfig?.theme || {
       mode: 'light' as 'light' | 'dark' | 'custom',
@@ -253,6 +262,10 @@ function ProgramCustomizer({
       showSocialLinks: true,
       showTiers: true,
       showVerificationBadge: true,
+      showLocation: true,
+      showWebsite: true,
+      showJoinDate: true,
+      showFollowerCount: true,
     },
   });
 
@@ -278,6 +291,8 @@ function ProgramCustomizer({
         headerImage: customizeData.headerImage,
         logo: customizeData.logo,
         brandColors: customizeData.brandColors,
+        socialLinks: customizeData.socialLinks,
+        customDomain: customizeData.customDomain,
         theme: customizeData.theme,
         visibility: {
           showProfile: customizeData.showProfile,
@@ -479,6 +494,82 @@ function ProgramCustomizer({
               <strong>Tip:</strong> Use program-specific images to differentiate your loyalty program from your personal brand. Leave blank to use your creator profile images.
             </AlertDescription>
           </Alert>
+        </CardContent>
+      </Card>
+
+      {/* Social Links & Custom Domain */}
+      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <ExternalLink className="h-5 w-5" />
+            Social Links & Custom Domain
+          </CardTitle>
+          <p className="text-sm text-gray-400">Add social media links and custom domain for your program</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="text-white">Twitter URL</Label>
+            <Input
+              value={customizeData.socialLinks?.twitter || ''}
+              onChange={(e) => setCustomizeData({
+                ...customizeData,
+                socialLinks: { ...customizeData.socialLinks, twitter: e.target.value }
+              })}
+              className="bg-white/5 border-white/10 text-white mt-1"
+              placeholder="https://twitter.com/yourhandle"
+            />
+          </div>
+          <div>
+            <Label className="text-white">Instagram URL</Label>
+            <Input
+              value={customizeData.socialLinks?.instagram || ''}
+              onChange={(e) => setCustomizeData({
+                ...customizeData,
+                socialLinks: { ...customizeData.socialLinks, instagram: e.target.value }
+              })}
+              className="bg-white/5 border-white/10 text-white mt-1"
+              placeholder="https://instagram.com/yourhandle"
+            />
+          </div>
+          <div>
+            <Label className="text-white">Discord URL</Label>
+            <Input
+              value={customizeData.socialLinks?.discord || ''}
+              onChange={(e) => setCustomizeData({
+                ...customizeData,
+                socialLinks: { ...customizeData.socialLinks, discord: e.target.value }
+              })}
+              className="bg-white/5 border-white/10 text-white mt-1"
+              placeholder="https://discord.gg/yourinvite"
+            />
+          </div>
+          <div>
+            <Label className="text-white">Website URL</Label>
+            <Input
+              value={customizeData.socialLinks?.website || ''}
+              onChange={(e) => setCustomizeData({
+                ...customizeData,
+                socialLinks: { ...customizeData.socialLinks, website: e.target.value }
+              })}
+              className="bg-white/5 border-white/10 text-white mt-1"
+              placeholder="https://yourwebsite.com"
+            />
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          <div>
+            <Label className="text-white">Custom Domain</Label>
+            <Input
+              value={customizeData.customDomain || ''}
+              onChange={(e) => setCustomizeData({ ...customizeData, customDomain: e.target.value })}
+              className="bg-white/5 border-white/10 text-white mt-1"
+              placeholder="program.yourdomain.com"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Enter your custom domain (e.g., loyalty.yourbrand.com). DNS configuration required.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -931,6 +1022,582 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
+      {/* Advanced Colors - Surface & State Colors */}
+      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Advanced Colors
+          </CardTitle>
+          <p className="text-sm text-gray-400">Customize surface backgrounds and state indicator colors</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Surface Colors */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Surface Colors</Label>
+            <p className="text-xs text-gray-400 mb-3">Colors for cards, panels, and elevated surfaces</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-300 text-sm">Surface</Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.surface || '#ffffff'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, surface: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.surface || '#ffffff'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, surface: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#ffffff"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Card backgrounds</p>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm">Surface Hover</Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.surfaceHover || '#f9fafb'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, surfaceHover: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.surfaceHover || '#f9fafb'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, surfaceHover: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#f9fafb"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Hover state for cards</p>
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          {/* State Colors */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">State Indicator Colors</Label>
+            <p className="text-xs text-gray-400 mb-3">Colors for success messages, warnings, errors, and info</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-300 text-sm flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                  Success
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.success || '#10b981'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, success: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.success || '#10b981'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, success: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#10b981"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                  Warning
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.warning || '#f59e0b'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, warning: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.warning || '#f59e0b'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, warning: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#f59e0b"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                  Error
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.error || '#ef4444'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, error: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.error || '#ef4444'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, error: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#ef4444"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                  Info
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.info || '#3b82f6'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, info: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.info || '#3b82f6'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, info: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#3b82f6"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm">Border</Label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={customizeData.theme?.colors?.border || '#e5e7eb'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, border: e.target.value }
+                      }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.theme?.colors?.border || '#e5e7eb'}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        colors: { ...customizeData.theme?.colors, border: e.target.value }
+                      }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#e5e7eb"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Card borders and dividers</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Typography */}
+      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Typography
+          </CardTitle>
+          <p className="text-sm text-gray-400">Customize fonts, sizes, weights, and spacing</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Font Family */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Font Family</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-gray-300 text-sm">Heading Font</Label>
+                <Input
+                  value={customizeData.theme?.typography?.fontFamily?.heading || 'Inter, system-ui, sans-serif'}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    theme: {
+                      ...customizeData.theme,
+                      typography: {
+                        ...customizeData.theme?.typography,
+                        fontFamily: {
+                          ...customizeData.theme?.typography?.fontFamily,
+                          heading: e.target.value
+                        }
+                      }
+                    }
+                  })}
+                  className="mt-1 bg-white/5 border-white/10 text-white"
+                  placeholder="Inter, sans-serif"
+                />
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm">Body Font</Label>
+                <Input
+                  value={customizeData.theme?.typography?.fontFamily?.body || 'Inter, system-ui, sans-serif'}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    theme: {
+                      ...customizeData.theme,
+                      typography: {
+                        ...customizeData.theme?.typography,
+                        fontFamily: {
+                          ...customizeData.theme?.typography?.fontFamily,
+                          body: e.target.value
+                        }
+                      }
+                    }
+                  })}
+                  className="mt-1 bg-white/5 border-white/10 text-white"
+                  placeholder="Inter, sans-serif"
+                />
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm">Monospace Font</Label>
+                <Input
+                  value={customizeData.theme?.typography?.fontFamily?.mono || 'Monaco, Courier, monospace'}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    theme: {
+                      ...customizeData.theme,
+                      typography: {
+                        ...customizeData.theme?.typography,
+                        fontFamily: {
+                          ...customizeData.theme?.typography?.fontFamily,
+                          mono: e.target.value
+                        }
+                      }
+                    }
+                  })}
+                  className="mt-1 bg-white/5 border-white/10 text-white"
+                  placeholder="Monaco, monospace"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          {/* Font Sizes */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Font Sizes</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl'].map((size) => (
+                <div key={size}>
+                  <Label className="text-gray-300 text-xs">{size.toUpperCase()}</Label>
+                  <Input
+                    value={customizeData.theme?.typography?.fontSize?.[size as keyof typeof customizeData.theme.typography.fontSize] || ''}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        typography: {
+                          ...customizeData.theme?.typography,
+                          fontSize: {
+                            ...customizeData.theme?.typography?.fontSize,
+                            [size]: e.target.value
+                          }
+                        }
+                      }
+                    })}
+                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
+                    placeholder="1rem"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          {/* Font Weights */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Font Weights</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['light', 'normal', 'medium', 'semibold', 'bold', 'extrabold'].map((weight) => (
+                <div key={weight}>
+                  <Label className="text-gray-300 text-xs capitalize">{weight}</Label>
+                  <Input
+                    type="number"
+                    min="100"
+                    max="900"
+                    step="100"
+                    value={customizeData.theme?.typography?.fontWeight?.[weight as keyof typeof customizeData.theme.typography.fontWeight] || ''}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        typography: {
+                          ...customizeData.theme?.typography,
+                          fontWeight: {
+                            ...customizeData.theme?.typography?.fontWeight,
+                            [weight]: parseInt(e.target.value)
+                          }
+                        }
+                      }
+                    })}
+                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
+                    placeholder="400"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          {/* Line Heights */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Line Heights</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {['tight', 'normal', 'relaxed', 'loose'].map((height) => (
+                <div key={height}>
+                  <Label className="text-gray-300 text-xs capitalize">{height}</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="3"
+                    step="0.05"
+                    value={customizeData.theme?.typography?.lineHeight?.[height as keyof typeof customizeData.theme.typography.lineHeight] || ''}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        typography: {
+                          ...customizeData.theme?.typography,
+                          lineHeight: {
+                            ...customizeData.theme?.typography?.lineHeight,
+                            [height]: parseFloat(e.target.value)
+                          }
+                        }
+                      }
+                    })}
+                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
+                    placeholder="1.5"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Layout - Border Radius, Spacing, Shadows */}
+      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Layers className="h-5 w-5" />
+            Layout & Design
+          </CardTitle>
+          <p className="text-sm text-gray-400">Customize border radius, spacing, and shadow effects</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Border Radius */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Border Radius</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {['none', 'sm', 'md', 'lg', 'xl', '2xl', 'full'].map((radius) => (
+                <div key={radius}>
+                  <Label className="text-gray-300 text-xs uppercase">{radius}</Label>
+                  <Input
+                    value={customizeData.theme?.layout?.borderRadius?.[radius as keyof typeof customizeData.theme.layout.borderRadius] || ''}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        layout: {
+                          ...customizeData.theme?.layout,
+                          borderRadius: {
+                            ...customizeData.theme?.layout?.borderRadius,
+                            [radius]: e.target.value
+                          }
+                        }
+                      }
+                    })}
+                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
+                    placeholder="0.5rem"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          {/* Spacing */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Spacing</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-300 text-sm">Spacing Mode</Label>
+                <select
+                  value={customizeData.theme?.layout?.spacing?.mode || 'normal'}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    theme: {
+                      ...customizeData.theme,
+                      layout: {
+                        ...customizeData.theme?.layout,
+                        spacing: {
+                          ...customizeData.theme?.layout?.spacing,
+                          mode: e.target.value as 'tight' | 'normal' | 'relaxed'
+                        }
+                      }
+                    }
+                  })}
+                  className="mt-1 w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2"
+                >
+                  <option value="tight">Tight</option>
+                  <option value="normal">Normal</option>
+                  <option value="relaxed">Relaxed</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-gray-300 text-sm">Spacing Scale</Label>
+                <Input
+                  type="number"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={customizeData.theme?.layout?.spacing?.scale || 1}
+                  onChange={(e) => setCustomizeData({
+                    ...customizeData,
+                    theme: {
+                      ...customizeData.theme,
+                      layout: {
+                        ...customizeData.theme?.layout,
+                        spacing: {
+                          ...customizeData.theme?.layout?.spacing,
+                          scale: parseFloat(e.target.value)
+                        }
+                      }
+                    }
+                  })}
+                  className="mt-1 bg-white/5 border-white/10 text-white"
+                  placeholder="1.0"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          {/* Shadows */}
+          <div>
+            <Label className="text-white mb-3 block font-semibold">Shadow Effects</Label>
+            <div className="space-y-3">
+              {['sm', 'md', 'lg', 'xl', 'inner'].map((shadow) => (
+                <div key={shadow}>
+                  <Label className="text-gray-300 text-sm uppercase">{shadow}</Label>
+                  <Input
+                    value={customizeData.theme?.layout?.shadow?.[shadow as keyof typeof customizeData.theme.layout.shadow] || ''}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      theme: {
+                        ...customizeData.theme,
+                        layout: {
+                          ...customizeData.theme?.layout,
+                          shadow: {
+                            ...customizeData.theme?.layout?.shadow,
+                            [shadow]: e.target.value
+                          }
+                        }
+                      }
+                    })}
+                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
+                    placeholder="0 1px 2px rgba(0,0,0,0.05)"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Page Visibility */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
         <CardHeader>
@@ -993,9 +1660,53 @@ function ProgramCustomizer({
                   <span className="text-white text-sm">Show Verification Badge</span>
                   <Switch
                     checked={customizeData.profileData?.showVerificationBadge ?? true}
-                    onCheckedChange={(checked) => setCustomizeData({ 
-                      ...customizeData, 
+                    onCheckedChange={(checked) => setCustomizeData({
+                      ...customizeData,
                       profileData: { ...customizeData.profileData, showVerificationBadge: checked }
+                    })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                  <span className="text-white text-sm">Show Location</span>
+                  <Switch
+                    checked={customizeData.profileData?.showLocation ?? true}
+                    onCheckedChange={(checked) => setCustomizeData({
+                      ...customizeData,
+                      profileData: { ...customizeData.profileData, showLocation: checked }
+                    })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                  <span className="text-white text-sm">Show Website</span>
+                  <Switch
+                    checked={customizeData.profileData?.showWebsite ?? true}
+                    onCheckedChange={(checked) => setCustomizeData({
+                      ...customizeData,
+                      profileData: { ...customizeData.profileData, showWebsite: checked }
+                    })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                  <span className="text-white text-sm">Show Join Date</span>
+                  <Switch
+                    checked={customizeData.profileData?.showJoinDate ?? true}
+                    onCheckedChange={(checked) => setCustomizeData({
+                      ...customizeData,
+                      profileData: { ...customizeData.profileData, showJoinDate: checked }
+                    })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                  <span className="text-white text-sm">Show Follower Count</span>
+                  <Switch
+                    checked={customizeData.profileData?.showFollowerCount ?? true}
+                    onCheckedChange={(checked) => setCustomizeData({
+                      ...customizeData,
+                      profileData: { ...customizeData.profileData, showFollowerCount: checked }
                     })}
                   />
                 </div>
