@@ -411,15 +411,33 @@ export default function ProgramPublic() {
             </p>
             
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
-              <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/30">
+              <Badge
+                style={{
+                  backgroundColor: brandColors.primary + '20',
+                  color: brandColors.primary,
+                  borderColor: brandColors.primary + '40'
+                }}
+              >
                 <Trophy className="h-3 w-3 mr-1" />
                 {programData.pointsName}
               </Badge>
-              <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+              <Badge
+                style={{
+                  backgroundColor: brandColors.secondary + '20',
+                  color: brandColors.secondary,
+                  borderColor: brandColors.secondary + '40'
+                }}
+              >
                 <Megaphone className="h-3 w-3 mr-1" />
                 {activeCampaigns.length} Active Campaigns
               </Badge>
-              <Badge className="bg-indigo-500/20 text-indigo-400 border-indigo-500/30">
+              <Badge
+                style={{
+                  backgroundColor: brandColors.accent + '20',
+                  color: brandColors.accent,
+                  borderColor: brandColors.accent + '40'
+                }}
+              >
                 <CheckSquare className="h-3 w-3 mr-1" />
                 {activeTasks.length} Tasks
               </Badge>
@@ -643,7 +661,13 @@ export default function ProgramPublic() {
             {/* Right Sidebar Widgets (1/3 width) */}
             <div className="space-y-6">
               {/* Your Stats - Always show for logged-in users */}
-              <YourStatsWidget programId={programData.id} pointsName={programData.pointsName || 'Points'} />
+              <YourStatsWidget
+                programId={programData.id}
+                pointsName={programData.pointsName || 'Points'}
+                themeColors={themeColors}
+                brandColors={brandColors}
+                isThemeDark={isThemeDark}
+              />
               
               {visibility.showFanWidget && (
                 <FanStatsWidget 

@@ -16,9 +16,21 @@ import {
 import type { Campaign, Task } from "@shared/schema";
 
 // Your Stats Widget (for logged-in fans)
-export function YourStatsWidget({ programId, pointsName }: { programId: string; pointsName: string }) {
+export function YourStatsWidget({
+  programId,
+  pointsName,
+  themeColors,
+  brandColors,
+  isThemeDark
+}: {
+  programId: string;
+  pointsName: string;
+  themeColors?: any;
+  brandColors?: any;
+  isThemeDark?: boolean;
+}) {
   const { user } = useAuth();
-  
+
   const { data: userStats } = useQuery<{
     points: number;
     tasksCompleted: number;
@@ -32,11 +44,35 @@ export function YourStatsWidget({ programId, pointsName }: { programId: string; 
     return null;
   }
 
+  // Use theme colors if provided, otherwise fallback to defaults
+  const colors = themeColors || {
+    background: '#1a1a1a',
+    text: {
+      primary: '#ffffff',
+      secondary: '#a3a3a3',
+      tertiary: '#737373'
+    }
+  };
+  const brand = brandColors || {
+    primary: '#8B5CF6',
+    secondary: '#EC4899',
+    accent: '#F59E0B'
+  };
+
   return (
-    <Card className="bg-gradient-to-br from-brand-primary/10 to-brand-secondary/10 border-brand-primary/20 shadow-sm">
+    <Card
+      className="shadow-sm"
+      style={{
+        background: isThemeDark
+          ? `linear-gradient(135deg, ${brand.primary}15, ${brand.secondary}15)`
+          : `linear-gradient(135deg, ${brand.primary}20, ${brand.secondary}20)`,
+        borderColor: brand.primary + '30',
+        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff'
+      }}
+    >
       <CardHeader>
-        <CardTitle className="text-gray-900 flex items-center gap-2">
-          <Star className="h-5 w-5 text-yellow-500" />
+        <CardTitle className="flex items-center gap-2" style={{ color: colors.text.primary }}>
+          <Star className="h-5 w-5" style={{ color: brand.accent }} />
           Your Stats
         </CardTitle>
       </CardHeader>
@@ -44,27 +80,37 @@ export function YourStatsWidget({ programId, pointsName }: { programId: string; 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-yellow-600" />
-              <span className="text-gray-700 text-sm">{pointsName}</span>
+              <Trophy className="h-4 w-4" style={{ color: brand.primary }} />
+              <span className="text-sm" style={{ color: colors.text.secondary }}>{pointsName}</span>
             </div>
-            <span className="text-gray-900 font-bold text-lg">{userStats.points.toLocaleString()}</span>
+            <span className="font-bold text-lg" style={{ color: colors.text.primary }}>
+              {userStats.points.toLocaleString()}
+            </span>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-green-600" />
-              <span className="text-gray-700 text-sm">Tasks Completed</span>
+              <Target className="h-4 w-4" style={{ color: brand.secondary }} />
+              <span className="text-sm" style={{ color: colors.text.secondary }}>Tasks Completed</span>
             </div>
-            <span className="text-gray-900 font-bold text-lg">{userStats.tasksCompleted}</span>
+            <span className="font-bold text-lg" style={{ color: colors.text.primary }}>
+              {userStats.tasksCompleted}
+            </span>
           </div>
-          
+
           {userStats.leaderboardRank && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-                <span className="text-gray-700 text-sm">Leaderboard Rank</span>
+                <TrendingUp className="h-4 w-4" style={{ color: brand.accent }} />
+                <span className="text-sm" style={{ color: colors.text.secondary }}>Leaderboard Rank</span>
               </div>
-              <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+              <Badge
+                style={{
+                  backgroundColor: brand.accent + '20',
+                  color: brand.accent,
+                  borderColor: brand.accent + '40'
+                }}
+              >
                 #{userStats.leaderboardRank}
               </Badge>
             </div>

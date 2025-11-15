@@ -2354,6 +2354,96 @@ export const nftDeliveriesRelations = relations(nftDeliveries, ({ one }) => ({
 }));
 
 // ============================================================================
+// AUDIT LOGGING
+// ============================================================================
+
+export const auditActionEnum = pgEnum('audit_action', [
+  'create',
+  'update',
+  'delete',
+  'approve',
+  'reject',
+  'verify',
+  'unverify',
+  'login',
+  'logout',
+  'export',
+  'import',
+  'grant_permission',
+  'revoke_permission'
+]);
+
+export const auditResourceEnum = pgEnum('audit_resource', [
+  'user',
+  'creator',
+  'program',
+  'task',
+  'reward',
+  'physical_reward',
+  'verification',
+  'subscription',
+  'payment',
+  'admin_settings',
+  'tenant',
+  'nft_collection',
+  'nft_template',
+  'badge_template'
+]);
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // Who performed the action
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
+  userRole: userRoleEnum("user_role"),
+
+  // What was done
+  action: auditActionEnum("action").notNull(),
+  resource: auditResourceEnum("resource").notNull(),
+  resourceId: varchar("resource_id"),
+
+  // Context
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'set null' }),
+
+  // Change details
+  changes: jsonb("changes").$type<{
+    before?: Record<string, any>;
+    after?: Record<string, any>;
+  }>(),
+
+  // Additional metadata
+  metadata: jsonb("metadata").$type<{
+    endpoint?: string;
+    method?: string;
+    statusCode?: number;
+    errorMessage?: string;
+    [key: string]: any;
+  }>(),
+
+  // Security tracking
+  ipAddress: varchar("ip_address", { length: 45 }), // IPv6 max length
+  userAgent: text("user_agent"),
+
+  // Timestamp
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [auditLogs.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// ============================================================================
 // NFT ZOD SCHEMAS & TYPES
 // ============================================================================
 
