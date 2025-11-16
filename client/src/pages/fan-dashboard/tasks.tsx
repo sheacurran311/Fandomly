@@ -444,7 +444,7 @@ export default function FanTasksPage() {
           completionMap={completionMap}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTasks.map((task: Task) => (
             <FanTaskCard
               key={task.id}

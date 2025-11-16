@@ -151,9 +151,13 @@ export function createTaskCompletionRoutes(storage: IStorage) {
       });
 
       res.status(201).json({ completion });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting task:', error);
-      res.status(500).json({ error: 'Failed to start task' });
+      res.status(500).json({
+        error: 'Failed to start task',
+        message: error.message || 'Unknown error',
+        details: error.stack
+      });
     }
   });
 
