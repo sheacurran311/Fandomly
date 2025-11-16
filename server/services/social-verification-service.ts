@@ -678,6 +678,306 @@ export async function verifyTikTokComment(
   }
 }
 
+// ============================================================================
+// FACEBOOK VERIFICATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Verify Facebook Page Like
+ * Checks if user liked a specific Facebook Page
+ *
+ * API: GET /{page-id}/likes
+ * Permission: user_likes (Fan-side App ID: 4233782626946744)
+ *
+ * @param userId - User's internal ID
+ * @param pageId - Facebook Page ID to verify
+ */
+export async function verifyFacebookPageLike(
+  userId: string,
+  pageId: string
+): Promise<VerificationResult> {
+  try {
+    const connection = await getSocialConnection(userId, 'facebook');
+
+    if (!connection || !connection.accessToken) {
+      return {
+        verified: false,
+        message: 'Facebook account not connected',
+        error: 'NO_CONNECTION'
+      };
+    }
+
+    // Facebook Graph API endpoint to check if user likes a page
+    // Note: Requires 'user_likes' permission (currently pending Facebook approval)
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${pageId}?fields=fan_count&access_token=${connection.accessToken}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[Facebook Verification] API Error:', error);
+
+      // Check if it's a permission error
+      if (error.error?.code === 200 || error.error?.message?.includes('permissions')) {
+        return {
+          verified: false,
+          message: 'Facebook user_likes permission not yet approved. This verification will work once the permission is granted for demo purposes.',
+          error: 'PERMISSION_PENDING'
+        };
+      }
+
+      return {
+        verified: false,
+        message: 'Error checking Facebook Page like',
+        error: error.error?.message || 'API_ERROR'
+      };
+    }
+
+    const pageData = await response.json();
+
+    // Check if user has liked the page
+    // Note: With user_likes permission, we'd check:
+    // GET /{user-id}/likes?fields=name&access_token={token}
+    // Then search for the page in the results
+
+    const checkLikeResponse = await fetch(
+      `https://graph.facebook.com/v18.0/me/likes/${pageId}?access_token=${connection.accessToken}`
+    );
+
+    if (!checkLikeResponse.ok) {
+      // If 404, user hasn't liked the page
+      if (checkLikeResponse.status === 404) {
+        return {
+          verified: false,
+          message: 'You haven not liked this Facebook Page yet',
+          error: 'NOT_LIKED'
+        };
+      }
+
+      const error = await checkLikeResponse.json();
+      return {
+        verified: false,
+        message: error.error?.message || 'Could not verify Facebook Page like',
+        error: 'VERIFICATION_FAILED'
+      };
+    }
+
+    const likeData = await checkLikeResponse.json();
+
+    return {
+      verified: true,
+      message: 'Successfully verified Facebook Page like!',
+      proof: {
+        platform: 'facebook',
+        action: 'page_like',
+        pageId: pageId,
+        pageName: pageData.name,
+        verifiedAt: new Date().toISOString(),
+        userId: connection.platformUserId
+      }
+    };
+  } catch (error) {
+    console.error('[Facebook Verification] Error:', error);
+    return {
+      verified: false,
+      message: 'Error verifying Facebook Page like',
+      error: String(error)
+    };
+  }
+}
+
+/**
+ * Verify Facebook Post Like
+ * Checks if user liked a specific Facebook Post
+ *
+ * API: GET /{post-id}/likes
+ * Permission: user_likes
+ *
+ * @param userId - User's internal ID
+ * @param postId - Facebook Post ID to verify
+ */
+export async function verifyFacebookPostLike(
+  userId: string,
+  postId: string
+): Promise<VerificationResult> {
+  try {
+    const connection = await getSocialConnection(userId, 'facebook');
+
+    if (!connection || !connection.accessToken) {
+      return {
+        verified: false,
+        message: 'Facebook account not connected',
+        error: 'NO_CONNECTION'
+      };
+    }
+
+    // Check if user liked the post
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${postId}/likes?access_token=${connection.accessToken}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      return {
+        verified: false,
+        message: error.error?.message || 'Could not verify Facebook Post like',
+        error: 'VERIFICATION_FAILED'
+      };
+    }
+
+    const data = await response.json();
+    const userFacebookId = connection.platformUserId;
+
+    // Check if the user's Facebook ID is in the likes
+    const hasLiked = data.data?.some((like: any) => like.id === userFacebookId);
+
+    if (!hasLiked) {
+      return {
+        verified: false,
+        message: 'You have not liked this Facebook Post yet',
+        error: 'NOT_LIKED'
+      };
+    }
+
+    return {
+      verified: true,
+      message: 'Successfully verified Facebook Post like!',
+      proof: {
+        platform: 'facebook',
+        action: 'post_like',
+        postId: postId,
+        verifiedAt: new Date().toISOString(),
+        userId: userFacebookId
+      }
+    };
+  } catch (error) {
+    console.error('[Facebook Verification] Error:', error);
+    return {
+      verified: false,
+      message: 'Error verifying Facebook Post like',
+      error: String(error)
+    };
+  }
+}
+
+/**
+ * Verify Facebook Post Comment
+ * Checks if user commented on a specific Facebook Post
+ *
+ * API: GET /{post-id}/comments
+ * Permission: user_posts (Creator-side) or pages_read_user_content
+ *
+ * @param userId - User's internal ID
+ * @param postId - Facebook Post ID to verify
+ */
+export async function verifyFacebookComment(
+  userId: string,
+  postId: string
+): Promise<VerificationResult> {
+  try {
+    const connection = await getSocialConnection(userId, 'facebook');
+
+    if (!connection || !connection.accessToken) {
+      return {
+        verified: false,
+        message: 'Facebook account not connected',
+        error: 'NO_CONNECTION'
+      };
+    }
+
+    // Get post comments
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${postId}/comments?fields=from&access_token=${connection.accessToken}`
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      return {
+        verified: false,
+        message: error.error?.message || 'Could not verify Facebook comment',
+        error: 'VERIFICATION_FAILED'
+      };
+    }
+
+    const data = await response.json();
+    const userFacebookId = connection.platformUserId;
+
+    // Check if the user's Facebook ID is in the comments
+    const hasCommented = data.data?.some((comment: any) => comment.from.id === userFacebookId);
+
+    if (!hasCommented) {
+      return {
+        verified: false,
+        message: 'You have not commented on this Facebook Post yet',
+        error: 'NOT_COMMENTED'
+      };
+    }
+
+    return {
+      verified: true,
+      message: 'Successfully verified Facebook comment!',
+      proof: {
+        platform: 'facebook',
+        action: 'comment',
+        postId: postId,
+        verifiedAt: new Date().toISOString(),
+        userId: userFacebookId
+      }
+    };
+  } catch (error) {
+    console.error('[Facebook Verification] Error:', error);
+    return {
+      verified: false,
+      message: 'Error verifying Facebook comment',
+      error: String(error)
+    };
+  }
+}
+
+/**
+ * Verify Facebook Post Share
+ * Checks if user shared a specific Facebook Post
+ *
+ * API: GET /{post-id}/sharedposts
+ * Permission: user_posts
+ *
+ * @param userId - User's internal ID
+ * @param postId - Facebook Post ID to verify
+ */
+export async function verifyFacebookShare(
+  userId: string,
+  postId: string
+): Promise<VerificationResult> {
+  try {
+    const connection = await getSocialConnection(userId, 'facebook');
+
+    if (!connection || !connection.accessToken) {
+      return {
+        verified: false,
+        message: 'Facebook account not connected',
+        error: 'NO_CONNECTION'
+      };
+    }
+
+    // Note: Facebook Graph API doesn't provide a direct way to check if a specific user shared a post
+    // This would typically require webhook setup or manual verification
+    // For demo purposes, we'll return a pending status
+
+    return {
+      verified: false,
+      message: 'Facebook share verification requires webhook setup or manual verification. This feature is in development.',
+      error: 'NOT_AVAILABLE'
+    };
+  } catch (error) {
+    console.error('[Facebook Verification] Error:', error);
+    return {
+      verified: false,
+      message: 'Error verifying Facebook share',
+      error: String(error)
+    };
+  }
+}
+
 // ===== TASK COMPLETION UPDATE =====
 
 /**

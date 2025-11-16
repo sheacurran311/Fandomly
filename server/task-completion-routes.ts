@@ -49,8 +49,23 @@ const tiktokTargetDataSchema = z.object({
   message: 'Either creatorTikTokId or videoId is required'
 });
 
+const facebookTargetDataSchema = z.object({
+  pageId: z.string().optional(),
+  postId: z.string().optional(),
+}).refine(data => data.pageId || data.postId, {
+  message: 'Either pageId or postId is required'
+});
+
+const instagramTargetDataSchema = z.object({
+  userId: z.string().optional(),
+  postId: z.string().optional(),
+  username: z.string().optional(),
+}).refine(data => data.userId || data.postId || data.username, {
+  message: 'Either userId, postId, or username is required'
+});
+
 const verifyTaskSchema = z.object({
-  platform: z.enum(['twitter', 'youtube', 'spotify', 'tiktok']),
+  platform: z.enum(['twitter', 'youtube', 'spotify', 'tiktok', 'facebook', 'instagram']),
   taskType: z.string().min(1),
   targetData: z.record(z.any()),
 });
@@ -461,6 +476,12 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         case 'tiktok':
           targetDataValidation = tiktokTargetDataSchema.safeParse(targetData);
           break;
+        case 'facebook':
+          targetDataValidation = facebookTargetDataSchema.safeParse(targetData);
+          break;
+        case 'instagram':
+          targetDataValidation = instagramTargetDataSchema.safeParse(targetData);
+          break;
       }
 
       if (targetDataValidation && !targetDataValidation.success) {
@@ -509,6 +530,10 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         verifyTikTokFollow,
         verifyTikTokLike,
         verifyTikTokComment,
+        verifyFacebookPageLike,
+        verifyFacebookPostLike,
+        verifyFacebookComment,
+        verifyFacebookShare,
         updateTaskCompletion
       } = await import('./services/social-verification-service');
 
@@ -574,6 +599,31 @@ export function createTaskCompletionRoutes(storage: IStorage) {
               break;
             default:
               return res.status(400).json({ error: 'Invalid TikTok task type' });
+          }
+          break;
+
+        case 'facebook':
+          switch (taskType) {
+            case 'facebook_like_page':
+            case 'like_page':
+              result = await verifyFacebookPageLike(req.user.id, targetData.pageId);
+              break;
+            case 'facebook_like_post':
+            case 'like_post':
+            case 'like':
+              result = await verifyFacebookPostLike(req.user.id, targetData.postId);
+              break;
+            case 'facebook_comment_post':
+            case 'facebook_comment_photo':
+            case 'comment':
+              result = await verifyFacebookComment(req.user.id, targetData.postId);
+              break;
+            case 'facebook_share':
+            case 'share':
+              result = await verifyFacebookShare(req.user.id, targetData.postId);
+              break;
+            default:
+              return res.status(400).json({ error: 'Invalid Facebook task type' });
           }
           break;
 
