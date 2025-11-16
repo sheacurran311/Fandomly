@@ -37,16 +37,17 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
   const completeTask = useCompleteTask();
   const checkIn = useCheckIn();
 
-  // Check if task is a social media task that can be verified
-  const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
-  const needsVerification = isSocialTask && inProgress && !completed;
-
+  // Calculate completion state first (before using these values)
   const completed = isTaskCompleted(completion);
   const inProgress = isTaskInProgress(completion);
   const progress = completion?.progress || 0;
   const streak = getCurrentStreak(completion);
   const canCheckIn = canCheckInToday(completion);
   const isVerified = completion?.verifiedAt != null;
+
+  // Check if task is a social media task that can be verified
+  const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
+  const needsVerification = isSocialTask && inProgress && !completed;
 
   // Task icon mapping
   const getTaskIcon = () => {
