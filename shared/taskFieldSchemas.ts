@@ -499,3 +499,298 @@ export function hasRequiredFieldsForVerification(
 
   return true; // Other task types don't have strict requirements
 }
+
+/**
+ * Extracts YouTube channel ID from various YouTube URL formats
+ * Supports:
+ * - https://youtube.com/channel/UC123456789
+ * - https://www.youtube.com/channel/UC123456789
+ * - https://youtube.com/@username (note: returns @username, needs API lookup)
+ * - https://www.youtube.com/@username
+ */
+function extractYouTubeChannelId(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+
+    // Channel ID format: /channel/UC...
+    const channelMatch = urlObj.pathname.match(/\/channel\/([^\/]+)/);
+    if (channelMatch) {
+      return channelMatch[1];
+    }
+
+    // Custom URL format: /@username
+    const customUrlMatch = urlObj.pathname.match(/\/@([^\/]+)/);
+    if (customUrlMatch) {
+      // Return the custom URL - caller will need to resolve to channel ID via API
+      return `@${customUrlMatch[1]}`;
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Extracts Spotify artist ID from Spotify artist URL
+ * Example: https://open.spotify.com/artist/6eUKZXaKkcviH0Ku9w2n3V → "6eUKZXaKkcviH0Ku9w2n3V"
+ */
+function extractSpotifyArtistId(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const match = urlObj.pathname.match(/\/artist\/([^\/\?]+)/);
+    return match ? match[1] : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Extracts Spotify playlist ID from Spotify playlist URL
+ * Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M → "37i9dQZF1DXcBWIGoYBM5M"
+ */
+function extractSpotifyPlaylistId(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const match = urlObj.pathname.match(/\/playlist\/([^\/\?]+)/);
+    return match ? match[1] : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Builds targetData object from task customSettings for verification
+ * This is the "missing component" that matches Creator account data with Fan verification
+ *
+ * @param customSettings - The task's customSettings JSONB field
+ * @param platform - The social platform (youtube, spotify, twitter, etc.)
+ * @param taskType - The specific task type (youtube_subscribe, spotify_follow, etc.)
+ * @returns Formatted targetData object ready for verification API calls
+ *
+ * Examples:
+ * - YouTube Subscribe: { channelId: "UC123..." } from { channelUrl: "https://youtube.com/channel/UC123..." }
+ * - YouTube Like: { videoId: "dQw4w9WgXcQ" } from { videoUrl: "https://youtube.com/watch?v=dQw4w9WgXcQ" }
+ * - Spotify Follow Artist: { artistId: "6eUK..." } from { artistUrl: "https://open.spotify.com/artist/6eUK..." }
+ * - Twitter Follow: { creatorTwitterId: "12345" } from { userId: "12345" }
+ */
+export function buildTargetDataFromSettings(
+  customSettings: Record<string, any>,
+  platform: string,
+  taskType: string
+): Record<string, any> {
+  const targetData: Record<string, any> = {};
+
+  // Handle platform-specific transformations
+  switch (platform) {
+    case 'youtube':
+      if (taskType === 'youtube_subscribe') {
+        // Extract channel ID from channelUrl
+        if (customSettings.channelUrl) {
+          const channelId = extractYouTubeChannelId(customSettings.channelUrl);
+          if (channelId) {
+            targetData.channelId = channelId;
+          }
+        }
+        // Also check if channelId is directly provided
+        if (customSettings.channelId) {
+          targetData.channelId = customSettings.channelId;
+        }
+      } else if (taskType === 'youtube_like' || taskType === 'youtube_comment') {
+        // Extract video ID from videoUrl
+        if (customSettings.videoUrl) {
+          const videoId = extractContentId(customSettings.videoUrl, 'youtube');
+          if (videoId) {
+            targetData.videoId = videoId;
+          }
+        }
+        // Also check if videoId is directly provided
+        if (customSettings.videoId) {
+          targetData.videoId = customSettings.videoId;
+        }
+        // Support legacy contentUrl field
+        if (customSettings.contentUrl && !targetData.videoId) {
+          const videoId = extractContentId(customSettings.contentUrl, 'youtube');
+          if (videoId) {
+            targetData.videoId = videoId;
+          }
+        }
+        if (customSettings.contentId && !targetData.videoId) {
+          targetData.videoId = customSettings.contentId;
+        }
+      }
+      break;
+
+    case 'spotify':
+      if (taskType === 'spotify_follow' || taskType === 'spotify_follow_artist') {
+        // Extract artist ID from artistUrl or contentUrl
+        if (customSettings.artistUrl) {
+          const artistId = extractSpotifyArtistId(customSettings.artistUrl);
+          if (artistId) {
+            targetData.artistId = artistId;
+          }
+        }
+        if (customSettings.artistId) {
+          targetData.artistId = customSettings.artistId;
+        }
+        if (customSettings.contentUrl && !targetData.artistId) {
+          const artistId = extractSpotifyArtistId(customSettings.contentUrl);
+          if (artistId) {
+            targetData.artistId = artistId;
+          }
+        }
+        if (customSettings.userId) {
+          targetData.artistId = customSettings.userId;
+        }
+      } else if (taskType === 'spotify_playlist' || taskType === 'spotify_follow_playlist') {
+        // Extract playlist ID from playlistUrl or contentUrl
+        if (customSettings.playlistUrl) {
+          const playlistId = extractSpotifyPlaylistId(customSettings.playlistUrl);
+          if (playlistId) {
+            targetData.playlistId = playlistId;
+          }
+        }
+        if (customSettings.playlistId) {
+          targetData.playlistId = customSettings.playlistId;
+        }
+        if (customSettings.contentUrl && !targetData.playlistId) {
+          const playlistId = extractSpotifyPlaylistId(customSettings.contentUrl);
+          if (playlistId) {
+            targetData.playlistId = playlistId;
+          }
+        }
+        if (customSettings.contentId && !targetData.playlistId) {
+          targetData.playlistId = customSettings.contentId;
+        }
+      }
+      break;
+
+    case 'twitter':
+      if (taskType === 'twitter_follow') {
+        // Twitter follow needs the creator's Twitter user ID
+        if (customSettings.userId) {
+          targetData.creatorTwitterId = customSettings.userId;
+        }
+        if (customSettings.creatorTwitterId) {
+          targetData.creatorTwitterId = customSettings.creatorTwitterId;
+        }
+      } else if (taskType === 'twitter_like' || taskType === 'twitter_retweet' || taskType === 'twitter_quote_tweet' || taskType === 'twitter_reply') {
+        // Extract tweet ID from tweetUrl or contentUrl
+        if (customSettings.tweetUrl) {
+          const tweetId = extractContentId(customSettings.tweetUrl, 'twitter');
+          if (tweetId) {
+            targetData.tweetId = tweetId;
+          }
+        }
+        if (customSettings.contentUrl && !targetData.tweetId) {
+          const tweetId = extractContentId(customSettings.contentUrl, 'twitter');
+          if (tweetId) {
+            targetData.tweetId = tweetId;
+          }
+        }
+        if (customSettings.tweetId) {
+          targetData.tweetId = customSettings.tweetId;
+        }
+        if (customSettings.contentId && !targetData.tweetId) {
+          targetData.tweetId = customSettings.contentId;
+        }
+      }
+      break;
+
+    case 'tiktok':
+      if (taskType === 'tiktok_follow') {
+        // TikTok follow needs the creator's TikTok user ID
+        if (customSettings.userId) {
+          targetData.creatorTikTokId = customSettings.userId;
+        }
+        if (customSettings.creatorTikTokId) {
+          targetData.creatorTikTokId = customSettings.creatorTikTokId;
+        }
+      } else if (taskType === 'tiktok_like' || taskType === 'tiktok_comment' || taskType === 'tiktok_share') {
+        // Extract video ID from videoUrl or contentUrl
+        if (customSettings.videoUrl) {
+          const videoId = extractContentId(customSettings.videoUrl, 'tiktok');
+          if (videoId) {
+            targetData.videoId = videoId;
+          }
+        }
+        if (customSettings.contentUrl && !targetData.videoId) {
+          const videoId = extractContentId(customSettings.contentUrl, 'tiktok');
+          if (videoId) {
+            targetData.videoId = videoId;
+          }
+        }
+        if (customSettings.videoId) {
+          targetData.videoId = customSettings.videoId;
+        }
+        if (customSettings.contentId && !targetData.videoId) {
+          targetData.videoId = customSettings.contentId;
+        }
+      }
+      break;
+
+    case 'instagram':
+      if (taskType === 'instagram_follow') {
+        if (customSettings.userId) {
+          targetData.userId = customSettings.userId;
+        }
+        if (customSettings.username) {
+          targetData.username = customSettings.username;
+        }
+      } else if (taskType === 'instagram_like_post' || taskType === 'comment_code' || taskType === 'keyword_comment') {
+        // Extract post ID from postUrl or contentUrl
+        if (customSettings.postUrl) {
+          const postId = extractContentId(customSettings.postUrl, 'instagram');
+          if (postId) {
+            targetData.postId = postId;
+          }
+        }
+        if (customSettings.contentUrl && !targetData.postId) {
+          const postId = extractContentId(customSettings.contentUrl, 'instagram');
+          if (postId) {
+            targetData.postId = postId;
+          }
+        }
+        if (customSettings.postId) {
+          targetData.postId = customSettings.postId;
+        }
+        if (customSettings.contentId && !targetData.postId) {
+          targetData.postId = customSettings.contentId;
+        }
+      }
+      break;
+
+    case 'facebook':
+      if (taskType === 'facebook_like_page') {
+        if (customSettings.pageId) {
+          targetData.pageId = customSettings.pageId;
+        }
+        if (customSettings.userId) {
+          targetData.pageId = customSettings.userId;
+        }
+      } else if (taskType === 'facebook_like_post' || taskType === 'facebook_comment_post' || taskType === 'facebook_share') {
+        // Extract post ID from postUrl or contentUrl
+        if (customSettings.postUrl) {
+          const postId = extractContentId(customSettings.postUrl, 'facebook');
+          if (postId) {
+            targetData.postId = postId;
+          }
+        }
+        if (customSettings.contentUrl && !targetData.postId) {
+          const postId = extractContentId(customSettings.contentUrl, 'facebook');
+          if (postId) {
+            targetData.postId = postId;
+          }
+        }
+        if (customSettings.postId) {
+          targetData.postId = customSettings.postId;
+        }
+        if (customSettings.contentId && !targetData.postId) {
+          targetData.postId = customSettings.contentId;
+        }
+      }
+      break;
+  }
+
+  return targetData;
+}
