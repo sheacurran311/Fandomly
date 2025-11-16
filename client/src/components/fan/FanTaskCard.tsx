@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { type Task } from "@shared/schema";
+import TaskCompletionModalRouter from "@/components/modals/TaskCompletionModalRouter";
 
 interface FanTaskCardProps {
   task: Task;
@@ -29,16 +31,39 @@ interface FanTaskCardProps {
   onClaim?: () => void;
 }
 
-export default function FanTaskCard({ 
-  task, 
-  progress, 
+export default function FanTaskCard({
+  task,
+  progress,
   onStart,
   onContinue,
   onClaim,
 }: FanTaskCardProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const isCompleted = progress?.completed || false;
   const progressPercent = progress?.progress || 0;
   const hasProgress = progressPercent > 0 && progressPercent < 100;
+
+  // Check if task is a social media task
+  const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok', 'x'].includes(
+    task.platform?.toLowerCase() || ''
+  );
+
+  // Handle start button click
+  const handleStartClick = () => {
+    if (isSocialTask) {
+      setIsModalOpen(true);
+    } else if (onStart) {
+      onStart();
+    }
+  };
+
+  // Handle modal success
+  const handleModalSuccess = () => {
+    setIsModalOpen(false);
+    if (onStart) {
+      onStart();
+    }
+  };
 
   // Get icon based on task type
   const getTaskIcon = () => {
@@ -232,9 +257,9 @@ export default function FanTaskCard({
               <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
           ) : (
-            <Button 
+            <Button
               className="w-full bg-brand-primary hover:bg-brand-primary/90"
-              onClick={onStart}
+              onClick={handleStartClick}
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Start Task
@@ -242,6 +267,16 @@ export default function FanTaskCard({
           )}
         </div>
       </CardContent>
+
+      {/* Task Completion Modal */}
+      {isSocialTask && (
+        <TaskCompletionModalRouter
+          task={task}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={handleModalSuccess}
+        />
+      )}
     </Card>
   );
 }
