@@ -190,4 +190,113 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(225, 6, 152, 0.7);
   }
+
+  /* Enhanced animations for new homepage */
+  @keyframes shimmer {
+    0%, 100% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% {
+      box-shadow: 0 0 10px rgba(225, 6, 152, 0.3), 0 0 20px rgba(20, 254, 238, 0.1);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(225, 6, 152, 0.6), 0 0 40px rgba(20, 254, 238, 0.2);
+    }
+  }
+
+  @keyframes gradient-shift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  @keyframes slide-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .shimmer-text {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    background-size: 1000px 100%;
+    animation: shimmer 3s infinite;
+  }
+
+  .float-animation {
+    animation: float-slow 6s ease-in-out infinite;
+  }
+
+  .glow-button {
+    transition: all 0.3s ease;
+  }
+
+  .glow-button:hover {
+    animation: glow-pulse 1.5s ease-in-out;
+  }
+
+  .gradient-shift {
+    animation: gradient-shift 6s ease infinite;
+    background-size: 200% 200%;
+  }
+
+  /* Button glow effects */
+  .btn-gradient-primary {
+    background: linear-gradient(135deg, #e10698 0%, #e10698 100%);
+    box-shadow: 0 0 20px rgba(225, 6, 152, 0.3);
+    transition: all 0.3s ease;
+  }
+
+  .btn-gradient-primary:hover {
+    box-shadow: 0 0 30px rgba(225, 6, 152, 0.6), 0 0 50px rgba(20, 254, 238, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .btn-gradient-accent {
+    background: linear-gradient(135deg, #14feee 0%, #14feee 100%);
+    box-shadow: 0 0 20px rgba(20, 254, 238, 0.3);
+    transition: all 0.3s ease;
+  }
+
+  .btn-gradient-accent:hover {
+    box-shadow: 0 0 30px rgba(20, 254, 238, 0.6), 0 0 50px rgba(225, 6, 152, 0.3);
+    transform: translateY(-2px);
+  }
+
+  /* Glass morphism effect */
+  .glass-effect {
+    background: rgba(20, 254, 238, 0.05);
+    border: 1px solid rgba(20, 254, 238, 0.1);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Animated border */
+  .animated-border {
+    position: relative;
+    border: 2px solid transparent;
+    background: linear-gradient(#101636, #101636) padding-box,
+                linear-gradient(135deg, #e10698, #14feee) border-box;
+  }
 }
