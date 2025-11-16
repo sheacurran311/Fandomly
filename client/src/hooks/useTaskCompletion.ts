@@ -22,37 +22,25 @@ async function fetchUserTaskCompletions(tenantId?: string): Promise<{ completion
  * Fetch task completion for a specific task
  */
 async function fetchTaskCompletion(taskId: string): Promise<{ completion: TaskCompletion }> {
-  const response = await fetch(`/api/task-completions/${taskId}`, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
+  try {
+    const { apiRequest } = await import('@/lib/queryClient');
+    const response = await apiRequest('GET', `/api/task-completions/${taskId}`);
+    return response.json();
+  } catch (error: any) {
+    // Return null completion for 404 (task not started yet)
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
       return { completion: null as any };
     }
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch task completion');
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
  * Start a task
  */
 async function startTask(data: { taskId: string; tenantId: string }): Promise<{ completion: TaskCompletion }> {
-  const response = await fetch('/api/task-completions/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to start task');
-  }
-
+  const { apiRequest } = await import('@/lib/queryClient');
+  const response = await apiRequest('POST', '/api/task-completions/start', data);
   return response.json();
 }
 
@@ -65,19 +53,8 @@ async function updateTaskProgress(data: {
   completionData?: Record<string, any>;
 }): Promise<{ completion: TaskCompletion }> {
   const { completionId, ...body } = data;
-  
-  const response = await fetch(`/api/task-completions/${completionId}/progress`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to update task progress');
-  }
-
+  const { apiRequest } = await import('@/lib/queryClient');
+  const response = await apiRequest('PATCH', `/api/task-completions/${completionId}/progress`, body);
   return response.json();
 }
 
@@ -94,19 +71,8 @@ async function completeTask(data: {
   pointsAwarded: number;
 }> {
   const { completionId, ...body } = data;
-  
-  const response = await fetch(`/api/task-completions/${completionId}/complete`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to complete task');
-  }
-
+  const { apiRequest } = await import('@/lib/queryClient');
+  const response = await apiRequest('POST', `/api/task-completions/${completionId}/complete`, body);
   return response.json();
 }
 
@@ -124,19 +90,8 @@ async function checkIn(data: {
   nextCheckIn: Date;
 }> {
   const { taskId, ...body } = data;
-  
-  const response = await fetch(`/api/task-completions/${taskId}/check-in`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to check in');
-  }
-
+  const { apiRequest } = await import('@/lib/queryClient');
+  const response = await apiRequest('POST', `/api/task-completions/${taskId}/check-in`, body);
   return response.json();
 }
 
