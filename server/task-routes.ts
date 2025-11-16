@@ -259,16 +259,37 @@ export function registerTaskRoutes(app: Express) {
       
       console.log(`[Tasks API] After time filtering: ${tasks.length} tasks available`);
       
-      // Enrich tasks with creator information
-      const enrichedTasks = tasks.map(task => ({
-        ...task,
-        creatorName: task.creator?.displayName || task.tenant?.name || 'Unknown Creator',
-        creatorImage: task.creator?.profileImage || task.tenant?.logo || null,
-        programName: task.program?.name || null,
-        programSlug: task.program?.slug || null,
-        platform: task.platform || 'other', // Use the platform field directly
-        type: task.taskType || task.type || 'other', // Use taskType field for consistency
-      }));
+      // Import the transformation function
+      const { buildTargetDataFromSettings } = await import("@shared/taskFieldSchemas");
+
+      // Enrich tasks with creator information AND targetData
+      const enrichedTasks = tasks.map(task => {
+        // Build targetData from customSettings for verification
+        const targetData = buildTargetDataFromSettings(
+          task.customSettings || {},
+          task.platform || 'other',
+          task.taskType || ''
+        );
+
+        // Log the transformation for debugging
+        if (Object.keys(targetData).length > 0) {
+          console.log(`[Tasks API] Built targetData for task ${task.id} (${task.taskType}):`, {
+            customSettings: task.customSettings,
+            targetData
+          });
+        }
+
+        return {
+          ...task,
+          creatorName: task.creator?.displayName || task.tenant?.name || 'Unknown Creator',
+          creatorImage: task.creator?.profileImage || task.tenant?.logo || null,
+          programName: task.program?.name || null,
+          programSlug: task.program?.slug || null,
+          platform: task.platform || 'other', // Use the platform field directly
+          type: task.taskType || task.type || 'other', // Use taskType field for consistency
+          targetData, // Add the transformed targetData for Fan verification
+        };
+      });
       
       res.json({ tasks: enrichedTasks });
     } catch (error) {

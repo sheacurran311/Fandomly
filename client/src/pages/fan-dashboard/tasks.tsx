@@ -1,13 +1,13 @@
-import { Trophy, Target, Flame, Filter, Search, Star, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Trophy, Target, Flame, Filter, Search, Star, Plus, Grid, List } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FanTaskCard } from '@/components/tasks/FanTaskCard';
+import { FanTasksTable } from '@/components/tasks/FanTasksTable';
 import { PlatformTaskCard } from '@/components/tasks/PlatformTaskCard';
-import { CreatorTasksTable } from '@/components/tasks/CreatorTasksTable';
 import { useUserTaskCompletions } from '@/hooks/useTaskCompletion';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/use-auth';
@@ -21,11 +21,28 @@ import { LineChartCard } from '@/components/charts/LineChartCard';
 import { PieChartCard } from '@/components/charts/PieChartCard';
 import { BarChartCard } from '@/components/charts/BarChartCard';
 
+type ViewType = 'table' | 'cards';
+
 export default function FanTasksPage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [timeframe, setTimeframe] = useState<Timeframe>('weekly');
+  const [viewType, setViewType] = useState<ViewType>('table'); // Default to table view
+
+  // Load view preference from localStorage
+  useEffect(() => {
+    const savedView = localStorage.getItem('fanTasksView') as ViewType;
+    if (savedView) {
+      setViewType(savedView);
+    }
+  }, []);
+
+  // Save view preference to localStorage
+  const handleViewChange = (view: ViewType) => {
+    setViewType(view);
+    localStorage.setItem('fanTasksView', view);
+  };
 
   // Fetch platform tasks (Fandomly-issued)
   const { data: platformTasksData, isLoading: isLoadingPlatformTasks } = useQuery({
@@ -369,11 +386,33 @@ export default function FanTasksPage() {
                 <TabsTrigger value="completed">Completed</TabsTrigger>
               </TabsList>
             </Tabs>
+
+            {/* View Toggle */}
+            <div className="flex gap-2">
+              <Button
+                variant={viewType === 'table' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewChange('table')}
+                className={viewType === 'table' ? 'bg-brand-primary hover:bg-brand-primary/80' : ''}
+              >
+                <List className="h-4 w-4 mr-2" />
+                Rows
+              </Button>
+              <Button
+                variant={viewType === 'cards' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewChange('cards')}
+                className={viewType === 'cards' ? 'bg-brand-primary hover:bg-brand-primary/80' : ''}
+              >
+                <Grid className="h-4 w-4 mr-2" />
+                Cards
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Tasks Table */}
+      {/* Tasks Display */}
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -385,7 +424,7 @@ export default function FanTasksPage() {
             <Target className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Tasks Found</h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery 
+              {searchQuery
                 ? 'Try adjusting your search or filters'
                 : 'Join creators to see their tasks!'}
             </p>
@@ -399,11 +438,22 @@ export default function FanTasksPage() {
             )}
           </CardContent>
         </Card>
-      ) : (
-        <CreatorTasksTable 
-          tasks={filteredTasks as any} 
+      ) : viewType === 'table' ? (
+        <FanTasksTable
+          tasks={filteredTasks as any}
           completionMap={completionMap}
         />
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {filteredTasks.map((task: Task) => (
+            <FanTaskCard
+              key={task.id}
+              task={task}
+              completion={completionMap.get(task.id)}
+              tenantId={task.tenantId}
+            />
+          ))}
+        </div>
       )}
       </div>
     </DashboardLayout>
