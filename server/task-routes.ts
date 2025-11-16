@@ -19,6 +19,14 @@ import {
   extractContentId,
   type SocialTaskSettings,
 } from "@shared/taskFieldSchemas";
+import {
+  taskCompletions,
+  manualReviewQueue,
+  creators,
+} from "@shared/schema";
+import { eq, and, isNull, desc } from "drizzle-orm";
+import { uploadScreenshot, getFileUrl } from "./middleware/upload";
+import { unifiedVerification } from "./services/verification/unified-verification";
 
 // Task configuration schemas based on our task builders
 const baseTaskSchema = z.object({
@@ -749,5 +757,344 @@ export function registerTaskRoutes(app: Express) {
       });
     }
   });
+
+  // ============================================================================
+  // TASK COMPLETION & VERIFICATION ENDPOINTS
+  // ============================================================================
+
+  /**
+   * Complete a task (submit for verification)
+   * POST /api/tasks/:taskId/complete
+   *
+   * Accepts proof data from frontend modals:
+   * - proofUrl: Link to social media post/profile
+   * - screenshot: Image file upload (multipart/form-data)
+   * - proofNotes: Additional text notes
+   * - platform: Social platform name
+   * - taskType: Specific task type
+   * - targetData: Task settings for verification
+   */
+  app.post(
+    "/api/tasks/:taskId/complete",
+    authenticateUser,
+    uploadScreenshot.single('screenshot'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user!.id;
+
+        // Get uploaded screenshot if present
+        const screenshotFile = req.file;
+        const screenshotUrl = screenshotFile
+          ? getFileUrl(screenshotFile.filename, 'screenshot')
+          : undefined;
+
+        // Parse form data
+        const {
+          platform,
+          taskType,
+          proofUrl,
+          proofNotes,
+          targetData,
+        } = req.body;
+
+        // Parse targetData if it's a JSON string
+        const taskSettings = typeof targetData === 'string'
+          ? JSON.parse(targetData)
+          : targetData;
+
+        // Get task details
+        const task = await storage.getTask(Number(taskId));
+        if (!task) {
+          return res.status(404).json({ error: "Task not found" });
+        }
+
+        // Verify unified verification service
+        const result = await unifiedVerification.verify({
+          userId,
+          taskId: Number(taskId),
+          tenantId: task.tenantId,
+          creatorId: task.creatorId,
+          platform: platform || task.platform || 'unknown',
+          taskType: taskType || task.taskType,
+          taskName: task.name,
+          taskSettings: taskSettings || task.customSettings || {},
+          proofUrl,
+          screenshotUrl,
+          proofNotes,
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error('Task completion error:', error);
+        res.status(500).json({
+          error: "Failed to complete task",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Verify an existing task completion
+   * POST /api/task-completions/:completionId/verify
+   *
+   * For tasks that were started but need verification
+   * (e.g., user clicked "Start Task" earlier, now submitting proof)
+   */
+  app.post(
+    "/api/task-completions/:completionId/verify",
+    authenticateUser,
+    uploadScreenshot.single('screenshot'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { completionId } = req.params;
+        const userId = req.user!.id;
+
+        // Get uploaded screenshot if present
+        const screenshotFile = req.file;
+        const screenshotUrl = screenshotFile
+          ? getFileUrl(screenshotFile.filename, 'screenshot')
+          : undefined;
+
+        // Parse form data
+        const {
+          platform,
+          taskType,
+          proofUrl,
+          proofNotes,
+          targetData,
+        } = req.body;
+
+        // Parse targetData if it's a JSON string
+        const taskSettings = typeof targetData === 'string'
+          ? JSON.parse(targetData)
+          : targetData;
+
+        // Get task completion
+        const completion = await db.query.taskCompletions.findFirst({
+          where: eq(taskCompletions.id, Number(completionId)),
+          with: {
+            task: true,
+          },
+        });
+
+        if (!completion) {
+          return res.status(404).json({ error: "Task completion not found" });
+        }
+
+        // Verify user owns this completion
+        if (completion.user_id !== userId) {
+          return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        const task = completion.task;
+
+        // Run verification
+        const result = await unifiedVerification.verify({
+          userId,
+          taskCompletionId: Number(completionId),
+          taskId: task.id,
+          tenantId: task.tenantId,
+          creatorId: task.creatorId,
+          platform: platform || task.platform || 'unknown',
+          taskType: taskType || task.taskType,
+          taskName: task.name,
+          taskSettings: taskSettings || task.customSettings || {},
+          proofUrl,
+          screenshotUrl,
+          proofNotes,
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error('Task verification error:', error);
+        res.status(500).json({
+          error: "Failed to verify task",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Get user's task completions
+   * GET /api/task-completions/me
+   */
+  app.get(
+    "/api/task-completions/me",
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user!.id;
+        const { status, tenantId } = req.query;
+
+        let query = db
+          .select()
+          .from(taskCompletions)
+          .where(eq(taskCompletions.user_id, userId));
+
+        if (status) {
+          query = query.where(eq(taskCompletions.status, status as string));
+        }
+
+        if (tenantId) {
+          query = query.where(eq(taskCompletions.tenant_id, Number(tenantId)));
+        }
+
+        const completions = await query;
+
+        res.json(completions);
+      } catch (error: any) {
+        console.error('Error fetching task completions:', error);
+        res.status(500).json({
+          error: "Failed to fetch task completions",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Get manual review queue for creator
+   * GET /api/manual-review/queue
+   */
+  app.get(
+    "/api/manual-review/queue",
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user!.id;
+        const { status = 'pending', limit = 50 } = req.query;
+
+        // Get creator record
+        const creator = await db.query.creators.findFirst({
+          where: eq(creators.user_id, userId),
+        });
+
+        if (!creator) {
+          return res.status(403).json({ error: "Only creators can access review queue" });
+        }
+
+        // Get pending reviews for this creator
+        const reviews = await db
+          .select()
+          .from(manualReviewQueue)
+          .where(
+            and(
+              eq(manualReviewQueue.creator_id, creator.id),
+              eq(manualReviewQueue.status, status as string),
+              isNull(manualReviewQueue.deleted_at)
+            )
+          )
+          .orderBy(desc(manualReviewQueue.priority), desc(manualReviewQueue.submitted_at))
+          .limit(Number(limit));
+
+        res.json(reviews);
+      } catch (error: any) {
+        console.error('Error fetching review queue:', error);
+        res.status(500).json({
+          error: "Failed to fetch review queue",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Approve manual review
+   * POST /api/manual-review/:reviewId/approve
+   */
+  app.post(
+    "/api/manual-review/:reviewId/approve",
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { reviewId } = req.params;
+        const { reviewNotes } = req.body;
+        const userId = req.user!.id;
+
+        // Verify user is creator who owns this review
+        const review = await db.query.manualReviewQueue.findFirst({
+          where: eq(manualReviewQueue.id, Number(reviewId)),
+          with: {
+            creator: true,
+          },
+        });
+
+        if (!review) {
+          return res.status(404).json({ error: "Review not found" });
+        }
+
+        if (review.creator.user_id !== userId) {
+          return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        await unifiedVerification.approveManualReview(
+          Number(reviewId),
+          userId,
+          reviewNotes
+        );
+
+        res.json({ success: true, message: "Task approved" });
+      } catch (error: any) {
+        console.error('Error approving review:', error);
+        res.status(500).json({
+          error: "Failed to approve review",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Reject manual review
+   * POST /api/manual-review/:reviewId/reject
+   */
+  app.post(
+    "/api/manual-review/:reviewId/reject",
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { reviewId } = req.params;
+        const { reviewNotes } = req.body;
+        const userId = req.user!.id;
+
+        if (!reviewNotes) {
+          return res.status(400).json({ error: "Review notes required for rejection" });
+        }
+
+        // Verify user is creator who owns this review
+        const review = await db.query.manualReviewQueue.findFirst({
+          where: eq(manualReviewQueue.id, Number(reviewId)),
+          with: {
+            creator: true,
+          },
+        });
+
+        if (!review) {
+          return res.status(404).json({ error: "Review not found" });
+        }
+
+        if (review.creator.user_id !== userId) {
+          return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        await unifiedVerification.rejectManualReview(
+          Number(reviewId),
+          userId,
+          reviewNotes
+        );
+
+        res.json({ success: true, message: "Task rejected" });
+      } catch (error: any) {
+        console.error('Error rejecting review:', error);
+        res.status(500).json({
+          error: "Failed to reject review",
+          message: error.message,
+        });
+      }
+    }
+  );
 }
 

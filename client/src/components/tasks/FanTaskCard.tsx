@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { 
+import {
   CheckCircle2, Clock, Star, Trophy, Users, Target,
   Flame, Gift, ArrowRight, Lock, Shield
 } from 'lucide-react';
 import type { Task, TaskCompletion } from '@shared/schema';
-import { 
-  useStartTask, 
-  useCompleteTask, 
+import {
+  useStartTask,
+  useCompleteTask,
   useCheckIn,
   isTaskCompleted,
   isTaskInProgress,
@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import TaskCompletionModalRouter from '@/components/modals/TaskCompletionModalRouter';
 
 interface FanTaskCardProps {
   task: Task;
@@ -31,8 +32,9 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const queryClient = useQueryClient();
-  
+
   const startTask = useStartTask();
   const completeTask = useCompleteTask();
   const checkIn = useCheckIn();
@@ -67,10 +69,20 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
 
   // Handle task start
   const handleStart = async () => {
+    // For social media tasks, show completion modal directly
+    const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
+
+    if (isSocialTask) {
+      // Open modal for social tasks
+      setIsModalOpen(true);
+      return;
+    }
+
+    // For non-social tasks (check-in, referral, etc.), create task completion
     try {
       setIsProcessing(true);
       await startTask.mutateAsync({ taskId: task.id, tenantId });
-      
+
       toast({
         title: 'Task Started!',
         description: `You've started "${task.name}"`,
@@ -84,6 +96,13 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Handle modal success (task completion submitted)
+  const handleModalSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+    setIsModalOpen(false);
   };
 
   // Handle check-in
@@ -400,6 +419,15 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
           </div>
         )}
       </CardContent>
+
+      {/* Task Completion Modal */}
+      <TaskCompletionModalRouter
+        task={task}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleModalSuccess}
+        completionId={completion?.id}
+      />
     </Card>
   );
 }

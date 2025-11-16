@@ -1272,6 +1272,64 @@ export const platformTaskCompletions = pgTable("platform_task_completions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Manual Review Queue - Tasks requiring creator review (Instagram, Facebook, etc.)
+export const manualReviewQueue = pgTable("manual_review_queue", {
+  id: serial("id").primaryKey(),
+  taskCompletionId: integer("task_completion_id").notNull(),
+  tenantId: integer("tenant_id").notNull(),
+  creatorId: integer("creator_id").notNull(),
+  fanId: integer("fan_id").notNull(),
+  taskId: integer("task_id").notNull(),
+
+  // Platform and task info
+  platform: varchar("platform", { length: 50 }).notNull(),
+  taskType: varchar("task_type", { length: 100 }).notNull(),
+  taskName: varchar("task_name", { length: 255 }).notNull(),
+
+  // Proof data
+  screenshotUrl: text("screenshot_url"),
+  proofUrl: text("proof_url"),
+  proofNotes: text("proof_notes"),
+
+  // Review status
+  status: varchar("status", { length: 20 }).default('pending').notNull(),
+  priority: varchar("priority", { length: 20 }).default('normal').notNull(),
+
+  // Review details
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: integer("reviewed_by"),
+  reviewNotes: text("review_notes"),
+
+  // Metadata
+  autoCheckResult: jsonb("auto_check_result").$type<Record<string, any>>(),
+  verificationAttempts: integer("verification_attempts").default(0),
+
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+// Verification Attempts - Audit log of all verification attempts
+export const verificationAttempts = pgTable("verification_attempts", {
+  id: serial("id").primaryKey(),
+  taskCompletionId: integer("task_completion_id").notNull(),
+  userId: integer("user_id").notNull(),
+
+  platform: varchar("platform", { length: 50 }).notNull(),
+  verificationMethod: varchar("verification_method", { length: 50 }).notNull(),
+
+  // Attempt details
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  verificationData: jsonb("verification_data").$type<Record<string, any>>(),
+
+  // Timestamps
+  attemptedAt: timestamp("attempted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Platform Points Transactions - Track platform-wide points separate from creator programs
 export const platformPointsTransactions = pgTable("platform_points_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
