@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, TrendingUp, DollarSign, Users, Instagram, Twitter, Facebook, Award } from "lucide-react";
+import { Calculator, TrendingUp, DollarSign, Users, Instagram, Twitter, Facebook, Award, Zap, Target, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface CalculatorInputs {
   sport: string;
@@ -96,26 +97,38 @@ export default function NILValueCalculator() {
   };
 
   return (
-    <section className="py-16 bg-gradient-to-b from-brand-dark-purple/20 to-brand-dark-bg">
+    <section className="py-24 bg-gradient-to-b from-brand-dark-purple/20 to-brand-dark-bg">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl lg:text-4xl font-bold mb-4 gradient-text">
-            NIL Value Calculator
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl lg:text-5xl font-black mb-6 gradient-text">
+            Discover Your NIL Worth
           </h2>
-          <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            Estimate your Name, Image, and Likeness value based on your social media presence, athletic performance, and market factors.
+          <p className="text-lg lg:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+            Get an instant, data-driven estimate of your Name, Image, and Likeness value. Our algorithm analyzes social metrics, athletic performance, and market dynamics to calculate your monetization potential.
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-          {/* Calculator Form */}
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Calculator className="h-5 w-5 mr-2 text-brand-primary" />
-                Calculate Your NIL Value
-              </CardTitle>
-            </CardHeader>
+          {/* Enhanced Calculator Form */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-primary/30 transition-all h-full">
+              <CardHeader className="bg-gradient-to-r from-brand-primary/10 to-brand-accent/10 border-b border-white/10">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-brand-primary" />
+                  Your NIL Profile
+                </CardTitle>
+              </CardHeader>
             <CardContent className="space-y-6">
               {/* Sport & Division */}
               <div className="grid grid-cols-2 gap-4">
@@ -250,93 +263,142 @@ export default function NILValueCalculator() {
                 />
               </div>
 
-              <Button 
+              <motion.button
                 onClick={calculateNILValue}
-                className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white"
-                size="lg"
+                className="w-full bg-gradient-to-r from-brand-primary to-brand-accent text-white py-3 px-4 rounded-lg font-bold text-base transition-all shadow-lg hover:shadow-xl"
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
               >
-                Calculate My NIL Value
-                <TrendingUp className="h-4 w-4 ml-2" />
-              </Button>
+                <div className="flex items-center justify-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Calculate My NIL Value
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+              </motion.button>
             </CardContent>
-          </Card>
+            </Card>
+          </motion.div>
 
-          {/* Results */}
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <DollarSign className="h-5 w-5 mr-2 text-brand-secondary" />
-                Your Estimated NIL Value
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {calculatedValue !== null ? (
-                <div className="space-y-6">
-                  {/* Main Value */}
-                  <div className="text-center">
-                    <div className={`text-6xl font-bold mb-2 ${getValueRange(calculatedValue).color}`}>
-                      ${calculatedValue.toLocaleString()}
+          {/* Enhanced Results Panel */}
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:border-brand-secondary/30 transition-all h-full">
+              <CardHeader className="bg-gradient-to-r from-brand-secondary/10 to-brand-accent/10 border-b border-white/10">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Target className="h-5 w-5 text-brand-secondary" />
+                  Your NIL Estimate
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {calculatedValue !== null ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.6 }}
+                    className="space-y-6"
+                  >
+                    {/* Main Value with Animation */}
+                    <div className="text-center p-6 bg-gradient-to-b from-white/5 to-transparent rounded-xl">
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2, duration: 0.6 }}
+                      >
+                        <div className={`text-5xl md:text-6xl font-black mb-3 ${getValueRange(calculatedValue).color}`}>
+                          ${calculatedValue.toLocaleString()}
+                        </div>
+                        <Badge className={`bg-gradient-to-r from-brand-primary/30 to-brand-accent/30 text-white text-base px-6 py-2 border border-brand-primary/50`}>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {getValueRange(calculatedValue).label}
+                        </Badge>
+                      </motion.div>
                     </div>
-                    <Badge variant="secondary" className="bg-brand-primary/20 text-brand-primary text-lg px-4 py-2">
-                      {getValueRange(calculatedValue).label}
-                    </Badge>
-                  </div>
 
-                  {/* Breakdown */}
-                  {breakdown && (
-                    <div className="space-y-4">
-                      <h4 className="font-semibold text-white">Value Breakdown:</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-300 flex items-center">
-                            <Users className="h-4 w-4 mr-2" />
-                            Social Media Impact
-                          </span>
-                          <span className="text-white font-medium">${breakdown.socialMedia.toLocaleString()}</span>
+                    {/* Animated Breakdown */}
+                    {breakdown && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.3, duration: 0.6 }}
+                        className="space-y-3"
+                      >
+                        <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+                          <Target className="w-4 h-4" />
+                          Value Breakdown
+                        </h4>
+                        <div className="space-y-2">
+                          {[
+                            { label: "Social Media Impact", value: breakdown.socialMedia, icon: Users },
+                            { label: "Sport Premium", value: breakdown.sport, icon: Award },
+                            { label: "Performance Bonus", value: breakdown.performance, icon: TrendingUp },
+                            { label: "Market Factor", value: breakdown.market, icon: Target }
+                          ].map((item, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.4 + idx * 0.1, duration: 0.4 }}
+                              className="flex items-center justify-between p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                              <span className="text-gray-300 flex items-center gap-2">
+                                <item.icon className="h-4 w-4 text-brand-accent" />
+                                {item.label}
+                              </span>
+                              <span className="text-white font-bold">${item.value.toLocaleString()}</span>
+                            </motion.div>
+                          ))}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-300 flex items-center">
-                            <Award className="h-4 w-4 mr-2" />
-                            Sport Premium
-                          </span>
-                          <span className="text-white font-medium">${breakdown.sport.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-300 flex items-center">
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            Performance Bonus
-                          </span>
-                          <span className="text-white font-medium">${breakdown.performance.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-300">Market Factor</span>
-                          <span className="text-white font-medium">${breakdown.market.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                      </motion.div>
+                    )}
 
-                  {/* Call to Action */}
-                  <div className="bg-brand-primary/10 border border-brand-primary/20 rounded-lg p-4">
-                    <h4 className="font-semibold text-brand-primary mb-2">Ready to Monetize Your NIL?</h4>
-                    <p className="text-gray-300 text-sm mb-4">
-                      Start building your fan loyalty program on Fandomly and unlock your earning potential.
+                    {/* Enhanced CTA */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.6, duration: 0.6 }}
+                      className="bg-gradient-to-r from-brand-primary/15 to-brand-accent/15 border border-brand-primary/30 rounded-xl p-4 mt-6"
+                    >
+                      <h4 className="font-bold text-brand-accent mb-2 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        Next Steps
+                      </h4>
+                      <p className="text-gray-300 text-sm mb-4">
+                        Launch your loyalty program on Fandomly and start monetizing your personal brand today.
+                      </p>
+                      <motion.button
+                        className="w-full bg-gradient-to-r from-brand-primary to-brand-accent text-white py-2 px-3 rounded-lg font-semibold text-sm transition-all"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Unlock My Earning Potential
+                      </motion.button>
+                    </motion.div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.6 }}
+                    className="text-center py-12"
+                  >
+                    <motion.div
+                      animate={{ y: [0, -10, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <Calculator className="h-16 w-16 text-brand-accent/50 mx-auto mb-4" />
+                    </motion.div>
+                    <p className="text-gray-400 font-medium">
+                      Complete the form on the left to discover your NIL value
                     </p>
-                    <Button className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white">
-                      Start Your NIL Journey
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Calculator className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-400">
-                    Fill out the form to calculate your estimated NIL value
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </motion.div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </div>
     </section>
