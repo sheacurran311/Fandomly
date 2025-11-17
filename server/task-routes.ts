@@ -293,6 +293,7 @@ export function registerTaskRoutes(app: Express) {
           creatorImage: task.creator?.profileImage || task.tenant?.logo || null,
           programName: task.program?.name || null,
           programSlug: task.program?.slug || null,
+          programImage: task.program?.imageUrl || task.program?.image || null,
           platform: task.platform || 'other', // Use the platform field directly
           type: task.taskType || task.type || 'other', // Use taskType field for consistency
           targetData, // Add the transformed targetData for Fan verification
@@ -929,7 +930,7 @@ export function registerTaskRoutes(app: Express) {
         const userId = req.user!.id;
         const { status, tenantId } = req.query;
 
-        // Build WHERE conditions array
+        // Build WHERE conditions
         const conditions = [eq(taskCompletions.user_id, userId)];
 
         if (status) {
@@ -937,13 +938,16 @@ export function registerTaskRoutes(app: Express) {
         }
 
         if (tenantId) {
-          conditions.push(eq(taskCompletions.tenant_id, Number(tenantId)));
+          conditions.push(eq(taskCompletions.tenant_id, tenantId as string));
         }
+
+        // Use single condition or AND based on array length
+        const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
 
         const completions = await db
           .select()
           .from(taskCompletions)
-          .where(and(...conditions));
+          .where(whereClause);
 
         res.json(completions);
       } catch (error: any) {

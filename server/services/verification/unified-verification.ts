@@ -6,11 +6,11 @@ import { tiktokVerification } from './tiktok-verification';
 import { validateProofUrl } from '../../middleware/upload';
 
 export interface UnifiedVerificationRequest {
-  userId: number;
+  userId: string;
   taskCompletionId?: number;
-  taskId: number;
-  tenantId: number;
-  creatorId: number;
+  taskId: string; // UUID
+  tenantId: string;
+  creatorId: string;
 
   platform: string;
   taskType: string;
@@ -243,9 +243,9 @@ export class UnifiedVerificationService {
    */
   private async upsertTaskCompletion(params: {
     taskCompletionId?: number;
-    userId: number;
-    taskId: number;
-    tenantId: number;
+    userId: string;
+    taskId: string;
+    tenantId: string;
     proofUrl?: string;
     screenshotUrl?: string;
     proofNotes?: string;
@@ -310,10 +310,10 @@ export class UnifiedVerificationService {
    */
   private async createManualReview(params: {
     taskCompletionId: number;
-    tenantId: number;
-    creatorId: number;
-    fanId: number;
-    taskId: number;
+    tenantId: string;
+    creatorId: string;
+    fanId: string;
+    taskId: string;
     platform: string;
     taskType: string;
     taskName: string;
@@ -348,7 +348,7 @@ export class UnifiedVerificationService {
    */
   private async logVerificationAttempt(params: {
     taskCompletionId: number;
-    userId: number;
+    userId: string;
     platform: string;
     verificationMethod: string;
     success: boolean;
@@ -371,7 +371,7 @@ export class UnifiedVerificationService {
   /**
    * Award points for verified task completion
    */
-  private async awardPoints(taskCompletionId: number, taskId: number): Promise<number> {
+  private async awardPoints(taskCompletionId: number, taskId: string): Promise<number> {
     // Get task to know how many points to award
     const task = await db.query.tasks.findFirst({
       where: (tasks, { eq }) => eq(tasks.id, taskId),
@@ -381,7 +381,7 @@ export class UnifiedVerificationService {
       throw new Error('Task not found');
     }
 
-    const pointsToAward = task.points_to_reward || 0;
+    const pointsToAward = task.pointsToReward || 0;
 
     // Update completion with points awarded
     await db
