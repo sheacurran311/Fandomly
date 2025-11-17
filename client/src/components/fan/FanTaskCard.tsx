@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Users,
   Flame,
@@ -15,9 +16,17 @@ import {
   Award,
   Sparkles,
   ChevronRight,
+  Twitter,
+  Instagram,
+  Facebook,
+  Youtube,
+  Music,
+  Video,
 } from "lucide-react";
 import { type Task } from "@shared/schema";
 import TaskCompletionModalRouter from "@/components/modals/TaskCompletionModalRouter";
+import { transformImageUrl } from "@/lib/image-utils";
+import { useSocialConnectionStatus } from "@/hooks/useSocialConnectionStatus";
 
 interface FanTaskCardProps {
   task: Task;
@@ -29,6 +38,10 @@ interface FanTaskCardProps {
   onStart?: () => void;
   onContinue?: () => void;
   onClaim?: () => void;
+  // Program information (enriched from parent)
+  programName?: string;
+  programImage?: string;
+  creatorName?: string;
 }
 
 export default function FanTaskCard({
@@ -37,6 +50,9 @@ export default function FanTaskCard({
   onStart,
   onContinue,
   onClaim,
+  programName,
+  programImage,
+  creatorName,
 }: FanTaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const isCompleted = progress?.completed || false;
@@ -47,6 +63,56 @@ export default function FanTaskCard({
   const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok', 'x'].includes(
     task.platform?.toLowerCase() || ''
   );
+
+  // Get platform icon
+  const getPlatformIcon = (platform?: string) => {
+    switch (platform?.toLowerCase()) {
+      case 'twitter':
+      case 'x':
+        return <Twitter className="h-4 w-4" />;
+      case 'instagram':
+        return <Instagram className="h-4 w-4" />;
+      case 'facebook':
+        return <Facebook className="h-4 w-4" />;
+      case 'youtube':
+        return <Youtube className="h-4 w-4" />;
+      case 'spotify':
+        return <Music className="h-4 w-4" />;
+      case 'tiktok':
+        return <Video className="h-4 w-4" />;
+      default:
+        return null;
+    }
+  };
+
+  // Get platform badge color
+  const getPlatformBadgeColor = (platform?: string) => {
+    switch (platform?.toLowerCase()) {
+      case 'twitter':
+      case 'x':
+        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      case 'instagram':
+        return 'bg-pink-500/20 text-pink-300 border-pink-500/30';
+      case 'facebook':
+        return 'bg-blue-600/20 text-blue-300 border-blue-600/30';
+      case 'youtube':
+        return 'bg-red-500/20 text-red-300 border-red-500/30';
+      case 'tiktok':
+        return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+      case 'spotify':
+        return 'bg-green-500/20 text-green-300 border-green-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+    }
+  };
+
+  // Format task type for display
+  const formatTaskType = (type?: string) => {
+    return type
+      ?.split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ') || 'Task';
+  };
 
   // Handle start button click
   const handleStartClick = () => {
@@ -126,15 +192,66 @@ export default function FanTaskCard({
   const colorClass = getTaskColor();
   const points = getPoints();
 
+  // Check connection status for social tasks
+  const { connected, isLoading: connectionLoading } = useSocialConnectionStatus(
+    isSocialTask ? task.platform : undefined
+  );
+
   return (
-    <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all hover:scale-[1.02] group">
+    <Card className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all hover:scale-[1.02] group relative">
+      {/* Connection Status Indicator (Top-Left) */}
+      {isSocialTask && (
+        <div className="absolute top-3 right-3 z-10">
+          {connectionLoading ? (
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-500/20 border border-gray-500/30 rounded-full">
+              <Clock className="h-3 w-3 text-gray-400 animate-pulse" />
+              <span className="text-xs text-gray-400">Checking...</span>
+            </div>
+          ) : connected ? (
+            <div className="flex items-center gap-1 px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
+              <CheckCircle className="h-3 w-3 text-green-400" />
+              <span className="text-xs text-green-400">Connected</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 px-2 py-1 bg-red-500/20 border border-red-500/30 rounded-full">
+              <CheckCircle className="h-3 w-3 text-red-400" />
+              <span className="text-xs text-red-400">Not Connected</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <CardHeader className="pb-3">
+        {/* Program/Creator Info */}
+        {(programName || creatorName) && (
+          <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/10">
+            {programImage && (
+              <Avatar className="h-8 w-8 border border-white/20">
+                <AvatarImage src={transformImageUrl(programImage)} alt={programName || creatorName} />
+                <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-xs">
+                  {(programName || creatorName)?.charAt(0)?.toUpperCase() || 'P'}
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-medium truncate">
+                {programName || creatorName}
+              </p>
+              {programName && creatorName && (
+                <p className="text-xs text-gray-400 truncate">
+                  by {creatorName}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3 flex-1">
             <div className={`w-12 h-12 rounded-lg ${colorClass} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
               <TaskIcon className="h-6 w-6" />
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-white font-semibold text-lg truncate">
@@ -147,7 +264,22 @@ export default function FanTaskCard({
                   </Badge>
                 )}
               </div>
-              
+
+              {/* Platform and Task Type Badges */}
+              <div className="flex items-center gap-2 mb-2">
+                {task.platform && (
+                  <Badge variant="outline" className={`text-xs ${getPlatformBadgeColor(task.platform)}`}>
+                    {getPlatformIcon(task.platform)}
+                    <span className="ml-1 capitalize">{task.platform}</span>
+                  </Badge>
+                )}
+                {task.taskType && (
+                  <Badge variant="outline" className={`text-xs ${colorClass}`}>
+                    {formatTaskType(task.taskType)}
+                  </Badge>
+                )}
+              </div>
+
               {task.description && (
                 <p className="text-gray-400 text-sm line-clamp-2">
                   {task.description}
@@ -155,10 +287,6 @@ export default function FanTaskCard({
               )}
             </div>
           </div>
-
-          <Badge variant="outline" className={`${colorClass} shrink-0 ml-2`}>
-            {getTaskTypeLabel()}
-          </Badge>
         </div>
       </CardHeader>
 
