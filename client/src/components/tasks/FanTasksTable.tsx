@@ -26,6 +26,7 @@ interface EnrichedTask extends Task {
   creatorImage?: string;
   programName?: string;
   programSlug?: string;
+  programImage?: string;
   platform?: string;
 }
 
@@ -87,7 +88,10 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
 
     switch (sortBy) {
       case 'creator':
-        compareValue = (a.creatorName || '').localeCompare(b.creatorName || '');
+        // Sort by program name first, fall back to creator name
+        const aName = a.programName || a.creatorName || '';
+        const bName = b.programName || b.creatorName || '';
+        compareValue = aName.localeCompare(bName);
         break;
       case 'platform':
         compareValue = (a.platform || '').localeCompare(b.platform || '');
@@ -201,7 +205,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
               className="text-gray-300 cursor-pointer select-none hover:text-white transition-colors"
               onClick={() => toggleSort('creator')}
             >
-              Creator <SortIcon column="creator" />
+              Program <SortIcon column="creator" />
             </TableHead>
             <TableHead
               className="text-gray-300 cursor-pointer select-none hover:text-white transition-colors"
@@ -268,27 +272,27 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
                   key={task.id}
                   className="border-white/10 hover:bg-white/5 transition-colors"
                 >
-                  {/* Creator */}
+                  {/* Program */}
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 border border-white/20">
-                        {task.creatorImage && (
+                        {task.programImage && (
                           <AvatarImage
-                            src={transformImageUrl(task.creatorImage)}
-                            alt={task.creatorName}
+                            src={transformImageUrl(task.programImage)}
+                            alt={task.programName}
                           />
                         )}
                         <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-xs">
-                          {task.creatorName?.charAt(0)?.toUpperCase() || 'C'}
+                          {task.programName?.charAt(0)?.toUpperCase() || task.creatorName?.charAt(0)?.toUpperCase() || 'P'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
                         <span className="text-white text-sm font-medium">
-                          {task.creatorName}
+                          {task.programName || task.creatorName}
                         </span>
-                        {task.programName && (
+                        {task.programName && task.creatorName && (
                           <span className="text-xs text-gray-400">
-                            {task.programName}
+                            by {task.creatorName}
                           </span>
                         )}
                       </div>
