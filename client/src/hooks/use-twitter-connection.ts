@@ -9,6 +9,8 @@ interface TwitterUserInfo {
   username?: string;
   followersCount?: number;
   followers_count?: number;
+  followingCount?: number;
+  following_count?: number;
 }
 
 interface TwitterConnectionState {
@@ -59,24 +61,33 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
         if (data.connected && data.connection) {
           const conn = data.connection;
           
-          // Extract follower count from multiple possible locations
-          const followersCount = 
+          // Extract follower and following counts from multiple possible locations
+          const followersCount =
             conn.profileData?.user?.followersCount ||
             conn.profileData?.user?.followers_count ||
             conn.profileData?.followersCount ||
             conn.profileData?.followers_count ||
             conn.profileData?.user?.public_metrics?.followers_count ||
             0;
-          
+
+          const followingCount =
+            conn.profileData?.user?.followingCount ||
+            conn.profileData?.user?.following_count ||
+            conn.profileData?.followingCount ||
+            conn.profileData?.following_count ||
+            conn.profileData?.user?.public_metrics?.following_count ||
+            0;
+
           // Debug log to see what we're receiving
           console.log('[Twitter Hook] Connection data:', {
             platformUsername: conn.platformUsername,
             hasProfileData: !!conn.profileData,
             profileDataKeys: conn.profileData ? Object.keys(conn.profileData) : [],
             followersCount,
+            followingCount,
             rawProfileData: conn.profileData
           });
-          
+
           setState(prev => ({
             ...prev,
             isConnected: true,
@@ -86,6 +97,8 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
               username: conn.platformUsername,
               followersCount: followersCount,
               followers_count: followersCount,
+              followingCount: followingCount,
+              following_count: followingCount,
             },
             error: null,
           }));
@@ -156,6 +169,8 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
             username: result.user.username,
             followersCount: result.user.followersCount || 0,
             followers_count: result.user.followersCount || 0,
+            followingCount: result.user.followingCount || 0,
+            following_count: result.user.followingCount || 0,
           },
           error: null,
         }));
