@@ -1062,6 +1062,10 @@ function TasksTab({
               task={task}
               completion={completionMap.get(task.id)}
               tenantId={task.tenantId}
+              themeColors={themeColors}
+              brandColors={brandColors}
+              pointsName={pointsName}
+              isThemeDark={isThemeDark}
             />
           ))}
         </div>

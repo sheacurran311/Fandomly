@@ -25,9 +25,33 @@ interface FanTaskCardProps {
   task: Task;
   completion?: TaskCompletion;
   tenantId: string;
+  // Optional theme customization for public pages
+  themeColors?: {
+    background?: string;
+    text?: {
+      primary?: string;
+      secondary?: string;
+      tertiary?: string;
+    };
+  };
+  brandColors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+  };
+  pointsName?: string;
+  isThemeDark?: boolean;
 }
 
-export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
+export function FanTaskCard({
+  task,
+  completion,
+  tenantId,
+  themeColors,
+  brandColors,
+  pointsName = 'points',
+  isThemeDark = false
+}: FanTaskCardProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -202,11 +226,17 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
   const available = isAvailable();
 
   return (
-    <Card className={`overflow-hidden transition-all hover:shadow-lg ${
-      completed ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
-      inProgress ? 'border-blue-200 dark:border-blue-800' :
-      !available ? 'opacity-60' : ''
-    }`}>
+    <Card
+      className={`overflow-hidden transition-all hover:shadow-lg ${
+        completed ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
+        inProgress ? 'border-blue-200 dark:border-blue-800' :
+        !available ? 'opacity-60' : ''
+      }`}
+      style={themeColors ? {
+        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+        borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'
+      } : undefined}
+    >
       <CardContent className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -215,10 +245,16 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
               {getTaskIcon()}
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-lg leading-tight mb-1">
+              <h3
+                className="font-semibold text-lg leading-tight mb-1"
+                style={brandColors ? { color: brandColors.primary } : undefined}
+              >
                 {task.name}
               </h3>
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p
+                className="text-sm text-muted-foreground line-clamp-2"
+                style={themeColors ? { color: themeColors.text?.secondary } : undefined}
+              >
                 {task.description}
               </p>
             </div>
@@ -283,8 +319,11 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Gift className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">
-              {task.pointsToReward || 0} points
+            <span
+              className="text-sm font-medium"
+              style={themeColors ? { color: themeColors.text?.primary } : undefined}
+            >
+              {task.pointsToReward || 0} {pointsName}
             </span>
           </div>
 
@@ -333,7 +372,8 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
             <Button
               onClick={handleStart}
               disabled={isProcessing}
-              className="w-full"
+              className="w-full text-white hover:opacity-90"
+              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {isProcessing ? 'Starting...' : 'Start Task'}
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -344,9 +384,10 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
             <Button
               onClick={handleCheckIn}
               disabled={isProcessing || !canCheckIn}
-              className="w-full"
+              className="w-full text-white hover:opacity-90"
+              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
-              {isProcessing ? 'Checking in...' : 
+              {isProcessing ? 'Checking in...' :
                !canCheckIn ? 'Already Checked In Today' :
                'Check In'}
               <Flame className="w-4 h-4 ml-2" />
@@ -357,7 +398,8 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
             <Button
               onClick={handleComplete}
               disabled={isProcessing || progress < 100}
-              className="w-full"
+              className="w-full text-white hover:opacity-90"
+              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {isProcessing ? 'Completing...' : 'Complete Task'}
               <CheckCircle2 className="w-4 h-4 ml-2" />
@@ -369,7 +411,8 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
               onClick={handleVerify}
               disabled={isVerifying}
               variant="default"
-              className="w-full"
+              className="w-full text-white hover:opacity-90"
+              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {isVerifying ? 'Verifying...' : 'Verify Task'}
               <Shield className="w-4 h-4 ml-2" />
@@ -380,7 +423,8 @@ export function FanTaskCard({ task, completion, tenantId }: FanTaskCardProps) {
             <Button
               onClick={task.taskType === 'check_in' ? handleCheckIn : handleComplete}
               disabled={isProcessing || (task.taskType === 'check_in' && !canCheckIn)}
-              className="w-full"
+              className="w-full text-white hover:opacity-90"
+              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {task.taskType === 'check_in' && !canCheckIn ? 'Already Checked In' : 'Do Again'}
               <ArrowRight className="w-4 h-4 ml-2" />
