@@ -177,13 +177,16 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
             id: platformUserId,
             username: platformUsername,
             name: platformDisplayName,
+            followersCount: profileData?.public_metrics?.followers_count || profileData?.follower_count || profileData?.followers_count || profileData?.followers?.total || 0,
+            followingCount: profileData?.public_metrics?.following_count || profileData?.following_count || 0,
             ...profileData
           },
           id: platformUserId,
           username: platformUsername,
           name: platformDisplayName,
           displayName: platformDisplayName,
-          followersCount: profileData?.follower_count || profileData?.followers_count || profileData?.followers?.total || 0,
+          followersCount: profileData?.public_metrics?.followers_count || profileData?.follower_count || profileData?.followers_count || profileData?.followers?.total || 0,
+          followingCount: profileData?.public_metrics?.following_count || profileData?.following_count || 0,
         };
         await storage.saveSocialAccount((user as any).dynamicUserId, platform, accountData);
         console.log(`[Social Connection POST] Also saved ${platform} to old storage system`);
