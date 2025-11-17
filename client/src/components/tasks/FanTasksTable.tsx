@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trophy, ChevronDown, ChevronUp, CheckCircle2, Clock } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, CheckCircle2, Clock, Shield } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,6 +15,8 @@ import { Progress } from '@/components/ui/progress';
 import { transformImageUrl } from '@/lib/image-utils';
 import { useStartTask } from '@/hooks/useTaskCompletion';
 import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import type { Task, TaskCompletion } from '@shared/schema';
 
 interface EnrichedTask extends Task {
@@ -59,9 +61,11 @@ const formatTaskType = (type: string) => {
 
 export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState<'creator' | 'platform' | 'points'>('creator');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [processingTasks, setProcessingTasks] = useState<Set<string>>(new Set());
+  const [verifyingTasks, setVerifyingTasks] = useState<Set<string>>(new Set());
 
   const startTask = useStartTask();
 
@@ -110,6 +114,47 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
       setProcessingTasks(prev => {
         const newSet = new Set(prev);
         newSet.delete(taskId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleVerify = async (task: EnrichedTask, completion: TaskCompletion) => {
+    setVerifyingTasks(prev => new Set(prev).add(task.id));
+    try {
+      const response = await apiRequest('POST', `/api/task-completions/${completion.id}/verify`, {
+        platform: task.platform,
+        taskType: task.taskType,
+        targetData: task.targetData || {},
+      });
+
+      const result = await response.json();
+
+      if (result.verified) {
+        queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
+        queryClient.invalidateQueries({ queryKey: ['task-completions', 'me'] });
+
+        toast({
+          title: '✅ Task Verified!',
+          description: result.message || 'Your task has been successfully verified',
+        });
+      } else {
+        toast({
+          title: 'Verification Failed',
+          description: result.message || result.error || 'Could not verify task completion',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Verification Error',
+        description: error.message || 'An error occurred during verification',
+        variant: 'destructive',
+      });
+    } finally {
+      setVerifyingTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(task.id);
         return newSet;
       });
     }
@@ -271,14 +316,37 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
                         +{completion?.pointsEarned || 0} pts
                       </span>
                     ) : isInProgress ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-blue-500/30 text-blue-300 hover:bg-blue-500/20"
-                        disabled
-                      >
-                        Continue
-                      </Button>
+                      // Show Verify button for social tasks in progress
+                      (() => {
+                        const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
+                        const isVerifying = verifyingTasks.has(task.id);
+
+                        if (isSocialTask && completion) {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/20"
+                              onClick={() => handleVerify(task, completion)}
+                              disabled={isVerifying}
+                            >
+                              <Shield className="h-3 w-3 mr-1" />
+                              {isVerifying ? 'Verifying...' : 'Verify'}
+                            </Button>
+                          );
+                        }
+
+                        return (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-500/30 text-blue-300 hover:bg-blue-500/20"
+                            disabled
+                          >
+                            In Progress
+                          </Button>
+                        );
+                      })()
                     ) : (
                       <Button
                         size="sm"

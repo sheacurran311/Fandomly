@@ -24,6 +24,8 @@ import {
   Globe
 } from "lucide-react";
 import type { Program, Creator, Task, Campaign } from "@shared/schema";
+import { FanTaskCard } from "@/components/tasks/FanTaskCard";
+import { useUserTaskCompletions } from "@/hooks/useTaskCompletion";
 import { ActivityFeed } from "@/components/program/activity-feed";
 import { 
   YourStatsWidget,
@@ -1011,25 +1013,35 @@ function CampaignsTab({ campaigns, pointsName }: { campaigns: Campaign[]; points
 }
 
 // Tasks Tab Component
-function TasksTab({ 
-  tasks, 
+function TasksTab({
+  tasks,
   pointsName,
   themeColors,
   brandColors,
   isThemeDark
-}: { 
-  tasks: Task[]; 
+}: {
+  tasks: Task[];
   pointsName: string;
   themeColors: any;
   brandColors: any;
   isThemeDark: boolean;
 }) {
+  const { user } = useAuth();
   const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
+
+  // Fetch task completions for the current user
+  const { data: completionsData } = useUserTaskCompletions();
+  const completions = completionsData?.completions || [];
+
+  // Create a map of task completions by task ID for quick lookup
+  const completionMap = new Map(
+    completions.map(c => [c.taskId, c])
+  );
 
   return (
     <div className="space-y-4">
       {activeTasks.length === 0 ? (
-        <Card 
+        <Card
           className="shadow-sm"
           style={{
             backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
@@ -1043,45 +1055,14 @@ function TasksTab({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {activeTasks.map((task) => (
-            <Card 
+            <FanTaskCard
               key={task.id}
-              className="shadow-sm transition-all cursor-pointer hover:shadow-md"
-              style={{
-                backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
-                borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'
-              }}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 
-                    className="font-semibold flex-1" 
-                    style={{ color: brandColors.primary }}
-                  >
-                    {task.name}
-                  </h3>
-                  <Badge 
-                    style={{ 
-                      backgroundColor: brandColors.primary + '20',
-                      color: brandColors.primary,
-                      borderColor: brandColors.primary + '40'
-                    }}
-                  >
-                    +{task.pointsToReward} {pointsName}
-                  </Badge>
-                </div>
-                <p className="text-sm mb-4" style={{ color: themeColors.text.secondary }}>
-                  {task.description}
-                </p>
-                <Button 
-                  className="w-full text-white hover:opacity-90"
-                  style={{ backgroundColor: brandColors.primary }}
-                >
-                  Complete Task
-                </Button>
-              </CardContent>
-            </Card>
+              task={task}
+              completion={completionMap.get(task.id)}
+              tenantId={task.tenantId}
+            />
           ))}
         </div>
       )}
