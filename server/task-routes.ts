@@ -804,7 +804,7 @@ export function registerTaskRoutes(app: Express) {
           : targetData;
 
         // Get task details
-        const task = await storage.getTask(Number(taskId));
+        const task = await storage.getTask(taskId);
         if (!task) {
           return res.status(404).json({ error: "Task not found" });
         }
@@ -812,7 +812,7 @@ export function registerTaskRoutes(app: Express) {
         // Verify unified verification service
         const result = await unifiedVerification.verify({
           userId,
-          taskId: Number(taskId),
+          taskId: taskId,
           tenantId: task.tenantId,
           creatorId: task.creatorId,
           platform: platform || task.platform || 'unknown',
@@ -929,20 +929,21 @@ export function registerTaskRoutes(app: Express) {
         const userId = req.user!.id;
         const { status, tenantId } = req.query;
 
-        let query = db
-          .select()
-          .from(taskCompletions)
-          .where(eq(taskCompletions.user_id, userId));
+        // Build WHERE conditions array
+        const conditions = [eq(taskCompletions.user_id, userId)];
 
         if (status) {
-          query = query.where(eq(taskCompletions.status, status as string));
+          conditions.push(eq(taskCompletions.status, status as string));
         }
 
         if (tenantId) {
-          query = query.where(eq(taskCompletions.tenant_id, Number(tenantId)));
+          conditions.push(eq(taskCompletions.tenant_id, Number(tenantId)));
         }
 
-        const completions = await query;
+        const completions = await db
+          .select()
+          .from(taskCompletions)
+          .where(and(...conditions));
 
         res.json(completions);
       } catch (error: any) {

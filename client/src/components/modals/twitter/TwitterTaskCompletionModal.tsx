@@ -20,8 +20,12 @@ import {
   UserPlus,
   Copy,
   Check,
+  Link as LinkIcon,
+  XCircle,
+  Trophy,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 
 interface TwitterTaskCompletionModalProps {
   task: Task;
@@ -44,6 +48,17 @@ export default function TwitterTaskCompletionModal({
 
   const settings = task.customSettings as any;
   const taskType = task.taskType as string;
+
+  // Twitter connection status
+  const { isConnected, isConnecting, connect, userInfo } = useTwitterConnection();
+
+  // Helper to format task type
+  const formatTaskType = (type: string) => {
+    return type
+      ?.split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ') || 'Task';
+  };
 
   // Submit task completion mutation
   const submitMutation = useMutation({
@@ -427,16 +442,82 @@ export default function TwitterTaskCompletionModal({
       </DialogHeader>
 
       <div className="space-y-6 py-4">
+        {/* Connection Status Banner */}
+        {!isConnected ? (
+          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <XCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                  Connect Your X Account
+                </h4>
+                <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                  Connect your X (Twitter) account to enable automatic verification and make completing tasks easier.
+                </p>
+                <Button
+                  onClick={connect}
+                  disabled={isConnecting}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Connect X Account
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Alert>
+        ) : (
+          <Alert className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <p className="text-sm text-green-800 dark:text-green-200">
+                Connected as <span className="font-semibold">@{userInfo?.username}</span>
+              </p>
+            </div>
+          </Alert>
+        )}
+
         {/* Task Instructions */}
         {content.instructions}
 
-        {/* Points Reward Display */}
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Reward:</span>
-            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-              +{task.pointsToReward || 0} points
-            </span>
+        {/* Task Summary Card */}
+        <div className="p-4 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-pink-950/30 rounded-xl border border-purple-200/50 dark:border-purple-800/50 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+                  {content.icon}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                    {task.name}
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    {formatTaskType(taskType)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Reward Badge */}
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-md">
+              <Trophy className="w-5 h-5 text-white" />
+              <div className="text-right">
+                <div className="text-xs font-medium text-yellow-50">Reward</div>
+                <div className="text-lg font-bold text-white">
+                  +{task.pointsToReward || 0}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

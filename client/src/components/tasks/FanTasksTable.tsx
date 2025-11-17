@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trophy, ChevronDown, ChevronUp, CheckCircle2, Clock, Shield } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, CheckCircle2, Clock, Shield, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,12 +18,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import type { Task, TaskCompletion } from '@shared/schema';
+import TaskCompletionModalRouter from '@/components/modals/TaskCompletionModalRouter';
+import { useSocialConnectionStatus } from '@/hooks/useSocialConnectionStatus';
 
 interface EnrichedTask extends Task {
   creatorName?: string;
   creatorImage?: string;
   programName?: string;
   programSlug?: string;
+  programImage?: string;
   platform?: string;
 }
 
@@ -66,6 +69,8 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [processingTasks, setProcessingTasks] = useState<Set<string>>(new Set());
   const [verifyingTasks, setVerifyingTasks] = useState<Set<string>>(new Set());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<EnrichedTask | null>(null);
 
   const startTask = useStartTask();
 
@@ -83,7 +88,10 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
 
     switch (sortBy) {
       case 'creator':
-        compareValue = (a.creatorName || '').localeCompare(b.creatorName || '');
+        // Sort by program name first, fall back to creator name
+        const aName = a.programName || a.creatorName || '';
+        const bName = b.programName || b.creatorName || '';
+        compareValue = aName.localeCompare(bName);
         break;
       case 'platform':
         compareValue = (a.platform || '').localeCompare(b.platform || '');
@@ -96,13 +104,26 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
     return sortOrder === 'asc' ? compareValue : -compareValue;
   });
 
-  const handleStartTask = async (taskId: string, tenantId: string, taskName: string) => {
-    setProcessingTasks(prev => new Set(prev).add(taskId));
+  const handleStartTask = async (task: EnrichedTask) => {
+    // Check if this is a social media task that requires a modal
+    const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok', 'x'].includes(
+      task.platform?.toLowerCase() || ''
+    );
+
+    if (isSocialTask) {
+      // Open modal for social tasks
+      setSelectedTask(task);
+      setIsModalOpen(true);
+      return;
+    }
+
+    // For non-social tasks, start directly
+    setProcessingTasks(prev => new Set(prev).add(task.id));
     try {
-      await startTask.mutateAsync({ taskId, tenantId });
+      await startTask.mutateAsync({ taskId: task.id, tenantId: task.tenantId });
       toast({
         title: 'Task Started!',
-        description: `You've started "${taskName}"`,
+        description: `You've started "${task.name}"`,
       });
     } catch (error: any) {
       toast({
@@ -113,10 +134,18 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
     } finally {
       setProcessingTasks(prev => {
         const newSet = new Set(prev);
-        newSet.delete(taskId);
+        newSet.delete(task.id);
         return newSet;
       });
     }
+  };
+
+  // Handle modal success
+  const handleModalSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+    setIsModalOpen(false);
+    setSelectedTask(null);
   };
 
   const handleVerify = async (task: EnrichedTask, completion: TaskCompletion) => {
@@ -176,7 +205,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
               className="text-gray-300 cursor-pointer select-none hover:text-white transition-colors"
               onClick={() => toggleSort('creator')}
             >
-              Creator <SortIcon column="creator" />
+              Program <SortIcon column="creator" />
             </TableHead>
             <TableHead
               className="text-gray-300 cursor-pointer select-none hover:text-white transition-colors"
@@ -192,6 +221,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
             >
               Points <SortIcon column="points" />
             </TableHead>
+            <TableHead className="text-gray-300 text-center">Connection</TableHead>
             <TableHead className="text-gray-300 text-center">Status</TableHead>
             <TableHead className="text-gray-300 text-right">Action</TableHead>
           </TableRow>
@@ -199,7 +229,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
         <TableBody>
           {sortedTasks.length === 0 ? (
             <TableRow className="border-white/10">
-              <TableCell colSpan={7} className="text-center py-8 text-gray-400">
+              <TableCell colSpan={8} className="text-center py-8 text-gray-400">
                 No tasks available. Join creators to see their tasks!
               </TableCell>
             </TableRow>
@@ -211,32 +241,58 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
               const progress = completion?.progress || 0;
               const isProcessing = processingTasks.has(task.id);
 
+              // Connection status component
+              const ConnectionStatusCell = () => {
+                const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform?.toLowerCase() || '');
+                const { connected, isLoading } = useSocialConnectionStatus(isSocialTask ? task.platform : undefined);
+
+                if (!isSocialTask) {
+                  return <span className="text-xs text-gray-500">N/A</span>;
+                }
+
+                if (isLoading) {
+                  return <AlertCircle className="h-4 w-4 text-gray-400 animate-pulse" />;
+                }
+
+                return connected ? (
+                  <div className="flex items-center justify-center gap-1">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <span className="text-xs text-green-400">Connected</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-1">
+                    <XCircle className="h-4 w-4 text-red-400" />
+                    <span className="text-xs text-red-400">Disconnected</span>
+                  </div>
+                );
+              };
+
               return (
                 <TableRow
                   key={task.id}
                   className="border-white/10 hover:bg-white/5 transition-colors"
                 >
-                  {/* Creator */}
+                  {/* Program */}
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 border border-white/20">
-                        {task.creatorImage && (
+                        {task.programImage && (
                           <AvatarImage
-                            src={transformImageUrl(task.creatorImage)}
-                            alt={task.creatorName}
+                            src={transformImageUrl(task.programImage)}
+                            alt={task.programName}
                           />
                         )}
                         <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-xs">
-                          {task.creatorName?.charAt(0)?.toUpperCase() || 'C'}
+                          {task.programName?.charAt(0)?.toUpperCase() || task.creatorName?.charAt(0)?.toUpperCase() || 'P'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
                         <span className="text-white text-sm font-medium">
-                          {task.creatorName}
+                          {task.programName || task.creatorName}
                         </span>
-                        {task.programName && (
+                        {task.programName && task.creatorName && (
                           <span className="text-xs text-gray-400">
-                            {task.programName}
+                            by {task.creatorName}
                           </span>
                         )}
                       </div>
@@ -285,6 +341,11 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
                         {task.pointsToReward || 0}
                       </span>
                     </div>
+                  </TableCell>
+
+                  {/* Connection Status */}
+                  <TableCell className="text-center">
+                    <ConnectionStatusCell />
                   </TableCell>
 
                   {/* Status */}
@@ -351,7 +412,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
                       <Button
                         size="sm"
                         className="bg-brand-primary hover:bg-brand-primary/80 text-white"
-                        onClick={() => handleStartTask(task.id, task.tenantId, task.name)}
+                        onClick={() => handleStartTask(task)}
                         disabled={isProcessing}
                       >
                         {isProcessing ? 'Starting...' : 'Start'}
@@ -364,6 +425,20 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
           )}
         </TableBody>
       </Table>
+
+      {/* Task Completion Modal */}
+      {selectedTask && (
+        <TaskCompletionModalRouter
+          task={selectedTask}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedTask(null);
+          }}
+          onSuccess={handleModalSuccess}
+          completionId={completionMap.get(selectedTask.id)?.id}
+        />
+      )}
     </div>
   );
 }
