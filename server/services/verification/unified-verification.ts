@@ -3,6 +3,7 @@ import { taskCompletions, manualReviewQueue, verificationAttempts } from '@share
 import { eq } from 'drizzle-orm';
 import { twitterVerification } from './twitter-verification';
 import { tiktokVerification } from './tiktok-verification';
+import { instagramVerification } from './instagram-verification';
 import { validateProofUrl } from '../../middleware/upload';
 
 export interface UnifiedVerificationRequest {
@@ -206,6 +207,15 @@ export class UnifiedVerificationService {
           taskSettings,
         });
 
+      case 'instagram':
+        return await instagramVerification.verify({
+          userId,
+          taskType,
+          proofUrl,
+          screenshotUrl,
+          taskSettings,
+        });
+
       case 'youtube':
         // TODO: Implement YouTube verification
         return {
@@ -215,12 +225,11 @@ export class UnifiedVerificationService {
           reason: 'YouTube verification not yet implemented',
         };
 
-      case 'instagram':
       case 'facebook':
       case 'spotify':
       case 'twitch':
       case 'discord':
-        // These platforms always require manual review
+        // These platforms require manual review (no API access or custom hooks available)
         return {
           verified: false,
           requiresManualReview: true,
@@ -408,8 +417,8 @@ export class UnifiedVerificationService {
       case 'youtube':
         return 'api';
       case 'tiktok':
-        return 'smart_detection';
       case 'instagram':
+        return 'smart_detection';
       case 'facebook':
       case 'spotify':
       case 'twitch':
