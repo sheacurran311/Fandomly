@@ -269,17 +269,17 @@ export class UnifiedVerificationService {
       : 'rejected';
 
     const completionData = {
-      user_id: userId,
-      task_id: taskId,
-      tenant_id: tenantId,
+      userId: userId,
+      taskId: taskId,
+      tenantId: tenantId,
       status,
-      proof_url: proofUrl,
-      proof_screenshot_url: screenshotUrl,
-      proof_notes: proofNotes,
-      verification_metadata: verificationResult.metadata || {},
-      requires_manual_review: verificationResult.requiresManualReview,
-      verified_at: verificationResult.verified ? new Date() : null,
-      updated_at: new Date(),
+      proofUrl: proofUrl,
+      proofScreenshotUrl: screenshotUrl,
+      proofNotes: proofNotes,
+      verificationMetadata: verificationResult.metadata || {},
+      requiresManualReview: verificationResult.requiresManualReview,
+      verifiedAt: verificationResult.verified ? new Date() : null,
+      updatedAt: new Date(),
     };
 
     if (taskCompletionId) {
@@ -297,7 +297,7 @@ export class UnifiedVerificationService {
         .insert(taskCompletions)
         .values({
           ...completionData,
-          created_at: new Date(),
+          createdAt: new Date(),
         })
         .returning();
 
@@ -325,21 +325,21 @@ export class UnifiedVerificationService {
     const priority = this.calculateReviewPriority(params.taskType);
 
     await db.insert(manualReviewQueue).values({
-      task_completion_id: params.taskCompletionId,
-      tenant_id: params.tenantId,
-      creator_id: params.creatorId,
-      fan_id: params.fanId,
-      task_id: params.taskId,
+      taskCompletionId: params.taskCompletionId,
+      tenantId: params.tenantId,
+      creatorId: params.creatorId,
+      fanId: params.fanId,
+      taskId: params.taskId,
       platform: params.platform,
-      task_type: params.taskType,
-      task_name: params.taskName,
-      screenshot_url: params.screenshotUrl,
-      proof_url: params.proofUrl,
-      proof_notes: params.proofNotes,
-      auto_check_result: params.autoCheckResult || {},
+      taskType: params.taskType,
+      taskName: params.taskName,
+      screenshotUrl: params.screenshotUrl,
+      proofUrl: params.proofUrl,
+      proofNotes: params.proofNotes,
+      autoCheckResult: params.autoCheckResult || {},
       priority,
       status: 'pending',
-      created_at: new Date(),
+      createdAt: new Date(),
     });
   }
 
@@ -356,15 +356,15 @@ export class UnifiedVerificationService {
     verificationData?: any;
   }) {
     await db.insert(verificationAttempts).values({
-      task_completion_id: params.taskCompletionId,
-      user_id: params.userId,
+      taskCompletionId: params.taskCompletionId,
+      userId: params.userId,
       platform: params.platform,
-      verification_method: params.verificationMethod,
+      verificationMethod: params.verificationMethod,
       success: params.success,
-      error_message: params.errorMessage,
-      verification_data: params.verificationData || {},
-      attempted_at: new Date(),
-      created_at: new Date(),
+      errorMessage: params.errorMessage,
+      verificationData: params.verificationData || {},
+      attemptedAt: new Date(),
+      createdAt: new Date(),
     });
   }
 
@@ -387,8 +387,8 @@ export class UnifiedVerificationService {
     await db
       .update(taskCompletions)
       .set({
-        points_awarded: pointsToAward,
-        completed_at: new Date(),
+        pointsAwarded: pointsToAward,
+        completedAt: new Date(),
       })
       .where(eq(taskCompletions.id, taskCompletionId));
 
