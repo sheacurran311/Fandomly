@@ -445,14 +445,26 @@ export default function FanTasksPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTasks.map((task: Task) => (
-            <FanTaskCard
-              key={task.id}
-              task={task}
-              completion={completionMap.get(task.id)}
-              tenantId={task.tenantId}
-            />
-          ))}
+          {filteredTasks.map((task: any) => {
+            const completion = completionMap.get(task.id);
+            return (
+              <FanTaskCard
+                key={task.id}
+                task={task}
+                progress={{
+                  completed: completion?.status === 'completed',
+                  progress: completion?.progress || 0,
+                  currentStreak: completion?.currentStreak || 0,
+                }}
+                programName={task.programName}
+                programImage={task.programImage}
+                creatorName={task.creatorName}
+                onStart={() => {}}
+                onContinue={() => {}}
+                onClaim={() => {}}
+              />
+            );
+          })}
         </div>
       )}
       </div>
