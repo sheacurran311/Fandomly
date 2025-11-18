@@ -83,7 +83,7 @@ export default function TwitterTaskCompletionModal({
       queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
 
-      // Handle verification success
+      // Handle verification success or failure (API-first verification = immediate result)
       if (data.verified && data.success) {
         toast({
           title: "🎉 Task Completed!",
@@ -93,18 +93,8 @@ export default function TwitterTaskCompletionModal({
         onSuccess();
         onClose();
       }
-      // Handle manual review required
-      else if (data.requiresManualReview) {
-        toast({
-          title: "Task Submitted",
-          description: "Your task is being reviewed. You'll be notified when it's complete!",
-          duration: 4000,
-        });
-        onSuccess();
-        onClose();
-      }
       // Handle verification failure
-      else if (!data.success) {
+      else {
         toast({
           title: "Verification Failed",
           description: data.message || "Make sure you have completed the task using the applicable connected account. Please try again...",

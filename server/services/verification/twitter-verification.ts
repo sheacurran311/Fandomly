@@ -107,7 +107,7 @@ export class TwitterVerificationService {
         default:
           return {
             verified: false,
-            requiresManualReview: true,
+            requiresManualReview: false,
             reason: `Unknown task type: ${taskType}`,
           };
       }
@@ -115,7 +115,7 @@ export class TwitterVerificationService {
       console.error('Twitter verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: error.message || 'Twitter API error',
         metadata: { error: error.message },
       };
@@ -132,7 +132,7 @@ export class TwitterVerificationService {
     if (!targetUsername) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Target username not specified',
       };
     }
@@ -143,7 +143,7 @@ export class TwitterVerificationService {
     if (!userClient) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Twitter account not connected. Please connect your Twitter account.',
       };
     }
@@ -157,7 +157,7 @@ export class TwitterVerificationService {
       if (!user?.twitter_user_id) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: 'Twitter user ID not found',
         };
       }
@@ -168,7 +168,7 @@ export class TwitterVerificationService {
       if (!targetUser.data) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: `Target user @${targetUsername} not found`,
         };
       }
@@ -203,7 +203,7 @@ export class TwitterVerificationService {
       console.error('Twitter follow verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: error.message || 'Failed to verify follow',
       };
     }
@@ -219,7 +219,7 @@ export class TwitterVerificationService {
     if (!tweetUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Tweet URL not specified',
       };
     }
@@ -229,7 +229,7 @@ export class TwitterVerificationService {
     if (!tweetId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Invalid tweet URL',
       };
     }
@@ -239,7 +239,7 @@ export class TwitterVerificationService {
     if (!userClient) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Twitter account not connected',
       };
     }
@@ -252,7 +252,7 @@ export class TwitterVerificationService {
       if (!user?.twitter_user_id) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: 'Twitter user ID not found',
         };
       }
@@ -282,7 +282,7 @@ export class TwitterVerificationService {
       console.error('Twitter like verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: error.message || 'Failed to verify like',
       };
     }
@@ -298,7 +298,7 @@ export class TwitterVerificationService {
     if (!tweetUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Tweet URL not specified',
       };
     }
@@ -308,7 +308,7 @@ export class TwitterVerificationService {
     if (!tweetId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Invalid tweet URL',
       };
     }
@@ -323,7 +323,7 @@ export class TwitterVerificationService {
       if (!user?.twitter_user_id) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: 'Twitter user ID not found',
         };
       }
@@ -353,7 +353,7 @@ export class TwitterVerificationService {
       console.error('Twitter retweet verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: error.message || 'Failed to verify retweet',
       };
     }
@@ -368,7 +368,7 @@ export class TwitterVerificationService {
     if (!proofUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Proof URL required for this task type',
       };
     }
@@ -378,7 +378,7 @@ export class TwitterVerificationService {
     if (!tweetId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Invalid tweet URL',
       };
     }
@@ -394,7 +394,7 @@ export class TwitterVerificationService {
       if (!tweet.data) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: 'Tweet not found',
         };
       }
@@ -459,7 +459,7 @@ export class TwitterVerificationService {
       console.error('Twitter content verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: error.message || 'Failed to verify tweet content',
       };
     }
@@ -474,7 +474,7 @@ export class TwitterVerificationService {
     if (!taskSettings.requiredText) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Required bio text not specified',
       };
     }
@@ -484,7 +484,7 @@ export class TwitterVerificationService {
     if (!userClient) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: 'Twitter account not connected',
       };
     }
@@ -497,7 +497,7 @@ export class TwitterVerificationService {
       if (!user?.twitter_user_id) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: 'Twitter user ID not found',
         };
       }
@@ -510,7 +510,7 @@ export class TwitterVerificationService {
       if (!profile.data) {
         return {
           verified: false,
-          requiresManualReview: true,
+          requiresManualReview: false,
           reason: 'Twitter profile not found',
         };
       }
@@ -538,7 +538,7 @@ export class TwitterVerificationService {
       console.error('Twitter bio verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         reason: error.message || 'Failed to verify bio',
       };
     }

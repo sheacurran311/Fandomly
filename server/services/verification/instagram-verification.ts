@@ -43,7 +43,7 @@ export class InstagramVerificationService {
     if (!proofUrl && !screenshotUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'No proof URL or screenshot provided',
       };
@@ -64,7 +64,7 @@ export class InstagramVerificationService {
           // These are handled by webhook service
           return {
             verified: false,
-            requiresManualReview: true,
+            requiresManualReview: false,
             confidence: 'medium',
             reason: 'Instagram comments are verified via webhooks. Please ensure your Instagram account is connected.',
           };
@@ -74,7 +74,7 @@ export class InstagramVerificationService {
           // These are handled by webhook service
           return {
             verified: false,
-            requiresManualReview: true,
+            requiresManualReview: false,
             confidence: 'medium',
             reason: 'Instagram story mentions are verified via webhooks. Please ensure your Instagram account is connected.',
           };
@@ -82,7 +82,7 @@ export class InstagramVerificationService {
         default:
           return {
             verified: false,
-            requiresManualReview: true,
+            requiresManualReview: false,
             confidence: 'low',
             reason: `Unknown Instagram task type: ${taskType}`,
           };
@@ -91,7 +91,7 @@ export class InstagramVerificationService {
       console.error('Instagram verification error:', error);
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: error.message || 'Instagram verification error',
         metadata: { error: error.message },
@@ -112,7 +112,7 @@ export class InstagramVerificationService {
     if (!targetUsername) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'Target username not specified in task settings',
       };
@@ -122,7 +122,7 @@ export class InstagramVerificationService {
     if (!proofUrl && screenshotUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Screenshot provided - requires manual verification',
         metadata: { screenshotUrl, targetUsername },
@@ -132,7 +132,7 @@ export class InstagramVerificationService {
     if (!proofUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'No proof URL provided',
       };
@@ -144,7 +144,7 @@ export class InstagramVerificationService {
     if (!submittedUsername) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Could not extract username from proof URL',
         metadata: { proofUrl, targetUsername },
@@ -171,7 +171,7 @@ export class InstagramVerificationService {
 
     return {
       verified: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       confidence: 'medium',
       reason: `Username mismatch. Expected: @${targetUsername}, Got: @${normalizedSubmitted}`,
       metadata: {
@@ -195,7 +195,7 @@ export class InstagramVerificationService {
     if (!targetPostUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'Target post URL not specified in task settings',
       };
@@ -205,7 +205,7 @@ export class InstagramVerificationService {
     if (!proofUrl && screenshotUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Screenshot provided - requires manual verification',
         metadata: { screenshotUrl },
@@ -215,7 +215,7 @@ export class InstagramVerificationService {
     if (!proofUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'No proof URL provided',
       };
@@ -228,7 +228,7 @@ export class InstagramVerificationService {
     if (!targetPostId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'Invalid target post URL in task settings',
         metadata: { targetPostUrl },
@@ -238,7 +238,7 @@ export class InstagramVerificationService {
     if (!submittedPostId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Could not extract post ID from proof URL',
         metadata: { proofUrl },
@@ -264,7 +264,7 @@ export class InstagramVerificationService {
 
     return {
       verified: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       confidence: 'medium',
       reason: 'Post ID mismatch',
       metadata: {
