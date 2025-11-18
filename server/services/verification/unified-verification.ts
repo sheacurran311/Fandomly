@@ -4,7 +4,11 @@ import { eq } from 'drizzle-orm';
 import { twitterVerification } from './twitter-verification';
 import { tiktokVerification } from './tiktok-verification';
 import { instagramVerification } from './instagram-verification';
+import { websiteVisitVerification } from './website-visit-verification';
+import { pollQuizVerification } from './poll-quiz-verification';
 import { validateProofUrl } from '../../middleware/upload';
+import { multiplierService } from '../multiplier-service';
+import { checkInService } from '../check-in-service';
 
 export interface UnifiedVerificationRequest {
   userId: string;
@@ -22,6 +26,14 @@ export interface UnifiedVerificationRequest {
   proofUrl?: string;
   screenshotUrl?: string;
   proofNotes?: string;
+
+  // Sprint 2: Interactive task data
+  trackingToken?: string; // For website_visit tasks
+  responses?: Array<{ // For poll/quiz tasks
+    questionId: string;
+    questionText: string;
+    selectedOptions: number[];
+  }>;
 }
 
 export interface UnifiedVerificationResult {
@@ -62,11 +74,13 @@ export class UnifiedVerificationService {
       proofUrl,
       screenshotUrl,
       proofNotes,
+      trackingToken,
+      responses,
     } = request;
 
     try {
-      // Validate proof URL if provided
-      if (proofUrl) {
+      // Validate proof URL if provided (skip for interactive task types)
+      if (proofUrl && !['website_visit', 'poll', 'quiz', 'check_in'].includes(taskType.toLowerCase())) {
         const urlValidation = validateProofUrl(proofUrl, platform);
         if (!urlValidation.valid) {
           return {
@@ -79,7 +93,7 @@ export class UnifiedVerificationService {
         }
       }
 
-      // Route to platform-specific verification
+      // Route to platform-specific or task-type-specific verification
       const verificationResult = await this.routeVerification({
         userId,
         platform,
@@ -87,6 +101,8 @@ export class UnifiedVerificationService {
         taskSettings,
         proofUrl,
         screenshotUrl,
+        trackingToken,
+        responses,
       });
 
       // Create or update task completion
@@ -106,7 +122,7 @@ export class UnifiedVerificationService {
         taskCompletionId: completion.id,
         userId,
         platform,
-        verificationMethod: this.getVerificationMethod(platform),
+        verificationMethod: this.getVerificationMethod(taskType, platform),
         success: verificationResult.verified,
         errorMessage: verificationResult.reason,
         verificationData: verificationResult.metadata,
@@ -177,7 +193,7 @@ export class UnifiedVerificationService {
   }
 
   /**
-   * Route to platform-specific verification service
+   * Route to platform-specific or task-type-specific verification service
    */
   private async routeVerification(params: {
     userId: number;
@@ -186,9 +202,56 @@ export class UnifiedVerificationService {
     taskSettings: any;
     proofUrl?: string;
     screenshotUrl?: string;
+    trackingToken?: string;
+    responses?: Array<{
+      questionId: string;
+      questionText: string;
+      selectedOptions: number[];
+    }>;
   }) {
-    const { platform, taskType, taskSettings, proofUrl, screenshotUrl, userId } = params;
+    const { platform, taskType, taskSettings, proofUrl, screenshotUrl, userId, trackingToken, responses } = params;
 
+    // Sprint 2: Check task type first for interactive/auto-verified tasks
+    switch (taskType.toLowerCase()) {
+      case 'website_visit':
+        return await websiteVisitVerification.verify({
+          userId: userId.toString(),
+          taskType,
+          taskSettings,
+          trackingToken,
+        });
+
+      case 'poll':
+      case 'quiz':
+        if (!responses || responses.length === 0) {
+          return {
+            verified: false,
+            requiresManualReview: false,
+            confidence: 'low' as const,
+            reason: 'No responses provided',
+          };
+        }
+        return await pollQuizVerification.verify({
+          userId: userId.toString(),
+          taskType,
+          taskSettings,
+          responses,
+        });
+
+      case 'check_in':
+        // Check-ins are handled separately via checkInService
+        // This is called after check-in is processed
+        return {
+          verified: true,
+          requiresManualReview: false,
+          confidence: 'high' as const,
+          metadata: {
+            checkInProcessed: true,
+          },
+        };
+    }
+
+    // Platform-based verification (existing)
     switch (platform.toLowerCase()) {
       case 'twitter':
       case 'x':
@@ -381,6 +444,15 @@ export class UnifiedVerificationService {
    * Award points for verified task completion
    */
   private async awardPoints(taskCompletionId: number, taskId: string): Promise<number> {
+    // Get task completion to get userId
+    const completion = await db.query.taskCompletions.findFirst({
+      where: eq(taskCompletions.id, taskCompletionId),
+    });
+
+    if (!completion) {
+      throw new Error('Task completion not found');
+    }
+
     // Get task to know how many points to award
     const task = await db.query.tasks.findFirst({
       where: (tasks, { eq }) => eq(tasks.id, taskId),
@@ -390,14 +462,43 @@ export class UnifiedVerificationService {
       throw new Error('Task not found');
     }
 
-    const pointsToAward = task.pointsToReward || 0;
+    const basePoints = task.pointsToReward || 0;
 
-    // Update completion with points awarded
+    // Calculate multiplier (Sprint 1 feature)
+    const multiplierResult = await multiplierService.calculateMultiplier({
+      userId: completion.userId,
+      taskId: taskId,
+      tenantId: task.tenantId,
+      taskType: task.taskType,
+      platform: task.platform,
+      // TODO: Get user tier and points balance from user service
+      // userTier: userTier,
+      // userPointsBalance: userPointsBalance,
+    });
+
+    // Apply multiplier to base points
+    const pointsToAward = Math.round(basePoints * multiplierResult.finalMultiplier);
+
+    console.log(`[Multiplier] Task: ${task.name}`);
+    console.log(`[Multiplier] Base points: ${basePoints}`);
+    console.log(`[Multiplier] Final multiplier: ${multiplierResult.finalMultiplier}x`);
+    console.log(`[Multiplier] Points awarded: ${pointsToAward}`);
+    if (multiplierResult.breakdown.length > 0) {
+      console.log(`[Multiplier] Breakdown:`, multiplierResult.breakdown);
+    }
+
+    // Update completion with points awarded and multiplier info
     await db
       .update(taskCompletions)
       .set({
         pointsAwarded: pointsToAward,
         completedAt: new Date(),
+        verificationMetadata: {
+          ...(completion.verificationMetadata as any || {}),
+          multiplierApplied: multiplierResult.finalMultiplier,
+          multiplierBreakdown: multiplierResult.breakdown,
+          basePoints: basePoints,
+        },
       })
       .where(eq(taskCompletions.id, taskCompletionId));
 
@@ -408,9 +509,21 @@ export class UnifiedVerificationService {
   }
 
   /**
-   * Get verification method for platform
+   * Get verification method for task type / platform
    */
-  private getVerificationMethod(platform: string): string {
+  private getVerificationMethod(taskType: string, platform: string): string {
+    // Sprint 2: Check task type first
+    switch (taskType.toLowerCase()) {
+      case 'website_visit':
+        return 'auto_tracking';
+      case 'poll':
+      case 'quiz':
+        return 'auto_interactive';
+      case 'check_in':
+        return 'auto_check_in';
+    }
+
+    // Platform-based verification (existing)
     switch (platform.toLowerCase()) {
       case 'twitter':
       case 'x':

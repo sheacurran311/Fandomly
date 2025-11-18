@@ -27,6 +27,7 @@ import {
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { uploadScreenshot, getFileUrl } from "./middleware/upload";
 import { unifiedVerification } from "./services/verification/unified-verification";
+import { taskFrequencyService } from "./services/task-frequency-service";
 
 // Task configuration schemas based on our task builders
 const baseTaskSchema = z.object({
@@ -808,6 +809,41 @@ export function registerTaskRoutes(app: Express) {
         const task = await storage.getTask(taskId);
         if (!task) {
           return res.status(404).json({ error: "Task not found" });
+        }
+
+        // Check reward frequency eligibility (Sprint 1 feature)
+        const frequencyCheck = await taskFrequencyService.checkEligibility({
+          userId,
+          taskId,
+          tenantId: task.tenantId,
+        });
+
+        if (!frequencyCheck.isEligible) {
+          // Calculate time until available
+          const timeUntil = await taskFrequencyService.getTimeUntilAvailable({
+            userId,
+            taskId,
+            tenantId: task.tenantId,
+          });
+
+          let availabilityMessage = frequencyCheck.reason || 'Task not available';
+          if (timeUntil) {
+            if (timeUntil.hours > 24) {
+              const days = Math.floor(timeUntil.hours / 24);
+              availabilityMessage += `. Available again in ${days} day${days > 1 ? 's' : ''}`;
+            } else if (timeUntil.hours > 0) {
+              availabilityMessage += `. Available again in ${timeUntil.hours} hour${timeUntil.hours > 1 ? 's' : ''}`;
+            } else if (timeUntil.minutes > 0) {
+              availabilityMessage += `. Available again in ${timeUntil.minutes} minute${timeUntil.minutes > 1 ? 's' : ''}`;
+            }
+          }
+
+          return res.status(403).json({
+            error: 'Task not available',
+            message: availabilityMessage,
+            nextAvailableAt: frequencyCheck.nextAvailableAt,
+            reason: frequencyCheck.reason,
+          });
         }
 
         // Verify unified verification service
