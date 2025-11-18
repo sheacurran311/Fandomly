@@ -833,11 +833,13 @@ export const taskTypeEnum = pgEnum('task_type', [
   // YouTube tasks
   'youtube_like', 'youtube_subscribe', 'youtube_share', 'youtube_comment',
   // TikTok tasks
-  'tiktok_follow', 'tiktok_like', 'tiktok_share', 'tiktok_comment',
-  // Spotify tasks  
+  'tiktok_follow', 'tiktok_like', 'tiktok_share', 'tiktok_comment', 'tiktok_post',
+  // Spotify tasks
   'spotify_follow', 'spotify_playlist', 'spotify_album',
   // Engagement & Rewards tasks (new)
   'check_in', 'follower_milestone', 'complete_profile',
+  // Sprint 2: Interactive & Link tasks
+  'website_visit', 'poll', 'quiz',
   // Generic tasks (legacy)
   'follow', 'join', 'repost', 'referral'
 ]);
@@ -1494,6 +1496,62 @@ export const checkInStreaks = pgTable("check_in_streaks", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Website Visit Tracking - Track clicks and time on site for website_visit tasks
+export const websiteVisitTracking = pgTable("website_visit_tracking", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // References
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  taskCompletionId: varchar("task_completion_id").references(() => taskCompletions.id),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+
+  // Tracking Data
+  uniqueToken: varchar("unique_token", { length: 100 }).notNull().unique(), // UUID for tracking
+  destinationUrl: text("destination_url").notNull(), // Where user is visiting
+  clickedAt: timestamp("clicked_at").defaultNow(), // When link was clicked
+  timeOnSite: integer("time_on_site"), // Seconds spent on site (if tracked)
+  actionCompleted: boolean("action_completed").default(false), // Did user complete required action
+  completedAt: timestamp("completed_at"), // When action was completed
+
+  // Metadata
+  metadata: jsonb("metadata").$type<{
+    referrer?: string;
+    userAgent?: string;
+    ipAddress?: string;
+    actionType?: string; // 'page_view' | 'scroll' | 'click' | 'form_submit'
+  }>(),
+});
+
+// Poll/Quiz Responses - Store user responses to poll and quiz tasks
+export const pollQuizResponses = pgTable("poll_quiz_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // References
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  taskCompletionId: varchar("task_completion_id").references(() => taskCompletions.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+
+  // Response Data
+  responses: jsonb("responses").notNull().$type<Array<{
+    questionId: string;
+    questionText: string;
+    selectedOptions: number[]; // Array of option indices selected
+    isCorrect?: boolean; // For quiz questions
+  }>>(),
+
+  // Quiz Scoring (if applicable)
+  score: decimal("score", { precision: 5, scale: 2 }), // Percentage score 0-100
+  totalQuestions: integer("total_questions"),
+  correctAnswers: integer("correct_answers"),
+  isPerfectScore: boolean("is_perfect_score").default(false),
+
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  submittedAt: timestamp("submitted_at").defaultNow(),
 });
 
 
