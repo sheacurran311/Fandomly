@@ -9,7 +9,13 @@ export interface TikTokVerificationRequest {
     contentUrl?: string;
     videoUrl?: string;
     requiredHashtags?: string[];
+    // For tiktok_post tasks
+    minLikes?: number;
+    minViews?: number;
+    postCaption?: string; // User can optionally provide caption for hashtag verification
   };
+  // User's TikTok username from their profile
+  userTikTokUsername?: string;
 }
 
 export interface VerificationResult {
@@ -67,6 +73,9 @@ export class TikTokVerificationService {
         case 'tiktok_share':
         case 'tiktok_comment':
           return this.verifyContentInteraction(proofUrl, taskSettings);
+
+        case 'tiktok_post':
+          return this.verifyPost(proofUrl, taskSettings, request.userTikTokUsername);
 
         default:
           return {
@@ -219,6 +228,120 @@ export class TikTokVerificationService {
         targetVideoUrl,
         targetVideoId,
         submittedVideoId,
+      },
+    };
+  }
+
+  /**
+   * Verify TikTok post creation task
+   * Checks if user posted their own TikTok video with required hashtags
+   */
+  private verifyPost(
+    proofUrl: string,
+    taskSettings: TikTokVerificationRequest['taskSettings'],
+    userTikTokUsername?: string
+  ): VerificationResult {
+    // Validate TikTok URL format
+    if (!this.isValidTikTokUrl(proofUrl)) {
+      return {
+        verified: false,
+        requiresManualReview: false,
+        confidence: 'low',
+        reason: 'Invalid TikTok URL format',
+        metadata: { proofUrl },
+      };
+    }
+
+    // Extract username from post URL
+    const postUsername = extractUsername(proofUrl, 'tiktok');
+
+    if (!postUsername) {
+      return {
+        verified: false,
+        requiresManualReview: false,
+        confidence: 'medium',
+        reason: 'Could not extract username from TikTok post URL',
+        metadata: { proofUrl },
+      };
+    }
+
+    // If user has connected their TikTok account, verify it's their post
+    if (userTikTokUsername) {
+      const normalizedUserUsername = this.normalizeUsername(userTikTokUsername);
+      const normalizedPostUsername = this.normalizeUsername(postUsername);
+
+      if (normalizedPostUsername !== normalizedUserUsername) {
+        return {
+          verified: false,
+          requiresManualReview: false,
+          confidence: 'high',
+          reason: `Post must be from your TikTok account (@${normalizedUserUsername}), but URL is from @${normalizedPostUsername}`,
+          metadata: {
+            proofUrl,
+            expectedUsername: normalizedUserUsername,
+            actualUsername: normalizedPostUsername,
+          },
+        };
+      }
+    }
+
+    // Check for required hashtags if caption provided
+    if (taskSettings.requiredHashtags && taskSettings.requiredHashtags.length > 0) {
+      if (taskSettings.postCaption) {
+        const hasRequiredHashtags = this.verifyHashtags(
+          taskSettings.postCaption,
+          taskSettings.requiredHashtags
+        );
+
+        if (!hasRequiredHashtags) {
+          const missingHashtags = taskSettings.requiredHashtags.filter(
+            required => !this.extractHashtags(taskSettings.postCaption!).includes(required.toLowerCase())
+          );
+
+          return {
+            verified: false,
+            requiresManualReview: false,
+            confidence: 'high',
+            reason: `Post must include required hashtags: ${missingHashtags.join(', ')}`,
+            metadata: {
+              proofUrl,
+              requiredHashtags: taskSettings.requiredHashtags,
+              missingHashtags,
+            },
+          };
+        }
+      } else {
+        // Hashtags required but no caption provided - flag for manual review
+        return {
+          verified: false,
+          requiresManualReview: true,
+          confidence: 'medium',
+          reason: `This task requires specific hashtags (${taskSettings.requiredHashtags.join(', ')}). Please include your post caption for verification.`,
+          metadata: {
+            proofUrl,
+            requiredHashtags: taskSettings.requiredHashtags,
+            needsCaptionForVerification: true,
+          },
+        };
+      }
+    }
+
+    // Extract video ID for metadata
+    const videoId = extractContentId(proofUrl, 'tiktok');
+
+    // Auto-verify the post
+    return {
+      verified: true,
+      requiresManualReview: false,
+      confidence: userTikTokUsername ? 'high' : 'medium',
+      reason: userTikTokUsername
+        ? `Verified: TikTok post from @${this.normalizeUsername(userTikTokUsername)}`
+        : 'TikTok post URL validated',
+      metadata: {
+        proofUrl,
+        postUsername: this.normalizeUsername(postUsername),
+        videoId,
+        hashtagsVerified: taskSettings.requiredHashtags && taskSettings.postCaption ? true : false,
       },
     };
   }
