@@ -821,6 +821,7 @@ export const taskSectionEnum = pgEnum('task_section', [
 
 export const updateCadenceEnum = pgEnum('update_cadence', ['immediate', 'daily', 'weekly', 'monthly']);
 export const rewardFrequencyEnum = pgEnum('reward_frequency', ['one_time', 'daily', 'weekly', 'monthly']);
+export const multiplierTypeEnum = pgEnum('multiplier_type', ['time_based', 'streak_based', 'tier_based', 'event', 'task_specific']);
 // Enhanced task type enum with consistent platform-specific naming
 export const taskTypeEnum = pgEnum('task_type', [
   // Twitter/X tasks (consistent prefixing)
@@ -1030,6 +1031,14 @@ export const tasks = pgTable("tasks", {
   multiplierValue: decimal("multiplier_value", { precision: 4, scale: 2 }), // e.g., 1.50, 2.00, 3.00
   currenciesToApply: jsonb("currencies_to_apply").$type<string[]>(), // Which currencies the multiplier applies to
   applyToExistingBalance: boolean("apply_to_existing_balance").default(false),
+
+  // Task-specific multiplier (Sprint 1 addition)
+  baseMultiplier: decimal("base_multiplier", { precision: 10, scale: 2 }).default('1.00'), // Task-specific point multiplier
+  multiplierConfig: jsonb("multiplier_config").$type<{
+    stackingType?: 'additive' | 'multiplicative'; // How multipliers stack
+    maxMultiplier?: number; // Cap on total multiplier (e.g., 10x max)
+    allowEventMultipliers?: boolean; // Whether event multipliers apply
+  }>(),
   
   // ============================================
   // SECTION 3: TIMING CONFIGURATION (Snag-Inspired)
@@ -1393,6 +1402,96 @@ export const programAnnouncements = pgTable("program_announcements", {
   isPinned: boolean("is_pinned").default(false),
   isPublished: boolean("is_published").default(true),
   
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================
+// SPRINT 1: MULTIPLIERS & FREQUENCY TABLES
+// ============================================
+
+// Active Multipliers - System-wide, event-based, and time-based multipliers
+export const activeMultipliers = pgTable("active_multipliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // Ownership
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }), // NULL for platform-wide multipliers
+
+  // Multiplier Identity
+  name: text("name").notNull(), // e.g., "Weekend Bonus", "VIP Member Multiplier", "Holiday 3x Points"
+  description: text("description"),
+  type: multiplierTypeEnum("type").notNull(),
+
+  // Multiplier Configuration
+  multiplier: decimal("multiplier", { precision: 10, scale: 2 }).notNull(), // e.g., 1.50, 2.00, 3.00
+
+  // Conditions - When this multiplier applies
+  conditions: jsonb("conditions").$type<{
+    // Time-based conditions
+    startDate?: string; // ISO 8601 date
+    endDate?: string;
+    daysOfWeek?: number[]; // [0,6] for Sunday/Saturday
+    timeRanges?: Array<{ start: string; end: string }>; // e.g., [{"start": "18:00", "end": "22:00"}]
+    timezone?: string; // "America/New_York"
+
+    // Streak-based conditions
+    requiredStreak?: number; // Minimum consecutive days
+    streakType?: 'daily_checkin' | 'task_completion'; // What creates the streak
+
+    // Tier-based conditions
+    requiredTier?: string; // 'basic' | 'premium' | 'vip'
+    minPointsBalance?: number; // Minimum points required
+
+    // Event/task-based conditions
+    applicableTaskTypes?: string[]; // Only apply to specific task types
+    applicableTaskIds?: string[]; // Only apply to specific tasks
+    applicablePlatforms?: string[]; // Only apply to specific platforms
+
+    // User conditions
+    newUsersOnly?: boolean; // Only for users registered after a date
+    userRegisteredAfter?: string; // ISO 8601 date
+  }>(),
+
+  // Stacking Rules
+  stackingType: text("stacking_type").default('multiplicative'), // 'additive' | 'multiplicative'
+  priority: integer("priority").default(0), // Higher priority = applied first
+  canStackWithOthers: boolean("can_stack_with_others").default(true),
+
+  // Status
+  isActive: boolean("is_active").default(true),
+
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+// Check-In Streaks - Track user streak data for check-in tasks
+export const checkInStreaks = pgTable("check_in_streaks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // References
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+
+  // Streak Data
+  currentStreak: integer("current_streak").default(0), // Current consecutive days
+  longestStreak: integer("longest_streak").default(0), // All-time record
+  totalCheckIns: integer("total_check_ins").default(0), // Lifetime total
+
+  // Dates
+  lastCheckIn: timestamp("last_check_in"), // Last check-in timestamp
+  lastStreakReset: timestamp("last_streak_reset"), // When streak was broken
+
+  // Metadata
+  metadata: jsonb("metadata").$type<{
+    streakMilestones?: Array<{ days: number; awardedAt: string }>; // Track milestone achievements
+    missedDays?: number; // Days missed in current period
+    longestStreakAchievedAt?: string; // When longest streak was achieved
+  }>(),
+
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

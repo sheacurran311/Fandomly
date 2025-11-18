@@ -5,6 +5,7 @@ import { twitterVerification } from './twitter-verification';
 import { tiktokVerification } from './tiktok-verification';
 import { instagramVerification } from './instagram-verification';
 import { validateProofUrl } from '../../middleware/upload';
+import { multiplierService } from '../multiplier-service';
 
 export interface UnifiedVerificationRequest {
   userId: string;
@@ -381,6 +382,15 @@ export class UnifiedVerificationService {
    * Award points for verified task completion
    */
   private async awardPoints(taskCompletionId: number, taskId: string): Promise<number> {
+    // Get task completion to get userId
+    const completion = await db.query.taskCompletions.findFirst({
+      where: eq(taskCompletions.id, taskCompletionId),
+    });
+
+    if (!completion) {
+      throw new Error('Task completion not found');
+    }
+
     // Get task to know how many points to award
     const task = await db.query.tasks.findFirst({
       where: (tasks, { eq }) => eq(tasks.id, taskId),
@@ -390,14 +400,43 @@ export class UnifiedVerificationService {
       throw new Error('Task not found');
     }
 
-    const pointsToAward = task.pointsToReward || 0;
+    const basePoints = task.pointsToReward || 0;
 
-    // Update completion with points awarded
+    // Calculate multiplier (Sprint 1 feature)
+    const multiplierResult = await multiplierService.calculateMultiplier({
+      userId: completion.userId,
+      taskId: taskId,
+      tenantId: task.tenantId,
+      taskType: task.taskType,
+      platform: task.platform,
+      // TODO: Get user tier and points balance from user service
+      // userTier: userTier,
+      // userPointsBalance: userPointsBalance,
+    });
+
+    // Apply multiplier to base points
+    const pointsToAward = Math.round(basePoints * multiplierResult.finalMultiplier);
+
+    console.log(`[Multiplier] Task: ${task.name}`);
+    console.log(`[Multiplier] Base points: ${basePoints}`);
+    console.log(`[Multiplier] Final multiplier: ${multiplierResult.finalMultiplier}x`);
+    console.log(`[Multiplier] Points awarded: ${pointsToAward}`);
+    if (multiplierResult.breakdown.length > 0) {
+      console.log(`[Multiplier] Breakdown:`, multiplierResult.breakdown);
+    }
+
+    // Update completion with points awarded and multiplier info
     await db
       .update(taskCompletions)
       .set({
         pointsAwarded: pointsToAward,
         completedAt: new Date(),
+        verificationMetadata: {
+          ...(completion.verificationMetadata as any || {}),
+          multiplierApplied: multiplierResult.finalMultiplier,
+          multiplierBreakdown: multiplierResult.breakdown,
+          basePoints: basePoints,
+        },
       })
       .where(eq(taskCompletions.id, taskCompletionId));
 
