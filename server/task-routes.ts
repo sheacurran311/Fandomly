@@ -931,14 +931,14 @@ export function registerTaskRoutes(app: Express) {
         const { status, tenantId } = req.query;
 
         // Build WHERE conditions
-        const conditions = [eq(taskCompletions.user_id, userId)];
+        const conditions = [eq(taskCompletions.userId, userId)];
 
         if (status) {
           conditions.push(eq(taskCompletions.status, status as string));
         }
 
         if (tenantId) {
-          conditions.push(eq(taskCompletions.tenant_id, tenantId as string));
+          conditions.push(eq(taskCompletions.tenantId, tenantId as string));
         }
 
         // Use single condition or AND based on array length

@@ -13,6 +13,7 @@ export interface TwitterUserInfo {
   name: string;
   profileImageUrl?: string;
   followersCount?: number;
+  followingCount?: number;
 }
 
 export interface TwitterLoginResult {
@@ -463,6 +464,7 @@ export class TwitterSDKManager {
         name: u.name,
         profileImageUrl: u.profile_image_url,
         followersCount: u.public_metrics?.followers_count,
+        followingCount: u.public_metrics?.following_count,
       };
     } catch (error) {
       console.error("[Twitter] Fetch user error:", error);
