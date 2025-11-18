@@ -40,7 +40,7 @@ export class TikTokVerificationService {
     if (!proofUrl && !screenshotUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'No proof URL or screenshot provided',
       };
@@ -50,7 +50,7 @@ export class TikTokVerificationService {
     if (!proofUrl && screenshotUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Screenshot provided, needs manual verification',
         metadata: { screenshotUrl },
@@ -71,7 +71,7 @@ export class TikTokVerificationService {
         default:
           return {
             verified: false,
-            requiresManualReview: true,
+            requiresManualReview: false,
             confidence: 'low',
             reason: `Unknown task type: ${taskType}`,
           };
@@ -80,7 +80,7 @@ export class TikTokVerificationService {
 
     return {
       verified: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       confidence: 'low',
       reason: 'Unable to verify automatically',
     };
@@ -99,7 +99,7 @@ export class TikTokVerificationService {
     if (!targetUsername) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'Task settings missing target username',
       };
@@ -111,7 +111,7 @@ export class TikTokVerificationService {
     if (!submittedUsername) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Could not extract username from proof URL',
         metadata: { proofUrl },
@@ -138,7 +138,7 @@ export class TikTokVerificationService {
 
     return {
       verified: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       confidence: 'medium',
       reason: `Username mismatch. Expected: @${targetUsername}, Got: @${normalizedSubmitted}`,
       metadata: {
@@ -162,7 +162,7 @@ export class TikTokVerificationService {
     if (!targetVideoUrl) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'Task settings missing target video URL',
       };
@@ -175,7 +175,7 @@ export class TikTokVerificationService {
     if (!targetVideoId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'low',
         reason: 'Invalid target video URL in task settings',
         metadata: { targetVideoUrl },
@@ -185,7 +185,7 @@ export class TikTokVerificationService {
     if (!submittedVideoId) {
       return {
         verified: false,
-        requiresManualReview: true,
+        requiresManualReview: false,
         confidence: 'medium',
         reason: 'Could not extract video ID from proof URL',
         metadata: { proofUrl },
@@ -211,7 +211,7 @@ export class TikTokVerificationService {
 
     return {
       verified: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       confidence: 'medium',
       reason: 'Video ID mismatch',
       metadata: {
