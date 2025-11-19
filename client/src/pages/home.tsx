@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { 
   Trophy, Camera, Music, Users, Shield, Zap, Rocket, Sparkles, 
   TrendingUp, Target, Building2, ArrowRight, CheckCircle, Coins,
-  Play, Globe, Lock, Smartphone, BarChart3, Palette, X
+  Play, Globe, Lock, Smartphone, BarChart3, Palette, X as XIcon
 } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { motion } from "framer-motion";
@@ -346,7 +346,7 @@ export default function Home() {
               <div className="relative bg-gray-900/90 backdrop-blur-xl border border-gray-700 rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
-                    <X className="w-6 h-6 text-gray-400" />
+                    <XIcon className="w-6 h-6 text-gray-400" />
                   </div>
                   <h3 className="text-2xl font-black text-gray-300">Old World NIL</h3>
                 </div>
@@ -359,7 +359,7 @@ export default function Home() {
                     "No direct fan engagement"
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-3 text-gray-400">
-                      <X className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <XIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </li>
                   ))}
