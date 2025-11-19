@@ -317,45 +317,6 @@ export default function FanTasksPage() {
         </div>
       </div>
 
-      {/* Platform Tasks Section */}
-      {platformTasks.length > 0 && (
-        <Card className="bg-gradient-to-r from-brand-primary/10 to-brand-secondary/10 border-brand-primary/30 mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-white flex items-center">
-                  <Star className="mr-2 h-5 w-5 text-brand-primary" />
-                  Platform Tasks
-                </CardTitle>
-                <p className="text-xs text-gray-400 mt-1">
-                  Earn Fandomly Points - Redeemable for platform rewards, NFTs, and special offers
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  NOTE: Not redeemable for any creator-issued rewards
-                </p>
-              </div>
-              <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/40">
-                {platformPoints} Points
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoadingPlatformTasks ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
-                <p className="mt-2 text-sm text-gray-400">Loading platform tasks...</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {platformTasks.map((task: Task) => (
-                  <PlatformTaskCard key={task.id} task={task} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Creator Tasks Section */}
       <div className="mb-4">
         <h2 className="text-2xl font-bold text-white mb-2">Creator Tasks</h2>
@@ -466,6 +427,45 @@ export default function FanTasksPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Platform Tasks Section */}
+      {platformTasks.length > 0 && (
+        <Card className="bg-gradient-to-r from-brand-primary/10 to-brand-secondary/10 border-brand-primary/30 mt-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center">
+                  <Star className="mr-2 h-5 w-5 text-brand-primary" />
+                  Platform Tasks
+                </CardTitle>
+                <p className="text-xs text-gray-400 mt-1">
+                  Earn Fandomly Points - Redeemable for platform rewards, NFTs, and special offers
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  NOTE: Not redeemable for any creator-issued rewards
+                </p>
+              </div>
+              <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/40">
+                {platformPoints} Points
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPlatformTasks ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-400">Loading platform tasks...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {platformTasks.map((task: Task) => (
+                  <PlatformTaskCard key={task.id} task={task} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
       </div>
     </DashboardLayout>

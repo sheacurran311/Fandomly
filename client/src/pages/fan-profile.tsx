@@ -640,7 +640,7 @@ export default function FanProfile() {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-300 text-sm flex items-center">
                         <Heart className="mr-2 h-4 w-4 text-red-400" />
-                        Following
+                        Enrolled
                       </span>
                       <span className="text-white font-semibold">5</span>
                     </div>

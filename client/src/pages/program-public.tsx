@@ -459,12 +459,12 @@ export default function ProgramPublic() {
                 {isFollowing ? (
                   <>
                     <Heart className="h-4 w-4 mr-2 fill-current" />
-                    Following
+                    Enrolled
                   </>
                 ) : (
                   <>
                     <Heart className="h-4 w-4 mr-2" />
-                    Follow
+                    Enroll
                   </>
                 )}
               </Button>
