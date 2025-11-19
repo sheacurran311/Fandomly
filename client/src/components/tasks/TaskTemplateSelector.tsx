@@ -31,10 +31,12 @@ import {
   ListMusic,
   Camera,
   Hash,
+  HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube } from "react-icons/si";
 
-export type TaskTemplateType = 
+export type TaskTemplateType =
   | 'complete_profile'
   | 'referral'
   | 'checkin'
@@ -58,12 +60,16 @@ export type TaskTemplateType =
   | 'tiktok_follow'
   | 'tiktok_like'
   | 'tiktok_comment'
+  | 'tiktok_post'
   | 'spotify_follow'
   | 'spotify_playlist'
   | 'social_follow'
   | 'social_like'
   | 'social_share'
   | 'social_comment'
+  | 'poll'
+  | 'quiz'
+  | 'website_visit'
   | 'custom_event';
 
 interface TaskTemplate {
@@ -551,6 +557,92 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Start conversations',
       'Community building',
       'Viral content',
+    ],
+  },
+  {
+    id: 'tiktok_post',
+    name: 'Create TikTok Post',
+    description: 'Reward fans for creating their own TikTok post with specific hashtags',
+    icon: Camera,
+    category: 'social',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 92,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'User-generated content',
+      'Viral campaign potential',
+      'Authentic brand advocacy',
+    ],
+    useCases: [
+      'Hashtag challenges',
+      'UGC campaigns',
+      'Brand awareness',
+    ],
+  },
+
+  // Interactive Templates
+  {
+    id: 'poll',
+    name: 'Fan Poll',
+    description: 'Create interactive polls to gather fan opinions and feedback',
+    icon: HelpCircle,
+    category: 'community',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 89,
+    estimatedSetupTime: '5 minutes',
+    benefits: [
+      'Gather fan feedback',
+      'Drive engagement',
+      'Make fans feel heard',
+    ],
+    useCases: [
+      'Content planning',
+      'Merchandise ideas',
+      'Fan preferences',
+    ],
+  },
+  {
+    id: 'quiz',
+    name: 'Trivia Quiz',
+    description: 'Create quizzes to test fan knowledge and reward correct answers',
+    icon: Trophy,
+    category: 'community',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 86,
+    estimatedSetupTime: '10 minutes',
+    benefits: [
+      'Fun engagement',
+      'Test fan knowledge',
+      'Gamification',
+    ],
+    useCases: [
+      'Trivia contests',
+      'Educational content',
+      'Fan challenges',
+    ],
+  },
+  {
+    id: 'website_visit',
+    name: 'Website Visit',
+    description: 'Reward fans for visiting your website or clicking specific links',
+    icon: ExternalLink,
+    category: 'custom',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 94,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Drive traffic',
+      'Auto-verified',
+      'Instant rewards',
+    ],
+    useCases: [
+      'Product launches',
+      'Merch stores',
+      'External content',
     ],
   },
 
