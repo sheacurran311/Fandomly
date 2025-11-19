@@ -7,14 +7,14 @@
  */
 
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 // Global flag to prevent duplicate execution across multiple renders/remounts
 let discordCallbackProcessed = false;
 
 export default function DiscordCallback() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const ranRef = useRef(false);
 
@@ -65,7 +65,7 @@ export default function DiscordCallback() {
             description: errorMsg,
             variant: "destructive",
           });
-          navigate("/creator-dashboard/social");
+          setLocation("/creator-dashboard/social");
           return;
         }
 
@@ -181,7 +181,7 @@ export default function DiscordCallback() {
           title: "Discord Connected! 🎉",
           description: `Successfully connected ${displayName}`,
         });
-        navigate("/creator-dashboard/social");
+        setLocation("/creator-dashboard/social");
       } catch (error) {
         console.error("[Discord Callback] Error:", error);
         const errorMsg = error instanceof Error ? error.message : "Failed to connect Discord";
@@ -205,12 +205,12 @@ export default function DiscordCallback() {
           description: errorMsg,
           variant: "destructive",
         });
-        navigate("/creator-dashboard/social");
+        setLocation("/creator-dashboard/social");
       }
     };
 
     run();
-  }, [navigate, toast]);
+  }, [setLocation, toast]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
