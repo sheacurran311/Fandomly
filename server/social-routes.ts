@@ -338,6 +338,122 @@ async function refreshSpotifyToken(refreshToken: string) {
   return response.json();
 }
 
+// Discord OAuth token exchange
+async function exchangeDiscordToken(code: string, redirectUri: string) {
+  console.log('[Discord Token Exchange] Request details:', {
+    hasClientId: !!process.env.DISCORD_APP_ID,
+    hasClientSecret: !!process.env.DISCORD_PUBLIC_KEY,
+    redirectUri,
+    codeLength: code.length
+  });
+
+  if (!process.env.DISCORD_APP_ID || !process.env.DISCORD_PUBLIC_KEY) {
+    throw new Error('Discord client credentials not configured');
+  }
+
+  const response = await fetch('https://discord.com/api/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: process.env.DISCORD_APP_ID,
+      client_secret: process.env.DISCORD_PUBLIC_KEY,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri
+    }).toString()
+  });
+
+  console.log('[Discord Token Exchange] Response status:', response.status);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Discord Token Exchange] Error:', errorText);
+    throw new Error(`Discord token exchange failed: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
+
+// Get Discord user info
+async function getDiscordUser(accessToken: string) {
+  console.log('[Discord User Info] Fetching user data...');
+
+  const response = await fetch('https://discord.com/api/users/@me', {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Discord User Info] Error:', errorText);
+    throw new Error(`Failed to fetch Discord user info: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// Twitch OAuth token exchange
+async function exchangeTwitchToken(code: string, redirectUri: string) {
+  console.log('[Twitch Token Exchange] Request details:', {
+    hasClientId: !!process.env.TWITCH_CLIENT_ID,
+    hasClientSecret: !!process.env.TWITCH_CLIENT_SECRET,
+    redirectUri,
+    codeLength: code.length
+  });
+
+  if (!process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET) {
+    throw new Error('Twitch client credentials not configured');
+  }
+
+  const response = await fetch('https://id.twitch.tv/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: process.env.TWITCH_CLIENT_ID,
+      client_secret: process.env.TWITCH_CLIENT_SECRET,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri
+    }).toString()
+  });
+
+  console.log('[Twitch Token Exchange] Response status:', response.status);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Twitch Token Exchange] Error:', errorText);
+    throw new Error(`Twitch token exchange failed: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
+
+// Get Twitch user info
+async function getTwitchUser(accessToken: string) {
+  console.log('[Twitch User Info] Fetching user data...');
+
+  const response = await fetch('https://api.twitch.tv/helix/users', {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Client-Id': process.env.TWITCH_CLIENT_ID!
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Twitch User Info] Error:', errorText);
+    throw new Error(`Failed to fetch Twitch user info: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.data && data.data.length > 0 ? data.data[0] : null;
+}
+
 // Get TikTok user info
 async function getTikTokUser(accessToken: string) {
   console.log('[TikTok User Info] Fetching user data...');
@@ -1402,6 +1518,78 @@ export function registerSocialRoutes(app: Express) {
         error: 'Failed to refresh Spotify token',
         message: error.message || 'Unknown error'
       });
+    }
+  });
+
+  // Discord token exchange
+  app.post('/api/social/discord/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { code, redirect_uri } = req.body;
+      if (!code || !redirect_uri) {
+        return res.status(400).json({ error: 'code and redirect_uri are required' });
+      }
+      console.log('[Discord Token Route] Processing token exchange');
+      const tokenData = await exchangeDiscordToken(code, redirect_uri);
+      res.json(tokenData);
+    } catch (error: any) {
+      console.error('Discord token exchange error:', error);
+      res.status(500).json({
+        error: 'Failed to exchange Discord token',
+        message: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // Discord user info
+  app.get('/api/social/discord/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Access token required' });
+      }
+
+      console.log('[Discord Me Route] Fetching user info');
+      const userData = await getDiscordUser(accessToken);
+      res.json(userData);
+    } catch (error) {
+      console.error('Discord me error:', error);
+      res.status(500).json({ error: 'Failed to get Discord user info' });
+    }
+  });
+
+  // Twitch token exchange
+  app.post('/api/social/twitch/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { code, redirect_uri } = req.body;
+      if (!code || !redirect_uri) {
+        return res.status(400).json({ error: 'code and redirect_uri are required' });
+      }
+      console.log('[Twitch Token Route] Processing token exchange');
+      const tokenData = await exchangeTwitchToken(code, redirect_uri);
+      res.json(tokenData);
+    } catch (error: any) {
+      console.error('Twitch token exchange error:', error);
+      res.status(500).json({
+        error: 'Failed to exchange Twitch token',
+        message: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // Twitch user info
+  app.get('/api/social/twitch/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Access token required' });
+      }
+
+      console.log('[Twitch Me Route] Fetching user info');
+      const userData = await getTwitchUser(accessToken);
+      res.json(userData);
+    } catch (error) {
+      console.error('Twitch me error:', error);
+      res.status(500).json({ error: 'Failed to get Twitch user info' });
     }
   });
 
