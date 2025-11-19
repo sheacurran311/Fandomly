@@ -12,6 +12,8 @@ import YouTubeTaskBuilder from "@/components/tasks/YouTubeTaskBuilder";
 import TikTokTaskBuilder from "@/components/tasks/TikTokTaskBuilder";
 import SpotifyTaskBuilder from "@/components/tasks/SpotifyTaskBuilder";
 import { CompleteProfileTaskBuilder } from "@/components/templates/CompleteProfileTaskBuilder";
+import PollQuizTaskBuilder from "@/components/tasks/PollQuizTaskBuilder";
+import WebsiteVisitTaskBuilder from "@/components/tasks/WebsiteVisitTaskBuilder";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -415,6 +417,7 @@ export default function TaskBuilder() {
     case 'tiktok_follow':
     case 'tiktok_like':
     case 'tiktok_comment':
+    case 'tiktok_post':
       return (
         <ProgramCampaignSelector>
           <TikTokTaskBuilder
@@ -424,6 +427,34 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+          />
+        </ProgramCampaignSelector>
+      );
+
+    case 'poll':
+    case 'quiz':
+      return (
+        <ProgramCampaignSelector>
+          <PollQuizTaskBuilder
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onBack={handleBack}
+            taskType={selectedTemplate}
+            initialData={existingTask}
+            isEditMode={isEditMode}
+          />
+        </ProgramCampaignSelector>
+      );
+
+    case 'website_visit':
+      return (
+        <ProgramCampaignSelector>
+          <WebsiteVisitTaskBuilder
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onBack={handleBack}
+            initialData={existingTask}
+            isEditMode={isEditMode}
           />
         </ProgramCampaignSelector>
       );

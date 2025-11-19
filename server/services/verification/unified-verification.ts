@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { taskCompletions, manualReviewQueue, verificationAttempts } from '@shared/schema';
+import { taskCompletions, manualReviewQueue, verificationAttempts, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { twitterVerification } from './twitter-verification';
 import { tiktokVerification } from './tiktok-verification';
@@ -263,11 +263,21 @@ export class UnifiedVerificationService {
         });
 
       case 'tiktok':
+        // Get user's TikTok username for post verification
+        let userTikTokUsername: string | undefined;
+        if (taskType === 'tiktok_post') {
+          const user = await db.query.users.findFirst({
+            where: eq(users.id, userId.toString()),
+          });
+          userTikTokUsername = (user?.socialLinks as any)?.tiktok;
+        }
+
         return await tiktokVerification.verify({
           taskType,
           proofUrl,
           screenshotUrl,
           taskSettings,
+          userTikTokUsername,
         });
 
       case 'instagram':

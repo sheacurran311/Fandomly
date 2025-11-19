@@ -16,12 +16,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
 import { SocialIntegrationManager } from "@/lib/social-integrations";
+import {
+  MultiplierConfig,
+  FrequencySelector,
+  type MultiplierConfigData,
+  type RewardFrequency,
+} from "./config";
 
 interface TikTokTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'tiktok_follow' | 'tiktok_like' | 'tiktok_comment';
+  taskType: 'tiktok_follow' | 'tiktok_like' | 'tiktok_comment' | 'tiktok_post';
   initialData?: any;
   isEditMode?: boolean;
 }
@@ -35,11 +41,19 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
   const [username, setUsername] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [requiredText, setRequiredText] = useState(''); // For comment tasks
+  const [requiredHashtags, setRequiredHashtags] = useState(''); // For post tasks (comma-separated)
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
   const [tiktokConnected, setTiktokConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
+
+  // Sprint 3: Advanced configuration
+  const [multiplierConfig, setMultiplierConfig] = useState<MultiplierConfigData>({
+    enabled: false,
+    baseMultiplier: 1.0,
+  });
+  const [rewardFrequency, setRewardFrequency] = useState<RewardFrequency>('one_time');
 
   // Check if TikTok is connected
   useEffect(() => {
@@ -93,6 +107,9 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
         case 'tiktok_comment':
           defaults = { name: 'Comment on TikTok Video', description: 'Leave a comment on our TikTok video!', points: 50 };
           break;
+        case 'tiktok_post':
+          defaults = { name: 'Create TikTok Post', description: 'Create your own TikTok with our hashtag and earn points!', points: 100 };
+          break;
         default:
           defaults = { name: '', description: '', points: 50 };
       }
@@ -115,26 +132,32 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
     if (points < 1 || points > 10000) errors.push('Points must be between 1 and 10,000');
     if (taskType === 'tiktok_follow' && !username.trim()) errors.push('TikTok username is required');
     if ((taskType === 'tiktok_like' || taskType === 'tiktok_comment') && !videoUrl.trim()) errors.push('TikTok video URL is required');
+    // tiktok_post doesn't require additional fields - hashtags are optional
     setValidationErrors(errors);
     setIsValid(errors.length === 0);
-  }, [taskName, description, points, username, videoUrl, requiredText, taskType, tiktokConnected]);
+  }, [taskName, description, points, username, videoUrl, requiredText, requiredHashtags, taskType, tiktokConnected]);
 
   const handlePublishClick = () => {
     if (validationErrors.length > 0) {
       toast({ title: "Validation Error", description: validationErrors[0], variant: "destructive" });
       return;
     }
-    
+
     let settings: any;
     if (taskType === 'tiktok_follow') {
       settings = { username: username.replace('@', '') };
+    } else if (taskType === 'tiktok_post') {
+      settings = {};
+      if (requiredHashtags.trim()) {
+        settings.requiredHashtags = requiredHashtags.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+      }
     } else {
       settings = { videoUrl };
       if (taskType === 'tiktok_comment' && requiredText.trim()) {
         settings.requiredText = requiredText;
       }
     }
-    
+
     const config = {
       name: taskName,
       description,
@@ -144,6 +167,10 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       isDraft: false,
       verificationMethod: useApiVerification ? 'api' : 'manual',
       settings,
+      // Sprint 3: Advanced configuration
+      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
+      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
+      rewardFrequency,
     };
     onPublish(config);
   };
@@ -152,13 +179,18 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
     let settings: any;
     if (taskType === 'tiktok_follow') {
       settings = { username: username.replace('@', '') };
+    } else if (taskType === 'tiktok_post') {
+      settings = {};
+      if (requiredHashtags.trim()) {
+        settings.requiredHashtags = requiredHashtags.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+      }
     } else {
       settings = { videoUrl };
       if (taskType === 'tiktok_comment' && requiredText.trim()) {
         settings.requiredText = requiredText;
       }
     }
-    
+
     const config = {
       name: taskName,
       description,
@@ -168,6 +200,10 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       isDraft: true,
       verificationMethod: useApiVerification ? 'api' : 'manual',
       settings,
+      // Sprint 3: Advanced configuration
+      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
+      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
+      rewardFrequency,
     };
     onSave(config);
   };
@@ -264,7 +300,13 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       <Card className="bg-white/5 border-white/10">
         <CardHeader>
           <CardTitle className="text-white">
-            {taskType === 'tiktok_follow' ? 'Follow Configuration' : taskType === 'tiktok_comment' ? 'Comment Configuration' : 'Like Video Configuration'}
+            {taskType === 'tiktok_follow'
+              ? 'Follow Configuration'
+              : taskType === 'tiktok_comment'
+              ? 'Comment Configuration'
+              : taskType === 'tiktok_post'
+              ? 'Post Creation Configuration'
+              : 'Like Video Configuration'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -285,6 +327,27 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
               <Label className="text-white">TikTok Username</Label>
               <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" className="bg-white/5 border-white/10 text-white" />
             </div>
+          ) : taskType === 'tiktok_post' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-white">Required Hashtags (Optional)</Label>
+                <Input
+                  value={requiredHashtags}
+                  onChange={(e) => setRequiredHashtags(e.target.value)}
+                  placeholder="#Fandomly, #YourBrand, #Challenge"
+                  className="bg-white/5 border-white/10 text-white"
+                />
+                <p className="text-xs text-gray-400">
+                  Comma-separated hashtags that fans must include in their TikTok post (leave blank for no requirements)
+                </p>
+              </div>
+              <Alert className="bg-blue-500/10 border-blue-500/20">
+                <AlertCircle className="h-4 w-4 text-blue-400" />
+                <AlertDescription className="text-blue-400 text-sm">
+                  <strong>UGC Campaign:</strong> Fans will create their own TikTok posts with your hashtags. Perfect for viral challenges and brand awareness!
+                </AlertDescription>
+              </Alert>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -294,7 +357,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
                   The full URL of the TikTok video you want fans to {taskType === 'tiktok_comment' ? 'comment on' : 'like'}
                 </p>
               </div>
-              
+
               {/* Required Text for Comment Tasks */}
               {taskType === 'tiktok_comment' && (
                 <div className="space-y-2">
@@ -331,6 +394,18 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
           </div>
         </CardContent>
       </Card>
+
+      {/* Sprint 3: Advanced Configuration */}
+      <MultiplierConfig
+        value={multiplierConfig}
+        onChange={setMultiplierConfig}
+      />
+
+      <FrequencySelector
+        value={rewardFrequency}
+        onChange={setRewardFrequency}
+        showUnlimited={false}
+      />
     </TaskBuilderBase>
   );
 }

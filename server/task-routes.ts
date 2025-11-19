@@ -44,6 +44,13 @@ const baseTaskSchema = z.object({
   isDraft: z.boolean().default(true),
   updateCadence: z.enum(['immediate', 'daily', 'weekly', 'monthly']).default('immediate'),
   rewardFrequency: z.enum(['one_time', 'daily', 'weekly', 'monthly']).default('one_time'),
+  // Sprint 3: Point multiplier configuration
+  baseMultiplier: z.number().min(1.0).max(10.0).optional().default(1.0),
+  multiplierConfig: z.object({
+    stackingType: z.enum(['additive', 'multiplicative']).optional(),
+    maxMultiplier: z.number().min(1.0).optional(),
+    allowEventMultipliers: z.boolean().optional(),
+  }).optional(),
 });
 
 const referralTaskSchema = baseTaskSchema.extend({
@@ -143,10 +150,10 @@ const youtubeTaskSchema = baseTaskSchema.extend({
 });
 
 const tiktokTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment', 'tiktok_share', 'tiktok_duet', 'tiktok_stitch']),
+  taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment', 'tiktok_share', 'tiktok_duet', 'tiktok_stitch', 'tiktok_post']),
   platform: z.literal('tiktok'),
   points: z.number().min(1).max(10000),
-  settings: tiktokTaskSettings.omit({ platform: true }), // Use unified schema
+  settings: tiktokTaskSettings.omit({ platform: true }).optional(), // Use unified schema
 });
 
 const spotifyTaskSchema = baseTaskSchema.extend({
@@ -170,6 +177,76 @@ const discordTaskSchema = baseTaskSchema.extend({
   settings: discordTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
+// Sprint 3: Interactive task schemas
+const pollTaskSchema = baseTaskSchema.extend({
+  taskType: z.literal('poll'),
+  platform: z.literal('interactive'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.literal('auto_interactive').optional(),
+  settings: z.object({
+    pollQuizConfig: z.object({
+      type: z.literal('poll'),
+      questions: z.array(z.object({
+        id: z.string(),
+        questionText: z.string(),
+        questionType: z.enum(['single_choice', 'multiple_choice', 'true_false']),
+        options: z.array(z.object({
+          id: z.number(),
+          text: z.string(),
+          isCorrect: z.boolean().optional(),
+        })),
+        explanation: z.string().optional(),
+      })),
+      showResults: z.boolean().optional(),
+      allowMultipleSubmissions: z.boolean().optional(),
+    }),
+  }),
+});
+
+const quizTaskSchema = baseTaskSchema.extend({
+  taskType: z.literal('quiz'),
+  platform: z.literal('interactive'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.literal('auto_interactive').optional(),
+  settings: z.object({
+    pollQuizConfig: z.object({
+      type: z.literal('quiz'),
+      questions: z.array(z.object({
+        id: z.string(),
+        questionText: z.string(),
+        questionType: z.enum(['single_choice', 'multiple_choice', 'true_false']),
+        options: z.array(z.object({
+          id: z.number(),
+          text: z.string(),
+          isCorrect: z.boolean().optional(),
+        })),
+        correctAnswers: z.array(z.number()).optional(),
+        explanation: z.string().optional(),
+      })),
+      passingScore: z.number().min(0).max(100).optional(),
+      requirePerfectScore: z.boolean().optional(),
+      perfectScoreMultiplier: z.number().min(1).max(5).optional(),
+      allowMultipleSubmissions: z.boolean().optional(),
+    }),
+  }),
+});
+
+const websiteVisitTaskSchema = baseTaskSchema.extend({
+  taskType: z.literal('website_visit'),
+  platform: z.literal('interactive'),
+  points: z.number().min(1).max(10000),
+  verificationMethod: z.literal('auto_tracking').optional(),
+  settings: z.object({
+    websiteConfig: z.object({
+      destinationUrl: z.string().url(),
+      requireMinTimeOnSite: z.boolean().optional(),
+      minTimeOnSiteSeconds: z.number().min(5).max(600).optional(),
+      requireActionCompletion: z.boolean().optional(),
+      actionType: z.enum(['form_submit', 'video_watch', 'button_click', 'custom']).optional(),
+    }),
+  }),
+});
+
 // Union of all task schemas
 const createTaskSchema = z.discriminatedUnion('taskType', [
   referralTaskSchema,
@@ -184,6 +261,10 @@ const createTaskSchema = z.discriminatedUnion('taskType', [
   spotifyTaskSchema,
   twitchTaskSchema,
   discordTaskSchema,
+  // Sprint 3: Interactive tasks
+  pollTaskSchema,
+  quizTaskSchema,
+  websiteVisitTaskSchema,
 ]);
 
 export function registerTaskRoutes(app: Express) {
@@ -470,13 +551,17 @@ export function registerTaskRoutes(app: Express) {
         // Timing
         updateCadence: validatedData.updateCadence,
         rewardFrequency: validatedData.rewardFrequency,
-        
+
+        // Sprint 3: Point multipliers
+        baseMultiplier: validatedData.baseMultiplier,
+        multiplierConfig: validatedData.multiplierConfig || null,
+
         // Verification method (for Twitter tasks)
         verificationMethod: 'verificationMethod' in validatedData ? validatedData.verificationMethod : undefined,
-        
+
         // Custom settings (task-specific configuration)
-        customSettings: 'settings' in validatedData 
-          ? validatedData.settings 
+        customSettings: 'settings' in validatedData
+          ? validatedData.settings
           : ('customSettings' in validatedData ? validatedData.customSettings : {}),
       };
 
