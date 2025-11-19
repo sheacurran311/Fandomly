@@ -25,6 +25,7 @@ import { registerTwitterTaskRoutes } from "./twitter-task-routes";
 import { registerYouTubeTaskRoutes } from "./youtube-task-routes";
 import { registerSpotifyTaskRoutes } from "./spotify-task-routes";
 import { registerTikTokTaskRoutes } from "./tiktok-task-routes";
+import { registerLeaderboardRoutes } from "./leaderboard-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -3297,6 +3298,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register agency routes
   registerAgencyRoutes(app);
+
+  // Register leaderboard routes (Sprint 8)
+  registerLeaderboardRoutes(app);
 
   // Register task routes
   const { registerTaskRoutes } = await import("./task-routes");
