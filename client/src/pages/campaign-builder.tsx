@@ -143,7 +143,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     type: "campaign", // Simplified: all campaigns are just "campaigns"
     startDate: "",
     endDate: "",
-    
+    isIndefinite: false, // Sprint 6: No end date
+
     // Step 2: Social Platforms
     platforms: {
       facebook: false,
@@ -156,22 +157,34 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       discord: false,
       telegram: false
     },
-    
+
     // Step 3: Tasks Configuration
     tasks: {} as Record<string, any[]>,
-    
-    // Step 4: Rewards & Points  
+
+    // Step 4: Rewards & Points
     rewardStructure: {
       campaignReward: { type: "points", value: 0 },
       taskRewards: true, // If false, only campaign reward applies
       defaultPoints: 50
     },
-    
-    // Step 5: Requirements & Hierarchy
+
+    // Step 5: Requirements & Hierarchy (Sprint 6 Enhanced)
     requirements: {
       allTasksRequired: true,
-      prerequisiteCampaigns: [] as string[]
-    }
+      prerequisiteCampaigns: [] as string[],
+      requiresPaidSubscription: false,
+      requiredSubscriberTier: "",
+      requiredNftCollectionIds: [] as string[],
+      requiredBadgeIds: [] as string[]
+    },
+
+    // Step 6: Task Dependencies (Sprint 6)
+    taskDependencies: [] as Array<{
+      taskId: string;
+      dependsOn: string[];
+      isOptional?: boolean;
+    }>,
+    requiredTaskIds: [] as string[] // Specific tasks required (overrides allTasksRequired)
   });
 
   // Authentication guard - show connect wallet prompt if not authenticated
@@ -231,7 +244,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     { id: 2, title: "Social Platforms", icon: Share2 },
     { id: 3, title: "Rewards & Points", icon: Gift },
     { id: 4, title: "Requirements", icon: Trophy },
-    { id: 5, title: "Review & Launch", icon: Check }
+    { id: 5, title: "Task Dependencies", icon: Settings },
+    { id: 6, title: "Review & Launch", icon: Check }
   ];
 
   const platformIcons = {
@@ -286,10 +300,10 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         if (!campaignData.startDate.trim()) {
           errors.startDate = "Campaign start date is required";
         }
-        if (!campaignData.endDate.trim()) {
-          errors.endDate = "Campaign end date is required";
+        if (!campaignData.isIndefinite && !campaignData.endDate.trim()) {
+          errors.endDate = "Campaign end date is required (or enable indefinite campaign)";
         }
-        if (campaignData.startDate && campaignData.endDate && new Date(campaignData.startDate) >= new Date(campaignData.endDate)) {
+        if (!campaignData.isIndefinite && campaignData.startDate && campaignData.endDate && new Date(campaignData.startDate) >= new Date(campaignData.endDate)) {
           errors.endDate = "End date must be after start date";
         }
         break;
@@ -318,9 +332,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const nextStep = () => {
     const validation = validateStep(currentStep);
     setValidationErrors(validation.errors);
-    
+
     if (validation.isValid) {
-      setCurrentStep(prev => Math.min(prev + 1, 6));
+      setCurrentStep(prev => Math.min(prev + 1, 7));
     }
   };
 
@@ -406,9 +420,27 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   value={campaignData.endDate}
                   onChange={(e) => updateCampaignData('endDate', e.target.value)}
                   className="mt-2 bg-white/10 border-white/20 text-white"
+                  disabled={campaignData.isIndefinite}
                 />
                 <ErrorMessage error={validationErrors.endDate} />
               </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-white/10 border border-white/20 rounded-lg">
+              <div>
+                <Label className="text-white">Indefinite Campaign</Label>
+                <p className="text-sm text-gray-400">Campaign runs continuously with no end date</p>
+              </div>
+              <Switch
+                data-testid="switch-indefinite-campaign"
+                checked={campaignData.isIndefinite}
+                onCheckedChange={(checked) => {
+                  updateCampaignData('isIndefinite', checked);
+                  if (checked) {
+                    updateCampaignData('endDate', '');
+                  }
+                }}
+              />
             </div>
           </div>
         );
@@ -495,7 +527,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Campaign Requirements</h3>
-            
+
             <Card className="bg-white/5 border-white/20">
               <CardHeader>
                 <CardTitle className="text-white">Completion Requirements</CardTitle>
@@ -530,10 +562,144 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="bg-white/5 border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">Subscriber Requirements (Sprint 6)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-white">Requires Paid Subscription</Label>
+                    <p className="text-sm text-gray-400">Only paid subscribers can participate</p>
+                  </div>
+                  <Switch
+                    data-testid="switch-requires-paid-subscription"
+                    checked={campaignData.requirements.requiresPaidSubscription}
+                    onCheckedChange={(checked) => updateCampaignData('requirements.requiresPaidSubscription', checked)}
+                  />
+                </div>
+
+                {campaignData.requirements.requiresPaidSubscription && (
+                  <>
+                    <Separator className="bg-white/20" />
+                    <div>
+                      <Label className="text-white">Required Subscriber Tier (Optional)</Label>
+                      <Input
+                        data-testid="input-required-subscriber-tier"
+                        placeholder="e.g., premium, vip, platinum"
+                        value={campaignData.requirements.requiredSubscriberTier}
+                        onChange={(e) => updateCampaignData('requirements.requiredSubscriberTier', e.target.value)}
+                        className="mt-2 bg-white/10 border-white/20 text-white"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Leave empty to allow any paid subscription tier</p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/5 border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">NFT & Badge Requirements (Sprint 6)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-white">Required NFT Collections</Label>
+                  <p className="text-sm text-gray-400 mb-2">Fans must own NFTs from these collections</p>
+                  <Input
+                    data-testid="input-required-nft-collections"
+                    placeholder="Collection IDs (comma-separated)"
+                    className="bg-white/10 border-white/20 text-white"
+                    onChange={(e) => {
+                      const collections = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      updateCampaignData('requirements.requiredNftCollectionIds', collections);
+                    }}
+                  />
+                </div>
+
+                <Separator className="bg-white/20" />
+
+                <div>
+                  <Label className="text-white">Required Badges</Label>
+                  <p className="text-sm text-gray-400 mb-2">Fans must have earned these badges</p>
+                  <Input
+                    data-testid="input-required-badges"
+                    placeholder="Badge IDs (comma-separated)"
+                    className="bg-white/10 border-white/20 text-white"
+                    onChange={(e) => {
+                      const badges = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      updateCampaignData('requirements.requiredBadgeIds', badges);
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         );
 
       case 5:
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-white mb-4">Task Dependencies (Sprint 6)</h3>
+
+            <Card className="bg-white/5 border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">Task Completion Requirements</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-white">Specific Required Tasks</Label>
+                  <p className="text-sm text-gray-400 mb-2">
+                    Override "All Tasks Required" by specifying exactly which tasks must be completed
+                  </p>
+                  <Input
+                    data-testid="input-required-tasks"
+                    placeholder="Task IDs (comma-separated, leave empty to require all tasks)"
+                    className="bg-white/10 border-white/20 text-white"
+                    onChange={(e) => {
+                      const tasks = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      updateCampaignData('requiredTaskIds', tasks);
+                    }}
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    {campaignData.requiredTaskIds.length > 0
+                      ? `${campaignData.requiredTaskIds.length} specific task(s) required`
+                      : campaignData.requirements.allTasksRequired
+                        ? "All tasks required by default"
+                        : "No specific tasks required"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/5 border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">Task Dependencies</CardTitle>
+                <p className="text-sm text-gray-400">Define the order in which tasks must be completed</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-blue-200 text-sm flex items-start gap-2">
+                    <Settings className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Task dependencies will be configured after assigning tasks to this campaign.
+                      This advanced feature allows you to create task sequences where certain tasks
+                      must be completed before others become available.
+                    </span>
+                  </p>
+                </div>
+
+                <div className="text-center py-6 text-gray-400">
+                  <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Task dependency configuration available after campaign creation</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 6:
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Review & Launch</h3>
@@ -549,8 +715,14 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                     <p className="text-white font-medium">{campaignData.name || 'Untitled Campaign'}</p>
                   </div>
                   <div>
-                    <span className="text-gray-400">Types:</span>
+                    <span className="text-gray-400">Type:</span>
                     <p className="text-white font-medium">Points-Based Campaign</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Duration:</span>
+                    <p className="text-white font-medium">
+                      {campaignData.isIndefinite ? 'Indefinite' : `${campaignData.startDate || 'Not set'} → ${campaignData.endDate || 'Not set'}`}
+                    </p>
                   </div>
                   <div>
                     <span className="text-gray-400">Platforms:</span>
@@ -561,9 +733,77 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                         .join(', ') || 'None selected'}
                     </p>
                   </div>
-                  <div>
-                    <span className="text-gray-400">Status:</span>
-                    <p className="text-white font-medium">Pending Tasks</p>
+                </div>
+
+                <Separator className="bg-white/20" />
+
+                <div className="space-y-2 text-sm">
+                  <h4 className="text-white font-semibold">Sprint 6 Requirements:</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      {campaignData.requirements.allTasksRequired ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className="text-gray-300">All Tasks Required</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {campaignData.requirements.requiresPaidSubscription ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className="text-gray-300">Paid Subscription</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {campaignData.requirements.prerequisiteCampaigns.length > 0 ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className="text-gray-300">
+                        {campaignData.requirements.prerequisiteCampaigns.length > 0
+                          ? `${campaignData.requirements.prerequisiteCampaigns.length} Prerequisite(s)`
+                          : 'No Prerequisites'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {campaignData.requirements.requiredNftCollectionIds.length > 0 ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className="text-gray-300">
+                        {campaignData.requirements.requiredNftCollectionIds.length > 0
+                          ? `${campaignData.requirements.requiredNftCollectionIds.length} Required NFT(s)`
+                          : 'No NFT Requirements'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {campaignData.requirements.requiredBadgeIds.length > 0 ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className="text-gray-300">
+                        {campaignData.requirements.requiredBadgeIds.length > 0
+                          ? `${campaignData.requirements.requiredBadgeIds.length} Required Badge(s)`
+                          : 'No Badge Requirements'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {campaignData.requiredTaskIds.length > 0 ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className="text-gray-300">
+                        {campaignData.requiredTaskIds.length > 0
+                          ? `${campaignData.requiredTaskIds.length} Specific Task(s)`
+                          : 'No Specific Tasks'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -645,7 +885,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           </Button>
           
           <div className="flex space-x-3">
-            {currentStep < 5 ? (
+            {currentStep < 6 ? (
               <Button
                 data-testid="button-next-step"
                 onClick={nextStep}
@@ -661,35 +901,45 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 className="bg-blue-600 hover:bg-blue-700"
                 onClick={async () => {
                   try {
-                    // Prepare simplified campaign data for "Pending Tasks" status
-                    const simplifiedCampaignData = {
+                    // Prepare Sprint 6 enhanced campaign data
+                    const sprint6CampaignData = {
                       name: campaignData.name,
                       description: campaignData.description,
                       startDate: campaignData.startDate || new Date().toISOString(),
-                      endDate: campaignData.endDate || null,
-                      status: 'pending_tasks', // Key: Set default status to pending_tasks
+                      endDate: campaignData.isIndefinite ? null : (campaignData.endDate || null),
+                      status: 'pending_tasks',
                       platforms: campaignData.platforms,
                       rewardStructure: campaignData.rewardStructure,
-                      requirements: campaignData.requirements,
+
+                      // Sprint 6: Advanced Requirements
+                      allTasksRequired: campaignData.requirements.allTasksRequired,
+                      prerequisiteCampaigns: campaignData.requirements.prerequisiteCampaigns,
+                      requiresPaidSubscription: campaignData.requirements.requiresPaidSubscription,
+                      requiredSubscriberTier: campaignData.requirements.requiredSubscriberTier || null,
+                      requiredNftCollectionIds: campaignData.requirements.requiredNftCollectionIds,
+                      requiredBadgeIds: campaignData.requirements.requiredBadgeIds,
+                      requiredTaskIds: campaignData.requiredTaskIds,
+                      taskDependencies: campaignData.taskDependencies,
+
                       creatorId: user?.id
                     };
 
-                    // Call simplified campaign creation API (no tasks required)
-                    const response = await apiRequest("POST", "/api/campaigns", simplifiedCampaignData);
+                    // Call campaign creation API with Sprint 6 fields
+                    const response = await apiRequest("POST", "/api/campaigns", sprint6CampaignData);
 
                     if (response.ok) {
                       const result = await response.json();
-                      console.log('Campaign created successfully:', result);
-                      
+                      console.log('Sprint 6 Campaign created successfully:', result);
+
                       // Invalidate campaigns cache to refresh the list
                       if (user?.creator?.id) {
-                        await queryClient.invalidateQueries({ 
-                          queryKey: ["/api/campaigns/creator", user.creator.id] 
+                        await queryClient.invalidateQueries({
+                          queryKey: ["/api/campaigns/creator", user.creator.id]
                         });
                       }
-                      
+
                       // Show success message and close modal
-                      alert(`🎉 Campaign "${campaignData.name}" created successfully! Assign tasks from the Tasks page before publishing.`);
+                      alert(`🎉 Campaign "${campaignData.name}" created successfully with Sprint 6 features! Assign tasks from the Tasks page before publishing.`);
                       onClose();
                     } else {
                       throw new Error('Failed to create campaign');

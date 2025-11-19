@@ -913,7 +913,19 @@ export const campaigns = pgTable("campaigns", {
   }>(),
   prerequisiteCampaigns: jsonb("prerequisite_campaigns").$type<string[]>().default([]), // Campaign IDs that must be completed first
   allTasksRequired: boolean("all_tasks_required").default(true), // Must complete all tasks for reward
-  
+
+  // Sprint 6: Advanced Requirements
+  requiresPaidSubscription: boolean("requires_paid_subscription").default(false), // Requires active paid subscription
+  requiredSubscriberTier: text("required_subscriber_tier"), // Specific tier required (e.g., "premium", "vip")
+  requiredNftCollectionIds: jsonb("required_nft_collection_ids").$type<string[]>().default([]), // Must own NFT from these collections
+  requiredBadgeIds: jsonb("required_badge_ids").$type<string[]>().default([]), // Must have earned these badges
+  requiredTaskIds: jsonb("required_task_ids").$type<string[]>().default([]), // Specific tasks required (overrides allTasksRequired if set)
+  taskDependencies: jsonb("task_dependencies").$type<Array<{
+    taskId: string;
+    dependsOn: string[]; // TaskIds that must be completed before this task
+    isOptional?: boolean;
+  }>>(), // Task completion order requirements
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

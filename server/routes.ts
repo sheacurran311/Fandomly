@@ -1674,6 +1674,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sprint 6: Validate campaign prerequisites (check if user can participate)
+  app.post("/api/campaigns/:campaignId/validate-prerequisites", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const campaignId = req.params.campaignId;
+
+      // Call the validation function from the database
+      const result = await db.execute(sql`
+        SELECT * FROM validate_campaign_prerequisites(${userId}, ${campaignId})
+      `);
+
+      const validation = result.rows[0];
+
+      if (!validation) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      res.json({
+        canParticipate: validation.can_participate,
+        missingPrerequisites: validation.missing_prerequisites
+      });
+    } catch (error) {
+      console.error("Failed to validate campaign prerequisites:", error);
+      res.status(500).json({ error: "Failed to validate prerequisites" });
+    }
+  });
+
   // Get pending campaigns (campaigns waiting for tasks)
   app.get("/api/campaigns/pending", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
