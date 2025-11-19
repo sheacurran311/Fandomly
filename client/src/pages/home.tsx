@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { motion } from "framer-motion";
+import CreatorEarningsCalculator from "@/components/nil/nil-value-calculator";
 
 export default function Home() {
   const { user, setShowAuthFlow } = useDynamicContext();
@@ -35,7 +36,7 @@ export default function Home() {
                            repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 40px, rgba(255,255,255,0.03) 41px)`
         }}></div>
 
-        {/* Left: NIL Athlete Visual */}
+        {/* Left: Creator Showcase Visual */}
         <div className="relative z-10 flex items-center justify-center p-8 lg:p-16">
           <motion.div
             initial={{ opacity: 0, x: -100 }}
@@ -43,7 +44,7 @@ export default function Home() {
             transition={{ duration: 1, ease: "easeOut" }}
             className="relative w-full max-w-lg"
           >
-            {/* Floating Athlete Card */}
+            {/* Floating Creator Card */}
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#14feee] via-[#8B5CF6] to-[#e10698] rounded-3xl blur-2xl opacity-75 group-hover:opacity-100 transition duration-1000 animate-pulse"></div>
               <div className="relative bg-black/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 overflow-hidden">
@@ -206,7 +207,7 @@ export default function Home() {
                   {i % 3 === 0 ? `${(i + 1) * 234}` : i % 3 === 1 ? `${(i + 1) * 1.2}K` : `$${(i + 1) * 850}`}
                 </div>
                 <div className="text-xs text-gray-400">
-                  {i % 3 === 0 ? "Quests Claimed" : i % 3 === 1 ? "Active Users" : "NIL Payouts"}
+                  {i % 3 === 0 ? "Quests Claimed" : i % 3 === 1 ? "Active Users" : "Creator Earnings"}
                 </div>
               </div>
             </div>
@@ -667,6 +668,9 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 💰 CREATOR EARNINGS CALCULATOR */}
+      <CreatorEarningsCalculator />
+
       {/* 🎯 LAUNCH PAD - Perspective CTA Footer */}
       <section className="relative py-32 px-4">
         <div className="max-w-5xl mx-auto">
@@ -689,7 +693,7 @@ export default function Home() {
                   </span>
                 </h2>
                 <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                  Join thousands of athletes and creators monetizing their fanbase with Web3 loyalty programs.
+                  Join thousands of athletes, musicians, content creators, and brands monetizing their fanbase with Web3 loyalty programs across 8 social platforms.
                 </p>
               </div>
 
@@ -705,8 +709,8 @@ export default function Home() {
                   <div className="absolute inset-0 bg-gradient-to-r from-[#e10698]/50 to-transparent blur-xl opacity-0 group-hover:opacity-100 transition"></div>
                   <div className="relative z-10">
                     <Trophy className="w-12 h-12 text-white mx-auto mb-4" />
-                    <h3 className="text-2xl font-black text-white mb-2">For Athletes</h3>
-                    <p className="text-white/80 text-sm">Launch your NIL program in minutes</p>
+                    <h3 className="text-2xl font-black text-white mb-2">For Creators</h3>
+                    <p className="text-white/80 text-sm">Launch your loyalty program in minutes</p>
                   </div>
                 </motion.button>
 
