@@ -2715,6 +2715,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Creator Activity Feed
+  app.get("/api/creator/activity/:creatorId", async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+      const { search = '', type = 'all', dateFilter = 'all', limit = '100' } = req.query;
+
+      // Get creator's programs
+      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, pointTransactions, users, tasks } = await import("@shared/schema");
+      const { eq, and, desc, or, like, gte, sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      const programs = await db.select()
+        .from(loyaltyPrograms)
+        .where(eq(loyaltyPrograms.creatorId, creatorId));
+
+      if (programs.length === 0) {
+        return res.json([]);
+      }
+
+      const programIds = programs.map(p => p.id);
+      const activities: any[] = [];
+
+      // Calculate date filter
+      let dateThreshold: Date | null = null;
+      const now = new Date();
+      if (dateFilter === 'today') {
+        dateThreshold = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (dateFilter === 'week') {
+        dateThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (dateFilter === 'month') {
+        dateThreshold = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else if (dateFilter === 'quarter') {
+        const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+        dateThreshold = new Date(now.getFullYear(), quarterMonth, 1);
+      }
+
+      // 1. Fetch fan enrollments (joins)
+      if (type === 'all' || type === 'join') {
+        for (const programId of programIds) {
+          const joins = await db.select({
+            id: fanPrograms.id,
+            fanId: fanPrograms.fanId,
+            joinedAt: fanPrograms.joinedAt,
+            fanUsername: users.username
+          })
+          .from(fanPrograms)
+          .leftJoin(users, eq(fanPrograms.fanId, users.id))
+          .where(and(
+            eq(fanPrograms.programId, programId),
+            dateThreshold ? gte(fanPrograms.joinedAt, dateThreshold) : sql`true`
+          ))
+          .orderBy(desc(fanPrograms.joinedAt))
+          .limit(parseInt(limit as string));
+
+          joins.forEach(join => {
+            activities.push({
+              id: join.id,
+              type: 'join',
+              description: `joined your loyalty program`,
+              timestamp: join.joinedAt,
+              fanName: join.fanUsername || 'Anonymous Fan',
+              fanId: join.fanId
+            });
+          });
+        }
+      }
+
+      // 2. Fetch task completions
+      if (type === 'all' || type === 'task' || type === 'earn') {
+        for (const programId of programIds) {
+          const completions = await db.select({
+            id: taskCompletions.id,
+            userId: taskCompletions.userId,
+            taskId: taskCompletions.taskId,
+            completedAt: taskCompletions.completedAt,
+            pointsAwarded: taskCompletions.pointsAwarded,
+            fanUsername: users.username,
+            taskName: tasks.name
+          })
+          .from(taskCompletions)
+          .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+          .leftJoin(users, eq(taskCompletions.userId, users.id))
+          .where(and(
+            eq(tasks.programId, programId),
+            eq(taskCompletions.status, 'completed'),
+            dateThreshold && taskCompletions.completedAt ? gte(taskCompletions.completedAt, dateThreshold) : sql`true`
+          ))
+          .orderBy(desc(taskCompletions.completedAt))
+          .limit(parseInt(limit as string));
+
+          completions.forEach(completion => {
+            if (completion.completedAt) {
+              activities.push({
+                id: completion.id,
+                type: 'task',
+                description: `completed task: ${completion.taskName}`,
+                timestamp: completion.completedAt,
+                points: completion.pointsAwarded,
+                fanName: completion.fanUsername || 'Anonymous Fan',
+                fanId: completion.userId
+              });
+            }
+          });
+        }
+      }
+
+      // 3. Fetch reward redemptions
+      if (type === 'all' || type === 'redeem') {
+        for (const programId of programIds) {
+          const redemptions = await db.select({
+            id: rewardRedemptions.id,
+            fanId: rewardRedemptions.fanId,
+            redeemedAt: rewardRedemptions.redeemedAt,
+            pointsSpent: rewardRedemptions.pointsSpent,
+            rewardId: rewardRedemptions.rewardId,
+            fanUsername: users.username
+          })
+          .from(rewardRedemptions)
+          .leftJoin(users, eq(rewardRedemptions.fanId, users.id))
+          .where(and(
+            eq(rewardRedemptions.programId, programId),
+            dateThreshold ? gte(rewardRedemptions.redeemedAt, dateThreshold) : sql`true`
+          ))
+          .orderBy(desc(rewardRedemptions.redeemedAt))
+          .limit(parseInt(limit as string));
+
+          redemptions.forEach(redemption => {
+            activities.push({
+              id: redemption.id,
+              type: 'redeem',
+              description: `redeemed a reward`,
+              timestamp: redemption.redeemedAt,
+              points: -redemption.pointsSpent,
+              fanName: redemption.fanUsername || 'Anonymous Fan',
+              fanId: redemption.fanId
+            });
+          });
+        }
+      }
+
+      // Sort all activities by timestamp
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      // Apply search filter
+      let filteredActivities = activities;
+      if (search && typeof search === 'string' && search.trim() !== '') {
+        const searchLower = search.toLowerCase();
+        filteredActivities = activities.filter(activity =>
+          activity.fanName?.toLowerCase().includes(searchLower) ||
+          activity.description?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Limit results
+      const limitedActivities = filteredActivities.slice(0, parseInt(limit as string));
+
+      res.json(limitedActivities);
+    } catch (error) {
+      console.error('Error fetching creator activity:', error);
+      res.status(500).json({ error: "Failed to fetch creator activity" });
+    }
+  });
+
   // Admin routes for user management
   app.get("/api/admin/users", authenticateUser, requireRole(['fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {

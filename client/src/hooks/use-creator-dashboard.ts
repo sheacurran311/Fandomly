@@ -221,44 +221,34 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
   }
 };
 
-const fetchCreatorActivity = async (creatorId: string): Promise<CreatorActivity[]> => {
+const fetchCreatorActivity = async (
+  creatorId: string,
+  params?: { search?: string; type?: string; dateFilter?: string }
+): Promise<CreatorActivity[]> => {
   try {
-    // Get recent point transactions across all creator's programs
-    const programsResponse = await fetch(`/api/loyalty-programs/creator/${creatorId}`);
-    if (!programsResponse.ok) {
-      throw new Error('Failed to fetch loyalty programs');
-    }
-    const programs = await programsResponse.json();
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.dateFilter) queryParams.append('dateFilter', params.dateFilter);
 
-    const activities: CreatorActivity[] = [];
+    const url = `/api/creator/activity/${creatorId}?${queryParams.toString()}`;
+    const response = await fetch(url);
 
-    for (const program of programs) {
-      try {
-        const transactionsResponse = await fetch(`/api/point-transactions/program/${program.id}`);
-        if (transactionsResponse.ok) {
-          const transactions = await transactionsResponse.json();
-          
-          // Convert transactions to activity format
-          transactions.slice(0, 10).forEach((tx: any) => {
-            activities.push({
-              id: tx.id,
-              type: 'point_transaction',
-              description: `Fan earned ${tx.pointsAwarded} points from ${tx.campaignName || 'Unknown Campaign'}`,
-              timestamp: tx.timestamp,
-              points: tx.pointsAwarded,
-              fan: tx.fanId
-            });
-          });
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch transactions for program ${program.id}:`, error);
-      }
+    if (!response.ok) {
+      throw new Error('Failed to fetch creator activity');
     }
 
-    // Sort by timestamp (most recent first)
-    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
-    return activities.slice(0, 10); // Return latest 10 activities
+    const activities = await response.json();
+
+    // Map to expected format
+    return activities.map((activity: any) => ({
+      id: activity.id,
+      type: activity.type,
+      description: activity.description,
+      timestamp: activity.timestamp,
+      points: activity.points,
+      fan: activity.fanName || activity.fanId
+    }));
   } catch (error) {
     console.error('Failed to fetch creator activity:', error);
     return [];
@@ -278,14 +268,14 @@ export const useCreatorStats = () => {
   });
 };
 
-export const useCreatorActivity = () => {
+export const useCreatorActivity = (params?: { search?: string; type?: string; dateFilter?: string }) => {
   const { user } = useAuth();
-  
+
   return useQuery({
-    queryKey: ['creatorActivity', user?.id],
-    queryFn: () => fetchCreatorActivity(user?.id || ''),
+    queryKey: ['creatorActivity', user?.id, params],
+    queryFn: () => fetchCreatorActivity(user?.id || '', params),
     enabled: !!user?.id && user?.userType === 'creator',
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds (shorter since we have filters)
     refetchOnWindowFocus: false,
   });
 };
