@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCreatorActivity } from "@/hooks/use-creator-dashboard";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -12,47 +12,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Filter, Download } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 export default function ActivityPage() {
-  const { data: activities, isLoading } = useCreatorActivity();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDate, setFilterDate] = useState<string>("all");
 
-  // Filter activities based on search and filters
-  const filteredActivities = activities?.filter((activity: any) => {
-    const matchesSearch = searchTerm === "" || 
-      (activity.user || activity.fanName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (activity.action || activity.description || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = filterType === "all" || activity.type === filterType;
-    
-    // Simple date filtering - you can enhance this
-    const matchesDate = filterDate === "all" || true; // Implement date logic
-    
-    return matchesSearch && matchesType && matchesDate;
-  }) || [];
+  // Debounced search term to avoid too many API calls
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
 
-  // Mock data if no real activities
-  const mockActivities = [
-    { id: 1, user: "Sarah M.", action: "joined your loyalty program", time: "2 hours ago", type: "join" },
-    { id: 2, user: "Mike R.", action: "redeemed VIP Discord Access", time: "4 hours ago", type: "redeem" },
-    { id: 3, user: "Emma L.", action: "earned 500 points from Instagram follow", time: "6 hours ago", type: "earn" },
-    { id: 4, user: "Alex K.", action: "joined your loyalty program", time: "1 day ago", type: "join" },
-    { id: 5, user: "Taylor B.", action: "completed Twitter follow task", time: "1 day ago", type: "earn" },
-    { id: 6, user: "Jordan C.", action: "redeemed Exclusive Merch", time: "2 days ago", type: "redeem" },
-    { id: 7, user: "Casey D.", action: "joined your loyalty program", time: "2 days ago", type: "join" },
-    { id: 8, user: "Morgan E.", action: "earned 300 points from campaign", time: "3 days ago", type: "earn" },
-    { id: 9, user: "Riley F.", action: "completed Instagram follow task", time: "3 days ago", type: "earn" },
-    { id: 10, user: "Avery G.", action: "joined your loyalty program", time: "4 days ago", type: "join" },
-    { id: 11, user: "Dakota H.", action: "redeemed Early Access Pass", time: "4 days ago", type: "redeem" },
-    { id: 12, user: "Skyler I.", action: "earned 150 points from task completion", time: "5 days ago", type: "earn" },
-    { id: 13, user: "Phoenix J.", action: "joined your loyalty program", time: "5 days ago", type: "join" },
-    { id: 14, user: "River K.", action: "completed TikTok follow task", time: "6 days ago", type: "earn" },
-    { id: 15, user: "Sage L.", action: "redeemed Premium Content", time: "1 week ago", type: "redeem" },
-  ];
+  // Debounce search term (500ms delay)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
 
-  const displayActivities = filteredActivities.length > 0 ? filteredActivities : mockActivities;
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  // Fetch activities with search and filters from database
+  const { data: activities = [], isLoading } = useCreatorActivity({
+    search: debouncedSearch,
+    type: filterType,
+    dateFilter: filterDate
+  });
+
+  const displayActivities = activities;
 
   const handleExport = () => {
     // Implement CSV export logic
@@ -168,10 +156,12 @@ export default function ActivityPage() {
                     }`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white">
-                        <span className="font-medium">{activity.user || activity.fanName || 'A fan'}</span>{' '}
-                        {activity.action || activity.description}
+                        <span className="font-medium">{activity.fan || 'A fan'}</span>{' '}
+                        {activity.description}
                       </p>
-                      <p className="text-xs text-gray-400">{activity.time || activity.timestamp}</p>
+                      <p className="text-xs text-gray-400">
+                        {activity.timestamp ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true }) : 'Unknown time'}
+                      </p>
                     </div>
                     <div className="text-xs text-gray-500 capitalize">
                       {activity.type}

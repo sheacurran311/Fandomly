@@ -2,7 +2,7 @@
 import FacebookSDK, { type FacebookUser, type FacebookPage } from './facebook';
 
 export interface SocialMediaAccount {
-  platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify';
+  platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify' | 'discord' | 'twitch';
   username: string;
   displayName: string;
   profileUrl: string;
@@ -603,6 +603,278 @@ export class SpotifyAPI {
   }
 }
 
+// Discord API
+export class DiscordAPI {
+  private clientId: string;
+  private redirectUri: string;
+
+  constructor() {
+    this.clientId = import.meta.env.VITE_DISCORD_APP_ID || '';
+    const origin = window.location.origin;
+    this.redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI || `${origin}/discord-callback`;
+
+    if (!this.clientId) {
+      console.warn('Discord: VITE_DISCORD_APP_ID not configured');
+    }
+  }
+
+  getAuthUrl(state?: string): string {
+    if (!this.clientId) {
+      throw new Error('Discord client ID not configured');
+    }
+
+    const csrfState = state || `discord_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.clientId,
+      scope: 'identify guilds guilds.members.read',
+      redirect_uri: this.redirectUri,
+      state: csrfState,
+      prompt: 'consent'
+    });
+
+    return `https://discord.com/oauth2/authorize?${params.toString()}`;
+  }
+
+  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+    return new Promise((resolve) => {
+      try {
+        const state = `discord_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('discord_oauth_state', state);
+
+        const authUrl = this.getAuthUrl(state);
+
+        const popup = window.open(
+          authUrl,
+          'discord-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener('message', onMsg); } catch {}
+          try { popup?.close(); } catch {}
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'discord-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+
+        window.addEventListener('message', onMsg);
+
+        const pollTimer = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ success: false, error: 'Authorization cancelled' });
+              }
+            }
+          } catch (error) {
+            // Cross-origin error means popup is still open
+          }
+        }, 1000);
+
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[Discord] Login error:', error);
+        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate Discord login' });
+      }
+    });
+  }
+
+  async exchangeCodeForToken(code: string): Promise<string> {
+    const response = await fetch('/api/social/discord/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+    });
+
+    const data = await response.json();
+    return data.access_token;
+  }
+
+  async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
+    const response = await fetch('https://discord.com/api/users/@me', {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+
+    const data = await response.json();
+
+    return {
+      platform: 'discord',
+      username: data.username,
+      displayName: data.global_name || data.username,
+      profileUrl: `https://discord.com/users/${data.id}`,
+      followers: 0, // Discord doesn't have a follower count
+      verified: data.verified || false,
+      profileImage: data.avatar ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png` : '',
+      accessToken,
+      connectedAt: new Date()
+    };
+  }
+}
+
+// Twitch API
+export class TwitchAPI {
+  private clientId: string;
+  private redirectUri: string;
+
+  constructor() {
+    this.clientId = import.meta.env.VITE_TWITCH_CLIENT_ID || '';
+    const origin = window.location.origin;
+    this.redirectUri = import.meta.env.VITE_TWITCH_REDIRECT_URI || `${origin}/twitch-callback`;
+
+    if (!this.clientId) {
+      console.warn('Twitch: VITE_TWITCH_CLIENT_ID not configured');
+    }
+  }
+
+  getAuthUrl(state?: string): string {
+    if (!this.clientId) {
+      throw new Error('Twitch client ID not configured');
+    }
+
+    const csrfState = state || `twitch_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.clientId,
+      scope: 'user:read:email channel:read:subscriptions',
+      redirect_uri: this.redirectUri,
+      state: csrfState,
+      force_verify: 'true'
+    });
+
+    return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;
+  }
+
+  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+    return new Promise((resolve) => {
+      try {
+        const state = `twitch_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('twitch_oauth_state', state);
+
+        const authUrl = this.getAuthUrl(state);
+
+        const popup = window.open(
+          authUrl,
+          'twitch-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener('message', onMsg); } catch {}
+          try { popup?.close(); } catch {}
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'twitch-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+
+        window.addEventListener('message', onMsg);
+
+        const pollTimer = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ success: false, error: 'Authorization cancelled' });
+              }
+            }
+          } catch (error) {
+            // Cross-origin error means popup is still open
+          }
+        }, 1000);
+
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[Twitch] Login error:', error);
+        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate Twitch login' });
+      }
+    });
+  }
+
+  async exchangeCodeForToken(code: string): Promise<string> {
+    const response = await fetch('/api/social/twitch/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+    });
+
+    const data = await response.json();
+    return data.access_token;
+  }
+
+  async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
+    const response = await fetch('https://api.twitch.tv/helix/users', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Client-Id': this.clientId
+      }
+    });
+
+    const data = await response.json();
+    const user = data.data && data.data.length > 0 ? data.data[0] : null;
+
+    if (!user) {
+      throw new Error('Failed to fetch Twitch user data');
+    }
+
+    return {
+      platform: 'twitch',
+      username: user.login,
+      displayName: user.display_name,
+      profileUrl: `https://twitch.tv/${user.login}`,
+      followers: 0, // Would need additional API call to get follower count
+      verified: user.broadcaster_type === 'partner',
+      profileImage: user.profile_image_url || '',
+      accessToken,
+      connectedAt: new Date()
+    };
+  }
+}
+
 // Social Integration Manager
 export class SocialIntegrationManager {
   private facebook: FacebookAPI;
@@ -611,6 +883,8 @@ export class SocialIntegrationManager {
   private twitter: TwitterAPI;
   private youtube: YouTubeAPI;
   private spotify: SpotifyAPI;
+  private discord: DiscordAPI;
+  private twitch: TwitchAPI;
 
   constructor() {
     this.facebook = new FacebookAPI();
@@ -619,6 +893,8 @@ export class SocialIntegrationManager {
     this.twitter = new TwitterAPI();
     this.youtube = new YouTubeAPI();
     this.spotify = new SpotifyAPI();
+    this.discord = new DiscordAPI();
+    this.twitch = new TwitchAPI();
   }
 
   getAuthUrl(platform: string): string {
@@ -629,6 +905,8 @@ export class SocialIntegrationManager {
       case 'twitter': return this.twitter.getAuthUrl();
       case 'youtube': return this.youtube.getAuthUrl();
       case 'spotify': return this.spotify.getAuthUrl();
+      case 'discord': return this.discord.getAuthUrl();
+      case 'twitch': return this.twitch.getAuthUrl();
       default: throw new Error(`Unsupported platform: ${platform}`);
     }
   }
@@ -658,6 +936,14 @@ export class SocialIntegrationManager {
         if (!code) throw new Error('Code required for Spotify');
         accessToken = await this.spotify.exchangeCodeForToken(code);
         return this.spotify.getUserProfile(accessToken);
+      case 'discord':
+        if (!code) throw new Error('Code required for Discord');
+        accessToken = await this.discord.exchangeCodeForToken(code);
+        return this.discord.getUserProfile(accessToken);
+      case 'twitch':
+        if (!code) throw new Error('Code required for Twitch');
+        accessToken = await this.twitch.exchangeCodeForToken(code);
+        return this.twitch.getUserProfile(accessToken);
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -704,6 +990,8 @@ export class SocialIntegrationManager {
       case 'twitter': return this.twitter.getUserProfile(account.accessToken);
       case 'youtube': return this.youtube.getUserProfile(account.accessToken);
       case 'spotify': return this.spotify.getUserProfile(account.accessToken);
+      case 'discord': return this.discord.getUserProfile(account.accessToken);
+      case 'twitch': return this.twitch.getUserProfile(account.accessToken);
       default: return account;
     }
   }

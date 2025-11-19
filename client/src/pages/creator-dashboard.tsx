@@ -22,19 +22,21 @@ import { calculateCreatorVerification } from "@shared/creatorVerificationSchema"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  Eye, 
-  Heart, 
+import {
+  Users,
+  DollarSign,
+  TrendingUp,
+  Eye,
+  Heart,
   MessageSquare,
   Target,
   Plus,
   BarChart3,
   Facebook,
   Instagram,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  Gift
 } from "lucide-react";
 
 export default function CreatorDashboard() {
@@ -321,22 +323,25 @@ export default function CreatorDashboard() {
                   gradient
                 />
                 <DashboardCard
-                  title="Monthly Revenue"
-                  value={`$${creatorStats?.monthlyRevenue?.toLocaleString() || "0"}`}
+                  title="Total Revenue"
+                  value={`$${creatorStats?.totalRevenue?.toLocaleString() || "0"}`}
                   change={creatorStats?.revenueChange}
                   icon={<DollarSign className="h-5 w-5" />}
+                  description="all-time"
                 />
                 <DashboardCard
-                  title="Engagement Rate"
-                  value={`${creatorStats?.engagementRate || "0"}%`}
-                  change={creatorStats?.engagementChange}
-                  icon={<Heart className="h-5 w-5" />}
+                  title="Tasks Completed"
+                  value={creatorStats?.tasksCompleted?.toLocaleString() || "0"}
+                  change={creatorStats?.tasksChange}
+                  icon={<CheckCircle2 className="h-5 w-5" />}
+                  description="all-time"
                 />
                 <DashboardCard
-                  title="Active Campaigns"
-                  value={creatorStats?.activeCampaigns?.toString() || "0"}
-                  description={creatorStats?.activeCampaigns && creatorStats.activeCampaigns > 0 ? "campaigns running" : "no active campaigns"}
-                  icon={<Target className="h-5 w-5" />}
+                  title="Rewards Redeemed"
+                  value={creatorStats?.rewardsRedeemed?.toLocaleString() || "0"}
+                  change={creatorStats?.rewardsChange}
+                  icon={<Gift className="h-5 w-5" />}
+                  description="all-time"
                 />
               </>
             )}

@@ -34,7 +34,7 @@ import {
   HelpCircle,
   ExternalLink,
 } from "lucide-react";
-import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube } from "react-icons/si";
+import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube, SiDiscord, SiTwitch } from "react-icons/si";
 
 export type TaskTemplateType =
   | 'complete_profile'
@@ -63,6 +63,11 @@ export type TaskTemplateType =
   | 'tiktok_post'
   | 'spotify_follow'
   | 'spotify_playlist'
+  | 'discord_join'
+  | 'discord_verify'
+  | 'twitch_follow'
+  | 'twitch_subscribe'
+  | 'stream_code_verify'
   | 'social_follow'
   | 'social_like'
   | 'social_share'
@@ -687,6 +692,117 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Promote playlists',
       'Music discovery',
       'Curated collections',
+    ],
+  },
+
+  // Discord Templates
+  {
+    id: 'discord_join',
+    name: 'Join Discord Server',
+    description: 'Reward fans for joining your Discord community server',
+    icon: SiDiscord,
+    category: 'community',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 93,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Build Discord community',
+      'Instant API verification',
+      'Centralized fan hub',
+    ],
+    useCases: [
+      'Community building',
+      'Fan engagement',
+      'Gaming communities',
+    ],
+  },
+  {
+    id: 'discord_verify',
+    name: 'Get Discord Member Role',
+    description: 'Reward fans for obtaining a specific member role in your Discord server',
+    icon: SiDiscord,
+    category: 'community',
+    difficulty: 'medium',
+    status: 'ready',
+    popularityScore: 88,
+    estimatedSetupTime: '4 minutes',
+    benefits: [
+      'Verify active members',
+      'Role-based rewards',
+      'Community tiers',
+    ],
+    useCases: [
+      'Verify engagement',
+      'Tiered memberships',
+      'Active community rewards',
+    ],
+  },
+
+  // Twitch Templates
+  {
+    id: 'twitch_follow',
+    name: 'Follow on Twitch',
+    description: 'Reward fans for following your Twitch channel',
+    icon: SiTwitch,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 91,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Grow Twitch following',
+      'Instant API verification',
+      'Build streaming audience',
+    ],
+    useCases: [
+      'Stream promotion',
+      'Channel growth',
+      'Viewer acquisition',
+    ],
+  },
+  {
+    id: 'twitch_subscribe',
+    name: 'Subscribe on Twitch',
+    description: 'Reward fans for subscribing to your Twitch channel (paid subscription)',
+    icon: SiTwitch,
+    category: 'social',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 89,
+    estimatedSetupTime: '3 minutes',
+    benefits: [
+      'Reward paid subscribers',
+      'Monetization incentive',
+      'Loyal fan recognition',
+    ],
+    useCases: [
+      'Subscriber rewards',
+      'Monetization boost',
+      'Premium fan perks',
+    ],
+  },
+
+  // Stream Code Verifier
+  {
+    id: 'stream_code_verify',
+    name: 'Join Stream or Spaces',
+    description: 'Reward fans who attend your live streams/spaces by entering a secret code you mention',
+    icon: Video,
+    category: 'community',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 95,
+    estimatedSetupTime: '2 minutes',
+    benefits: [
+      'Works on any platform',
+      'Reward live attendance',
+      'No API required',
+    ],
+    useCases: [
+      'Live stream rewards',
+      'Twitter/X Spaces',
+      'Virtual event attendance',
     ],
   },
 

@@ -11,6 +11,9 @@ import InstagramTaskBuilder from "@/components/tasks/InstagramTaskBuilder";
 import YouTubeTaskBuilder from "@/components/tasks/YouTubeTaskBuilder";
 import TikTokTaskBuilder from "@/components/tasks/TikTokTaskBuilder";
 import SpotifyTaskBuilder from "@/components/tasks/SpotifyTaskBuilder";
+import DiscordTaskBuilder from "@/components/tasks/DiscordTaskBuilder";
+import TwitchTaskBuilder from "@/components/tasks/TwitchTaskBuilder";
+import StreamCodeTaskBuilder from "@/components/tasks/StreamCodeTaskBuilder";
 import { CompleteProfileTaskBuilder } from "@/components/templates/CompleteProfileTaskBuilder";
 import PollQuizTaskBuilder from "@/components/tasks/PollQuizTaskBuilder";
 import WebsiteVisitTaskBuilder from "@/components/tasks/WebsiteVisitTaskBuilder";
@@ -470,6 +473,49 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+          />
+        </ProgramCampaignSelector>
+      );
+
+    case 'discord_join':
+    case 'discord_verify':
+      return (
+        <ProgramCampaignSelector>
+          <DiscordTaskBuilder
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onBack={handleBack}
+            initialData={existingTask}
+            isEditMode={isEditMode}
+            taskType={selectedTemplate}
+          />
+        </ProgramCampaignSelector>
+      );
+
+    case 'twitch_follow':
+    case 'twitch_subscribe':
+      return (
+        <ProgramCampaignSelector>
+          <TwitchTaskBuilder
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onBack={handleBack}
+            initialData={existingTask}
+            isEditMode={isEditMode}
+            taskType={selectedTemplate}
+          />
+        </ProgramCampaignSelector>
+      );
+
+    case 'stream_code_verify':
+      return (
+        <ProgramCampaignSelector>
+          <StreamCodeTaskBuilder
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onBack={handleBack}
+            initialData={existingTask}
+            isEditMode={isEditMode}
           />
         </ProgramCampaignSelector>
       );

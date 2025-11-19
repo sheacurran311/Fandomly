@@ -751,27 +751,55 @@ export default function CreatorSocial() {
     }
   ];
 
+  // Social activity filter state
+  const [activityFilters, setActivityFilters] = useState({
+    instagram: true,
+    twitter: true,
+    tiktok: true,
+    facebook: true,
+    youtube: true,
+    spotify: true
+  });
+
+  const toggleFilter = (platform: keyof typeof activityFilters) => {
+    setActivityFilters(prev => ({
+      ...prev,
+      [platform]: !prev[platform]
+    }));
+  };
+
   const automationRules = [
     {
       id: "1",
-      name: "New Instagram Post",
-      description: "Award 50 points when fans like and comment on new posts",
+      name: "Instagram Engagement Task",
+      description: "Auto-create task: Like & Comment on new posts (50 pts per completion)",
       active: true,
-      triggered: 247
+      triggered: 247,
+      taskType: "Instagram Follow"
     },
     {
       id: "2",
-      name: "Twitter Engagement",
-      description: "Award 25 points for retweets and replies",
+      name: "Twitter Retweet Campaign",
+      description: "Auto-create task: Retweet announcements (25 pts per completion)",
       active: true,
-      triggered: 189
+      triggered: 189,
+      taskType: "Twitter Follow"
     },
     {
       id: "3",
-      name: "TikTok Shares",
-      description: "Award 75 points when fans share videos",
+      name: "TikTok Share Challenge",
+      description: "Auto-create task: Share video content (75 pts per completion)",
       active: false,
-      triggered: 0
+      triggered: 0,
+      taskType: "TikTok Follow"
+    },
+    {
+      id: "4",
+      name: "YouTube Subscriber Reward",
+      description: "Auto-create task: Subscribe to channel (100 pts per completion)",
+      active: true,
+      triggered: 142,
+      taskType: "YouTube Subscribe"
     }
   ];
 
@@ -1099,16 +1127,29 @@ export default function CreatorSocial() {
                   {automationRules.map((rule) => (
                     <div key={rule.id} className="p-4 rounded-lg bg-white/5 border border-white/10">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-white font-medium">{rule.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-white font-medium">{rule.name}</h4>
+                          <Badge className="bg-brand-primary/20 text-brand-primary text-xs">
+                            {rule.taskType}
+                          </Badge>
+                        </div>
                         <Switch checked={rule.active} />
                       </div>
                       <p className="text-sm text-gray-400 mb-3">{rule.description}</p>
-                      <div className="flex items-center space-x-4">
-                        <Zap className="h-4 w-4 text-brand-secondary" />
-                        <span className="text-sm text-white">{rule.triggered} triggered</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <Zap className="h-4 w-4 text-brand-secondary" />
+                          <span className="text-sm text-white">{rule.triggered} tasks created</span>
+                        </div>
+                        <span className="text-xs text-gray-500">Automated</span>
                       </div>
                     </div>
                   ))}
+                </div>
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <p className="text-xs text-gray-400">
+                    Automation rules automatically create tasks for your fans based on social activity. Toggle off to pause rule.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -1116,28 +1157,124 @@ export default function CreatorSocial() {
             {/* Recent Social Activity */}
             <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
               <CardHeader>
-                <CardTitle className="text-white">Recent Social Activity</CardTitle>
+                <CardTitle className="text-white flex items-center justify-between">
+                  <span>Recent Social Activity</span>
+                  <Badge className="bg-brand-secondary/20 text-brand-secondary">
+                    Live
+                  </Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Platform Filter Toggles */}
+                <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-white/10">
+                  <button
+                    onClick={() => toggleFilter('instagram')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilters.instagram
+                        ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
+                        : 'bg-white/5 text-gray-400 border border-white/10'
+                    }`}
+                  >
+                    <Instagram className="h-3 w-3 inline mr-1" />
+                    Instagram
+                  </button>
+                  <button
+                    onClick={() => toggleFilter('twitter')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilters.twitter
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        : 'bg-white/5 text-gray-400 border border-white/10'
+                    }`}
+                  >
+                    <Twitter className="h-3 w-3 inline mr-1" />
+                    Twitter
+                  </button>
+                  <button
+                    onClick={() => toggleFilter('tiktok')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilters.tiktok
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        : 'bg-white/5 text-gray-400 border border-white/10'
+                    }`}
+                  >
+                    <Video className="h-3 w-3 inline mr-1" />
+                    TikTok
+                  </button>
+                  <button
+                    onClick={() => toggleFilter('facebook')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilters.facebook
+                        ? 'bg-blue-600/20 text-blue-500 border border-blue-600/30'
+                        : 'bg-white/5 text-gray-400 border border-white/10'
+                    }`}
+                  >
+                    <Facebook className="h-3 w-3 inline mr-1" />
+                    Facebook
+                  </button>
+                  <button
+                    onClick={() => toggleFilter('youtube')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilters.youtube
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        : 'bg-white/5 text-gray-400 border border-white/10'
+                    }`}
+                  >
+                    <Youtube className="h-3 w-3 inline mr-1" />
+                    YouTube
+                  </button>
+                  <button
+                    onClick={() => toggleFilter('spotify')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilters.spotify
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-white/5 text-gray-400 border border-white/10'
+                    }`}
+                  >
+                    <Music className="h-3 w-3 inline mr-1" />
+                    Spotify
+                  </button>
+                </div>
+
+                {/* Activity Feed */}
                 <div className="space-y-4">
+                  {[
+                    { platform: "Instagram" as keyof typeof activityFilters, action: "New post received 247 likes", time: "2 hours ago", points: "12,350 points awarded" },
+                    { platform: "TikTok" as keyof typeof activityFilters, action: "Video shared 89 times", time: "4 hours ago", points: "6,675 points awarded" },
+                    { platform: "Twitter" as keyof typeof activityFilters, action: "Tweet retweeted 156 times", time: "6 hours ago", points: "3,900 points awarded" },
+                    { platform: "Instagram" as keyof typeof activityFilters, action: "Story viewed 1,234 times", time: "1 day ago", points: "8,600 points awarded" },
+                    { platform: "YouTube" as keyof typeof activityFilters, action: "Video received 523 comments", time: "1 day ago", points: "5,230 points awarded" },
+                    { platform: "Facebook" as keyof typeof activityFilters, action: "Page post shared 78 times", time: "2 days ago", points: "3,120 points awarded" },
+                  ]
+                    .filter(activity => activityFilters[activity.platform.toLowerCase() as keyof typeof activityFilters])
+                    .map((activity, index) => (
+                      <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
+                        <div className="w-2 h-2 bg-brand-secondary rounded-full mt-2 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="text-sm font-medium text-white">{activity.platform}</span>
+                            <span className="text-xs text-gray-500">{activity.time}</span>
+                          </div>
+                          <p className="text-sm text-gray-300">{activity.action}</p>
+                          <p className="text-xs text-brand-secondary">{activity.points}</p>
+                        </div>
+                      </div>
+                    ))}
+
                   {[
                     { platform: "Instagram", action: "New post received 247 likes", time: "2 hours ago", points: "12,350 points awarded" },
                     { platform: "TikTok", action: "Video shared 89 times", time: "4 hours ago", points: "6,675 points awarded" },
                     { platform: "Twitter", action: "Tweet retweeted 156 times", time: "6 hours ago", points: "3,900 points awarded" },
                     { platform: "Instagram", action: "Story viewed 1,234 times", time: "1 day ago", points: "8,600 points awarded" },
-                  ].map((activity, index) => (
-                    <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
-                      <div className="w-2 h-2 bg-brand-secondary rounded-full mt-2 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="text-sm font-medium text-white">{activity.platform}</span>
-                          <span className="text-xs text-gray-500">{activity.time}</span>
-                        </div>
-                        <p className="text-sm text-gray-300">{activity.action}</p>
-                        <p className="text-xs text-brand-secondary">{activity.points}</p>
+                    { platform: "YouTube", action: "Video received 523 comments", time: "1 day ago", points: "5,230 points awarded" },
+                    { platform: "Facebook", action: "Page post shared 78 times", time: "2 days ago", points: "3,120 points awarded" },
+                  ]
+                    .filter(activity => activityFilters[activity.platform.toLowerCase() as keyof typeof activityFilters])
+                    .length === 0 && (
+                      <div className="text-center py-8 text-gray-400">
+                        <p>No activity for selected platforms</p>
+                        <p className="text-xs mt-1">Select platforms above to view activity</p>
                       </div>
-                    </div>
-                  ))}
+                    )}
                 </div>
               </CardContent>
             </Card>

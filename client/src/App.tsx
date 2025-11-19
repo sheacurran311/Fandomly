@@ -68,6 +68,8 @@ import TikTokCallback from "@/pages/tiktok-callback";
 import XCallback from "@/pages/x-callback";
 import YouTubeCallback from "@/pages/youtube-callback";
 import SpotifyCallback from "@/pages/spotify-callback";
+import DiscordCallback from "@/pages/discord-callback";
+import TwitchCallback from "@/pages/twitch-callback";
 import CreatorPublic from "@/pages/creator-public";
 import TaskBuilder from "@/pages/creator-dashboard/task-builder";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -146,6 +148,8 @@ function Router() {
       <Route path="/x-callback" component={XCallback} />
       <Route path="/youtube-callback" component={YouTubeCallback} />
       <Route path="/spotify-callback" component={SpotifyCallback} />
+      <Route path="/discord-callback" component={DiscordCallback} />
+      <Route path="/twitch-callback" component={TwitchCallback} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />

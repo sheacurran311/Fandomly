@@ -137,13 +137,13 @@ export default function FanDashboard() {
                   icon={<CreditCard className="h-5 w-5" />}
                 />
                 <DashboardCard
-                  title="Following"
+                  title="Enrolled"
                   value={fanStats?.followingCount?.toString() || "0"}
                   description="Active creators"
                   icon={<Heart className="h-5 w-5" />}
                 />
                 <DashboardCard
-                  title="Active Campaigns"
+                  title="Programs Enrolled"
                   value={fanStats?.activeCampaignsCount?.toString() || "0"}
                   description="Join and earn"
                   icon={<Trophy className="h-5 w-5" />}
@@ -226,14 +226,14 @@ export default function FanDashboard() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                       <div>
-                        <p className="text-sm text-gray-400">Active Campaigns</p>
+                        <p className="text-sm text-gray-400">Programs Enrolled</p>
                         <p className="text-2xl font-bold text-white">{fanStats?.activeCampaignsCount || 0}</p>
                       </div>
                       <TrendingUp className="h-8 w-8 text-green-400" />
                     </div>
                     <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
                       <div>
-                        <p className="text-sm text-gray-400">Following</p>
+                        <p className="text-sm text-gray-400">Enrolled</p>
                         <p className="text-2xl font-bold text-white">{fanStats?.followingCount || 0}</p>
                       </div>
                       <Users className="h-8 w-8 text-blue-400" />
@@ -253,15 +253,15 @@ export default function FanDashboard() {
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Active Campaigns */}
+            {/* Programs Enrolled */}
             <div className="lg:col-span-2">
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center justify-between">
-                    <span>Active Campaigns</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <span>Programs Enrolled</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
                       onClick={() => window.location.href = '/fan-dashboard/campaigns'}
                     >
@@ -427,7 +427,7 @@ export default function FanDashboard() {
               {/* Points Breakdown */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white text-sm">Points by Creator</CardTitle>
+                  <CardTitle className="text-white text-sm">Points by Program</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">

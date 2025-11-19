@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   TrendingDown,
   Target,
   Users,
@@ -16,7 +16,13 @@ import {
   LineChart,
   ArrowUpRight,
   ArrowDownRight,
-  Loader2
+  Loader2,
+  Facebook,
+  Instagram,
+  Share2,
+  MessageCircle,
+  ThumbsUp,
+  Eye
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 
@@ -343,6 +349,127 @@ export default function CreatorGrowth() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Social Network Analytics */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+              <Share2 className="mr-2 h-5 w-5 text-brand-primary" />
+              Social Network Analytics
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Facebook Analytics */}
+              <Card className="bg-gradient-to-br from-blue-600/10 to-blue-800/5 backdrop-blur-lg border-blue-500/20">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Facebook className="mr-2 h-5 w-5 text-blue-400" />
+                      Facebook
+                    </div>
+                    <Badge className="bg-blue-500/20 text-blue-400">Connected</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <ThumbsUp className="h-4 w-4 text-blue-400" />
+                        <span className="text-xs text-green-400">+12%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">2.4K</p>
+                      <p className="text-xs text-gray-400">Total Likes</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <MessageCircle className="h-4 w-4 text-blue-400" />
+                        <span className="text-xs text-green-400">+8%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">342</p>
+                      <p className="text-xs text-gray-400">Comments</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <Share2 className="h-4 w-4 text-blue-400" />
+                        <span className="text-xs text-green-400">+15%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">187</p>
+                      <p className="text-xs text-gray-400">Shares</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <Eye className="h-4 w-4 text-blue-400" />
+                        <span className="text-xs text-green-400">+18%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">12.5K</p>
+                      <p className="text-xs text-gray-400">Reach</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Engagement Rate</span>
+                      <span className="text-lg font-bold text-blue-400">4.8%</span>
+                    </div>
+                    <Progress value={48} className="h-2 mt-2" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Instagram Analytics */}
+              <Card className="bg-gradient-to-br from-pink-600/10 to-purple-800/5 backdrop-blur-lg border-pink-500/20">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Instagram className="mr-2 h-5 w-5 text-pink-400" />
+                      Instagram
+                    </div>
+                    <Badge className="bg-pink-500/20 text-pink-400">Connected</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <ThumbsUp className="h-4 w-4 text-pink-400" />
+                        <span className="text-xs text-green-400">+22%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">3.8K</p>
+                      <p className="text-xs text-gray-400">Total Likes</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <MessageCircle className="h-4 w-4 text-pink-400" />
+                        <span className="text-xs text-green-400">+14%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">521</p>
+                      <p className="text-xs text-gray-400">Comments</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <Share2 className="h-4 w-4 text-pink-400" />
+                        <span className="text-xs text-green-400">+19%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">284</p>
+                      <p className="text-xs text-gray-400">Shares</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <Eye className="h-4 w-4 text-pink-400" />
+                        <span className="text-xs text-green-400">+25%</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">18.2K</p>
+                      <p className="text-xs text-gray-400">Reach</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Engagement Rate</span>
+                      <span className="text-lg font-bold text-pink-400">6.2%</span>
+                    </div>
+                    <Progress value={62} className="h-2 mt-2" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Growth Insights */}

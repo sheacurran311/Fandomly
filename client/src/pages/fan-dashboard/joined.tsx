@@ -214,7 +214,7 @@ export default function FanJoined() {
             </div>
           </div>
 
-          {/* Following List */}
+          {/* Enrolled Programs List */}
           {followingCreators.length === 0 ? (
             <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
               <CardContent className="py-12 text-center">

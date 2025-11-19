@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Instagram, Music, Twitter, Youtube, Zap, 
+import {
+  Instagram, Music, Twitter, Youtube, Zap,
   Check, AlertCircle, ExternalLink, Loader2,
-  Users, Heart, MessageCircle, Share2
+  Users, Heart, MessageCircle, Share2, Video
 } from "lucide-react";
-import { FaTiktok, FaSpotify } from "react-icons/fa";
+import { FaTiktok, FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
 import { socialManager, type SocialMediaAccount } from "@/lib/social-integrations";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +65,22 @@ const platforms: SocialPlatform[] = [
     color: '#1DB954',
     description: 'Connect Spotify for music streaming and playlist analytics',
     benefits: ['Listener statistics', 'Playlist performance', 'Monthly listeners'],
+  },
+  {
+    id: 'discord',
+    name: 'Discord',
+    icon: FaDiscord,
+    color: '#5865F2',
+    description: 'Connect Discord for community engagement and server analytics',
+    benefits: ['Server member tracking', 'Role management', 'Community insights'],
+  },
+  {
+    id: 'twitch',
+    name: 'Twitch',
+    icon: FaTwitch,
+    color: '#9146FF',
+    description: 'Link Twitch for streaming analytics and subscriber data',
+    benefits: ['Subscriber tracking', 'Stream analytics', 'Follower insights'],
   }
 ];
 
@@ -327,6 +343,68 @@ export default function SocialMediaConnect({
           onAccountsChange?.(mapped);
         } else {
           throw new Error(result.error || 'Spotify connect failed');
+        }
+      } else if (platformId === 'discord') {
+        // Use OAuth flow for Discord
+        const discordAPI = socialManager['discord'];
+        if (discordAPI) {
+          const result = await discordAPI.secureLogin();
+          if (result.success) {
+            toast({
+              title: "Discord Connected! 🎉",
+              description: result.displayName ? `Successfully connected ${result.displayName}` : "Successfully connected to Discord.",
+            });
+            // Reload accounts to get the new connection
+            const res = await fetch('/api/social/accounts', { credentials: 'include' });
+            const accounts = await res.json();
+            const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+              platform: a.platform,
+              username: a.username,
+              displayName: a.displayName,
+              followers: Number(a.followers || 0),
+              verified: Boolean(a.verified || false),
+              profileUrl: a.profileUrl || '#',
+              lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+              status: a.isActive === false ? 'expired' : 'connected'
+            }));
+            setConnectedAccounts(mapped);
+            onAccountsChange?.(mapped);
+          } else {
+            throw new Error(result.error || 'Discord connect failed');
+          }
+        } else {
+          throw new Error('Discord integration not configured');
+        }
+      } else if (platformId === 'twitch') {
+        // Use OAuth flow for Twitch
+        const twitchAPI = socialManager['twitch'];
+        if (twitchAPI) {
+          const result = await twitchAPI.secureLogin();
+          if (result.success) {
+            toast({
+              title: "Twitch Connected! 🎉",
+              description: result.displayName ? `Successfully connected ${result.displayName}` : "Successfully connected to Twitch.",
+            });
+            // Reload accounts to get the new connection
+            const res = await fetch('/api/social/accounts', { credentials: 'include' });
+            const accounts = await res.json();
+            const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+              platform: a.platform,
+              username: a.username,
+              displayName: a.displayName,
+              followers: Number(a.followers || 0),
+              verified: Boolean(a.verified || false),
+              profileUrl: a.profileUrl || '#',
+              lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+              status: a.isActive === false ? 'expired' : 'connected'
+            }));
+            setConnectedAccounts(mapped);
+            onAccountsChange?.(mapped);
+          } else {
+            throw new Error(result.error || 'Twitch connect failed');
+          }
+        } else {
+          throw new Error('Twitch integration not configured');
         }
       } else {
         // Fallback for other platforms (Instagram, etc.)
