@@ -4,6 +4,8 @@ import TwitterTaskCompletionModal from "./twitter/TwitterTaskCompletionModal";
 import InstagramTaskCompletionModal from "./instagram/InstagramTaskCompletionModal";
 import YouTubeTaskCompletionModal from "./youtube/YouTubeTaskCompletionModal";
 import TikTokTaskCompletionModal from "./tiktok/TikTokTaskCompletionModal";
+import PollQuizCompletionModal from "./interactive/PollQuizCompletionModal";
+import WebsiteVisitCompletionModal from "./interactive/WebsiteVisitCompletionModal";
 import GenericTaskCompletionModal from "./GenericTaskCompletionModal";
 
 interface TaskCompletionModalRouterProps {
@@ -29,6 +31,32 @@ export default function TaskCompletionModalRouter({
   // Route to platform-specific modal
   const renderModal = () => {
     const platform = task.platform?.toLowerCase();
+    const taskType = task.taskType?.toLowerCase();
+
+    // Sprint 4: Interactive task routing
+    if (platform === 'interactive') {
+      if (taskType === 'poll' || taskType === 'quiz') {
+        return (
+          <PollQuizCompletionModal
+            task={task}
+            onClose={onClose}
+            onSuccess={onSuccess}
+            completionId={completionId}
+          />
+        );
+      }
+
+      if (taskType === 'website_visit') {
+        return (
+          <WebsiteVisitCompletionModal
+            task={task}
+            onClose={onClose}
+            onSuccess={onSuccess}
+            completionId={completionId}
+          />
+        );
+      }
+    }
 
     switch (platform) {
       case 'twitter':

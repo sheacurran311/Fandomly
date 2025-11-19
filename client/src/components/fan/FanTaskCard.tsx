@@ -22,6 +22,8 @@ import {
   Youtube,
   Music,
   Video,
+  HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import { type Task } from "@shared/schema";
 import TaskCompletionModalRouter from "@/components/modals/TaskCompletionModalRouter";
@@ -63,6 +65,9 @@ export default function FanTaskCard({
   const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok', 'x'].includes(
     task.platform?.toLowerCase() || ''
   );
+
+  // Check if task is an interactive task (Sprint 4)
+  const isInteractiveTask = task.platform?.toLowerCase() === 'interactive';
 
   // Get platform icon
   const getPlatformIcon = (platform?: string) => {
@@ -116,7 +121,7 @@ export default function FanTaskCard({
 
   // Handle start button click
   const handleStartClick = () => {
-    if (isSocialTask) {
+    if (isSocialTask || isInteractiveTask) {
       setIsModalOpen(true);
     } else if (onStart) {
       onStart();
@@ -142,6 +147,12 @@ export default function FanTaskCard({
         return TrendingUp;
       case 'complete_profile':
         return CheckCircle;
+      // Sprint 4: Interactive task icons
+      case 'poll':
+      case 'quiz':
+        return HelpCircle;
+      case 'website_visit':
+        return ExternalLink;
       default:
         return Target;
     }
@@ -158,6 +169,12 @@ export default function FanTaskCard({
         return 'text-green-400 bg-green-500/20 border-green-500/30';
       case 'complete_profile':
         return 'text-purple-400 bg-purple-500/20 border-purple-500/30';
+      // Sprint 4: Interactive task colors
+      case 'poll':
+      case 'quiz':
+        return 'text-purple-400 bg-purple-500/20 border-purple-500/30';
+      case 'website_visit':
+        return 'text-blue-400 bg-blue-500/20 border-blue-500/30';
       default:
         return 'text-gray-400 bg-gray-500/20 border-gray-500/30';
     }
@@ -397,7 +414,7 @@ export default function FanTaskCard({
       </CardContent>
 
       {/* Task Completion Modal */}
-      {isSocialTask && (
+      {(isSocialTask || isInteractiveTask) && (
         <TaskCompletionModalRouter
           task={task}
           isOpen={isModalOpen}
