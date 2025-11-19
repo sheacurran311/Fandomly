@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,10 +13,28 @@ import {
   ArrowRight,
   Eye,
   Heart,
+  Trophy,
+  Gift,
+  CheckCircle,
+  Calendar
 } from "lucide-react";
 
 export default function AnalyticsOverview() {
-  // Mock data - replace with actual API calls
+  const { user } = useAuth();
+
+  // Fetch weekly metrics from database
+  const { data: weeklyMetrics, isLoading: weeklyLoading } = useQuery({
+    queryKey: ['/api/creator/weekly-metrics', user?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/creator/weekly-metrics/${user?.id}`);
+      if (!response.ok) throw new Error('Failed to fetch weekly metrics');
+      return response.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Mock data for other sections - replace with actual API calls
   const metrics = {
     totalFans: 2847,
     totalRevenue: 7420,
@@ -43,6 +63,75 @@ export default function AnalyticsOverview() {
           <p className="text-gray-400">
             Track your performance, growth, and revenue metrics
           </p>
+        </div>
+
+        {/* Weekly Metrics Cards */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="h-5 w-5 text-brand-primary" />
+            <h2 className="text-xl font-bold text-white">This Week</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 backdrop-blur-lg border-blue-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-200">New Fans</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {weeklyLoading ? '...' : (weeklyMetrics?.newFans || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-blue-300 mt-1">Joined this week</p>
+                  </div>
+                  <Users className="h-10 w-10 text-blue-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-500/20 to-green-600/10 backdrop-blur-lg border-green-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-200">Revenue</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {weeklyLoading ? '...' : (weeklyMetrics?.revenue || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-300 mt-1">Points redeemed</p>
+                  </div>
+                  <DollarSign className="h-10 w-10 text-green-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 backdrop-blur-lg border-purple-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-200">Tasks Completed</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {weeklyLoading ? '...' : (weeklyMetrics?.tasksCompleted || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-purple-300 mt-1">Fan engagement</p>
+                  </div>
+                  <CheckCircle className="h-10 w-10 text-purple-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 backdrop-blur-lg border-yellow-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-yellow-200">Rewards Redeemed</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {weeklyLoading ? '...' : (weeklyMetrics?.rewardsRedeemed || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-yellow-300 mt-1">This week</p>
+                  </div>
+                  <Gift className="h-10 w-10 text-yellow-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Key Metrics Grid */}

@@ -2878,6 +2878,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Creator Weekly Metrics
+  app.get("/api/creator/weekly-metrics/:creatorId", async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+
+      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks } = await import("@shared/schema");
+      const { eq, and, gte, sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      // Get creator's programs
+      const programs = await db.select()
+        .from(loyaltyPrograms)
+        .where(eq(loyaltyPrograms.creatorId, creatorId));
+
+      if (programs.length === 0) {
+        return res.json({
+          newFans: 0,
+          revenue: 0,
+          tasksCompleted: 0,
+          rewardsRedeemed: 0
+        });
+      }
+
+      const programIds = programs.map(p => p.id);
+
+      // Calculate start of current week (Sunday)
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      // 1. Count new fans this week
+      let newFans = 0;
+      for (const programId of programIds) {
+        const fans = await db.select({ count: sql<number>`count(*)` })
+          .from(fanPrograms)
+          .where(and(
+            eq(fanPrograms.programId, programId),
+            gte(fanPrograms.joinedAt, startOfWeek)
+          ));
+        newFans += Number(fans[0]?.count || 0);
+      }
+
+      // 2. Calculate revenue this week (from reward redemptions)
+      let revenue = 0;
+      for (const programId of programIds) {
+        const redemptions = await db.select({ total: sql<number>`sum(${rewardRedemptions.pointsSpent})` })
+          .from(rewardRedemptions)
+          .where(and(
+            eq(rewardRedemptions.programId, programId),
+            gte(rewardRedemptions.redeemedAt, startOfWeek)
+          ));
+        revenue += Number(redemptions[0]?.total || 0);
+      }
+
+      // 3. Count tasks completed this week
+      let tasksCompleted = 0;
+      for (const programId of programIds) {
+        const completions = await db.select({ count: sql<number>`count(*)` })
+          .from(taskCompletions)
+          .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+          .where(and(
+            eq(tasks.programId, programId),
+            eq(taskCompletions.status, 'completed'),
+            gte(taskCompletions.completedAt, startOfWeek)
+          ));
+        tasksCompleted += Number(completions[0]?.count || 0);
+      }
+
+      // 4. Count rewards redeemed this week
+      let rewardsRedeemed = 0;
+      for (const programId of programIds) {
+        const redemptions = await db.select({ count: sql<number>`count(*)` })
+          .from(rewardRedemptions)
+          .where(and(
+            eq(rewardRedemptions.programId, programId),
+            gte(rewardRedemptions.redeemedAt, startOfWeek)
+          ));
+        rewardsRedeemed += Number(redemptions[0]?.count || 0);
+      }
+
+      res.json({
+        newFans,
+        revenue,
+        tasksCompleted,
+        rewardsRedeemed
+      });
+    } catch (error) {
+      console.error('Error fetching weekly metrics:', error);
+      res.status(500).json({ error: "Failed to fetch weekly metrics" });
+    }
+  });
+
   // Admin routes for user management
   app.get("/api/admin/users", authenticateUser, requireRole(['fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {
