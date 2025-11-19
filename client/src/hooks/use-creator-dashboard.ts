@@ -3,20 +3,25 @@ import { useAuth } from './use-auth';
 
 interface CreatorStats {
   totalFans: number;
-  monthlyRevenue: number;
-  engagementRate: number;
-  activeCampaigns: number;
-  revenueChange?: {
-    value: number;
-    type: 'increase' | 'decrease';
-    period: string;
-  };
+  totalRevenue: number; // ALL-TIME total revenue
+  tasksCompleted: number; // ALL-TIME tasks completed
+  rewardsRedeemed: number; // ALL-TIME rewards redeemed
   fansChange?: {
     value: number;
     type: 'increase' | 'decrease';
     period: string;
   };
-  engagementChange?: {
+  revenueChange?: {
+    value: number;
+    type: 'increase' | 'decrease';
+    period: string;
+  };
+  tasksChange?: {
+    value: number;
+    type: 'increase' | 'decrease';
+    period: string;
+  };
+  rewardsChange?: {
     value: number;
     type: 'increase' | 'decrease';
     period: string;
@@ -42,11 +47,9 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     }
     const programs = await programsResponse.json();
 
-    // Get creator's campaigns
-    const campaignsResponse = await fetch(`/api/campaigns/creator/${creatorId}`);
-    const campaigns = campaignsResponse.ok ? await campaignsResponse.json() : [];
-    
-    // Calculate total fans across all programs
+    // ====================
+    // 1. TOTAL FANS (enrolled in programs)
+    // ====================
     let totalFans = 0;
     for (const program of programs) {
       try {
@@ -60,64 +63,67 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       }
     }
 
-    // Get subscription/billing data for revenue
-    let monthlyRevenue = 0;
+    // ====================
+    // 2. TOTAL REVENUE (ALL-TIME)
+    // ====================
+    // TODO: Calculate from actual payment transactions when payment system is built
+    // For now, return 0 as placeholder
+    let totalRevenue = 0;
+
+    // ====================
+    // 3. TASKS COMPLETED (ALL-TIME)
+    // ====================
+    let tasksCompleted = 0;
     try {
-      const subscriptionResponse = await fetch(`/api/subscription-status`);
-      if (subscriptionResponse.ok) {
-        const subscription = await subscriptionResponse.json();
-        // Calculate monthly revenue based on subscription tier
-        if (subscription.subscriptionTier === 'starter') monthlyRevenue = 29;
-        else if (subscription.subscriptionTier === 'pro') monthlyRevenue = 99;
-        else if (subscription.subscriptionTier === 'enterprise') monthlyRevenue = 299;
+      // Get all task completions for this creator's programs
+      const completionsResponse = await fetch(`/api/task-completions/creator/${creatorId}`);
+      if (completionsResponse.ok) {
+        const completions = await completionsResponse.json();
+        // Count only completed or claimed tasks
+        tasksCompleted = completions.filter((c: any) =>
+          c.status === 'completed' || c.status === 'claimed'
+        ).length;
       }
     } catch (error) {
-      console.warn('Failed to fetch subscription data:', error);
+      console.warn('Failed to fetch task completions:', error);
     }
 
-    // Calculate engagement rate based on recent activities
-    let engagementRate = 0;
-    if (totalFans > 0) {
-      // Get recent point transactions to estimate engagement
-      try {
-        for (const program of programs) {
-          const transactionsResponse = await fetch(`/api/point-transactions/program/${program.id}`);
-          if (transactionsResponse.ok) {
-            const transactions = await transactionsResponse.json();
-            // Simple engagement calculation: recent transactions / total fans
-            const recentTransactions = transactions.filter((tx: any) => {
-              const txDate = new Date(tx.timestamp);
-              const weekAgo = new Date();
-              weekAgo.setDate(weekAgo.getDate() - 7);
-              return txDate > weekAgo;
-            });
-            engagementRate += (recentTransactions.length / totalFans) * 100;
-          }
-        }
-        engagementRate = Math.min(engagementRate, 100); // Cap at 100%
-      } catch (error) {
-        console.warn('Failed to calculate engagement rate:', error);
+    // ====================
+    // 4. REWARDS REDEEMED (ALL-TIME)
+    // ====================
+    let rewardsRedeemed = 0;
+    try {
+      // Get all reward redemptions for this creator's programs
+      const redemptionsResponse = await fetch(`/api/reward-redemptions/creator/${creatorId}`);
+      if (redemptionsResponse.ok) {
+        const redemptions = await redemptionsResponse.json();
+        rewardsRedeemed = redemptions.length;
       }
+    } catch (error) {
+      console.warn('Failed to fetch reward redemptions:', error);
     }
 
-    // Calculate real percentage changes by comparing with previous period
+    // ====================
+    // CALCULATE PERCENTAGE CHANGES
+    // ====================
     let fansChange = undefined;
     let revenueChange = undefined;
-    let engagementChange = undefined;
+    let tasksChange = undefined;
+    let rewardsChange = undefined;
 
     try {
-      // Try to get historical stats from 30 days ago for fan count and revenue
+      // Calculate 30-day changes for comparison
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      // Get historical fan count (count fans who joined before 30 days ago)
+
+      // Historical fan count (fans who joined before 30 days ago)
       let previousFans = 0;
       for (const program of programs) {
         try {
           const fansResponse = await fetch(`/api/fan-programs/program/${program.id}`);
           if (fansResponse.ok) {
             const programFans = await fansResponse.json();
-            previousFans += programFans.filter((fan: any) => 
+            previousFans += programFans.filter((fan: any) =>
               new Date(fan.joinedAt) < thirtyDaysAgo
             ).length;
           }
@@ -135,64 +141,74 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         };
       }
 
-      // Calculate engagement change by comparing last 7 days vs previous 7 days
-      let previousWeekEngagementRate = 0;
-      if (totalFans > 0) {
-        for (const program of programs) {
-          try {
-            const transactionsResponse = await fetch(`/api/point-transactions/program/${program.id}`);
-            if (transactionsResponse.ok) {
-              const transactions = await transactionsResponse.json();
-              const twoWeeksAgo = new Date();
-              twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-              const oneWeekAgo = new Date();
-              oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-              
-              const previousWeekTransactions = transactions.filter((tx: any) => {
-                const txDate = new Date(tx.timestamp);
-                return txDate > twoWeeksAgo && txDate <= oneWeekAgo;
-              });
-              previousWeekEngagementRate += (previousWeekTransactions.length / totalFans) * 100;
-            }
-          } catch (error) {
-            console.warn('Failed to calculate previous engagement:', error);
-          }
+      // Historical tasks completed (before 30 days ago)
+      let previousTasksCompleted = 0;
+      try {
+        const completionsResponse = await fetch(`/api/task-completions/creator/${creatorId}`);
+        if (completionsResponse.ok) {
+          const completions = await completionsResponse.json();
+          previousTasksCompleted = completions.filter((c: any) =>
+            (c.status === 'completed' || c.status === 'claimed') &&
+            new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
+          ).length;
         }
-        previousWeekEngagementRate = Math.min(previousWeekEngagementRate, 100);
-
-        if (previousWeekEngagementRate > 0 && engagementRate !== previousWeekEngagementRate) {
-          const engagementChangeValue = ((engagementRate - previousWeekEngagementRate) / previousWeekEngagementRate) * 100;
-          engagementChange = {
-            value: Math.abs(parseFloat(engagementChangeValue.toFixed(1))),
-            type: engagementChangeValue >= 0 ? 'increase' : 'decrease',
-            period: 'vs last week'
-          };
-        }
+      } catch (error) {
+        console.warn('Failed to calculate historical task completions:', error);
       }
 
-      // Note: Revenue change would require subscription history tracking
-      // For now, this will be undefined until subscription history is implemented
+      if (previousTasksCompleted > 0 && tasksCompleted !== previousTasksCompleted) {
+        const tasksChangeValue = ((tasksCompleted - previousTasksCompleted) / previousTasksCompleted) * 100;
+        tasksChange = {
+          value: Math.abs(parseFloat(tasksChangeValue.toFixed(1))),
+          type: tasksChangeValue >= 0 ? 'increase' : 'decrease',
+          period: 'vs last month'
+        };
+      }
+
+      // Historical rewards redeemed (before 30 days ago)
+      let previousRewardsRedeemed = 0;
+      try {
+        const redemptionsResponse = await fetch(`/api/reward-redemptions/creator/${creatorId}`);
+        if (redemptionsResponse.ok) {
+          const redemptions = await redemptionsResponse.json();
+          previousRewardsRedeemed = redemptions.filter((r: any) =>
+            new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
+          ).length;
+        }
+      } catch (error) {
+        console.warn('Failed to calculate historical reward redemptions:', error);
+      }
+
+      if (previousRewardsRedeemed > 0 && rewardsRedeemed !== previousRewardsRedeemed) {
+        const rewardsChangeValue = ((rewardsRedeemed - previousRewardsRedeemed) / previousRewardsRedeemed) * 100;
+        rewardsChange = {
+          value: Math.abs(parseFloat(rewardsChangeValue.toFixed(1))),
+          type: rewardsChangeValue >= 0 ? 'increase' : 'decrease',
+          period: 'vs last month'
+        };
+      }
     } catch (error) {
       console.warn('Failed to calculate percentage changes:', error);
     }
 
     return {
       totalFans,
-      monthlyRevenue,
-      engagementRate: parseFloat(engagementRate.toFixed(1)),
-      activeCampaigns: campaigns.length,
+      totalRevenue,
+      tasksCompleted,
+      rewardsRedeemed,
       fansChange,
       revenueChange,
-      engagementChange
+      tasksChange,
+      rewardsChange
     };
   } catch (error) {
     console.error('Failed to fetch creator stats:', error);
     // Return fallback data if API fails
     return {
       totalFans: 0,
-      monthlyRevenue: 0,
-      engagementRate: 0,
-      activeCampaigns: 0
+      totalRevenue: 0,
+      tasksCompleted: 0,
+      rewardsRedeemed: 0
     };
   }
 };
