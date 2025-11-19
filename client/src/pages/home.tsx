@@ -10,19 +10,13 @@ import CreatorEarningsCalculator from "@/components/nil/nil-value-calculator";
 
 export default function Home() {
   const { user, setShowAuthFlow } = useDynamicContext();
-  const [liveStats, setLiveStats] = useState({ wallets: 47832, quests: 234891, payouts: 8234 });
-
-  // Simul animated live stats ticker
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveStats(prev => ({
-        wallets: prev.wallets + Math.floor(Math.random() * 10),
-        quests: prev.quests + Math.floor(Math.random() * 50),
-        payouts: prev.payouts + Math.floor(Math.random() * 20)
-      }));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  // Platform capabilities - real features, no fake metrics
+  const platformCapabilities = [
+    { label: "Social Platforms", value: "8", icon: "🌐" },
+    { label: "Blockchains", value: "4+", icon: "⛓️" },
+    { label: "Campaign Templates", value: "12", icon: "🎯" },
+    { label: "Setup Time", value: "<5min", icon: "⚡" }
+  ];
 
   return (
     <div className="min-h-screen bg-[#0a0118] overflow-x-hidden">
@@ -56,38 +50,44 @@ export default function Home() {
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#14feee] to-[#e10698] p-1">
                       <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
-                        <Sparkles className="w-10 h-10 text-[#14feee]" />
+                        <Zap className="w-10 h-10 text-[#14feee]" />
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black text-white">Top Creator</h3>
-                      <p className="text-[#14feee] font-semibold">Multi-Platform • Verified</p>
+                      <h3 className="text-2xl font-black text-white">Your Platform Stack</h3>
+                      <p className="text-[#14feee] font-semibold">All-in-One • Web3-Powered</p>
                     </div>
                   </div>
                   
-                  {/* Live Stats */}
-                  <div className="grid grid-cols-3 gap-4 p-4 bg-white/5 rounded-xl border border-[#14feee]/20" data-testid="hero-creator-stats">
-                    <div data-testid="stat-earnings">
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#14feee] to-[#8B5CF6] bg-clip-text text-transparent">$42K</div>
-                      <div className="text-xs text-gray-400">Earnings</div>
+                  {/* Platform Capabilities */}
+                  <div className="space-y-3" data-testid="hero-platform-features">
+                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-[#14feee]/20" data-testid="feature-platforms">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#14feee] to-[#8B5CF6] flex items-center justify-center flex-shrink-0">
+                        <Globe className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">8 Social Platforms</div>
+                        <div className="text-xs text-gray-400">Real-time verification across all networks</div>
+                      </div>
                     </div>
-                    <div data-testid="stat-fans">
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#8B5CF6] to-[#e10698] bg-clip-text text-transparent">125K</div>
-                      <div className="text-xs text-gray-400">Fans</div>
+                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-[#8B5CF6]/20" data-testid="feature-blockchain">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#e10698] flex items-center justify-center flex-shrink-0">
+                        <Shield className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">Multi-Chain Rewards</div>
+                        <div className="text-xs text-gray-400">Ethereum, Solana, Polygon & more</div>
+                      </div>
                     </div>
-                    <div data-testid="stat-engagement">
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#e10698] to-[#14feee] bg-clip-text text-transparent">8.4%</div>
-                      <div className="text-xs text-gray-400">Engagement</div>
+                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-[#e10698]/20" data-testid="feature-ai">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#e10698] to-[#14feee] flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">AI Campaign Builder</div>
+                        <div className="text-xs text-gray-400">Smart templates & optimization</div>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Badges */}
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {["8 Platforms", "Multi-Chain", "AI-Powered"].map((badge) => (
-                      <span key={badge} className="px-3 py-1 bg-white/10 border border-[#14feee]/30 rounded-full text-xs text-white">
-                        {badge}
-                      </span>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -117,8 +117,8 @@ export default function Home() {
           >
             {/* Vertical Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl border border-[#14feee]/30 rounded-full mb-6" data-testid="hero-live-badge">
-              <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse"></div>
-              <span className="text-sm font-semibold text-[#14feee]">47,832 Wallets Connected Today</span>
+              <Rocket className="w-4 h-4 text-[#14feee]" />
+              <span className="text-sm font-semibold text-[#14feee]">Now in Early Access</span>
             </div>
 
             {/* Main Headline */}
@@ -165,37 +165,44 @@ export default function Home() {
               </motion.button>
             </div>
 
-            {/* Live Ticker */}
-            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl p-4" data-testid="hero-live-ticker">
-              <div className="text-xs text-gray-400 mb-2">LIVE PLATFORM ACTIVITY</div>
-              <div className="grid grid-cols-3 gap-4">
-                <div data-testid="live-stat-wallets">
-                  <div className="text-2xl font-black text-[#14feee]">{liveStats.wallets.toLocaleString()}</div>
-                  <div className="text-xs text-gray-400">Wallets</div>
-                </div>
-                <div data-testid="live-stat-quests">
-                  <div className="text-2xl font-black text-[#8B5CF6]">{liveStats.quests.toLocaleString()}</div>
-                  <div className="text-xs text-gray-400">Quests</div>
-                </div>
-                <div data-testid="live-stat-payouts">
-                  <div className="text-2xl font-black text-[#e10698]">${liveStats.payouts.toLocaleString()}</div>
-                  <div className="text-xs text-gray-400">Payouts</div>
-                </div>
+            {/* Platform Capabilities Ticker */}
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl p-4" data-testid="hero-platform-ticker">
+              <div className="text-xs text-gray-400 mb-2">PLATFORM CAPABILITIES</div>
+              <div className="grid grid-cols-4 gap-4">
+                {platformCapabilities.map((cap, idx) => (
+                  <div key={idx} data-testid={`capability-${idx}`}>
+                    <div className="text-2xl font-black bg-gradient-to-r from-[#14feee] to-[#e10698] bg-clip-text text-transparent">{cap.value}</div>
+                    <div className="text-xs text-gray-400">{cap.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* 🌊 PULSE RAIL - Morphing Blob Marquee */}
+      {/* 🌊 PULSE RAIL - Platform Features Marquee */}
       <section className="relative py-12 overflow-hidden border-y border-white/10 bg-black/50" data-testid="pulse-rail">
         <motion.div
           className="flex gap-8"
           animate={{ x: [0, -1920] }}
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         >
-          {[...Array(12)].map((_, i) => (
-            <div key={i} className="flex-shrink-0 w-64 h-32 relative" data-testid={`pulse-blob-${i}`}>
+          {[
+            { feature: "Real-Time", detail: "Social Verification", icon: "✓" },
+            { feature: "Multi-Chain", detail: "Rewards", icon: "⛓️" },
+            { feature: "8 Platforms", detail: "Integrated", icon: "🌐" },
+            { feature: "AI-Powered", detail: "Campaigns", icon: "🤖" },
+            { feature: "Instant", detail: "Payouts", icon: "⚡" },
+            { feature: "Smart", detail: "Analytics", icon: "📊" },
+            { feature: "Web3", detail: "Native", icon: "🔐" },
+            { feature: "Template", detail: "Library", icon: "📚" },
+            { feature: "Auto", detail: "Compliance", icon: "🛡️" },
+            { feature: "Cross-Platform", detail: "Tracking", icon: "🎯" },
+            { feature: "Blockchain", detail: "Verified", icon: "✨" },
+            { feature: "5-Min", detail: "Setup", icon: "🚀" }
+          ].map((item, i) => (
+            <div key={i} className="flex-shrink-0 w-64 h-32 relative" data-testid={`pulse-feature-${i}`}>
               <div
                 className="absolute inset-0 rounded-full blur-xl opacity-60"
                 style={{
@@ -203,11 +210,12 @@ export default function Home() {
                 }}
               ></div>
               <div className="relative h-full flex flex-col items-center justify-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-                <div className="text-3xl font-black bg-gradient-to-r from-[#14feee] to-[#e10698] bg-clip-text text-transparent" data-testid={`pulse-stat-value-${i}`}>
-                  {i % 3 === 0 ? `${(i + 1) * 234}` : i % 3 === 1 ? `${(i + 1) * 1.2}K` : `$${(i + 1) * 850}`}
+                <div className="text-3xl mb-1">{item.icon}</div>
+                <div className="text-lg font-black bg-gradient-to-r from-[#14feee] to-[#e10698] bg-clip-text text-transparent" data-testid={`pulse-feature-name-${i}`}>
+                  {item.feature}
                 </div>
                 <div className="text-xs text-gray-400">
-                  {i % 3 === 0 ? "Quests Claimed" : i % 3 === 1 ? "Active Users" : "Creator Earnings"}
+                  {item.detail}
                 </div>
               </div>
             </div>
@@ -693,7 +701,7 @@ export default function Home() {
                   </span>
                 </h2>
                 <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                  Join thousands of athletes, musicians, content creators, and brands monetizing their fanbase with Web3 loyalty programs across 8 social platforms.
+                  Be among the first creators to build Web3 loyalty programs with real-time social verification across 8 platforms. Early access starts now.
                 </p>
               </div>
 
@@ -719,13 +727,13 @@ export default function Home() {
                   className="group relative p-8 bg-gradient-to-r from-[#8B5CF6] to-[#14feee] rounded-2xl overflow-hidden"
                   whileHover={{ scale: 1.05, y: -5 }}
                   whileTap={{ scale: 0.95 }}
-                  data-testid="button-launchpad-creators"
+                  data-testid="button-launchpad-fans"
                 >
                   <div className="absolute inset-0 bg-gradient-to-l from-[#14feee]/50 to-transparent blur-xl opacity-0 group-hover:opacity-100 transition"></div>
                   <div className="relative z-10">
-                    <Camera className="w-12 h-12 text-white mx-auto mb-4" />
-                    <h3 className="text-2xl font-black text-white mb-2">For Creators</h3>
-                    <p className="text-white/80 text-sm">Build your community empire</p>
+                    <Users className="w-12 h-12 text-white mx-auto mb-4" />
+                    <h3 className="text-2xl font-black text-white mb-2">For Fans</h3>
+                    <p className="text-white/80 text-sm">Earn rewards for your fandom</p>
                   </div>
                 </motion.button>
               </div>
