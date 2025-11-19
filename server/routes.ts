@@ -2706,6 +2706,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/reward-redemptions/program/:programId", async (req, res) => {
+    try {
+      const redemptions = await storage.getRewardRedemptionsByProgram(req.params.programId);
+      res.json(redemptions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch reward redemptions for program" });
+    }
+  });
+
   // Admin routes for user management
   app.get("/api/admin/users", authenticateUser, requireRole(['fandomly_admin']), async (req: AuthenticatedRequest, res) => {
     try {

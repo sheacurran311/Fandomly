@@ -82,6 +82,7 @@ export interface IStorage {
   // Reward redemption operations
   createRewardRedemption(redemption: any): Promise<RewardRedemption>;
   getRewardRedemptionsByUser(fanId: string): Promise<RewardRedemption[]>;
+  getRewardRedemptionsByProgram(programId: string): Promise<RewardRedemption[]>;
   updateRewardRedemption(id: string, updates: any): Promise<RewardRedemption>;
 
   // Tenant operations
@@ -143,6 +144,7 @@ export interface IStorage {
   getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined>;
   getUserTaskCompletions(userId: string, tenantId?: string): Promise<TaskCompletion[]>;
   getTaskCompletions(taskId: string): Promise<TaskCompletion[]>;
+  getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]>;
   createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion>;
   updateTaskCompletion(id: string, updates: Partial<InsertTaskCompletion>): Promise<TaskCompletion | undefined>;
   
@@ -586,6 +588,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(rewardRedemptions.redeemedAt));
   }
 
+  async getRewardRedemptionsByProgram(programId: string): Promise<RewardRedemption[]> {
+    return await db.select().from(rewardRedemptions)
+      .where(eq(rewardRedemptions.programId, programId))
+      .orderBy(desc(rewardRedemptions.redeemedAt));
+  }
+
   async updateRewardRedemption(id: string, updates: Partial<InsertRewardRedemption>): Promise<RewardRedemption> {
     const [redemption] = await db.update(rewardRedemptions).set(updates as any)
       .where(eq(rewardRedemptions.id, id)).returning();
@@ -980,6 +988,32 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(taskCompletions)
       .where(eq(taskCompletions.taskId, taskId))
       .orderBy(desc(taskCompletions.startedAt));
+  }
+
+  async getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]> {
+    // Join with tasks table to filter by programId
+    const completions = await db
+      .select({
+        id: taskCompletions.id,
+        taskId: taskCompletions.taskId,
+        userId: taskCompletions.userId,
+        tenantId: taskCompletions.tenantId,
+        status: taskCompletions.status,
+        progress: taskCompletions.progress,
+        completionData: taskCompletions.completionData,
+        pointsAwarded: taskCompletions.pointsAwarded,
+        startedAt: taskCompletions.startedAt,
+        completedAt: taskCompletions.completedAt,
+        verifiedAt: taskCompletions.verifiedAt,
+        createdAt: taskCompletions.createdAt,
+        updatedAt: taskCompletions.updatedAt,
+      })
+      .from(taskCompletions)
+      .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+      .where(eq(tasks.programId, programId))
+      .orderBy(desc(taskCompletions.completedAt));
+
+    return completions as TaskCompletion[];
   }
 
   async createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion> {

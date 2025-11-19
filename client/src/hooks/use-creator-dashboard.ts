@@ -75,14 +75,16 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     // ====================
     let tasksCompleted = 0;
     try {
-      // Get all task completions for this creator's programs
-      const completionsResponse = await fetch(`/api/task-completions/creator/${creatorId}`);
-      if (completionsResponse.ok) {
-        const completions = await completionsResponse.json();
-        // Count only completed or claimed tasks
-        tasksCompleted = completions.filter((c: any) =>
-          c.status === 'completed' || c.status === 'claimed'
-        ).length;
+      // Get all task completions for each program
+      for (const program of programs) {
+        const completionsResponse = await fetch(`/api/task-completions/program/${program.id}`);
+        if (completionsResponse.ok) {
+          const completions = await completionsResponse.json();
+          // Count only completed or claimed tasks
+          tasksCompleted += completions.filter((c: any) =>
+            c.status === 'completed' || c.status === 'claimed'
+          ).length;
+        }
       }
     } catch (error) {
       console.warn('Failed to fetch task completions:', error);
@@ -93,11 +95,13 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     // ====================
     let rewardsRedeemed = 0;
     try {
-      // Get all reward redemptions for this creator's programs
-      const redemptionsResponse = await fetch(`/api/reward-redemptions/creator/${creatorId}`);
-      if (redemptionsResponse.ok) {
-        const redemptions = await redemptionsResponse.json();
-        rewardsRedeemed = redemptions.length;
+      // Get all reward redemptions for each program
+      for (const program of programs) {
+        const redemptionsResponse = await fetch(`/api/reward-redemptions/program/${program.id}`);
+        if (redemptionsResponse.ok) {
+          const redemptions = await redemptionsResponse.json();
+          rewardsRedeemed += redemptions.length;
+        }
       }
     } catch (error) {
       console.warn('Failed to fetch reward redemptions:', error);
@@ -144,13 +148,15 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       // Historical tasks completed (before 30 days ago)
       let previousTasksCompleted = 0;
       try {
-        const completionsResponse = await fetch(`/api/task-completions/creator/${creatorId}`);
-        if (completionsResponse.ok) {
-          const completions = await completionsResponse.json();
-          previousTasksCompleted = completions.filter((c: any) =>
-            (c.status === 'completed' || c.status === 'claimed') &&
-            new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
-          ).length;
+        for (const program of programs) {
+          const completionsResponse = await fetch(`/api/task-completions/program/${program.id}`);
+          if (completionsResponse.ok) {
+            const completions = await completionsResponse.json();
+            previousTasksCompleted += completions.filter((c: any) =>
+              (c.status === 'completed' || c.status === 'claimed') &&
+              new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
+            ).length;
+          }
         }
       } catch (error) {
         console.warn('Failed to calculate historical task completions:', error);
@@ -168,12 +174,14 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       // Historical rewards redeemed (before 30 days ago)
       let previousRewardsRedeemed = 0;
       try {
-        const redemptionsResponse = await fetch(`/api/reward-redemptions/creator/${creatorId}`);
-        if (redemptionsResponse.ok) {
-          const redemptions = await redemptionsResponse.json();
-          previousRewardsRedeemed = redemptions.filter((r: any) =>
-            new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
-          ).length;
+        for (const program of programs) {
+          const redemptionsResponse = await fetch(`/api/reward-redemptions/program/${program.id}`);
+          if (redemptionsResponse.ok) {
+            const redemptions = await redemptionsResponse.json();
+            previousRewardsRedeemed += redemptions.filter((r: any) =>
+              new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
+            ).length;
+          }
         }
       } catch (error) {
         console.warn('Failed to calculate historical reward redemptions:', error);

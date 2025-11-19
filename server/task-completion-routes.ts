@@ -94,6 +94,22 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   });
 
   // ==============================================
+  // GET /api/task-completions/program/:programId
+  // Get all task completions for a specific program
+  // ==============================================
+  router.get('/program/:programId', async (req: Request, res: Response) => {
+    try {
+      const { programId } = req.params;
+      const completions = await storage.getTaskCompletionsByProgram(programId);
+
+      res.json(completions);
+    } catch (error) {
+      console.error('Error fetching program task completions:', error);
+      res.status(500).json({ error: 'Failed to fetch task completions for program' });
+    }
+  });
+
+  // ==============================================
   // GET /api/task-completions/:taskId
   // Get user's completion for a specific task
   // ==============================================
