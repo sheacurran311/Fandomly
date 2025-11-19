@@ -7,12 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { 
+import {
   Plus, Settings, Target, Trash2, Edit, Eye, EyeOff,
-  CheckCircle, Clock, BarChart3, Search, Filter
+  CheckCircle, Clock, BarChart3, Search, Filter, X,
+  CheckSquare, Square, TrendingUp
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
@@ -45,6 +48,11 @@ export default function CreatorTasksIndex() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
+  const [filterFrequency, setFilterFrequency] = useState<string>('all');
+
+  // Sprint 4B: Bulk operations
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
 
   // Fetch tasks
   const { data: tasks = [], isLoading: tasksLoading, refetch } = useQuery<Task[]>({
@@ -102,6 +110,75 @@ export default function CreatorTasksIndex() {
     }
   });
 
+  // Sprint 4B: Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (taskIds: string[]) => {
+      await Promise.all(taskIds.map(id =>
+        apiRequest('DELETE', `/api/tasks/${id}`).then(r => r.json())
+      ));
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tasks Deleted",
+        description: `Successfully deleted ${selectedTasks.size} task(s).`,
+      });
+      setSelectedTasks(new Set());
+      setBulkMode(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete some tasks.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Sprint 4B: Bulk publish mutation
+  const bulkPublishMutation = useMutation({
+    mutationFn: async ({ taskIds, isDraft }: { taskIds: string[]; isDraft: boolean }) => {
+      await Promise.all(taskIds.map(id =>
+        apiRequest('PUT', `/api/tasks/${id}`, { isDraft }).then(r => r.json())
+      ));
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: variables.isDraft ? "Tasks Saved as Drafts" : "Tasks Published",
+        description: `Successfully updated ${selectedTasks.size} task(s).`,
+      });
+      setSelectedTasks(new Set());
+      setBulkMode(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update some tasks.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Sprint 4B: Bulk selection handlers
+  const toggleTaskSelection = (taskId: string) => {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTasks(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTasks.size === filteredTasks.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(filteredTasks.map(t => t.id)));
+    }
+  };
+
   // Filter and search tasks
   const filteredTasks = tasks.filter(task => {
     // Tab filter
@@ -120,6 +197,11 @@ export default function CreatorTasksIndex() {
 
     // Platform filter
     if (filterPlatform !== 'all' && task.platform !== filterPlatform) {
+      return false;
+    }
+
+    // Sprint 4B: Frequency filter
+    if (filterFrequency !== 'all' && task.frequency !== filterFrequency) {
       return false;
     }
 
@@ -153,13 +235,23 @@ export default function CreatorTasksIndex() {
                 </p>
               </div>
               
-              <Button 
-                onClick={() => setLocation("/creator-dashboard/tasks/create")}
-                className="bg-brand-primary hover:bg-brand-primary/80"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Task
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setBulkMode(!bulkMode)}
+                  variant="outline"
+                  className="border-white/20 hover:bg-white/5"
+                >
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  {bulkMode ? 'Exit Bulk Mode' : 'Bulk Actions'}
+                </Button>
+                <Button
+                  onClick={() => setLocation("/creator-dashboard/tasks/create")}
+                  className="bg-brand-primary hover:bg-brand-primary/80"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Task
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -240,17 +332,114 @@ export default function CreatorTasksIndex() {
                     </SelectContent>
                   </Select>
                 )}
+
+                {/* Sprint 4B: Frequency Filter */}
+                <Select value={filterFrequency} onValueChange={setFilterFrequency}>
+                  <SelectTrigger className="w-full md:w-[200px] bg-white/10 border-white/20 text-white">
+                    <SelectValue placeholder="Frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Frequencies</SelectItem>
+                    <SelectItem value="one_time">One-time</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
 
+          {/* Sprint 4B: Bulk Actions Bar */}
+          {bulkMode && selectedTasks.size > 0 && (
+            <Card className="bg-brand-primary/10 border-brand-primary/30 mb-6">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="text-white font-semibold">
+                      {selectedTasks.size} task(s) selected
+                    </div>
+                    <Button
+                      onClick={() => setSelectedTasks(new Set())}
+                      variant="ghost"
+                      size="sm"
+                      className="text-white hover:bg-white/10"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear Selection
+                    </Button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => bulkPublishMutation.mutate({
+                        taskIds: Array.from(selectedTasks),
+                        isDraft: false
+                      })}
+                      variant="outline"
+                      size="sm"
+                      className="border-white/20 text-white hover:bg-white/10"
+                      disabled={bulkPublishMutation.isPending}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Publish All
+                    </Button>
+                    <Button
+                      onClick={() => bulkPublishMutation.mutate({
+                        taskIds: Array.from(selectedTasks),
+                        isDraft: true
+                      })}
+                      variant="outline"
+                      size="sm"
+                      className="border-white/20 text-white hover:bg-white/10"
+                      disabled={bulkPublishMutation.isPending}
+                    >
+                      <EyeOff className="h-4 w-4 mr-1" />
+                      Unpublish All
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (confirm(`Delete ${selectedTasks.size} task(s)? This cannot be undone.`)) {
+                          bulkDeleteMutation.mutate(Array.from(selectedTasks));
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-500/20 text-red-400 hover:bg-red-500/10"
+                      disabled={bulkDeleteMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete All
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Tasks Tabs */}
           <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as any)} className="space-y-6">
-            <TabsList className="bg-white/5 border-white/10">
-              <TabsTrigger value="all">All Tasks ({stats.total})</TabsTrigger>
-              <TabsTrigger value="published">Published ({stats.published})</TabsTrigger>
-              <TabsTrigger value="draft">Drafts ({stats.draft})</TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between">
+              <TabsList className="bg-white/5 border-white/10">
+                <TabsTrigger value="all">All Tasks ({stats.total})</TabsTrigger>
+                <TabsTrigger value="published">Published ({stats.published})</TabsTrigger>
+                <TabsTrigger value="draft">Drafts ({stats.draft})</TabsTrigger>
+              </TabsList>
+
+              {/* Sprint 4B: Select All Toggle */}
+              {bulkMode && filteredTasks.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={selectedTasks.size === filteredTasks.length && filteredTasks.length > 0}
+                    onCheckedChange={toggleSelectAll}
+                    id="select-all"
+                  />
+                  <Label htmlFor="select-all" className="text-white cursor-pointer">
+                    Select All ({filteredTasks.length})
+                  </Label>
+                </div>
+              )}
+            </div>
 
             <TabsContent value={selectedTab} className="space-y-6">
               {tasksLoading ? (
@@ -289,15 +478,18 @@ export default function CreatorTasksIndex() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredTasks.map((task) => (
-                    <TaskCard 
-                      key={task.id} 
+                    <TaskCard
+                      key={task.id}
                       task={task}
                       onDelete={() => deleteTaskMutation.mutate(task.id)}
-                      onTogglePublish={() => togglePublishMutation.mutate({ 
-                        taskId: task.id, 
-                        isDraft: task.isDraft 
+                      onTogglePublish={() => togglePublishMutation.mutate({
+                        taskId: task.id,
+                        isDraft: task.isDraft
                       })}
                       onEdit={() => setLocation(`/creator-dashboard/tasks/edit/${task.id}`)}
+                      bulkMode={bulkMode}
+                      isSelected={selectedTasks.has(task.id)}
+                      onToggleSelection={() => toggleTaskSelection(task.id)}
                     />
                   ))}
                 </div>
@@ -310,11 +502,22 @@ export default function CreatorTasksIndex() {
 }
 
 // Task Card Component
-function TaskCard({ task, onDelete, onTogglePublish, onEdit }: { 
+function TaskCard({
+  task,
+  onDelete,
+  onTogglePublish,
+  onEdit,
+  bulkMode = false,
+  isSelected = false,
+  onToggleSelection,
+}: {
   task: Task;
   onDelete: () => void;
   onTogglePublish: () => void;
   onEdit: () => void;
+  bulkMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: () => void;
 }) {
   const getTaskTypeColor = (type: string) => {
     if (type.includes('referral')) return 'bg-purple-500/20 text-purple-400';
@@ -337,9 +540,20 @@ function TaskCard({ task, onDelete, onTogglePublish, onEdit }: {
   };
 
   return (
-    <Card className={`bg-white/5 border-white/10 hover:border-brand-primary/30 transition-all ${task.isDraft ? 'opacity-75' : ''}`}>
+    <Card className={`bg-white/5 border-white/10 hover:border-brand-primary/30 transition-all ${task.isDraft ? 'opacity-75' : ''} ${isSelected ? 'ring-2 ring-brand-primary' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
+          {/* Sprint 4B: Bulk selection checkbox */}
+          {bulkMode && onToggleSelection && (
+            <div className="mr-3 pt-1">
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={onToggleSelection}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               {task.isDraft ? (
