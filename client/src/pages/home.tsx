@@ -55,34 +55,34 @@ export default function Home() {
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#14feee] to-[#e10698] p-1">
                       <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
-                        <Trophy className="w-10 h-10 text-[#14feee]" />
+                        <Sparkles className="w-10 h-10 text-[#14feee]" />
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black text-white">NIL Athlete</h3>
-                      <p className="text-[#14feee] font-semibold">D1 Football • Junior</p>
+                      <h3 className="text-2xl font-black text-white">Top Creator</h3>
+                      <p className="text-[#14feee] font-semibold">Multi-Platform • Verified</p>
                     </div>
                   </div>
                   
                   {/* Live Stats */}
-                  <div className="grid grid-cols-3 gap-4 p-4 bg-white/5 rounded-xl border border-[#14feee]/20" data-testid="hero-athlete-stats">
-                    <div data-testid="stat-nil-earnings">
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#14feee] to-[#8B5CF6] bg-clip-text text-transparent">$24K</div>
-                      <div className="text-xs text-gray-400">NIL Earnings</div>
+                  <div className="grid grid-cols-3 gap-4 p-4 bg-white/5 rounded-xl border border-[#14feee]/20" data-testid="hero-creator-stats">
+                    <div data-testid="stat-earnings">
+                      <div className="text-3xl font-black bg-gradient-to-r from-[#14feee] to-[#8B5CF6] bg-clip-text text-transparent">$42K</div>
+                      <div className="text-xs text-gray-400">Earnings</div>
                     </div>
                     <div data-testid="stat-fans">
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#8B5CF6] to-[#e10698] bg-clip-text text-transparent">12K</div>
+                      <div className="text-3xl font-black bg-gradient-to-r from-[#8B5CF6] to-[#e10698] bg-clip-text text-transparent">125K</div>
                       <div className="text-xs text-gray-400">Fans</div>
                     </div>
                     <div data-testid="stat-engagement">
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#e10698] to-[#14feee] bg-clip-text text-transparent">98%</div>
+                      <div className="text-3xl font-black bg-gradient-to-r from-[#e10698] to-[#14feee] bg-clip-text text-transparent">8.4%</div>
                       <div className="text-xs text-gray-400">Engagement</div>
                     </div>
                   </div>
 
                   {/* Badges */}
                   <div className="flex flex-wrap gap-2 mt-4">
-                    {["NCAA Compliant", "Multi-Chain", "Social Verified"].map((badge) => (
+                    {["8 Platforms", "Multi-Chain", "AI-Powered"].map((badge) => (
                       <span key={badge} className="px-3 py-1 bg-white/10 border border-[#14feee]/30 rounded-full text-xs text-white">
                         {badge}
                       </span>
@@ -131,7 +131,7 @@ export default function Home() {
 
             {/* Subheadline */}
             <p className="text-xl text-gray-300 mb-8 max-w-xl leading-relaxed">
-              The first Web3 loyalty platform built for NIL athletes, creators, and musicians. Launch campaigns, verify social proof, distribute rewards—all in one neural grid.
+              The first Web3 loyalty platform for athletes, content creators, musicians, and brands. Launch campaigns across 8 social platforms, verify engagement, and distribute rewards—all powered by AI.
             </p>
 
             {/* CTA Stack */}
@@ -320,8 +320,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 💥 NIL COLLISION COURSE - Split Screen Slider */}
-      <section className="relative py-32 px-4 bg-gradient-to-b from-transparent to-[#8B5CF6]/10">
+      {/* 🎯 WHO IT'S FOR - Creator Types Grid */}
+      <section className="relative py-32 px-4 bg-gradient-to-b from-transparent to-[#8B5CF6]/10" data-testid="creator-types-section">
         <div className="max-w-7xl mx-auto">
           <motion.h2
             initial={{ opacity: 0, y: 30 }}
@@ -329,81 +329,155 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-5xl md:text-6xl font-black text-center mb-4"
           >
-            <span className="text-white">NIL </span>
-            <span className="bg-gradient-to-r from-[#e10698] to-[#14feee] bg-clip-text text-transparent">Revolution</span>
+            <span className="text-white">Built For </span>
+            <span className="bg-gradient-to-r from-[#e10698] to-[#14feee] bg-clip-text text-transparent">Every Creator</span>
           </motion.h2>
-          <p className="text-center text-xl text-gray-300 mb-16">The old way vs. the Fandomly way</p>
+          <p className="text-center text-xl text-gray-300 mb-16">From athletes to brands - one platform powers them all</p>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Old World */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-gray-600 to-gray-800 rounded-2xl blur opacity-50"></div>
-              <div className="relative bg-gray-900/90 backdrop-blur-xl border border-gray-700 rounded-2xl p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
-                    <XIcon className="w-6 h-6 text-gray-400" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: Trophy,
+                type: "Athletes",
+                desc: "Monetize your fanbase with loyalty programs, exclusive content, and Web3 rewards",
+                gradient: "from-[#14feee] to-[#8B5CF6]",
+                testId: "creator-type-athletes"
+              },
+              {
+                icon: Camera,
+                type: "Content Creators",
+                desc: "Turn views into revenue with cross-platform campaigns and engagement rewards",
+                gradient: "from-[#8B5CF6] to-[#e10698]",
+                testId: "creator-type-content"
+              },
+              {
+                icon: Music,
+                type: "Musicians",
+                desc: "Build superfans with exclusive drops, concert perks, and streaming rewards",
+                gradient: "from-[#e10698] to-[#10B981]",
+                testId: "creator-type-musicians"
+              },
+              {
+                icon: Building2,
+                type: "Brands & Agencies",
+                desc: "Launch influencer campaigns, track ROI, and manage creator partnerships at scale",
+                gradient: "from-[#10B981] to-[#14feee]",
+                testId: "creator-type-brands"
+              }
+            ].map((creator, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="relative group"
+                data-testid={creator.testId}
+              >
+                <div className={`absolute -inset-0.5 bg-gradient-to-r ${creator.gradient} rounded-2xl blur opacity-60 group-hover:opacity-100 transition`}></div>
+                <div className="relative bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 h-full">
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${creator.gradient} flex items-center justify-center mb-4`}>
+                    <creator.icon className="w-7 h-7 text-white" />
                   </div>
-                  <h3 className="text-2xl font-black text-gray-300">Old World NIL</h3>
+                  <h3 className="text-xl font-black text-white mb-3">{creator.type}</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">{creator.desc}</p>
                 </div>
-                <ul className="space-y-3">
-                  {[
-                    "Complex compliance paperwork",
-                    "Limited monetization options",
-                    "Manual fan tracking",
-                    "Delayed payments",
-                    "No direct fan engagement"
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3 text-gray-400">
-                      <XIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Fandomly Way */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-[#14feee] to-[#e10698] rounded-2xl blur opacity-75 animate-pulse"></div>
-              <div className="relative bg-black/90 backdrop-blur-xl border-2 border-[#14feee] rounded-2xl p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#14feee] to-[#e10698] flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-black text-white">Fandomly NIL</h3>
+      {/* 🌐 SOCIAL PLATFORM INTEGRATIONS - 8-Platform Grid */}
+      <section className="relative py-32 px-4 bg-gradient-to-b from-[#8B5CF6]/10 to-black" data-testid="social-integrations">
+        <div className="max-w-7xl mx-auto">
+          <motion.h2
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-5xl md:text-6xl font-black text-center mb-4"
+          >
+            <span className="bg-gradient-to-r from-[#14feee] via-[#8B5CF6] to-[#e10698] bg-clip-text text-transparent">
+              8 Platforms, One Dashboard
+            </span>
+          </motion.h2>
+          <p className="text-center text-xl text-gray-300 mb-6">Real-time verification, aggregated analytics, and AI-powered insights across all major social networks</p>
+
+          {/* Platform Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            {[
+              { name: "Facebook", icon: "📘", color: "#1877F2" },
+              { name: "Instagram", icon: "📷", color: "#E4405F" },
+              { name: "X (Twitter)", icon: "𝕏", color: "#1DA1F2" },
+              { name: "TikTok", icon: "🎵", color: "#FE2C55" },
+              { name: "YouTube", icon: "▶️", color: "#FF0000" },
+              { name: "Spotify", icon: "🎧", color: "#1DB954" },
+              { name: "Discord", icon: "💬", color: "#5865F2" },
+              { name: "Twitch", icon: "🎮", color: "#9146FF" }
+            ].map((platform, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+                className="relative group cursor-pointer"
+                data-testid={`platform-${platform.name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <div
+                  className="absolute -inset-0.5 rounded-xl blur opacity-0 group-hover:opacity-100 transition"
+                  style={{ background: `radial-gradient(circle, ${platform.color}, transparent)` }}
+                ></div>
+                <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center group-hover:border-white/30 transition">
+                  <div className="text-4xl mb-2">{platform.icon}</div>
+                  <div className="text-sm font-bold text-white">{platform.name}</div>
                 </div>
-                <ul className="space-y-3">
-                  {[
-                    "Built-in NCAA compliance",
-                    "Multi-channel monetization",
-                    "AI-powered fan insights",
-                    "Instant crypto payouts",
-                    "Direct loyalty programs"
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3 text-white">
-                      <CheckCircle className="w-5 h-5 text-[#10B981] flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Features Grid */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Zap,
+                title: "Real-Time Verification",
+                desc: "Instant task completion tracking with webhook-based proof across all platforms",
+                testId: "feature-verification"
+              },
+              {
+                icon: BarChart3,
+                title: "Aggregated Analytics",
+                desc: "Unified dashboard showing engagement, reach, and ROI across all connected platforms",
+                testId: "feature-analytics"
+              },
+              {
+                icon: Sparkles,
+                title: "AI Creator Toolkit",
+                desc: "Smart campaign suggestions, content optimization, and audience insights powered by AI",
+                testId: "feature-ai-toolkit"
+              }
+            ].map((feature, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.4 + i * 0.1 }}
+                className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl"
+                data-testid={feature.testId}
+              >
+                <feature.icon className="w-10 h-10 text-[#14feee] mb-4" />
+                <h3 className="text-xl font-black text-white mb-3">{feature.title}</h3>
+                <p className="text-gray-300 leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* 📜 PROOF OF FANDOM - Scrollytelling Timeline */}
-      <section className="relative py-32 px-4 bg-gradient-to-b from-[#8B5CF6]/10 to-transparent" data-testid="proof-of-fandom">
+      <section className="relative py-32 px-4 bg-gradient-to-b from-black to-[#8B5CF6]/10" data-testid="proof-of-fandom">
         <div className="max-w-4xl mx-auto">
           <motion.h2
             initial={{ opacity: 0, y: 30 }}
@@ -654,7 +728,7 @@ export default function Home() {
 
               {/* Trust Badges */}
               <div className="flex flex-wrap justify-center gap-4 mt-12 pt-8 border-t border-white/10">
-                {["Multi-Chain", "NCAA Compliant", "SOC 2 Certified", "24/7 Support"].map((badge) => (
+                {["Multi-Chain", "Enterprise-Grade Security", "8 Platform Integrations", "24/7 Support"].map((badge) => (
                   <span key={badge} className="px-4 py-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full text-sm text-white">
                     {badge}
                   </span>
