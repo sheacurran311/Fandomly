@@ -71,41 +71,6 @@ export default function FanPoints() {
     },
   });
 
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "Platinum": return "text-purple-400";
-      case "Gold": return "text-yellow-400";
-      case "Silver": return "text-gray-400";
-      default: return "text-green-400";
-    }
-  };
-
-  const getTierFromPoints = (points: number) => {
-    if (points >= 50000) return "Platinum";
-    if (points >= 20000) return "Gold";
-    if (points >= 5000) return "Silver";
-    return "Bronze";
-  };
-
-  const getNextTier = (currentTier: string) => {
-    switch (currentTier) {
-      case "Bronze": return "Silver";
-      case "Silver": return "Gold";
-      case "Gold": return "Platinum";
-      case "Platinum": return "Diamond";
-      default: return "Silver";
-    }
-  };
-
-  const getPointsToNextTier = (points: number, currentTier: string) => {
-    switch (currentTier) {
-      case "Bronze": return 5000 - points;
-      case "Silver": return 20000 - points;
-      case "Gold": return 50000 - points;
-      default: return 0;
-    }
-  };
-
   const handleRedeemReward = async (rewardId: string, programId: string) => {
     try {
       await redeemRewardMutation.mutateAsync({ rewardId, programId });
@@ -152,10 +117,6 @@ export default function FanPoints() {
     );
   }
 
-  const currentTier = getTierFromPoints(pointsSummary?.totalPoints || 0);
-  const nextTier = getNextTier(currentTier);
-  const pointsToNextTier = getPointsToNextTier(pointsSummary?.totalPoints || 0, currentTier);
-
   // Calculate platform points this month
   const platformPointsThisMonth = platformTxList
     .filter((tx: any) => {
@@ -167,10 +128,12 @@ export default function FanPoints() {
 
   // Calculate creator points this month
   const creatorPointsThisMonth = transactionHistory
-    .filter(tx => 
-      tx.type === 'earned' && 
-      new Date(tx.createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    )
+    .filter(tx => {
+      if (tx.type !== 'earned') return false;
+      const txDate = new Date(tx.createdAt);
+      const now = new Date();
+      return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+    })
     .reduce((sum, tx) => sum + tx.points, 0);
 
   return (
@@ -356,7 +319,7 @@ export default function FanPoints() {
           {/* Creator Points Tab */}
           <TabsContent value="creator" className="space-y-6">
             {/* Creator Points Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -387,26 +350,6 @@ export default function FanPoints() {
                   </div>
                   <div className="mt-2">
                     <p className="text-xs text-gray-400">{availableRewards.length} rewards available</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-400">Current Tier</p>
-                      <p className={`text-2xl font-bold ${getTierColor(currentTier)}`}>
-                        {currentTier}
-                      </p>
-                    </div>
-                    <Trophy className="h-8 w-8 text-yellow-400" />
-                  </div>
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-400">Next: {nextTier}</p>
-                    {pointsToNextTier > 0 && (
-                      <p className="text-xs text-gray-500">{pointsToNextTier.toLocaleString()} points to go</p>
-                    )}
                   </div>
                 </CardContent>
               </Card>
