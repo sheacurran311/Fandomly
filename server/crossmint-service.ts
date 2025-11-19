@@ -114,7 +114,58 @@ export class CrossmintService {
   // ========================================================================
 
   /**
-   * Create a new NFT collection on specified chain
+   * Create a new NFT collection on specified chain (idempotent version)
+   * Uses PUT endpoint with custom collectionId for guaranteed idempotency
+   */
+  async createCollectionIdempotent(
+    collectionId: string,
+    params: CreateCollectionParams
+  ): Promise<CreateCollectionResponse> {
+    const url = `${this.baseUrl}/2022-06-09/collections/${collectionId}`;
+
+    const body: any = {
+      chain: params.chain,
+      metadata: {
+        name: params.metadata.name,
+        description: params.metadata.description || '',
+        imageUrl: params.metadata.imageUrl || '',
+        symbol: params.metadata.symbol || params.metadata.name.substring(0, 10).toUpperCase(),
+      },
+      fungibility: params.fungibility || 'non-fungible',
+      reuploadLinkedFiles: true, // Auto-upload images to IPFS
+    };
+
+    if (params.supplyLimit) {
+      body.supplyLimit = params.supplyLimit;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Crossmint API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`
+        );
+      }
+
+      return (await response.json()) as CreateCollectionResponse;
+    } catch (error: any) {
+      console.error('❌ Crossmint createCollectionIdempotent error:', error);
+      throw new Error(`Failed to create collection: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a new NFT collection on specified chain (legacy POST version)
    */
   async createCollection(
     params: CreateCollectionParams
@@ -129,6 +180,7 @@ export class CrossmintService {
         imageUrl: params.metadata.imageUrl || '',
       },
       fungibility: params.fungibility || 'non-fungible',
+      reuploadLinkedFiles: true, // Auto-upload images to IPFS
     };
 
     // Add token metadata for EVM chains
@@ -205,7 +257,54 @@ export class CrossmintService {
   // ========================================================================
 
   /**
-   * Mint a single NFT to a recipient
+   * Mint a single NFT to a recipient (idempotent version)
+   * Uses PUT endpoint with custom nftId for guaranteed idempotency
+   * Recommended for production use to avoid duplicate mints
+   */
+  async mintNFTIdempotent(
+    nftId: string,
+    params: MintNFTParams
+  ): Promise<MintNFTResponse> {
+    const url = `${this.baseUrl}/2022-06-09/collections/${params.collectionId}/nfts/${nftId}`;
+
+    const body: any = {
+      recipient: params.recipient,
+      metadata: params.metadata,
+      reuploadLinkedFiles: params.reuploadLinkedFiles !== undefined ? params.reuploadLinkedFiles : true,
+    };
+
+    // Solana compressed NFTs
+    if (params.compressed && params.collectionId.includes('solana')) {
+      body.compressed = true;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Crossmint API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`
+        );
+      }
+
+      return (await response.json()) as MintNFTResponse;
+    } catch (error: any) {
+      console.error('❌ Crossmint mintNFTIdempotent error:', error);
+      throw new Error(`Failed to mint NFT: ${error.message}`);
+    }
+  }
+
+  /**
+   * Mint a single NFT to a recipient (legacy POST version)
    */
   async mintNFT(params: MintNFTParams): Promise<MintNFTResponse> {
     const url = `${this.baseUrl}/2022-06-09/collections/${params.collectionId}/nfts`;
@@ -213,12 +312,12 @@ export class CrossmintService {
     const body: any = {
       recipient: params.recipient,
       metadata: params.metadata,
+      reuploadLinkedFiles: params.reuploadLinkedFiles !== undefined ? params.reuploadLinkedFiles : true,
     };
 
     // Solana compressed NFTs
     if (params.compressed && params.collectionId.includes('solana')) {
       body.compressed = true;
-      body.reuploadLinkedFiles = params.reuploadLinkedFiles !== undefined ? params.reuploadLinkedFiles : false;
     }
 
     try {
@@ -354,6 +453,121 @@ export class CrossmintService {
   }
 
   // ========================================================================
+  // TEMPLATE MANAGEMENT (for Badge NFTs)
+  // ========================================================================
+
+  /**
+   * Create an NFT template with predefined metadata (idempotent)
+   * Perfect for badge templates that will be minted multiple times
+   */
+  async createTemplate(
+    collectionId: string,
+    templateId: string,
+    params: {
+      metadata: {
+        name: string;
+        image: string;
+        description?: string;
+        symbol?: string;
+        attributes?: Array<{ trait_type: string; value: string; display_type?: string }>;
+      };
+      supply?: {
+        limit?: number; // Set to 1 for NFTs, higher for SFTs
+      };
+      reuploadLinkedFiles?: boolean;
+    }
+  ): Promise<any> {
+    const url = `${this.baseUrl}/2022-06-09/collections/${collectionId}/templates/${templateId}`;
+
+    const body: any = {
+      metadata: {
+        name: params.metadata.name,
+        image: params.metadata.image,
+        description: params.metadata.description || '',
+      },
+      reuploadLinkedFiles: params.reuploadLinkedFiles !== undefined ? params.reuploadLinkedFiles : true,
+    };
+
+    if (params.metadata.symbol) {
+      body.metadata.symbol = params.metadata.symbol;
+    }
+
+    if (params.metadata.attributes) {
+      body.metadata.attributes = params.metadata.attributes;
+    }
+
+    if (params.supply) {
+      body.supply = params.supply;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Crossmint API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`
+        );
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      console.error('❌ Crossmint createTemplate error:', error);
+      throw new Error(`Failed to create template: ${error.message}`);
+    }
+  }
+
+  /**
+   * Mint from a template
+   * Use this for badge minting after creating a template
+   */
+  async mintFromTemplate(
+    collectionId: string,
+    templateId: string,
+    recipient: string,
+    nftId?: string // Optional nftId for idempotency
+  ): Promise<MintNFTResponse> {
+    const baseUrl = `${this.baseUrl}/2022-06-09/collections/${collectionId}/templates/${templateId}/nfts`;
+    const url = nftId ? `${baseUrl}/${nftId}` : baseUrl;
+
+    const body: any = {
+      recipient,
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: nftId ? 'PUT' : 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Crossmint API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`
+        );
+      }
+
+      return (await response.json()) as MintNFTResponse;
+    } catch (error: any) {
+      console.error('❌ Crossmint mintFromTemplate error:', error);
+      throw new Error(`Failed to mint from template: ${error.message}`);
+    }
+  }
+
+  // ========================================================================
   // NFT METADATA & MANAGEMENT
   // ========================================================================
 
@@ -476,6 +690,204 @@ export class CrossmintService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // ========================================================================
+  // BADGE-SPECIFIC HELPERS
+  // ========================================================================
+
+  /**
+   * Create a badge collection for Fandomly badges
+   * Optimized for badge use case with sensible defaults
+   */
+  async createBadgeCollection(
+    collectionId: string,
+    params: {
+      name: string;
+      description: string;
+      imageUrl: string;
+      chain?: string;
+      symbol?: string;
+    }
+  ): Promise<CreateCollectionResponse> {
+    return this.createCollectionIdempotent(collectionId, {
+      chain: params.chain || 'polygon', // Default to Polygon for badges
+      metadata: {
+        name: params.name,
+        description: params.description,
+        imageUrl: params.imageUrl,
+        symbol: params.symbol || 'BADGE',
+      },
+      fungibility: 'non-fungible',
+      supplyLimit: undefined, // Unlimited badges
+    });
+  }
+
+  /**
+   * Create a badge template for reusable badge types
+   * This allows minting the same badge to multiple users
+   */
+  async createBadgeTemplate(
+    collectionId: string,
+    badgeId: string,
+    params: {
+      name: string;
+      description: string;
+      imageUrl: string;
+      category: string; // achievement, milestone, special, event
+      criteria?: string;
+      requirements?: string[];
+    }
+  ): Promise<any> {
+    const attributes: Array<{ trait_type: string; value: string }> = [
+      { trait_type: 'Category', value: params.category },
+    ];
+
+    if (params.criteria) {
+      attributes.push({ trait_type: 'Criteria', value: params.criteria });
+    }
+
+    if (params.requirements && params.requirements.length > 0) {
+      params.requirements.forEach((req, index) => {
+        attributes.push({ trait_type: `Requirement ${index + 1}`, value: req });
+      });
+    }
+
+    return this.createTemplate(collectionId, badgeId, {
+      metadata: {
+        name: params.name,
+        image: params.imageUrl,
+        description: params.description,
+        symbol: 'BADGE',
+        attributes,
+      },
+      supply: {
+        limit: undefined, // Unlimited mints from this template
+      },
+      reuploadLinkedFiles: true,
+    });
+  }
+
+  /**
+   * Mint a badge to a user (idempotent)
+   * Use this to award badges to fans
+   */
+  async mintBadge(
+    collectionId: string,
+    badgeTemplateId: string,
+    recipientAddress: string,
+    mintId: string // Unique ID for this specific badge award (e.g., userId-badgeId)
+  ): Promise<MintNFTResponse> {
+    return this.mintFromTemplate(
+      collectionId,
+      badgeTemplateId,
+      recipientAddress,
+      mintId
+    );
+  }
+
+  // ========================================================================
+  // IMAGE HANDLING HELPERS
+  // ========================================================================
+
+  /**
+   * Validate that an image URL is accessible
+   * Crossmint will reupload this to IPFS automatically
+   */
+  static async validateImageUrl(imageUrl: string): Promise<boolean> {
+    try {
+      const response = await fetch(imageUrl, { method: 'HEAD' });
+      return response.ok;
+    } catch (error) {
+      console.error('Image URL validation failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate metadata JSON for an NFT/Badge
+   * Returns a properly formatted metadata object
+   */
+  static generateMetadata(params: {
+    name: string;
+    description: string;
+    imageUrl: string;
+    attributes?: Array<{ trait_type: string; value: string; display_type?: string }>;
+  }): MintNFTParams['metadata'] {
+    return {
+      name: params.name,
+      description: params.description,
+      image: params.imageUrl,
+      attributes: params.attributes || [],
+    };
+  }
+
+  /**
+   * Create a badge from scratch (collection + template + mint)
+   * All-in-one helper for creating and awarding a new badge type
+   */
+  async createAndMintBadge(params: {
+    // Collection info (created once per badge collection)
+    collectionId: string;
+    collectionName: string;
+    collectionDescription: string;
+    collectionImageUrl: string;
+    chain?: string;
+
+    // Badge template info
+    badgeTemplateId: string;
+    badgeName: string;
+    badgeDescription: string;
+    badgeImageUrl: string;
+    badgeCategory: string;
+    badgeCriteria?: string;
+    badgeRequirements?: string[];
+
+    // Minting info
+    recipientAddress: string;
+    mintId: string;
+  }): Promise<{
+    collection: CreateCollectionResponse;
+    template: any;
+    mint: MintNFTResponse;
+  }> {
+    // Step 1: Create collection (idempotent)
+    const collection = await this.createBadgeCollection(params.collectionId, {
+      name: params.collectionName,
+      description: params.collectionDescription,
+      imageUrl: params.collectionImageUrl,
+      chain: params.chain,
+    });
+
+    console.log('✅ Badge collection created:', collection.id);
+
+    // Step 2: Create badge template (idempotent)
+    const template = await this.createBadgeTemplate(
+      params.collectionId,
+      params.badgeTemplateId,
+      {
+        name: params.badgeName,
+        description: params.badgeDescription,
+        imageUrl: params.badgeImageUrl,
+        category: params.badgeCategory,
+        criteria: params.badgeCriteria,
+        requirements: params.badgeRequirements,
+      }
+    );
+
+    console.log('✅ Badge template created:', params.badgeTemplateId);
+
+    // Step 3: Mint badge to recipient (idempotent)
+    const mint = await this.mintBadge(
+      params.collectionId,
+      params.badgeTemplateId,
+      params.recipientAddress,
+      params.mintId
+    );
+
+    console.log('✅ Badge minted to:', params.recipientAddress);
+
+    return { collection, template, mint };
   }
 }
 
