@@ -3380,6 +3380,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // CAMPAIGN BUILDER: Draft & Task Assignment Endpoints
+  // ============================================================================
+
+  // Create draft campaign (soft-save for campaign builder)
+  app.post("/api/campaigns/draft", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      // Create draft campaign with minimal required fields
+      const campaignData = {
+        ...req.body,
+        creatorId: creator.id,
+        tenantId: creator.tenantId,
+        status: 'draft',
+        campaignType: 'direct',
+        trigger: 'custom_event',
+      };
+
+      const campaign = await storage.createCampaign(campaignData);
+      res.json(campaign);
+    } catch (error) {
+      console.error("Failed to create draft campaign:", error);
+      res.status(500).json({ error: "Failed to create draft campaign" });
+    }
+  });
+
+  // Assign task to campaign
+  app.post("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { taskId } = req.params;
+      const { campaignId } = req.body;
+
+      if (!campaignId) {
+        return res.status(400).json({ error: "Campaign ID required" });
+      }
+
+      // Update task with campaign assignment
+      const updatedTask = await storage.updateTask(taskId, { campaignId });
+      res.json(updatedTask);
+    } catch (error) {
+      console.error("Failed to assign task to campaign:", error);
+      res.status(500).json({ error: "Failed to assign task" });
+    }
+  });
+
+  // ============================================================================
   // SPRINT 8: LEADERBOARD ENDPOINTS
   // Real-time calculations only - no mock/hardcoded data
   // ============================================================================

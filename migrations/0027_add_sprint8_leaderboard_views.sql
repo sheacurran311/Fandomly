@@ -286,4 +286,6 @@ COMMENT ON FUNCTION refresh_leaderboard_views IS
 'Refresh all leaderboard materialized views concurrently';
 
 COMMENT ON TABLE leaderboard_badge_rewards IS
-'Configuration for automatic badge rewards based on leaderboard positions';
+'Configuration for automatic badge rewards based on leaderboard positions.
+NOTE: Auto badge rewards as NFTs are for PLATFORM CAMPAIGNS ONLY (admin-created).
+Creators have tools to implement their own NFT badges for campaign leaders, but winners are only for time-based campaigns (not ongoing programs).';
