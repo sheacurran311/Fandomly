@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/queryClient";
@@ -29,6 +30,7 @@ import {
 
 export default function CreatorCampaigns() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCampaignModal, setShowCampaignModal] = useState(false);
@@ -77,10 +79,10 @@ export default function CreatorCampaigns() {
               </p>
             </div>
             <div className="flex gap-3 mt-4 sm:mt-0">
-              <Button 
+              <Button
                 data-testid="button-create-campaign"
                 className="bg-brand-primary hover:bg-brand-primary/80"
-                onClick={() => setShowCampaignModal(true)}
+                onClick={() => setLocation("/creator-dashboard/campaign-builder")}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Campaign
@@ -196,7 +198,7 @@ export default function CreatorCampaigns() {
                   <Button 
                     data-testid="button-create-first-campaign"
                     className="bg-brand-primary hover:bg-brand-primary/80"
-                    onClick={() => setShowCampaignModal(true)}
+                    onClick={() => setLocation("/creator-dashboard/campaign-builder")}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Your First Campaign

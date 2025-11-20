@@ -70,6 +70,14 @@ export default function CampaignBuilderNew() {
   const [isSaving, setIsSaving] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [newTaskData, setNewTaskData] = useState({
+    name: "",
+    description: "",
+    taskType: "twitter_follow",
+    points: 100,
+    targetUrl: "",
+    targetUsername: "",
+  });
 
   // Campaign form state
   const [campaignData, setCampaignData] = useState({
@@ -157,6 +165,35 @@ export default function CampaignBuilderNew() {
     onSuccess: () => {
       refetchTasks();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    },
+  });
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: any) => {
+      const res = await fetchApi("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify(taskData),
+      });
+      return res.json();
+    },
+    onSuccess: async (newTask) => {
+      // Auto-assign to current campaign if we have one
+      if (campaignId && newTask.id) {
+        await assignTaskMutation.mutateAsync({ taskId: newTask.id, campaignId });
+        updateData("assignedTaskIds", [...campaignData.assignedTaskIds, newTask.id]);
+      }
+      refetchTasks();
+      setIsTaskModalOpen(false);
+      // Reset form
+      setNewTaskData({
+        name: "",
+        description: "",
+        taskType: "twitter_follow",
+        points: 100,
+        targetUrl: "",
+        targetUsername: "",
+      });
     },
   });
 
@@ -651,20 +688,121 @@ export default function CampaignBuilderNew() {
           </div>
         </div>
 
-        {/* Task Creation Modal - Placeholder for now */}
+        {/* Task Creation Modal */}
         <Dialog open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
-          <DialogContent className="bg-gray-900 border-white/10">
+          <DialogContent className="bg-gray-900 border-white/10 max-w-lg">
             <DialogHeader>
               <DialogTitle className="text-white">Create New Task</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
-              <p className="text-gray-400">
-                Task creation modal will be implemented here. For now, create tasks from the Tasks page and return to assign them.
-              </p>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-white">Task Name *</Label>
+                <Input
+                  value={newTaskData.name}
+                  onChange={(e) => setNewTaskData({ ...newTaskData, name: e.target.value })}
+                  placeholder="e.g., Follow on Twitter"
+                  className="mt-1 bg-white/5 border-white/20 text-white"
+                />
+              </div>
+
+              <div>
+                <Label className="text-white">Description</Label>
+                <Textarea
+                  value={newTaskData.description}
+                  onChange={(e) => setNewTaskData({ ...newTaskData, description: e.target.value })}
+                  placeholder="Describe what fans need to do..."
+                  className="mt-1 bg-white/5 border-white/20 text-white min-h-[80px]"
+                />
+              </div>
+
+              <div>
+                <Label className="text-white">Task Type</Label>
+                <Select
+                  value={newTaskData.taskType}
+                  onValueChange={(value) => setNewTaskData({ ...newTaskData, taskType: value })}
+                >
+                  <SelectTrigger className="mt-1 bg-white/5 border-white/20 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-white/20">
+                    <SelectItem value="twitter_follow">Twitter Follow</SelectItem>
+                    <SelectItem value="twitter_retweet">Twitter Retweet</SelectItem>
+                    <SelectItem value="twitter_like">Twitter Like</SelectItem>
+                    <SelectItem value="instagram_follow">Instagram Follow</SelectItem>
+                    <SelectItem value="instagram_like_post">Instagram Like</SelectItem>
+                    <SelectItem value="youtube_subscribe">YouTube Subscribe</SelectItem>
+                    <SelectItem value="youtube_like">YouTube Like</SelectItem>
+                    <SelectItem value="tiktok_follow">TikTok Follow</SelectItem>
+                    <SelectItem value="spotify_follow">Spotify Follow</SelectItem>
+                    <SelectItem value="discord_join">Discord Join</SelectItem>
+                    <SelectItem value="referral">Referral</SelectItem>
+                    <SelectItem value="website_visit">Website Visit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-white">Points Reward</Label>
+                  <Input
+                    type="number"
+                    value={newTaskData.points}
+                    onChange={(e) => setNewTaskData({ ...newTaskData, points: parseInt(e.target.value) || 0 })}
+                    className="mt-1 bg-white/5 border-white/20 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-white">Target Username</Label>
+                  <Input
+                    value={newTaskData.targetUsername}
+                    onChange={(e) => setNewTaskData({ ...newTaskData, targetUsername: e.target.value })}
+                    placeholder="@username"
+                    className="mt-1 bg-white/5 border-white/20 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-white">Target URL (optional)</Label>
+                <Input
+                  value={newTaskData.targetUrl}
+                  onChange={(e) => setNewTaskData({ ...newTaskData, targetUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="mt-1 bg-white/5 border-white/20 text-white"
+                />
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsTaskModalOpen(false)}>
-                Close
+              <Button
+                variant="outline"
+                onClick={() => setIsTaskModalOpen(false)}
+                className="border-white/20 text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  createTaskMutation.mutate({
+                    name: newTaskData.name,
+                    description: newTaskData.description,
+                    taskType: newTaskData.taskType,
+                    pointsToReward: newTaskData.points,
+                    customSettings: {
+                      targetUrl: newTaskData.targetUrl,
+                      targetUsername: newTaskData.targetUsername,
+                    },
+                    campaignId: campaignId,
+                  });
+                }}
+                disabled={!newTaskData.name || createTaskMutation.isPending}
+                className="bg-brand-primary hover:bg-brand-primary/80"
+              >
+                {createTaskMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                Create Task
               </Button>
             </DialogFooter>
           </DialogContent>
