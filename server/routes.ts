@@ -3372,10 +3372,314 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('Error fetching creator store:', error);
-      res.status(500).json({ 
-        error: "Error fetching creator store", 
-        message: error.message 
+      res.status(500).json({
+        error: "Error fetching creator store",
+        message: error.message
       });
+    }
+  });
+
+  // ============================================================================
+  // CAMPAIGN BUILDER: Draft & Task Assignment Endpoints
+  // ============================================================================
+
+  // Create draft campaign (soft-save for campaign builder)
+  app.post("/api/campaigns/draft", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      // Create draft campaign with minimal required fields
+      const campaignData = {
+        ...req.body,
+        creatorId: creator.id,
+        tenantId: creator.tenantId,
+        status: 'draft',
+        campaignType: 'direct',
+        trigger: 'custom_event',
+      };
+
+      const campaign = await storage.createCampaign(campaignData);
+      res.json(campaign);
+    } catch (error) {
+      console.error("Failed to create draft campaign:", error);
+      res.status(500).json({ error: "Failed to create draft campaign" });
+    }
+  });
+
+  // Assign task to campaign
+  app.post("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { taskId } = req.params;
+      const { campaignId } = req.body;
+
+      if (!campaignId) {
+        return res.status(400).json({ error: "Campaign ID required" });
+      }
+
+      // Update task with campaign assignment
+      const updatedTask = await storage.updateTask(taskId, { campaignId });
+      res.json(updatedTask);
+    } catch (error) {
+      console.error("Failed to assign task to campaign:", error);
+      res.status(500).json({ error: "Failed to assign task" });
+    }
+  });
+
+  // ============================================================================
+  // SPRINT 8: LEADERBOARD ENDPOINTS
+  // Real-time calculations only - no mock/hardcoded data
+  // ============================================================================
+
+  // Platform Leaderboard - Global rankings across all fans
+  app.get("/api/leaderboards/platform", async (req, res) => {
+    try {
+      const { sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      const timePeriod = (req.query.period as string) || 'all_time';
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      // Use the database function for real-time calculation
+      const result = await db.execute(sql`
+        SELECT * FROM get_platform_leaderboard(${timePeriod}, ${limit})
+      `);
+
+      res.json({
+        leaderboard: result.rows.map(row => ({
+          userId: row.user_id,
+          username: row.username,
+          fullName: row.full_name,
+          avatarUrl: row.avatar_url,
+          totalPoints: row.total_points || 0,
+          rank: row.rank || 0
+        })),
+        timePeriod,
+        totalParticipants: result.rows.length
+      });
+    } catch (error) {
+      console.error("Failed to fetch platform leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch platform leaderboard" });
+    }
+  });
+
+  // Campaign Leaderboard - Per-campaign rankings
+  app.get("/api/leaderboards/campaign/:campaignId", async (req, res) => {
+    try {
+      const { sql, eq } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+      const { campaigns } = await import("@shared/schema");
+
+      const { campaignId } = req.params;
+      const timePeriod = (req.query.period as string) || 'all_time';
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      // Use the database function for real-time calculation
+      const result = await db.execute(sql`
+        SELECT * FROM get_campaign_leaderboard(${campaignId}, ${timePeriod}, ${limit})
+      `);
+
+      // Get campaign details
+      const campaign = await db.select().from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
+
+      res.json({
+        campaignId,
+        campaignName: campaign[0]?.name || 'Unknown Campaign',
+        leaderboard: result.rows.map(row => ({
+          userId: row.user_id,
+          username: row.username,
+          fullName: row.full_name,
+          avatarUrl: row.avatar_url,
+          totalPoints: row.total_points || 0,
+          participationCount: row.participation_count || 0,
+          rank: row.rank || 0
+        })),
+        timePeriod,
+        totalParticipants: result.rows.length
+      });
+    } catch (error) {
+      console.error("Failed to fetch campaign leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch campaign leaderboard" });
+    }
+  });
+
+  // Program Leaderboard - Per-program rankings
+  app.get("/api/leaderboards/program/:programId", async (req, res) => {
+    try {
+      const { sql, eq } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+      const { loyaltyPrograms } = await import("@shared/schema");
+
+      const { programId } = req.params;
+      const timePeriod = (req.query.period as string) || 'all_time';
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      // Use the database function for real-time calculation
+      const result = await db.execute(sql`
+        SELECT * FROM get_program_leaderboard(${programId}, ${timePeriod}, ${limit})
+      `);
+
+      // Get program details
+      const program = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.id, programId)).limit(1);
+
+      res.json({
+        programId,
+        programName: program[0]?.name || 'Unknown Program',
+        leaderboard: result.rows.map(row => ({
+          userId: row.user_id,
+          username: row.username,
+          fullName: row.full_name,
+          avatarUrl: row.avatar_url,
+          totalPoints: row.total_points || 0,
+          currentTier: row.current_tier,
+          rank: row.rank || 0
+        })),
+        timePeriod,
+        totalParticipants: result.rows.length
+      });
+    } catch (error) {
+      console.error("Failed to fetch program leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch program leaderboard" });
+    }
+  });
+
+  // Refresh leaderboard views (admin only)
+  app.post("/api/leaderboards/refresh", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      // Check if user is admin
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      await db.execute(sql`SELECT refresh_leaderboard_views()`);
+
+      res.json({ success: true, message: "Leaderboard views refreshed" });
+    } catch (error) {
+      console.error("Failed to refresh leaderboard views:", error);
+      res.status(500).json({ error: "Failed to refresh leaderboard views" });
+    }
+  });
+
+  // Get user's leaderboard position across all types
+  app.get("/api/leaderboards/my-rankings", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get platform ranking
+      const platformResult = await db.execute(sql`
+        SELECT rank, total_points
+        FROM platform_leaderboard
+        WHERE user_id = ${userId}
+      `);
+
+      // Get program rankings
+      const programResults = await db.execute(sql`
+        SELECT program_id, program_name, rank, total_points, current_tier
+        FROM program_leaderboard
+        WHERE user_id = ${userId}
+      `);
+
+      // Get campaign rankings
+      const campaignResults = await db.execute(sql`
+        SELECT campaign_id, campaign_name, rank, total_points
+        FROM campaign_leaderboard
+        WHERE user_id = ${userId}
+      `);
+
+      res.json({
+        platform: platformResult.rows[0] ? {
+          rank: platformResult.rows[0].rank || 0,
+          totalPoints: platformResult.rows[0].total_points || 0
+        } : { rank: 0, totalPoints: 0 },
+        programs: programResults.rows.map(row => ({
+          programId: row.program_id,
+          programName: row.program_name,
+          rank: row.rank || 0,
+          totalPoints: row.total_points || 0,
+          currentTier: row.current_tier
+        })),
+        campaigns: campaignResults.rows.map(row => ({
+          campaignId: row.campaign_id,
+          campaignName: row.campaign_name,
+          rank: row.rank || 0,
+          totalPoints: row.total_points || 0
+        }))
+      });
+    } catch (error) {
+      console.error("Failed to fetch user rankings:", error);
+      res.status(500).json({ error: "Failed to fetch user rankings" });
+    }
+  });
+
+  // Configure automatic badge rewards for leaderboard positions
+  app.post("/api/leaderboards/badge-rewards", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      // Check if user is admin or creator
+      const user = await storage.getUser(req.user?.id || '');
+      if (!user || (user.role !== 'admin' && user.userType !== 'creator')) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { leaderboardType, targetId, badgeId, minRank, maxRank } = req.body;
+
+      const result = await db.execute(sql`
+        INSERT INTO leaderboard_badge_rewards (leaderboard_type, target_id, badge_id, min_rank, max_rank)
+        VALUES (${leaderboardType}, ${targetId}, ${badgeId}, ${minRank || 1}, ${maxRank || 1})
+        RETURNING *
+      `);
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Failed to configure badge reward:", error);
+      res.status(500).json({ error: "Failed to configure badge reward" });
+    }
+  });
+
+  // Get badge reward configurations for a leaderboard
+  app.get("/api/leaderboards/badge-rewards/:type/:targetId?", async (req, res) => {
+    try {
+      const { sql } = await import("drizzle-orm");
+      const db = (await import("./db")).db;
+
+      const { type, targetId } = req.params;
+
+      const result = await db.execute(sql`
+        SELECT * FROM leaderboard_badge_rewards
+        WHERE leaderboard_type = ${type}
+        AND (${targetId}::VARCHAR IS NULL OR target_id = ${targetId})
+        AND is_active = true
+        ORDER BY min_rank
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Failed to fetch badge rewards:", error);
+      res.status(500).json({ error: "Failed to fetch badge rewards" });
     }
   });
 

@@ -1,27 +1,38 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Trophy, ExternalLink } from "lucide-react";
+import { Trophy, ExternalLink, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
 interface LeaderboardEntry {
-  id: string;
-  name: string;
+  userId: string;
   username: string;
-  points: number;
-  avatar?: string;
+  fullName: string;
+  avatarUrl: string | null;
+  totalPoints: number;
   rank: number;
 }
 
-export default function LeaderboardWidget() {
-  // Mock data - replace with actual API call
-  const topFans: LeaderboardEntry[] = [
-    { id: "1", name: "Sarah Mitchell", username: "@sarahm", points: 2450, rank: 1 },
-    { id: "2", name: "Mike Rodriguez", username: "@miker", points: 2180, rank: 2 },
-    { id: "3", name: "Emma Chen", username: "@emm achen", points: 1950, rank: 3 },
-    { id: "4", name: "James Wilson", username: "@jwilson", points: 1820, rank: 4 },
-    { id: "5", name: "Lisa Anderson", username: "@lisaa", points: 1690, rank: 5 },
-  ];
+interface Props {
+  programId?: string;
+}
+
+export default function LeaderboardWidget({ programId }: Props) {
+  // Real-time data from API - no mock data
+  const { data, isLoading } = useQuery<{ leaderboard: LeaderboardEntry[] }>({
+    queryKey: ["program-leaderboard", programId],
+    queryFn: async () => {
+      const endpoint = programId
+        ? `/api/leaderboards/program/${programId}?period=all_time&limit=5`
+        : `/api/leaderboards/platform?period=all_time&limit=5`;
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error("Failed to fetch leaderboard");
+      return res.json();
+    },
+  });
+
+  const topFans = data?.leaderboard || [];
   
   const getRankColor = (rank: number) => {
     if (rank === 1) return "text-yellow-400";
@@ -30,6 +41,18 @@ export default function LeaderboardWidget() {
     return "text-gray-400";
   };
   
+  if (isLoading) {
+    return (
+      <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-brand-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const hasData = topFans.some(fan => fan.totalPoints > 0);
+
   return (
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
       <CardHeader>
@@ -51,40 +74,47 @@ export default function LeaderboardWidget() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {topFans.map((fan) => (
-            <div
-              key={fan.id}
-              className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              <div className={`text-lg font-bold w-6 text-center ${getRankColor(fan.rank)}`}>
-                {fan.rank}
+        {!hasData ? (
+          <div className="text-center py-6">
+            <Trophy className="h-8 w-8 mx-auto mb-2 text-gray-500" />
+            <p className="text-sm text-gray-400">No activity yet</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {topFans.map((fan) => (
+              <div
+                key={fan.userId}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <div className={`text-lg font-bold w-6 text-center ${getRankColor(fan.rank)}`}>
+                  {fan.rank}
+                </div>
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={fan.avatarUrl || undefined} alt={fan.fullName} />
+                  <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-sm">
+                    {fan.fullName?.split(' ').map(n => n[0]).join('') || fan.username?.[0]?.toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="text-white font-medium text-sm truncate">
+                    {fan.fullName || fan.username || 'Anonymous'}
+                  </div>
+                  <div className="text-gray-400 text-xs truncate">
+                    @{fan.username || 'user'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-brand-primary font-bold text-sm">
+                    {fan.totalPoints.toLocaleString()}
+                  </div>
+                  <div className="text-gray-400 text-xs">
+                    points
+                  </div>
+                </div>
               </div>
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={fan.avatar} alt={fan.name} />
-                <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-sm">
-                  {fan.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="text-white font-medium text-sm truncate">
-                  {fan.name}
-                </div>
-                <div className="text-gray-400 text-xs truncate">
-                  {fan.username}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-brand-primary font-bold text-sm">
-                  {fan.points.toLocaleString()}
-                </div>
-                <div className="text-gray-400 text-xs">
-                  points
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -35,6 +35,7 @@ import CreatorNIL from "@/pages/creator-dashboard/nil";
 import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
 import CreatorSettings from "@/pages/creator-dashboard/settings";
 import ProgramBuilder from "@/pages/creator-dashboard/program-builder";
+import CampaignBuilderNew from "@/pages/creator-dashboard/campaign-builder-new";
 import ProgramPublic from "@/pages/program-public";
 import BillingPage from "@/pages/billing";
 import FanDashboard from "@/pages/fan-dashboard";
@@ -114,6 +115,7 @@ function Router() {
       <Route path="/creator-dashboard/tasks/edit/:id" component={TaskBuilder} />
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
+      <Route path="/creator-dashboard/campaign-builder" component={CampaignBuilderNew} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
       <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
