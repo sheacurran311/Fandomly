@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
 import { SocialIntegrationManager } from "@/lib/social-integrations";
+import { RewardConfiguration, getRewardConfigDefaults, RewardType, UpdateCadence, RewardFrequency } from "./RewardConfiguration";
 
 interface TwitterTaskBuilderProps {
   onSave: (config: any) => void;
@@ -48,7 +49,6 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
   const { toast } = useToast();
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(50);
   const [handle, setHandle] = useState('');
   const [tweetUrl, setTweetUrl] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true);
@@ -64,6 +64,17 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
   const [showAddPartner, setShowAddPartner] = useState(false);
   const [newPartnerHandle, setNewPartnerHandle] = useState('');
   const [newPartnerPoints, setNewPartnerPoints] = useState(50);
+
+  // Reward Configuration (Snag-inspired)
+  const rewardDefaults = getRewardConfigDefaults(taskType, 'twitter');
+  const [rewardType, setRewardType] = useState<RewardType>('points');
+  const [pointsToReward, setPointsToReward] = useState(50);
+  const [pointCurrency, setPointCurrency] = useState('default');
+  const [multiplierValue, setMultiplierValue] = useState(1.5);
+  const [currenciesToApply, setCurrenciesToApply] = useState<string[]>([]);
+  const [applyToExistingBalance, setApplyToExistingBalance] = useState(false);
+  const [updateCadence, setUpdateCadence] = useState<UpdateCadence>(rewardDefaults.updateCadence);
+  const [rewardFrequency, setRewardFrequency] = useState<RewardFrequency>(rewardDefaults.rewardFrequency);
 
   const extractTweetId = useExtractTweetId();
 
@@ -153,7 +164,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       const defaults = getDefaultValues();
       setTaskName(defaults.name);
       setDescription(defaults.description);
-      setPoints(defaults.points);
+      setPointsToReward(defaults.points);
     }
   }, [taskType, isEditMode]);
   
@@ -162,7 +173,13 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
-      setPoints(initialData.points || 50);
+      setPointsToReward(initialData.pointsToReward || initialData.points || 50);
+      setRewardType(initialData.rewardType || 'points');
+      if (initialData.pointCurrency) setPointCurrency(initialData.pointCurrency);
+      if (initialData.multiplierValue) setMultiplierValue(initialData.multiplierValue);
+      if (initialData.updateCadence) setUpdateCadence(initialData.updateCadence);
+      if (initialData.rewardFrequency) setRewardFrequency(initialData.rewardFrequency);
+      
       if (initialData.settings?.handle) {
         setHandle(initialData.settings.handle);
       }
@@ -249,8 +266,12 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
     if (!description.trim()) {
       errors.push('Description is required');
     }
-    if (points < 1 || points > 10000) {
+    // Validate reward configuration
+    if (rewardType === 'points' && (pointsToReward < 1 || pointsToReward > 10000)) {
       errors.push('Points must be between 1 and 10,000');
+    }
+    if (rewardType === 'multiplier' && (multiplierValue < 1.01 || multiplierValue > 10)) {
+      errors.push('Multiplier must be between 1.01 and 10.0');
     }
     
     if (taskType === 'twitter_follow') {
@@ -275,7 +296,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
   // Validate on config changes
   useEffect(() => {
     validateForm();
-  }, [taskName, description, points, handle, tweetUrl, tweetIdValid, twitterConnected, taskType]);
+  }, [taskName, description, pointsToReward, multiplierValue, rewardType, handle, tweetUrl, tweetIdValid, twitterConnected, taskType]);
 
   const buildTaskConfig = (isDraft: boolean) => {
     const baseConfig = {
@@ -283,9 +304,20 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       description,
       taskType,
       platform: 'twitter' as const,
-      points,
       isDraft,
       verificationMethod: useApiVerification ? 'api' : 'manual',
+      
+      // Reward configuration
+      rewardType,
+      pointsToReward: rewardType === 'points' ? pointsToReward : undefined,
+      pointCurrency: rewardType === 'points' ? pointCurrency : undefined,
+      multiplierValue: rewardType === 'multiplier' ? multiplierValue : undefined,
+      currenciesToApply: rewardType === 'multiplier' ? currenciesToApply : undefined,
+      applyToExistingBalance: rewardType === 'multiplier' ? applyToExistingBalance : undefined,
+      
+      // Timing configuration
+      updateCadence,
+      rewardFrequency,
     };
 
     if (taskType === 'twitter_follow') {
@@ -328,7 +360,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
           ...mainTask,
           name: `Follow @${partner.handle} on Twitter`,
           description: `Follow @${partner.handle} on Twitter to earn points`,
-          points: partner.points,
+          pointsToReward: partner.points,
           settings: {
             handle: partner.handle,
             isPartnerAccount: true,
@@ -361,7 +393,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
           ...mainTask,
           name: `Follow @${partner.handle} on Twitter`,
           description: `Follow @${partner.handle} on Twitter to earn points`,
-          points: partner.points,
+          pointsToReward: partner.points,
           settings: {
             handle: partner.handle,
             isPartnerAccount: true,
@@ -433,7 +465,13 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       <div className="space-y-2 text-sm">
         <p><span className="text-blue-400">Type:</span> {taskType.replace('twitter_', '').replace('_', ' ').toUpperCase()}</p>
         <p><span className="text-blue-400">Name:</span> {taskName || 'Untitled Task'}</p>
-        <p><span className="text-blue-400">Points:</span> {points} points</p>
+        <p><span className="text-blue-400">Reward:</span> {
+          rewardType === 'points' 
+            ? `${pointsToReward} ${pointCurrency} points`
+            : `${multiplierValue}x multiplier`
+        }</p>
+        <p><span className="text-blue-400">Cadence:</span> {updateCadence}</p>
+        <p><span className="text-blue-400">Frequency:</span> {rewardFrequency.replace('_', ' ')}</p>
         <p><span className="text-blue-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
         {taskType === 'twitter_follow' && handle && (
           <p><span className="text-blue-400">Handle:</span> @{handle}</p>
@@ -529,23 +567,6 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                 className={`bg-white/5 border-white/10 text-white ${!twitterConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
                 disabled={!twitterConnected}
               />
-            </div>
-
-            {/* Points */}
-            <div className="space-y-2">
-              <Label className="text-white">Points Reward</Label>
-              <NumberInput
-                value={points}
-                onChange={(val) => setPoints(val || 1)}
-                min={1}
-                max={10000}
-                allowEmpty={false}
-                className={`bg-white/5 border-white/10 text-white ${!twitterConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={!twitterConnected}
-              />
-              <p className="text-xs text-gray-400">
-                How many points fans will earn for completing this task
-              </p>
             </div>
 
             {/* Task-Specific Fields */}
@@ -732,6 +753,31 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
               )}
             </div>
 
+            {/* Reward Configuration (Snag-inspired) */}
+            <RewardConfiguration
+              rewardType={rewardType}
+              onRewardTypeChange={setRewardType}
+              pointsToReward={pointsToReward}
+              onPointsToRewardChange={setPointsToReward}
+              pointCurrency={pointCurrency}
+              onPointCurrencyChange={setPointCurrency}
+              multiplierValue={multiplierValue}
+              onMultiplierValueChange={setMultiplierValue}
+              currenciesToApply={currenciesToApply}
+              onCurrenciesToApplyChange={setCurrenciesToApply}
+              applyToExistingBalance={applyToExistingBalance}
+              onApplyToExistingBalanceChange={setApplyToExistingBalance}
+              updateCadence={updateCadence}
+              onUpdateCadenceChange={setUpdateCadence}
+              rewardFrequency={rewardFrequency}
+              onRewardFrequencyChange={setRewardFrequency}
+              taskType={taskType}
+              platform="twitter"
+              lockCadence={rewardDefaults.lockCadence}
+              lockFrequency={rewardDefaults.lockFrequency}
+              errors={[]}
+            />
+
             {/* Preview */}
             <div className="space-y-2">
               <Label className="text-white">Preview</Label>
@@ -748,7 +794,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                       </div>
                     </div>
                     <Badge variant="outline" className="border-brand-primary text-brand-primary">
-                      +{points} points
+                      +{rewardType === 'points' ? pointsToReward : `${multiplierValue}x`} {rewardType === 'points' ? 'points' : 'multiplier'}
                     </Badge>
                   </div>
                   {useApiVerification && (

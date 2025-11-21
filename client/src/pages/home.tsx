@@ -30,10 +30,82 @@ export default function Home() {
                            repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 40px, rgba(255,255,255,0.03) 41px)`
         }}></div>
 
-        {/* Left: Creator Showcase Visual */}
+        {/* Left: Manifesto Stack */}
+        <div className="relative z-10 flex flex-col justify-center p-8 lg:p-16 lg:pr-8">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            {/* Vertical Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl border border-[#14feee]/30 rounded-full mb-6" data-testid="hero-live-badge">
+              <Rocket className="w-4 h-4 text-[#14feee]" />
+              <span className="text-sm font-semibold text-[#14feee]">Now in Early Access</span>
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-none mb-8">
+              <span className="block text-white mb-2">Turn</span>
+              <span className="block bg-gradient-to-r from-[#8B5CF6] via-[#14feee] to-[#e10698] bg-clip-text text-transparent">
+                Fans Into
+              </span>
+              <span className="block text-white mt-2">Fortune</span>
+            </h1>
+
+            {/* Subheadline */}
+            <p className="text-xl text-gray-300 mb-8 max-w-xl leading-relaxed">
+              The first Web3 loyalty platform for athletes, content creators, musicians, and brands. Launch campaigns across 8 social platforms, verify engagement, and distribute rewards—all powered by AI.
+            </p>
+
+            {/* CTA Stack */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-12">
+              <motion.button
+                onClick={() => setShowAuthFlow(true)}
+                className="group relative px-8 py-4 bg-gradient-to-r from-[#14feee] to-[#e10698] rounded-xl font-bold text-white overflow-hidden"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                data-testid="button-launch-program"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  <Rocket className="w-5 h-5" />
+                  Launch Your Program
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => setShowAuthFlow(true)}
+                className="px-8 py-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl font-bold text-white hover:bg-white/20 transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                data-testid="button-join-fan"
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Join as Fan
+                </span>
+              </motion.button>
+            </div>
+
+            {/* Platform Capabilities Ticker */}
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl p-4" data-testid="hero-platform-ticker">
+              <div className="text-xs text-gray-400 mb-2">PLATFORM CAPABILITIES</div>
+              <div className="grid grid-cols-4 gap-4">
+                {platformCapabilities.map((cap, idx) => (
+                  <div key={idx} data-testid={`capability-${idx}`}>
+                    <div className="text-2xl font-black bg-gradient-to-r from-[#14feee] to-[#e10698] bg-clip-text text-transparent">{cap.value}</div>
+                    <div className="text-xs text-gray-400">{cap.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Right: Creator Showcase Visual */}
         <div className="relative z-10 flex items-center justify-center p-8 lg:p-16">
           <motion.div
-            initial={{ opacity: 0, x: -100 }}
+            initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 1, ease: "easeOut" }}
             className="relative w-full max-w-lg"
@@ -105,78 +177,6 @@ export default function Home() {
               }}
               transition={{ duration: 4, repeat: Infinity }}
             />
-          </motion.div>
-        </div>
-
-        {/* Right: Manifesto Stack */}
-        <div className="relative z-10 flex flex-col justify-center p-8 lg:p-16 lg:pl-8">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            {/* Vertical Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl border border-[#14feee]/30 rounded-full mb-6" data-testid="hero-live-badge">
-              <Rocket className="w-4 h-4 text-[#14feee]" />
-              <span className="text-sm font-semibold text-[#14feee]">Now in Early Access</span>
-            </div>
-
-            {/* Main Headline */}
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-none mb-8">
-              <span className="block text-white mb-2">Turn</span>
-              <span className="block bg-gradient-to-r from-[#8B5CF6] via-[#14feee] to-[#e10698] bg-clip-text text-transparent">
-                Fans Into
-              </span>
-              <span className="block text-white mt-2">Fortune</span>
-            </h1>
-
-            {/* Subheadline */}
-            <p className="text-xl text-gray-300 mb-8 max-w-xl leading-relaxed">
-              The first Web3 loyalty platform for athletes, content creators, musicians, and brands. Launch campaigns across 8 social platforms, verify engagement, and distribute rewards—all powered by AI.
-            </p>
-
-            {/* CTA Stack */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-12">
-              <motion.button
-                onClick={() => setShowAuthFlow(true)}
-                className="group relative px-8 py-4 bg-gradient-to-r from-[#14feee] to-[#e10698] rounded-xl font-bold text-white overflow-hidden"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                data-testid="button-launch-program"
-              >
-                <span className="relative z-10 flex items-center gap-2">
-                  <Rocket className="w-5 h-5" />
-                  Launch Your Program
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </span>
-              </motion.button>
-
-              <motion.button
-                onClick={() => setShowAuthFlow(true)}
-                className="px-8 py-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl font-bold text-white hover:bg-white/20 transition-all"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                data-testid="button-join-fan"
-              >
-                <span className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Join as Fan
-                </span>
-              </motion.button>
-            </div>
-
-            {/* Platform Capabilities Ticker */}
-            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl p-4" data-testid="hero-platform-ticker">
-              <div className="text-xs text-gray-400 mb-2">PLATFORM CAPABILITIES</div>
-              <div className="grid grid-cols-4 gap-4">
-                {platformCapabilities.map((cap, idx) => (
-                  <div key={idx} data-testid={`capability-${idx}`}>
-                    <div className="text-2xl font-black bg-gradient-to-r from-[#14feee] to-[#e10698] bg-clip-text text-transparent">{cap.value}</div>
-                    <div className="text-xs text-gray-400">{cap.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </motion.div>
         </div>
       </section>

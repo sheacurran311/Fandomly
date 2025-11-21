@@ -30,7 +30,7 @@ import { unifiedVerification } from "./services/verification/unified-verificatio
 import { taskFrequencyService } from "./services/task-frequency-service";
 
 // Task configuration schemas based on our task builders
-const baseTaskSchema = z.object({
+const baseTaskSchemaFields = {
   name: z.string().min(1),
   description: z.string().optional(),
   ownershipLevel: z.enum(['platform', 'creator']).default('creator'),
@@ -42,16 +42,33 @@ const baseTaskSchema = z.object({
   isRequired: z.boolean().default(false),
   hideFromUI: z.boolean().default(false),
   isDraft: z.boolean().default(true),
+  
+  // REWARD CONFIGURATION (Snag-inspired)
+  rewardType: z.enum(['points', 'multiplier']).default('points'),
+  
+  // Points reward fields
+  pointsToReward: z.number().min(1).max(10000).optional(),
+  pointCurrency: z.string().default('default'),
+  
+  // Multiplier reward fields
+  multiplierValue: z.number().min(1.01).max(10.0).optional(),
+  currenciesToApply: z.array(z.string()).optional(),
+  applyToExistingBalance: z.boolean().default(false),
+  
+  // TIMING CONFIGURATION (Snag-inspired)
   updateCadence: z.enum(['immediate', 'daily', 'weekly', 'monthly']).default('immediate'),
   rewardFrequency: z.enum(['one_time', 'daily', 'weekly', 'monthly']).default('one_time'),
-  // Sprint 3: Point multiplier configuration
+  
+  // Task-specific multiplier for ALL tasks
   baseMultiplier: z.number().min(1.0).max(10.0).optional().default(1.0),
   multiplierConfig: z.object({
     stackingType: z.enum(['additive', 'multiplicative']).optional(),
     maxMultiplier: z.number().min(1.0).optional(),
     allowEventMultipliers: z.boolean().optional(),
   }).optional(),
-});
+};
+
+const baseTaskSchema = z.object(baseTaskSchemaFields);
 
 const referralTaskSchema = baseTaskSchema.extend({
   taskType: z.literal('referral'),
@@ -124,56 +141,56 @@ const completeProfileTaskSchema = baseTaskSchema.extend({
 const twitterTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet', 'twitter_quote_tweet', 'twitter_reply']),
   platform: z.literal('twitter'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: twitterTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const facebookTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['facebook_like_page', 'facebook_like_post', 'facebook_comment_post', 'facebook_comment_photo', 'facebook_share', 'facebook_join_group']),
   platform: z.literal('facebook'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: facebookTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const instagramTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['instagram_follow', 'instagram_like_post', 'comment_code', 'mention_story', 'keyword_comment']),
   platform: z.literal('instagram'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: instagramTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const youtubeTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['youtube_subscribe', 'youtube_like', 'youtube_comment', 'youtube_watch', 'youtube_share']),
   platform: z.literal('youtube'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: youtubeTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const tiktokTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment', 'tiktok_share', 'tiktok_duet', 'tiktok_stitch', 'tiktok_post']),
   platform: z.literal('tiktok'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: tiktokTaskSettings.omit({ platform: true }).optional(), // Use unified schema
 });
 
 const spotifyTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['spotify_follow', 'spotify_playlist', 'spotify_save_track', 'spotify_save_album']),
   platform: z.literal('spotify'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: spotifyTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const twitchTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['twitch_follow', 'twitch_subscribe', 'twitch_watch']),
   platform: z.literal('twitch'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: twitchTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const discordTaskSchema = baseTaskSchema.extend({
   taskType: z.enum(['discord_join', 'discord_verify', 'discord_react', 'discord_message']),
   platform: z.literal('discord'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: discordTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
@@ -181,7 +198,7 @@ const discordTaskSchema = baseTaskSchema.extend({
 const pollTaskSchema = baseTaskSchema.extend({
   taskType: z.literal('poll'),
   platform: z.literal('interactive'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   verificationMethod: z.literal('auto_interactive').optional(),
   settings: z.object({
     pollQuizConfig: z.object({
@@ -206,7 +223,7 @@ const pollTaskSchema = baseTaskSchema.extend({
 const quizTaskSchema = baseTaskSchema.extend({
   taskType: z.literal('quiz'),
   platform: z.literal('interactive'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   verificationMethod: z.literal('auto_interactive').optional(),
   settings: z.object({
     pollQuizConfig: z.object({
@@ -234,7 +251,7 @@ const quizTaskSchema = baseTaskSchema.extend({
 const websiteVisitTaskSchema = baseTaskSchema.extend({
   taskType: z.literal('website_visit'),
   platform: z.literal('interactive'),
-  points: z.number().min(1).max(10000),
+  points: z.number().min(1).max(10000).optional(), // Legacy support
   verificationMethod: z.literal('auto_tracking').optional(),
   settings: z.object({
     websiteConfig: z.object({
@@ -247,7 +264,7 @@ const websiteVisitTaskSchema = baseTaskSchema.extend({
   }),
 });
 
-// Union of all task schemas
+// Union of all task schemas with validation
 const createTaskSchema = z.discriminatedUnion('taskType', [
   referralTaskSchema,
   checkInTaskSchema,
@@ -265,7 +282,19 @@ const createTaskSchema = z.discriminatedUnion('taskType', [
   pollTaskSchema,
   quizTaskSchema,
   websiteVisitTaskSchema,
-]);
+]).refine((data) => {
+  // If reward type is 'points', pointsToReward is required (unless legacy 'points' field exists)
+  if (data.rewardType === 'points' && !data.pointsToReward && !('points' in data)) {
+    return false;
+  }
+  // If reward type is 'multiplier', multiplierValue is required
+  if (data.rewardType === 'multiplier' && !data.multiplierValue) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Points reward requires pointsToReward; Multiplier reward requires multiplierValue",
+});
 
 export function registerTaskRoutes(app: Express) {
   // Get all published tasks (for fans) - REQUIRES AUTH
@@ -539,20 +568,26 @@ export function registerTaskRoutes(app: Express) {
         hideFromUI: validatedData.hideFromUI,
         isDraft: validatedData.isDraft,
         
-        // Reward configuration
-        rewardType: 'points' as const, // Default to points for now
-        pointsToReward: 'points' in validatedData 
-          ? validatedData.points 
-          : ('customSettings' in validatedData && 'pointsPerCheckIn' in validatedData.customSettings 
-            ? validatedData.customSettings.pointsPerCheckIn 
-            : 50),
-        pointCurrency: 'default',
+        // Reward configuration (Snag-inspired)
+        rewardType: validatedData.rewardType || 'points',
+        pointsToReward: validatedData.pointsToReward || 
+          ('points' in validatedData 
+            ? validatedData.points 
+            : ('customSettings' in validatedData && 'pointsPerCheckIn' in validatedData.customSettings 
+              ? validatedData.customSettings.pointsPerCheckIn 
+              : 50)),
+        pointCurrency: validatedData.pointCurrency || 'default',
         
-        // Timing
+        // Multiplier reward configuration
+        multiplierValue: validatedData.multiplierValue || null,
+        currenciesToApply: validatedData.currenciesToApply || null,
+        applyToExistingBalance: validatedData.applyToExistingBalance || false,
+        
+        // Timing configuration (Snag-inspired)
         updateCadence: validatedData.updateCadence,
         rewardFrequency: validatedData.rewardFrequency,
 
-        // Sprint 3: Point multipliers
+        // Task-specific multiplier (applied to ALL tasks)
         baseMultiplier: validatedData.baseMultiplier,
         multiplierConfig: validatedData.multiplierConfig || null,
 

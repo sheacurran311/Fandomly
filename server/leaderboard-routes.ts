@@ -5,7 +5,7 @@
  */
 
 import type { Express } from "express";
-import { db } from "../db";
+import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { authenticateUser, AuthenticatedRequest } from "./middleware/rbac";
 import { BadgeRewardsService } from "./badge-rewards-service";

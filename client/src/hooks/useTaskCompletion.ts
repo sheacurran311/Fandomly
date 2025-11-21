@@ -106,6 +106,10 @@ export function useUserTaskCompletions(tenantId?: string) {
   return useQuery({
     queryKey: ['task-completions', 'me', tenantId],
     queryFn: () => fetchUserTaskCompletions(tenantId),
+    // Auto-refresh every minute to update countdown timers
+    refetchInterval: 60 * 1000,
+    // Keep previous data while refetching for smooth UX
+    placeholderData: (prev) => prev,
   });
 }
 

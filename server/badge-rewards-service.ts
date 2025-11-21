@@ -4,7 +4,7 @@
  * Integrates with Crossmint for NFT badge minting
  */
 
-import { db } from "../db";
+import { db } from "./db";
 import { sql, eq, and, isNull } from "drizzle-orm";
 import { nftMints, fandomlyBadgeTemplates, users } from "@shared/schema";
 import { CrossmintService } from "./crossmint-service";

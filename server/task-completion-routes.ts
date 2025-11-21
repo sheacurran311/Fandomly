@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { IStorage } from './storage';
 import type { Task, User } from '@shared/schema';
 import { authenticateUser, type AuthenticatedRequest } from './middleware/rbac';
+import { taskFrequencyService } from './services/task-frequency-service';
 
 // Validation schemas
 const startTaskSchema = z.object({
@@ -134,6 +135,45 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   });
 
   // ==============================================
+  // GET /api/task-completions/check-eligibility/:taskId
+  // Check if user can complete a task based on frequency rules
+  // ==============================================
+  router.get('/check-eligibility/:taskId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { taskId } = req.params;
+      const tenantId = req.query.tenantId as string | undefined;
+
+      const eligibility = await taskFrequencyService.checkEligibility({
+        userId: req.user.id,
+        taskId,
+        tenantId,
+      });
+
+      // Also get time remaining if not eligible
+      let timeRemaining = null;
+      if (!eligibility.isEligible) {
+        timeRemaining = await taskFrequencyService.getTimeUntilAvailable({
+          userId: req.user.id,
+          taskId,
+          tenantId,
+        });
+      }
+
+      res.json({
+        ...eligibility,
+        timeRemaining,
+      });
+    } catch (error: any) {
+      console.error('Error checking task eligibility:', error);
+      res.status(500).json({ error: 'Failed to check task eligibility' });
+    }
+  });
+
+  // ==============================================
   // POST /api/task-completions/start
   // Start a task (create initial completion record)
   // ==============================================
@@ -160,9 +200,26 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         return res.status(404).json({ error: 'Task not found' });
       }
 
-      // Check if user has already started this task
+      // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
+      const frequencyCheck = await taskFrequencyService.checkEligibility({
+        userId: req.user.id,
+        taskId,
+        tenantId,
+      });
+
+      if (!frequencyCheck.isEligible) {
+        return res.status(403).json({
+          error: 'Task not available',
+          reason: frequencyCheck.reason,
+          nextAvailableAt: frequencyCheck.nextAvailableAt,
+          lastCompletedAt: frequencyCheck.lastCompletedAt,
+          completionsCount: frequencyCheck.completionsCount,
+        });
+      }
+
+      // Check if user has already started this task (but not completed)
       const existingCompletion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);
-      if (existingCompletion) {
+      if (existingCompletion && existingCompletion.status === 'in_progress') {
         return res.json({ 
           completion: existingCompletion,
           message: 'Task already started'

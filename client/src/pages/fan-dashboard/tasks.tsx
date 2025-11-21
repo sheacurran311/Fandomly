@@ -95,14 +95,25 @@ export default function FanTasksPage() {
     if (filterType !== 'all') {
       const completion = completionMap.get(task.id);
       
-      if (filterType === 'available' && completion?.status === 'completed') {
-        return false;
+      if (filterType === 'available') {
+        // Show if: never completed, in progress, OR completed but available again
+        const isCompletedButAvailable = completion?.status === 'completed' && (completion as any)?.isAvailableAgain;
+        const isCompleted = completion?.status === 'completed';
+        
+        if (isCompleted && !isCompletedButAvailable) {
+          return false; // Hide one-time completed tasks
+        }
       }
+      
       if (filterType === 'in_progress' && completion?.status !== 'in_progress') {
         return false;
       }
-      if (filterType === 'completed' && completion?.status !== 'completed') {
-        return false;
+      
+      if (filterType === 'completed') {
+        // Show completed tasks that are NOT available again
+        if (completion?.status !== 'completed' || (completion as any)?.isAvailableAgain) {
+          return false;
+        }
       }
     }
 

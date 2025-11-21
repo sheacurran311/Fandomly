@@ -2021,6 +2021,18 @@ export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
 export type TaskCompletion = typeof taskCompletions.$inferSelect;
 export type InsertTaskCompletion = typeof taskCompletions.$inferInsert;
+
+// Enriched TaskCompletion with frequency eligibility data
+export interface TaskCompletionEnriched extends TaskCompletion {
+  isAvailableAgain?: boolean;
+  nextAvailableAt?: Date | null;
+  timeRemaining?: {
+    hours: number;
+    minutes: number;
+    seconds: number;
+    totalSeconds: number;
+  } | null;
+}
 export type RewardDistribution = typeof rewardDistributions.$inferSelect;
 export type InsertRewardDistribution = typeof rewardDistributions.$inferInsert;
 

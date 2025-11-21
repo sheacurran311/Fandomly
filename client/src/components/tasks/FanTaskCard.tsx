@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   CheckCircle2, Clock, Star, Trophy, Users, Target,
-  Flame, Gift, ArrowRight, Lock, Shield
+  Flame, Gift, ArrowRight, Lock, Shield, RefreshCw
 } from 'lucide-react';
 import type { Task, TaskCompletion } from '@shared/schema';
 import {
@@ -66,6 +66,7 @@ export function FanTaskCard({
   // Calculate completion state first (before using these values)
   const completed = isTaskCompleted(completion);
   const inProgress = isTaskInProgress(completion);
+  const canStartAgain = (completion as any)?.isAvailableAgain === true;
   const progress = completion?.progress || 0;
   const streak = getCurrentStreak(completion);
   const canCheckIn = canCheckInToday(completion);
@@ -247,6 +248,7 @@ export function FanTaskCard({
   return (
     <Card
       className={`overflow-hidden transition-all hover:shadow-lg ${
+        canStartAgain ? 'border-blue-400 dark:border-blue-600' : // Blue for available again
         completed ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
         inProgress ? 'border-blue-200 dark:border-blue-800' :
         !available ? 'opacity-60' : ''
@@ -376,10 +378,41 @@ export function FanTaskCard({
             </Button>
           )}
 
-          {available && completed && task.rewardFrequency === 'one_time' && (
+          {/* Show "Complete Again" for repeatable tasks that are eligible */}
+          {completed && canStartAgain && (
+            <Button
+              onClick={handleStart}
+              disabled={!available || isProcessing}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Complete Again
+            </Button>
+          )}
+
+          {/* Show countdown timer for completed but not yet eligible */}
+          {completed && !canStartAgain && (completion as any)?.nextAvailableAt && (
+            <div className="space-y-2 w-full">
+              <Button
+                disabled
+                className="w-full bg-green-500/20 text-green-400"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Completed
+              </Button>
+              {(completion as any).timeRemaining && (
+                <p className="text-xs text-center" style={themeColors ? { color: themeColors.text?.tertiary } : undefined}>
+                  Available in {(completion as any).timeRemaining.hours}h {(completion as any).timeRemaining.minutes}m
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Regular completed (one-time tasks) */}
+          {available && completed && !canStartAgain && !(completion as any)?.nextAvailableAt && (
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full bg-green-500/20 text-green-400"
               disabled
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -435,18 +468,6 @@ export function FanTaskCard({
             >
               {isVerifying ? 'Verifying...' : 'Verify Task'}
               <Shield className="w-4 h-4 ml-2" />
-            </Button>
-          )}
-
-          {available && completed && task.rewardFrequency !== 'one_time' && (
-            <Button
-              onClick={task.taskType === 'check_in' ? handleCheckIn : handleComplete}
-              disabled={isProcessing || (task.taskType === 'check_in' && !canCheckIn)}
-              className="w-full text-white hover:opacity-90"
-              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
-            >
-              {task.taskType === 'check_in' && !canCheckIn ? 'Already Checked In' : 'Do Again'}
-              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )}
         </div>

@@ -142,7 +142,7 @@ export interface IStorage {
   // Task Completion operations
   getTaskCompletion(id: string): Promise<TaskCompletion | undefined>;
   getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined>;
-  getUserTaskCompletions(userId: string, tenantId?: string): Promise<TaskCompletion[]>;
+  getUserTaskCompletions(userId: string, tenantId?: string): Promise<any[]>;
   getTaskCompletions(taskId: string): Promise<TaskCompletion[]>;
   getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]>;
   createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion>;
@@ -975,13 +975,55 @@ export class DatabaseStorage implements IStorage {
     return completion;
   }
 
-  async getUserTaskCompletions(userId: string, tenantId?: string): Promise<TaskCompletion[]> {
+  async getUserTaskCompletions(userId: string, tenantId?: string): Promise<any[]> {
     const conditions = tenantId 
       ? and(eq(taskCompletions.userId, userId), eq(taskCompletions.tenantId, tenantId))
       : eq(taskCompletions.userId, userId);
-    return await db.select().from(taskCompletions)
+    
+    const completions = await db.select().from(taskCompletions)
       .where(conditions)
       .orderBy(desc(taskCompletions.lastActivityAt));
+
+    // Import frequency service at the top of the file if not already imported
+    const { taskFrequencyService } = await import('./services/task-frequency-service');
+
+    // For each COMPLETED task with repeatable frequency, check eligibility
+    const enrichedCompletions = await Promise.all(
+      completions.map(async (completion) => {
+        if (completion.status !== 'completed') {
+          return { ...completion, isAvailableAgain: false };
+        }
+
+        // Get task to check frequency
+        const task = await db.query.tasks.findFirst({
+          where: eq(tasks.id, completion.taskId),
+        });
+
+        // Only check eligibility if repeatable frequency
+        if (task && ['daily', 'weekly', 'monthly'].includes(task.rewardFrequency || '')) {
+          const eligibility = await taskFrequencyService.checkEligibility({
+            userId,
+            taskId: completion.taskId,
+            tenantId: completion.tenantId,
+          });
+
+          return {
+            ...completion,
+            isAvailableAgain: eligibility.isEligible,
+            nextAvailableAt: eligibility.nextAvailableAt,
+            timeRemaining: eligibility.isEligible ? null : await taskFrequencyService.getTimeUntilAvailable({
+              userId,
+              taskId: completion.taskId,
+              tenantId: completion.tenantId,
+            }),
+          };
+        }
+
+        return { ...completion, isAvailableAgain: false };
+      })
+    );
+
+    return enrichedCompletions;
   }
 
   async getTaskCompletions(taskId: string): Promise<TaskCompletion[]> {
