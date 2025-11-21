@@ -22,7 +22,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#0a0118] overflow-x-hidden">
       
       {/* 🎯 ASYMMETRICAL HERO - Split Canvas */}
-      <section className="relative min-h-screen grid lg:grid-cols-2 gap-0">
+      <section className="relative min-h-screen grid lg:grid-cols-2 gap-0 z-20">
         {/* Background Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(139,92,246,0.15),transparent_50%),radial-gradient(ellipse_at_bottom_right,rgba(225,6,152,0.15),transparent_50%)]"></div>
         <div className="absolute inset-0 opacity-30" style={{
@@ -31,7 +31,7 @@ export default function Home() {
         }}></div>
 
         {/* Left: Manifesto Stack */}
-        <div className="relative z-10 flex flex-col justify-center p-8 lg:p-16 lg:pr-8">
+        <div className="relative z-50 flex flex-col justify-center p-8 lg:p-16 lg:pr-8">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
