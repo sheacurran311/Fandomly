@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeCrossmintService } from "./crossmint-service";
+import { initializeCrossmintService } from "./services/nft/crossmint-service";
 
 const app = express();
 app.use(express.json());

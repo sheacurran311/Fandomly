@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import type { IStorage } from '../storage';
+import type { IStorage } from '../core/storage';
 import type { AuthenticatedRequest } from './rbac';
 
 /**

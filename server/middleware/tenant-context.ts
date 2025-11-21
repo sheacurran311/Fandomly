@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { storage } from '../storage';
+import { storage } from '../core/storage';
 import { AuthenticatedRequest } from './rbac';
 
 declare module 'express-serve-static-core' {

@@ -12,7 +12,7 @@
  * - Provide streak statistics
  */
 
-import { db } from '../db';
+import { db } from '../../../db';
 import { checkInStreaks, taskCompletions } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
