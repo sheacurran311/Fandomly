@@ -36,6 +36,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
+            style={{ overflow: "visible" }}
           >
             {/* Vertical Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl border border-[#14feee]/30 rounded-full mb-6" data-testid="hero-live-badge">
@@ -44,7 +45,7 @@ export default function Home() {
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight mb-8">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-relaxed mb-8 pb-4 overflow-visible">
               <span className="block text-white mb-2">Elevate Your</span>
               <span className="block text-white mb-2">Brand.</span>
               <span className="block bg-gradient-to-r from-[#10B981] via-[#14feee] to-[#8B5CF6] bg-clip-text text-transparent">
