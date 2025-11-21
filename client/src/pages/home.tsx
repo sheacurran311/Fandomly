@@ -46,10 +46,10 @@ export default function Home() {
             {/* Main Headline */}
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-none mb-8">
               <span className="block text-white mb-2">Elevate Your</span>
-              <span className="block bg-gradient-to-r from-[#8B5CF6] via-[#14feee] to-[#e10698] bg-clip-text text-transparent">
-                Brand. Reward
+              <span className="block text-white mb-2">Brand.</span>
+              <span className="block bg-gradient-to-r from-[#10B981] via-[#14feee] to-[#8B5CF6] bg-clip-text text-transparent">
+                Reward Your Community.
               </span>
-              <span className="block text-white mt-2">Your Community.</span>
             </h1>
 
             {/* Subheadline */}
