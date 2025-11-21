@@ -44,7 +44,7 @@ export default function Home() {
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-none mb-8">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-none mb-8">
               <span className="block text-white mb-2">Elevate Your</span>
               <span className="block text-white mb-2">Brand.</span>
               <span className="block bg-gradient-to-r from-[#10B981] via-[#14feee] to-[#8B5CF6] bg-clip-text text-transparent">
