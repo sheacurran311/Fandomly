@@ -4,6 +4,12 @@ import {
   TrendingUp, Target, Building2, ArrowRight, CheckCircle, Coins,
   Play, Globe, Lock, Smartphone, BarChart3, Palette, X as XIcon
 } from "lucide-react";
+import { 
+  FaPalette, FaTag, FaBookOpen, FaGlobe, FaCheckCircle, 
+  FaBolt, FaGift, FaChartLine, FaLock, FaMobileAlt, 
+  FaBullseye, FaRocket, FaUserPlus, FaBrush, FaUsers,
+  FaTrophy, FaChartBar
+} from "react-icons/fa";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { motion } from "framer-motion";
 import CreatorEarningsCalculator from "@/components/nil/nil-value-calculator";
@@ -12,9 +18,9 @@ export default function Home() {
   const { user, setShowAuthFlow } = useDynamicContext();
   // Platform capabilities - real features, no fake metrics
   const platformCapabilities = [
-    { label: "Social Platforms", value: "8", icon: "🌐" },
-    { label: "Blockchains", value: "4+", icon: "⛓️" },
-    { label: "Campaign Templates", value: "12", icon: "🎯" },
+    { label: "Social Platforms", value: "8+", icon: "🌐" },
+    { label: "Task Templates", value: "32+", icon: "🎯" },
+    { label: "Campaign Templates", value: "12", icon: "📋" },
     { label: "Setup Time", value: "<5min", icon: "⚡" }
   ];
 
@@ -55,7 +61,7 @@ export default function Home() {
 
             {/* Subheadline */}
             <p className="text-xl text-gray-300 mb-8 max-w-xl leading-relaxed">
-              The first Web3 loyalty platform for athletes, content creators, musicians, and brands. Launch campaigns across 8 social platforms, verify engagement, and distribute rewards—all powered by AI.
+              Turn fans into superfans. Launch your own branded loyalty platform in under 5 minutes—no coding, no crypto wallets, just pure engagement magic across every social platform your fans love.
             </p>
 
             {/* CTA Stack */}
@@ -127,8 +133,8 @@ export default function Home() {
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black text-white">Your Platform Stack</h3>
-                      <p className="text-[#14feee] font-semibold">All-in-One • Web3-Powered</p>
+                      <h3 className="text-2xl font-black text-white">Your Loyalty Stack</h3>
+                      <p className="text-[#14feee] font-semibold">All-in-One • No-Code</p>
                     </div>
                   </div>
                   
@@ -148,8 +154,8 @@ export default function Home() {
                         <Shield className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-white">Multi-Chain Rewards</div>
-                        <div className="text-xs text-gray-400">Ethereum, Solana, Polygon & more</div>
+                        <div className="text-sm font-bold text-white">White-Label Ready</div>
+                        <div className="text-xs text-gray-400">Custom branding & your auth provider</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-[#e10698]/20" data-testid="feature-ai">
@@ -190,18 +196,18 @@ export default function Home() {
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         >
           {[
-            { feature: "Real-Time", detail: "Social Verification", icon: "✓" },
-            { feature: "Multi-Chain", detail: "Rewards", icon: "⛓️" },
-            { feature: "8 Platforms", detail: "Integrated", icon: "🌐" },
-            { feature: "AI-Powered", detail: "Campaigns", icon: "🤖" },
-            { feature: "Instant", detail: "Payouts", icon: "⚡" },
-            { feature: "Smart", detail: "Analytics", icon: "📊" },
-            { feature: "Web3", detail: "Native", icon: "🔐" },
-            { feature: "Template", detail: "Library", icon: "📚" },
-            { feature: "Auto", detail: "Compliance", icon: "🛡️" },
-            { feature: "Cross-Platform", detail: "Tracking", icon: "🎯" },
-            { feature: "Blockchain", detail: "Verified", icon: "✨" },
-            { feature: "5-Min", detail: "Setup", icon: "🚀" }
+            { feature: "No-Code", detail: "Setup", icon: FaBrush, color: "#8B5CF6" },
+            { feature: "White-Label", detail: "Branding", icon: FaPalette, color: "#14feee" },
+            { feature: "32+ Templates", detail: "Pre-Built", icon: FaBookOpen, color: "#e10698" },
+            { feature: "8+ Platforms", detail: "Integrated", icon: FaGlobe, color: "#10B981" },
+            { feature: "Real-Time", detail: "Verification", icon: FaCheckCircle, color: "#14feee" },
+            { feature: "Instant", detail: "Rewards", icon: FaBolt, color: "#FBBF24" },
+            { feature: "Auto", detail: "Distribution", icon: FaGift, color: "#e10698" },
+            { feature: "Smart", detail: "Analytics", icon: FaChartBar, color: "#8B5CF6" },
+            { feature: "Custom", detail: "Auth", icon: FaLock, color: "#10B981" },
+            { feature: "Embedded", detail: "Option", icon: FaMobileAlt, color: "#14feee" },
+            { feature: "Multi-Campaign", detail: "Support", icon: FaBullseye, color: "#e10698" },
+            { feature: "5-Min", detail: "Setup", icon: FaRocket, color: "#FBBF24" }
           ].map((item, i) => (
             <div key={i} className="flex-shrink-0 w-64 h-32 relative" data-testid={`pulse-feature-${i}`}>
               <div
@@ -211,7 +217,7 @@ export default function Home() {
                 }}
               ></div>
               <div className="relative h-full flex flex-col items-center justify-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-                <div className="text-3xl mb-1">{item.icon}</div>
+                <item.icon className="text-3xl mb-1" style={{ color: item.color }} />
                 <div className="text-lg font-black bg-gradient-to-r from-[#14feee] to-[#e10698] bg-clip-text text-transparent" data-testid={`pulse-feature-name-${i}`}>
                   {item.feature}
                 </div>
@@ -262,8 +268,8 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#14feee] to-[#8B5CF6] flex items-center justify-center mb-6">
                   <Shield className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-2xl font-black text-white mb-4">Social Proof</h3>
-                <p className="text-gray-300 mb-6">Verify Instagram, TikTok, X, YouTube actions with blockchain-backed proof.</p>
+                <h3 className="text-2xl font-black text-white mb-4">Instant Verification</h3>
+                <p className="text-gray-300 mb-6">Verify X, YouTube, Facebook, Spotify, Discord, and Twitch actions instantly. No manual checking. No fraud. Just authentic engagement, instantly rewarded.</p>
                 <div className="flex flex-wrap gap-2">
                   {["Instagram", "TikTok", "X", "YouTube"].map(platform => (
                     <span key={platform} className="px-3 py-1 bg-[#14feee]/20 border border-[#14feee]/30 rounded-full text-xs text-[#14feee]">
@@ -315,12 +321,12 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#e10698] to-[#10B981] flex items-center justify-center mb-6">
                   <Coins className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-2xl font-black text-white mb-4">Web3 Rewards</h3>
-                <p className="text-gray-300 mb-6">Distribute NFTs, tokens, and exclusive perks across multiple blockchains.</p>
+                <h3 className="text-2xl font-black text-white mb-4">Rewards That Matter</h3>
+                <p className="text-gray-300 mb-6">From digital collectibles to game-worn jerseys. Points, NFTs, raffle entries, and exclusive merch—all automated, all yours to customize. Your fans get rewarded instantly, no crypto expertise needed.</p>
                 <div className="flex flex-wrap gap-2">
-                  {["Ethereum", "Solana", "Polygon", "Base"].map(chain => (
-                    <span key={chain} className="px-3 py-1 bg-[#e10698]/20 border border-[#e10698]/30 rounded-full text-xs text-[#e10698]">
-                      {chain}
+                  {["Points", "NFTs", "Raffle Tickets", "Physical Goods"].map(reward => (
+                    <span key={reward} className="px-3 py-1 bg-[#e10698]/20 border border-[#e10698]/30 rounded-full text-xs text-[#e10698]">
+                      {reward}
                     </span>
                   ))}
                 </div>
@@ -348,29 +354,29 @@ export default function Home() {
             {[
               {
                 icon: Trophy,
-                type: "Athletes",
-                desc: "Monetize your fanbase with loyalty programs, exclusive content, and Web3 rewards",
+                type: "NIL Athletes",
+                desc: "Your fans want to be part of your journey. Give them the power to support you and watch your brand value soar. Monetize your name, image, and likeness with loyalty programs that turn followers into stakeholders.",
                 gradient: "from-[#14feee] to-[#8B5CF6]",
                 testId: "creator-type-athletes"
               },
               {
                 icon: Camera,
                 type: "Content Creators",
-                desc: "Turn views into revenue with cross-platform campaigns and engagement rewards",
+                desc: "Turn casual viewers into devoted fans. Reward every like, comment, and share. Your audience becomes your growth engine—engaged, invested, and scaling your reach organically.",
                 gradient: "from-[#8B5CF6] to-[#e10698]",
                 testId: "creator-type-content"
               },
               {
                 icon: Music,
                 type: "Musicians",
-                desc: "Build superfans with exclusive drops, concert perks, and streaming rewards",
+                desc: "Streaming pays pennies. Your superfans? They're worth gold. Reward them for every stream, share, and show attendance. Build a direct relationship that grows your revenue beyond the algorithms.",
                 gradient: "from-[#e10698] to-[#10B981]",
                 testId: "creator-type-musicians"
               },
               {
                 icon: Building2,
                 type: "Brands & Agencies",
-                desc: "Launch influencer campaigns, track ROI, and manage creator partnerships at scale",
+                desc: "Your brand. Your domain. Your auth. Launch unlimited campaigns for multiple clients with enterprise-grade white-labeling. 32+ ready-to-go templates mean you're live in minutes, not months.",
                 gradient: "from-[#10B981] to-[#14feee]",
                 testId: "creator-type-brands"
               }
@@ -411,19 +417,19 @@ export default function Home() {
               8 Platforms, One Dashboard
             </span>
           </motion.h2>
-          <p className="text-center text-xl text-gray-300 mb-6">Real-time verification, aggregated analytics, and AI-powered insights across all major social networks</p>
+          <p className="text-center text-xl text-gray-300 mb-6">Meet your fans where they are. Verify every action instantly. Reward across all platforms from one command center.</p>
 
           {/* Platform Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
             {[
-              { name: "Facebook", icon: "📘", color: "#1877F2" },
-              { name: "Instagram", icon: "📷", color: "#E4405F" },
-              { name: "X (Twitter)", icon: "𝕏", color: "#1DA1F2" },
-              { name: "TikTok", icon: "🎵", color: "#FE2C55" },
-              { name: "YouTube", icon: "▶️", color: "#FF0000" },
-              { name: "Spotify", icon: "🎧", color: "#1DB954" },
-              { name: "Discord", icon: "💬", color: "#5865F2" },
-              { name: "Twitch", icon: "🎮", color: "#9146FF" }
+              { name: "Facebook", icon: "/Social Icons/icons8-facebook-48.png", color: "#1877F2" },
+              { name: "Instagram", icon: "/Social Icons/icons8-instagram-48.png", color: "#E4405F" },
+              { name: "X (Twitter)", icon: "/Social Icons/icons8-x-48.png", color: "#1DA1F2" },
+              { name: "TikTok", icon: "/Social Icons/icons8-tiktok-48.png", color: "#FE2C55" },
+              { name: "YouTube", icon: "/Social Icons/icons8-youtube-48.png", color: "#FF0000" },
+              { name: "Spotify", icon: "/Social Icons/icons8-spotify-48.png", color: "#1DB954" },
+              { name: "Discord", icon: "/Social Icons/icons8-discord-48.png", color: "#5865F2" },
+              { name: "Twitch", icon: "/Social Icons/icons8-twitch-48.png", color: "#9146FF" }
             ].map((platform, i) => (
               <motion.div
                 key={i}
@@ -439,7 +445,7 @@ export default function Home() {
                   style={{ background: `radial-gradient(circle, ${platform.color}, transparent)` }}
                 ></div>
                 <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center group-hover:border-white/30 transition">
-                  <div className="text-4xl mb-2">{platform.icon}</div>
+                  <img src={platform.icon} alt={platform.name} className="w-12 h-12 mx-auto mb-2" />
                   <div className="text-sm font-bold text-white">{platform.name}</div>
                 </div>
               </motion.div>
@@ -451,20 +457,20 @@ export default function Home() {
             {[
               {
                 icon: Zap,
-                title: "Real-Time Verification",
-                desc: "Instant task completion tracking with webhook-based proof across all platforms",
+                title: "Verified in Milliseconds",
+                desc: "Every like, follow, and share verified instantly via webhooks. No delays, no manual checking, no fraud.",
                 testId: "feature-verification"
               },
               {
                 icon: BarChart3,
-                title: "Aggregated Analytics",
-                desc: "Unified dashboard showing engagement, reach, and ROI across all connected platforms",
+                title: "One Dashboard to Rule Them All",
+                desc: "See everything in one place. Engagement, reach, revenue, ROI—across every platform, every campaign, every fan.",
                 testId: "feature-analytics"
               },
               {
                 icon: Sparkles,
-                title: "AI Creator Toolkit",
-                desc: "Smart campaign suggestions, content optimization, and audience insights powered by AI",
+                title: "AI That Actually Helps",
+                desc: "Smart suggestions for campaigns, tasks, and rewards. Optimize what's working, fix what's not. Like having a growth team in your pocket.",
                 testId: "feature-ai-toolkit"
               }
             ].map((feature, i) => (
@@ -507,31 +513,38 @@ export default function Home() {
             {[
               {
                 step: "01",
-                title: "Connect Wallet",
-                description: "Link your blockchain wallet (Ethereum, Solana, Cosmos) in 15 seconds. No crypto knowledge required.",
-                icon: "🔗",
+                title: "Sign Up & Connect",
+                description: "Create your account and link your socials in under 60 seconds. No blockchain wallets, no crypto confusion—just your existing social logins.",
+                icon: FaUserPlus,
                 gradient: "from-[#14feee] to-[#8B5CF6]"
               },
               {
                 step: "02",
-                title: "Design Your Campaign",
-                description: "Use AI templates or build custom quests. Set points, rewards, and verification rules for Instagram, TikTok, X, and YouTube.",
-                icon: "🎨",
+                title: "Design Your Program",
+                description: "Make it yours. Full white-label branding, your domain, your style. Pick from 32+ proven templates or build custom tasks. Live in 5 minutes.",
+                icon: FaPalette,
                 gradient: "from-[#8B5CF6] to-[#e10698]"
               },
               {
                 step: "03",
-                title: "Fans Complete Tasks",
-                description: "Fans follow, like, share, or create content. Our AI verifies proof-of-action in real time with blockchain receipts.",
-                icon: "⚡",
+                title: "Fans Complete & Get Verified",
+                description: "Your community follows, likes, subscribes, creates content—and gets instantly verified. Real actions. Real rewards. Real-time.",
+                icon: FaCheckCircle,
                 gradient: "from-[#e10698] to-[#10B981]"
               },
               {
                 step: "04",
-                title: "Distribute Rewards",
-                description: "Auto-pay points, NFTs, or tokens to winners. Track analytics and watch your community grow exponentially.",
-                icon: "🎁",
+                title: "Rewards Deploy Automatically",
+                description: "Points, raffle entries, NFT collectibles, access to exclusive drops. Fans redeem for physical merch, game-worn gear, meet-and-greets. You set it, we automate it.",
+                icon: FaGift,
                 gradient: "from-[#10B981] to-[#14feee]"
+              },
+              {
+                step: "05",
+                title: "Watch Your Value Explode",
+                description: "Engaged fans = higher valuation. Track every metric, prove ROI, and scale your community into a movement. Your brand equity compounds daily.",
+                icon: FaTrophy,
+                gradient: "from-[#14feee] to-[#8B5CF6]"
               }
             ].map((item, i) => (
               <motion.div
@@ -542,13 +555,15 @@ export default function Home() {
                 className={`relative flex items-center gap-8 mb-16 ${i % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'}`}
                 data-testid={`timeline-step-${i}`}
               >
-                {/* Timeline Dot */}
-                <div className="absolute left-8 md:left-1/2 -ml-3 md:-ml-3 w-6 h-6 rounded-full bg-gradient-to-r from-[#14feee] to-[#e10698] border-4 border-[#0a0118] z-10"></div>
+                {/* Timeline Dot - Fixed positioning */}
+                <div className="hidden md:block absolute left-1/2 -ml-3 w-6 h-6 rounded-full bg-gradient-to-r from-[#14feee] to-[#e10698] border-4 border-[#0a0118] z-10"></div>
 
-                {/* Content Card */}
-                <div className={`flex-1 ${i % 2 === 0 ? 'md:text-right md:pr-20' : 'md:pl-20'} ml-20 md:ml-0`}>
+                {/* Content Card - Improved spacing */}
+                <div className={`flex-1 ${i % 2 === 0 ? 'md:text-right md:pr-24' : 'md:pl-24'}`}>
                   <div className="inline-block p-6 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl">
-                    <div className={`text-6xl mb-4 ${i % 2 === 0 ? 'md:justify-end' : ''} flex`}>{item.icon}</div>
+                    <div className={`text-6xl mb-4 ${i % 2 === 0 ? 'md:justify-end' : ''} flex`}>
+                      <item.icon className={`bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent`} />
+                    </div>
                     <div className={`text-sm font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent mb-2`}>
                       STEP {item.step}
                     </div>
@@ -571,106 +586,67 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-5xl md:text-6xl font-black text-center mb-4"
           >
-            <span className="text-white">One Platform, </span>
-            <span className="bg-gradient-to-r from-[#8B5CF6] to-[#14feee] bg-clip-text text-transparent">Every Chain</span>
+            <span className="text-white">Built for </span>
+            <span className="bg-gradient-to-r from-[#8B5CF6] to-[#14feee] bg-clip-text text-transparent">Enterprises</span>
           </motion.h2>
-          <p className="text-center text-xl text-gray-300 mb-20">Multi-chain verification without the complexity</p>
+          <p className="text-center text-xl text-gray-300 mb-20">White-label everything. Your brand, your auth, your rules.</p>
 
-          {/* Constellation Grid */}
-          <div className="relative h-[500px]">
-            {/* Connection Lines */}
-            <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
-              <defs>
-                <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#14feee" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#e10698" stopOpacity="0.3" />
-                </linearGradient>
-              </defs>
-              <line x1="20%" y1="30%" x2="50%" y2="50%" stroke="url(#line-gradient)" strokeWidth="2" />
-              <line x1="80%" y1="30%" x2="50%" y2="50%" stroke="url(#line-gradient)" strokeWidth="2" />
-              <line x1="20%" y1="70%" x2="50%" y2="50%" stroke="url(#line-gradient)" strokeWidth="2" />
-              <line x1="80%" y1="70%" x2="50%" y2="50%" stroke="url(#line-gradient)" strokeWidth="2" />
-            </svg>
-
-            {/* Chain Nodes */}
+          {/* Enterprise Features Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             {[
-              { name: "Ethereum", position: { top: "30%", left: "20%" }, color: "#627EEA", logo: "Ξ" },
-              { name: "Solana", position: { top: "30%", right: "20%" }, color: "#14F195", logo: "◎" },
-              { name: "Polygon", position: { bottom: "30%", left: "20%" }, color: "#8247E5", logo: "⬡" },
-              { name: "Base", position: { bottom: "30%", right: "20%" }, color: "#0052FF", logo: "▲" }
-            ].map((chain, i) => (
-              <motion.div
-                key={chain.name}
-                initial={{ opacity: 0, scale: 0 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="absolute"
-                style={chain.position}
-                data-testid={`chain-node-${chain.name.toLowerCase()}`}
-              >
-                <motion.div
-                  className="relative w-24 h-24 cursor-pointer"
-                  whileHover={{ scale: 1.2, rotate: 360 }}
-                  transition={{ type: "spring", stiffness: 200 }}
-                >
-                  <div
-                    className="absolute inset-0 rounded-full blur-xl opacity-60"
-                    style={{ background: `radial-gradient(circle, ${chain.color}, transparent)` }}
-                  ></div>
-                  <div
-                    className="relative w-full h-full rounded-full border-2 flex items-center justify-center bg-black/90 backdrop-blur-xl"
-                    style={{ borderColor: chain.color }}
-                  >
-                    <span className="text-3xl font-black" style={{ color: chain.color }}>{chain.logo}</span>
-                  </div>
-                </motion.div>
-                <div className="text-center mt-3">
-                  <div className="text-sm font-bold text-white">{chain.name}</div>
-                </div>
-              </motion.div>
-            ))}
-
-            {/* Center Hub */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-              data-testid="chain-hub-center"
-            >
-              <div className="relative">
-                <div className="absolute -inset-8 bg-gradient-to-r from-[#14feee] via-[#8B5CF6] to-[#e10698] rounded-full blur-2xl opacity-50 animate-pulse"></div>
-                <div className="relative w-40 h-40 rounded-full border-4 border-white/20 bg-gradient-to-br from-[#1a0a2e] to-[#0a0118] flex items-center justify-center backdrop-blur-xl">
-                  <div className="text-center">
-                    <Zap className="w-12 h-12 text-white mx-auto mb-2" />
-                    <div className="text-sm font-black text-white">FANDOMLY</div>
-                    <div className="text-xs text-gray-400">Hub</div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-6 mt-20">
-            {[
-              { title: "Instant Verification", desc: "Cross-chain transaction confirmation in milliseconds", icon: <Shield className="w-8 h-8" /> },
-              { title: "Gas Optimization", desc: "Smart routing minimizes fees across all networks", icon: <Zap className="w-8 h-8" /> },
-              { title: "Universal Wallet", desc: "One login works across Ethereum, Solana, and more", icon: <Coins className="w-8 h-8" /> }
+              {
+                icon: Palette,
+                title: "100% Your Brand",
+                desc: "Not a trace of Fandomly anywhere. Your domain, your logo, your colors, your CSS. White-label so complete, even your dev team won't know you didn't build it.",
+                features: ["Custom Domain", "Brand Colors", "Logo Integration", "Custom CSS"],
+                gradient: "from-[#14feee] to-[#8B5CF6]"
+              },
+              {
+                icon: Lock,
+                title: "Your Auth, Your Users",
+                desc: "Already have authentication? Perfect. OAuth, SAML SSO, custom flows—plug in what you've got. Your users stay in your ecosystem, seamlessly.",
+                features: ["OAuth 2.0", "SAML SSO", "Custom Auth", "Multi-Tenant"],
+                gradient: "from-[#8B5CF6] to-[#e10698]"
+              },
+              {
+                icon: Building2,
+                title: "Unlimited Scale",
+                desc: "Agencies: manage 50 brands. Enterprises: run 100 campaigns. No limits, no throttling, no surprise fees as you grow. Built for ambition.",
+                features: ["Unlimited Campaigns", "Multi-Brand", "Agency Dashboard", "Client Portal"],
+                gradient: "from-[#e10698] to-[#10B981]"
+              },
+              {
+                icon: Smartphone,
+                title: "Embed or Standalone",
+                desc: "iFrame it into your existing app. Hook into our API. Listen to webhooks. Or launch standalone. However you build, we flex to fit.",
+                features: ["iFrame Embed", "API Access", "Webhook Events", "Custom Integration"],
+                gradient: "from-[#10B981] to-[#14feee]"
+              }
             ].map((feature, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl text-center"
-                data-testid={`chain-feature-${i}`}
+                transition={{ delay: i * 0.15 }}
+                className="relative group h-full"
+                data-testid={`enterprise-feature-${i}`}
               >
-                <div className="text-[#14feee] mb-4 flex justify-center">{feature.icon}</div>
-                <h3 className="text-xl font-black text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-400 text-sm">{feature.desc}</p>
+                <div className={`absolute -inset-0.5 bg-gradient-to-r ${feature.gradient} rounded-2xl blur opacity-60 group-hover:opacity-100 transition`}></div>
+                <div className="relative bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl p-8 h-full flex flex-col">
+                  <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 flex-shrink-0`}>
+                    <feature.icon className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white mb-4">{feature.title}</h3>
+                  <p className="text-gray-300 mb-6 leading-relaxed flex-grow">{feature.desc}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {feature.features.map((item, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-white/10 border border-white/20 rounded-full text-xs text-gray-300">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -702,7 +678,7 @@ export default function Home() {
                   </span>
                 </h2>
                 <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                  Be among the first creators to build Web3 loyalty programs with real-time social verification across 8 platforms. Early access starts now.
+                  Join the creators turning followers into revenue. Real-time verification. Real rewards. Real growth. Early access is open.
                 </p>
               </div>
 
@@ -734,14 +710,14 @@ export default function Home() {
                   <div className="relative z-10">
                     <Users className="w-12 h-12 text-white mx-auto mb-4" />
                     <h3 className="text-2xl font-black text-white mb-2">For Fans</h3>
-                    <p className="text-white/80 text-sm">Earn rewards for your fandom</p>
+                    <p className="text-white/80 text-sm">Get rewarded for supporting who you love</p>
                   </div>
                 </motion.button>
               </div>
 
               {/* Trust Badges */}
               <div className="flex flex-wrap justify-center gap-4 mt-12 pt-8 border-t border-white/10">
-                {["Multi-Chain", "Enterprise-Grade Security", "8 Platform Integrations", "24/7 Support"].map((badge) => (
+                {["No-Code Platform", "Fully White-Labeled", "32+ Task Templates", "8+ Social Integrations"].map((badge) => (
                   <span key={badge} className="px-4 py-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full text-sm text-white">
                     {badge}
                   </span>

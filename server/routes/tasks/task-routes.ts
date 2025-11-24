@@ -25,7 +25,7 @@ import {
   creators,
 } from "@shared/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
-import { uploadScreenshot, getFileUrl } from "./middleware/upload";
+import { uploadScreenshot, getFileUrl } from "../../middleware/upload";
 import { unifiedVerification } from "../../services/verification/unified-verification";
 import { taskFrequencyService } from "../../services/task-frequency-service";
 
