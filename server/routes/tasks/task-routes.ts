@@ -720,8 +720,8 @@ export function registerTaskRoutes(app: Express) {
       // Validate update data
       const validatedData = createTaskSchema.parse(req.body);
 
-      // Prepare update data
-      const updateData = {
+      // Prepare update data - PRESERVE ALL FIELDS including settings for social tasks
+      const updateData: Record<string, any> = {
         name: validatedData.name,
         description: validatedData.description || '',
         section: validatedData.section,
@@ -732,8 +732,26 @@ export function registerTaskRoutes(app: Express) {
         isDraft: validatedData.isDraft,
         updateCadence: validatedData.updateCadence,
         rewardFrequency: validatedData.rewardFrequency,
-        customSettings: 'customSettings' in validatedData ? validatedData.customSettings : {},
+        // Preserve verificationMethod
+        verificationMethod: (validatedData as any).verificationMethod || existingTask.verificationMethod,
       };
+
+      // Handle points - support both pointsToReward and legacy 'points' field
+      if ('pointsToReward' in validatedData && validatedData.pointsToReward) {
+        updateData.pointsToReward = validatedData.pointsToReward;
+      } else if ('points' in validatedData && (validatedData as any).points) {
+        updateData.pointsToReward = (validatedData as any).points;
+      }
+
+      // Handle settings for social tasks (pageUrl, channelUrl, handle, etc.)
+      if ('settings' in validatedData && validatedData.settings) {
+        updateData.settings = validatedData.settings;
+      }
+
+      // Handle customSettings for non-social tasks (checkin, referral, follower_milestone)
+      if ('customSettings' in validatedData && validatedData.customSettings) {
+        updateData.customSettings = validatedData.customSettings;
+      }
 
       const updatedTask = await storage.updateTask(taskId, updateData);
 
@@ -1030,7 +1048,7 @@ export function registerTaskRoutes(app: Express) {
 
         // Get task completion
         const completion = await db.query.taskCompletions.findFirst({
-          where: eq(taskCompletions.id, Number(completionId)),
+          where: eq(taskCompletions.id, completionId),
           with: {
             task: true,
           },
@@ -1050,7 +1068,7 @@ export function registerTaskRoutes(app: Express) {
         // Run verification
         const result = await unifiedVerification.verify({
           userId,
-          taskCompletionId: Number(completionId),
+          taskCompletionId: completionId,
           taskId: task.id,
           tenantId: task.tenantId,
           creatorId: task.creatorId,

@@ -15,12 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
 import { SiInstagram } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useInstagramConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
 
 interface InstagramTaskBuilderProps {
   onSave: (config: any) => void;
@@ -34,6 +34,18 @@ interface InstagramTaskBuilderProps {
 export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: InstagramTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use unified Instagram connection hook
+  const {
+    isConnected: instagramConnected,
+    isLoading: checkingConnection,
+    userInfo: instagramUserInfo,
+    connect: connectInstagram,
+  } = useInstagramConnection();
+  
+  // Derived from hook
+  const instagramHandle = instagramUserInfo?.username || null;
+  
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(50);
@@ -44,52 +56,15 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-  const [instagramConnected, setInstagramConnected] = useState(false);
-  const [instagramHandle, setInstagramHandle] = useState<string | null>(null);
-  const [checkingConnection, setCheckingConnection] = useState(true);
   const [instagramPosts, setInstagramPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
 
-  // Check if Instagram is connected and auto-populate username
+  // Auto-populate username when Instagram connects
   useEffect(() => {
-    const checkInstagramConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/instagram', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setInstagramConnected(data.connected || false);
-          if (data.connected && data.connection) {
-            const instagramUsername = data.connection.platformUsername || data.connection.platformDisplayName;
-            setInstagramHandle(instagramUsername);
-            // Auto-populate username for follow tasks
-            if (taskType === 'instagram_follow' && !username && instagramUsername) {
-              setUsername(instagramUsername);
-            }
-          }
-        } else {
-          setInstagramConnected(false);
-        }
-      } catch (error) {
-        console.error('[InstagramTaskBuilder] Error checking Instagram connection:', error);
-        setInstagramConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-    
-    if (user?.id) {
-      checkInstagramConnection();
-    } else {
-      setCheckingConnection(false);
+    if (instagramConnected && instagramHandle && taskType === 'instagram_follow' && !username && !isEditMode) {
+      setUsername(instagramHandle);
     }
-  }, [user?.dynamicUserId, user?.id, taskType]);
+  }, [instagramConnected, instagramHandle, taskType, username, isEditMode]);
 
   // Initialize form with defaults based on task type
   useEffect(() => {
@@ -101,23 +76,27 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     }
   }, [taskType, isEditMode]);
   
-  // Load initial data if editing
+  // Load initial data if editing - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
-      setPoints(initialData.points || 50);
-      if (initialData.settings?.username) {
-        setUsername(initialData.settings.username);
+      setPoints(initialData.pointsToReward || initialData.points || 50);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      if (settings.username) {
+        setUsername(settings.username);
       }
-      if (initialData.settings?.postUrl) {
-        setPostUrl(initialData.settings.postUrl);
+      if (settings.postUrl || settings.contentUrl) {
+        setPostUrl(settings.postUrl || settings.contentUrl);
       }
-      if (initialData.settings?.keyword) {
-        setKeyword(initialData.settings.keyword);
+      if (settings.keyword) {
+        setKeyword(settings.keyword);
       }
-      if (initialData.settings?.requireHashtag) {
-        setRequireHashtag(initialData.settings.requireHashtag);
+      if (settings.requireHashtag) {
+        setRequireHashtag(settings.requireHashtag);
       }
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
@@ -216,6 +195,8 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
       points,
       isDraft,
       verificationMethod: useApiVerification ? 'api' : 'manual',
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
 
     if (taskType === 'instagram_follow') {
@@ -367,45 +348,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
                 <p className="text-sm mt-1">You must connect your Instagram account before creating Instagram tasks.</p>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const socialManager = new SocialIntegrationManager();
-                    const result = await socialManager['instagram'].secureLogin();
-                    
-                    if (result.success) {
-                      toast({ title: "Instagram Connected! 📸" });
-                      // Re-check connection
-                      const response = await fetch('/api/social-connections/instagram', {
-                        headers: {
-                          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                          'Content-Type': 'application/json'
-                        },
-                        credentials: 'include'
-                      });
-                      
-                      if (response.ok) {
-                        const data = await response.json();
-                        setInstagramConnected(data.connected || false);
-                        if (data.connected && data.username) {
-                          setInstagramHandle(data.username);
-                          if (taskType === 'instagram_follow' && !username) {
-                            setUsername(data.username);
-                          }
-                        }
-                        setCheckingConnection(false);
-                      }
-                    } else {
-                      toast({ 
-                        title: "Connection Failed",
-                        description: result.error || "Failed to connect Instagram",
-                        variant: "destructive" 
-                      });
-                    }
-                  } catch (error) {
-                    console.error('Instagram connection error:', error);
-                    toast({ title: "Error", description: "Failed to connect Instagram", variant: "destructive" });
-                  }
-                }}
+                onClick={connectInstagram}
                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 ml-4"
               >
                 Connect Instagram
@@ -541,6 +484,30 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
                 )}
               </div>
             )}
+
+            {/* Locked Frequency Display */}
+            <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-white font-semibold">Reward Frequency</Label>
+                    <Lock className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Social engagement tasks are one-time only
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-pink-500/30 text-pink-400">
+                  One-time
+                </Badge>
+              </div>
+              <Alert className="bg-pink-500/10 border-pink-500/20">
+                <Info className="h-4 w-4 text-pink-400" />
+                <AlertDescription className="text-pink-400 text-sm">
+                  This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+                </AlertDescription>
+              </Alert>
+            </div>
 
             {/* API Verification Toggle */}
             <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">

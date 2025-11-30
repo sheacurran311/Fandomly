@@ -110,57 +110,95 @@ export default function CampaignBuilderNew() {
   const { data: previousCampaigns = [] } = useQuery<Campaign[]>({
     queryKey: ["/api/campaigns/creator", user?.creator?.id],
     queryFn: async () => {
-      const res = await fetchApi(`/api/campaigns/creator/${user?.creator?.id}`);
-      return res.json();
+      return await fetchApi(`/api/campaigns/creator/${user?.creator?.id}`);
     },
     enabled: !!user?.creator?.id,
   });
 
-  // Fetch available tasks (not assigned to any campaign or assigned to this one)
+  // Fetch available tasks (all creator's tasks)
   const { data: availableTasks = [], refetch: refetchTasks } = useQuery<Task[]>({
     queryKey: ["/api/tasks/available", campaignId],
     queryFn: async () => {
-      const res = await fetchApi("/api/tasks");
-      const allTasks = await res.json();
-      // Show tasks that are unassigned OR assigned to this campaign
-      return allTasks.filter((t: Task) => !t.campaignId || t.campaignId === campaignId);
+      return await fetchApi("/api/tasks");
     },
     enabled: !!user?.creator?.id,
   });
 
+  // Fetch existing task assignments for the campaign
+  const { data: taskAssignmentsData } = useQuery<{ taskIds: string[] }>({
+    queryKey: ["/api/campaigns/task-assignments", campaignId],
+    queryFn: async () => {
+      return await fetchApi(`/api/campaigns/${campaignId}/task-assignments`);
+    },
+    enabled: !!campaignId,
+  });
+
+  // Load existing task assignments when campaign data is fetched
+  useEffect(() => {
+    if (taskAssignmentsData?.taskIds && taskAssignmentsData.taskIds.length > 0) {
+      setCampaignData(prev => ({
+        ...prev,
+        assignedTaskIds: taskAssignmentsData.taskIds
+      }));
+    }
+  }, [taskAssignmentsData]);
+
   // Soft-save campaign mutation (creates draft in DB)
   const softSaveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, any>) => {
       const endpoint = campaignId
         ? `/api/campaigns/${campaignId}`
         : "/api/campaigns/draft";
       const method = campaignId ? "PUT" : "POST";
-      const res = await fetchApi(endpoint, {
+      
+      // Build clean payload - the server will add creatorId from auth
+      const payload = {
+        ...data,
+        status: "draft",
+      };
+      
+      console.log(`[Campaign Builder] ${method} ${endpoint}`, payload);
+      
+      // fetchApi already returns parsed JSON, no need to call .json()
+      return await fetchApi(endpoint, {
         method,
-        body: JSON.stringify({
-          ...data,
-          status: "draft",
-          creatorId: user?.creator?.id,
-        }),
+        body: JSON.stringify(payload),
       });
-      return res.json();
     },
     onSuccess: (result) => {
       if (!campaignId && result.id) {
         setCampaignId(result.id);
       }
+      // Invalidate all campaign-related queries
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/creator"] });
+    },
+    onError: (error) => {
+      console.error('[Campaign Builder] Save failed:', error);
     },
   });
 
   // Assign task to campaign mutation
   const assignTaskMutation = useMutation({
     mutationFn: async ({ taskId, campaignId }: { taskId: string; campaignId: string }) => {
-      const res = await fetchApi(`/api/tasks/${taskId}/assign`, {
+      return await fetchApi(`/api/tasks/${taskId}/assign`, {
         method: "POST",
         body: JSON.stringify({ campaignId }),
       });
-      return res.json();
+    },
+    onSuccess: () => {
+      refetchTasks();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    },
+  });
+
+  // Unassign task from campaign mutation
+  const unassignTaskMutation = useMutation({
+    mutationFn: async ({ taskId, campaignId }: { taskId: string; campaignId: string }) => {
+      return await fetchApi(`/api/tasks/${taskId}/unassign`, {
+        method: "DELETE",
+        body: JSON.stringify({ campaignId }),
+      });
     },
     onSuccess: () => {
       refetchTasks();
@@ -171,11 +209,10 @@ export default function CampaignBuilderNew() {
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: any) => {
-      const res = await fetchApi("/api/tasks", {
+      return await fetchApi("/api/tasks", {
         method: "POST",
         body: JSON.stringify(taskData),
       });
-      return res.json();
     },
     onSuccess: async (newTask) => {
       // Auto-assign to current campaign if we have one
@@ -201,28 +238,90 @@ export default function CampaignBuilderNew() {
   const publishMutation = useMutation({
     mutationFn: async () => {
       if (!campaignId) throw new Error("Campaign not saved");
-      const res = await fetchApi(`/api/campaigns/${campaignId}/publish`, {
+      return await fetchApi(`/api/campaigns/${campaignId}/publish`, {
         method: "POST",
       });
-      return res.json();
     },
     onSuccess: () => {
+      // Invalidate all campaign-related queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/creator"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/active"] });
       setLocation("/creator-dashboard/campaigns");
     },
   });
 
+  // Helper to safely parse date
+  const safeParseDate = (dateStr: string): string | null => {
+    if (!dateStr || dateStr === '') return null;
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return null;
+      return date.toISOString();
+    } catch {
+      return null;
+    }
+  };
+
+  // State for validation errors
+  const [dateError, setDateError] = useState<string | null>(null);
+
   // Handle step navigation
   const handleNext = async () => {
     if (currentStep === 1) {
-      // Soft-save on leaving step 1 to get campaign ID
-      await softSaveMutation.mutateAsync({
-        name: campaignData.name,
-        description: campaignData.description,
-        startDate: campaignData.startDate || new Date().toISOString(),
-        endDate: campaignData.isIndefinite ? null : campaignData.endDate,
-        campaignTypes: [campaignData.rewardType],
-      });
+      setDateError(null);
+
+      // Validate dates before saving
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      const parsedStartDate = safeParseDate(campaignData.startDate);
+      const parsedEndDate = campaignData.isIndefinite ? null : safeParseDate(campaignData.endDate);
+
+      // Validate: Start date must be today or in the future
+      if (parsedStartDate) {
+        const startDateObj = new Date(parsedStartDate);
+        if (startDateObj < today) {
+          setDateError("Start date cannot be in the past");
+          return;
+        }
+      }
+
+      // Validate: End date must be after start date
+      if (parsedStartDate && parsedEndDate) {
+        const startDateObj = new Date(parsedStartDate);
+        const endDateObj = new Date(parsedEndDate);
+        if (endDateObj <= startDateObj) {
+          setDateError("End date must be after start date");
+          return;
+        }
+      }
+
+      // Prepare data for soft-save - only include valid, non-empty values
+      const saveData: Record<string, any> = {
+        name: campaignData.name?.trim() || 'Untitled Campaign',
+        campaignTypes: [campaignData.rewardType || 'points'],
+      };
+
+      // Only add description if non-empty
+      if (campaignData.description?.trim()) {
+        saveData.description = campaignData.description.trim();
+      }
+
+      // Handle startDate - let backend default if we can't parse
+      if (parsedStartDate) {
+        saveData.startDate = parsedStartDate;
+      }
+
+      // Handle endDate
+      if (campaignData.isIndefinite) {
+        saveData.endDate = null;
+      } else if (parsedEndDate) {
+        saveData.endDate = parsedEndDate;
+      }
+
+      console.log('[Campaign Builder] Saving draft with data:', saveData);
+      await softSaveMutation.mutateAsync(saveData);
     }
     setCurrentStep((prev) => Math.min(prev + 1, 4));
   };
@@ -244,10 +343,11 @@ export default function CampaignBuilderNew() {
 
     const isAssigned = campaignData.assignedTaskIds.includes(taskId);
     if (isAssigned) {
-      // Unassign task
+      // Unassign task via API
+      await unassignTaskMutation.mutateAsync({ taskId, campaignId });
       updateData("assignedTaskIds", campaignData.assignedTaskIds.filter(id => id !== taskId));
     } else {
-      // Assign task
+      // Assign task via API
       await assignTaskMutation.mutateAsync({ taskId, campaignId });
       updateData("assignedTaskIds", [...campaignData.assignedTaskIds, taskId]);
     }
@@ -328,27 +428,47 @@ export default function CampaignBuilderNew() {
                   </div>
 
                   {!campaignData.isIndefinite && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="startDate" className="text-white">Start Date</Label>
-                        <Input
-                          id="startDate"
-                          type="datetime-local"
-                          value={campaignData.startDate}
-                          onChange={(e) => updateData("startDate", e.target.value)}
-                          className="mt-1 bg-white/5 border-white/20 text-white"
-                        />
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="startDate" className="text-white">Start Date</Label>
+                          <Input
+                            id="startDate"
+                            type="datetime-local"
+                            value={campaignData.startDate}
+                            onChange={(e) => {
+                              updateData("startDate", e.target.value);
+                              setDateError(null);
+                            }}
+                            min={new Date().toISOString().slice(0, 16)}
+                            className="mt-1 bg-white/5 border-white/20 text-white"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Must be today or in the future</p>
+                        </div>
+                        <div>
+                          <Label htmlFor="endDate" className="text-white">End Date</Label>
+                          <Input
+                            id="endDate"
+                            type="datetime-local"
+                            value={campaignData.endDate}
+                            onChange={(e) => {
+                              updateData("endDate", e.target.value);
+                              setDateError(null);
+                            }}
+                            min={campaignData.startDate || new Date().toISOString().slice(0, 16)}
+                            className="mt-1 bg-white/5 border-white/20 text-white"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Must be after start date</p>
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor="endDate" className="text-white">End Date</Label>
-                        <Input
-                          id="endDate"
-                          type="datetime-local"
-                          value={campaignData.endDate}
-                          onChange={(e) => updateData("endDate", e.target.value)}
-                          className="mt-1 bg-white/5 border-white/20 text-white"
-                        />
-                      </div>
+                      {dateError && (
+                        <Alert className="bg-red-500/10 border-red-500/30">
+                          <AlertCircle className="h-4 w-4 text-red-400" />
+                          <AlertDescription className="text-red-200">
+                            {dateError}
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     </div>
                   )}
                 </div>

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from '../core/storage';
+import { db } from '../db';
 import { registerSocialRoutes } from "./social/social-routes";
 import { registerTenantRoutes } from "./user/tenant-routes";
 import { registerAdminRoutes } from "./admin/admin-routes";
@@ -99,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/storage/*', async (req, res) => {
     try {
       const filename = (req.params as any)[0]; // Get everything after /api/storage/
-      const { getStorageClient } = await import('./storage-client');
+      const { getStorageClient } = await import('../core/storage-client');
       const client = await getStorageClient();
       
       const result = await client.downloadAsBytes(filename);
@@ -142,7 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/storage/videos/*', async (req, res) => {
     try {
       const filename = (req.params as any)[0]; // Get everything after /api/storage/videos/
-      const { getStorageClient } = await import('./storage-client');
+      const { getStorageClient } = await import('../core/storage-client');
       const client = await getStorageClient();
       
       const result = await client.downloadAsBytes(filename);
@@ -567,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let agencyId = null;
       if (creatorType === 'brand' && brandType === 'agency' && agencyName) {
         try {
-          const { db } = await import("./db");
+          const { db } = await import("../db");
           const { agencies } = await import("@shared/schema");
           
           const [agency] = await db.insert(agencies).values({
@@ -1074,7 +1075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const { loyaltyPrograms } = await import("@shared/schema");
             const { eq, and } = await import("drizzle-orm");
-            const db = (await import("./db")).db;
+            const db = (await import("../db")).db;
 
             const publishedPrograms = await db.select()
               .from(loyaltyPrograms)
@@ -2137,6 +2138,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Helper to parse dates to Date objects
+      const parseDate = (value: any): Date | null => {
+        if (!value) return null;
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date;
+      };
+
       // Create the main campaign with proper tenant scoping
       const campaignPayload = {
         tenantId: creator.tenantId,
@@ -2146,8 +2154,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: campaignData.description || '',
         campaignType: 'direct' as const,
         trigger: 'custom_event' as const,
-        startDate: campaignData.startDate || new Date().toISOString(),
-        endDate: campaignData.endDate || null,
+        startDate: parseDate(campaignData.startDate) || new Date(),  // Must be Date object
+        endDate: parseDate(campaignData.endDate),  // Must be Date object or null
         status: 'active' as const,
         campaignTypes: campaignData.type || ['points'],
         rewardStructure: campaignData.rewardStructure,
@@ -2774,7 +2782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/fan-programs/user/:fanId", async (req, res) => {
     try {
-      const { db } = await import("./db");
+      const { db } = await import("../db");
       const { eq } = await import("drizzle-orm");
       const { fanPrograms: fanProgramsTable, loyaltyPrograms } = await import("@shared/schema");
       
@@ -2844,7 +2852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get creator's programs
       const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, pointTransactions, users, tasks } = await import("@shared/schema");
       const { eq, and, desc, or, like, gte, sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       const programs = await db.select()
         .from(loyaltyPrograms)
@@ -3005,7 +3013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks } = await import("@shared/schema");
       const { eq, and, gte, sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       // Get creator's programs
       const programs = await db.select()
@@ -3484,30 +3492,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Creator profile required" });
       }
 
-      // Create draft campaign with minimal required fields
-      const campaignData = {
-        ...req.body,
+      console.log("[Campaign Draft] Request body:", JSON.stringify(req.body, null, 2));
+
+      // Helper to safely parse to Date object (Drizzle expects Date objects for timestamp columns)
+      const parseToDate = (value: any): Date | null => {
+        if (!value || value === '') return null;
+        try {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) return null;
+          return date;
+        } catch {
+          return null;
+        }
+      };
+
+      // Parse dates as Date objects (Drizzle requires Date objects, not strings!)
+      const startDate: Date = parseToDate(req.body.startDate) || new Date();
+      const endDate: Date | null = parseToDate(req.body.endDate);
+
+      // Date validation for drafts (be lenient - allow saving but warn)
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Midnight today
+
+      // For drafts, start date should be today or future (but allow for editing)
+      if (startDate < today) {
+        console.log("[Campaign Draft] Warning: Start date is in the past, adjusting to today");
+        // Don't reject drafts with past dates - they might be editing
+      }
+
+      // End date must be after start date
+      if (endDate && endDate <= startDate) {
+        return res.status(400).json({ 
+          error: "Invalid dates", 
+          message: "End date must be after start date" 
+        });
+      }
+
+      // Build campaign data explicitly - DO NOT spread req.body
+      // This prevents invalid/unexpected fields from causing errors
+      const campaignData: any = {
+        // Required fields
+        name: String(req.body.name || 'Untitled Campaign'),
         creatorId: creator.id,
         tenantId: creator.tenantId,
         status: 'draft',
-        campaignType: 'direct',
+        campaignType: String(req.body.campaignType || 'direct'),
         trigger: 'custom_event',
+        startDate: startDate,  // Must be Date object
+        
+        // Optional fields
+        description: req.body.description ? String(req.body.description) : null,
+        endDate: endDate,  // Must be Date object or null
+        visibility: 'everyone',
       };
+
+      // Only add JSONB fields if they are properly formatted
+      if (req.body.campaignTypes && Array.isArray(req.body.campaignTypes)) {
+        campaignData.campaignTypes = req.body.campaignTypes.map(String);
+      }
+      if (req.body.rewardStructure && typeof req.body.rewardStructure === 'object' && !Array.isArray(req.body.rewardStructure)) {
+        campaignData.rewardStructure = req.body.rewardStructure;
+      }
+      if (req.body.prerequisiteCampaigns && Array.isArray(req.body.prerequisiteCampaigns)) {
+        campaignData.prerequisiteCampaigns = req.body.prerequisiteCampaigns.map(String);
+      }
+      if (typeof req.body.allTasksRequired === 'boolean') {
+        campaignData.allTasksRequired = req.body.allTasksRequired;
+      }
+
+      console.log("[Campaign Draft] Creating campaign with data:", JSON.stringify({
+        ...campaignData,
+        startDate: startDate.toISOString(),
+        endDate: endDate?.toISOString() || null,
+      }, null, 2));
 
       const campaign = await storage.createCampaign(campaignData);
       res.json(campaign);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create draft campaign:", error);
-      res.status(500).json({ error: "Failed to create draft campaign" });
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Failed to create draft campaign", details: error.message });
     }
   });
 
-  // Assign task to campaign
+  // Update campaign (for updating drafts during campaign builder flow)
+  app.put("/api/campaigns/:campaignId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const { campaignId } = req.params;
+
+      // Verify campaign belongs to this creator
+      const existingCampaign = await storage.getCampaign(campaignId, creator.tenantId);
+      if (!existingCampaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      if (existingCampaign.creatorId !== creator.id) {
+        return res.status(403).json({ error: "Not authorized to update this campaign" });
+      }
+
+      // Helper to safely parse to Date object (Drizzle expects Date objects for timestamp columns)
+      const parseToDate = (value: any): Date | null => {
+        if (!value || value === '') return null;
+        try {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) return null;
+          return date;
+        } catch {
+          return null;
+        }
+      };
+
+      // Build update data explicitly - only include valid fields
+      const updateData: any = {};
+      
+      // String fields
+      if (req.body.name && req.body.name !== '') {
+        updateData.name = String(req.body.name);
+      }
+      if (req.body.description !== undefined) {
+        updateData.description = req.body.description ? String(req.body.description) : null;
+      }
+      if (req.body.status && ['draft', 'active', 'paused', 'completed'].includes(req.body.status)) {
+        updateData.status = req.body.status;
+      }
+
+      // Date fields - must be Date objects for Drizzle
+      const startDate = parseToDate(req.body.startDate);
+      if (startDate) {
+        updateData.startDate = startDate;
+      }
+      if (req.body.endDate === null) {
+        updateData.endDate = null;
+      } else {
+        const endDate = parseToDate(req.body.endDate);
+        if (endDate) {
+          updateData.endDate = endDate;
+        }
+      }
+
+      // JSONB fields - validate they're proper arrays/objects
+      if (req.body.campaignTypes && Array.isArray(req.body.campaignTypes)) {
+        updateData.campaignTypes = req.body.campaignTypes.map(String);
+      }
+      if (req.body.rewardStructure && typeof req.body.rewardStructure === 'object' && !Array.isArray(req.body.rewardStructure)) {
+        updateData.rewardStructure = req.body.rewardStructure;
+      }
+      if (req.body.visibilityRules && typeof req.body.visibilityRules === 'object') {
+        updateData.visibilityRules = req.body.visibilityRules;
+      }
+      if (req.body.prerequisiteCampaigns && Array.isArray(req.body.prerequisiteCampaigns)) {
+        updateData.prerequisiteCampaigns = req.body.prerequisiteCampaigns.map(String);
+      }
+      if (typeof req.body.allTasksRequired === 'boolean') {
+        updateData.allTasksRequired = req.body.allTasksRequired;
+      }
+
+      // Only update if we have changes
+      if (Object.keys(updateData).length === 0) {
+        return res.json(existingCampaign);
+      }
+
+      const updatedCampaign = await storage.updateCampaign(campaignId, updateData);
+      res.json(updatedCampaign);
+    } catch (error: any) {
+      console.error("Failed to update campaign:", error);
+      res.status(500).json({ error: "Failed to update campaign", details: error.message });
+    }
+  });
+
+  // Assign task to campaign (uses task_assignments table)
   app.post("/api/tasks/:taskId/assign", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
       }
 
       const { taskId } = req.params;
@@ -3517,12 +3690,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Campaign ID required" });
       }
 
-      // Update task with campaign assignment
-      const updatedTask = await storage.updateTask(taskId, { campaignId });
-      res.json(updatedTask);
-    } catch (error) {
+      // Verify campaign belongs to this creator
+      const campaign = await storage.getCampaign(campaignId, creator.tenantId);
+      if (!campaign || campaign.creatorId !== creator.id) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      // Verify task exists and belongs to this creator
+      const task = await storage.getTask(taskId, creator.tenantId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Use proper assignment method that inserts into task_assignments table
+      const assignment = await storage.assignTaskToCampaign(taskId, campaignId, creator.tenantId);
+      res.json({ success: true, assignment, task });
+    } catch (error: any) {
       console.error("Failed to assign task to campaign:", error);
-      res.status(500).json({ error: "Failed to assign task" });
+      res.status(500).json({ error: "Failed to assign task", details: error.message });
+    }
+  });
+
+  // Unassign task from campaign
+  app.delete("/api/tasks/:taskId/unassign", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const { taskId } = req.params;
+      const { campaignId } = req.body;
+
+      if (!campaignId) {
+        return res.status(400).json({ error: "Campaign ID required" });
+      }
+
+      // Verify campaign belongs to this creator
+      const campaign = await storage.getCampaign(campaignId, creator.tenantId);
+      if (!campaign || campaign.creatorId !== creator.id) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      // Unassign task from campaign
+      await storage.unassignTaskFromCampaign(taskId, campaignId, creator.tenantId);
+      res.json({ success: true, message: "Task unassigned from campaign" });
+    } catch (error: any) {
+      console.error("Failed to unassign task from campaign:", error);
+      res.status(500).json({ error: "Failed to unassign task", details: error.message });
+    }
+  });
+
+  // Get task assignments for a campaign
+  app.get("/api/campaigns/:campaignId/task-assignments", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Creator profile required" });
+      }
+
+      const { campaignId } = req.params;
+
+      // Verify campaign belongs to this creator
+      const campaign = await storage.getCampaign(campaignId, creator.tenantId);
+      if (!campaign || campaign.creatorId !== creator.id) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      // Get task assignments
+      const assignments = await storage.getTaskAssignments(campaignId);
+      const taskIds = assignments.map(a => a.taskId);
+
+      res.json({ assignments, taskIds });
+    } catch (error: any) {
+      console.error("Failed to get task assignments:", error);
+      res.status(500).json({ error: "Failed to get task assignments", details: error.message });
     }
   });
 
@@ -3535,7 +3787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboards/platform", async (req, res) => {
     try {
       const { sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       const timePeriod = (req.query.period as string) || 'all_time';
       const limit = parseInt(req.query.limit as string) || 100;
@@ -3567,7 +3819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboards/campaign/:campaignId", async (req, res) => {
     try {
       const { sql, eq } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
       const { campaigns } = await import("@shared/schema");
 
       const { campaignId } = req.params;
@@ -3607,7 +3859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboards/program/:programId", async (req, res) => {
     try {
       const { sql, eq } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
       const { loyaltyPrograms } = await import("@shared/schema");
 
       const { programId } = req.params;
@@ -3647,7 +3899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leaderboards/refresh", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       // Check if user is admin
       const user = await storage.getUser(req.user?.id || '');
@@ -3668,7 +3920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboards/my-rankings", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       const userId = req.user?.id;
       if (!userId) {
@@ -3725,7 +3977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leaderboards/badge-rewards", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       // Check if user is admin or creator
       const user = await storage.getUser(req.user?.id || '');
@@ -3752,7 +4004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboards/badge-rewards/:type/:targetId?", async (req, res) => {
     try {
       const { sql } = await import("drizzle-orm");
-      const db = (await import("./db")).db;
+      const db = (await import("../db")).db;
 
       const { type, targetId } = req.params;
 

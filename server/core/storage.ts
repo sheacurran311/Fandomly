@@ -98,6 +98,7 @@ export interface IStorage {
   getUserMemberships(userId: string): Promise<TenantMembership[]>;
 
   // Campaign operations
+  getCampaign(id: string, tenantId?: string): Promise<Campaign | undefined>;
   getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]>;
   getActiveCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]>;
   getAllActiveCampaigns(tenantId?: string): Promise<Campaign[]>;
@@ -673,6 +674,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Campaign operations
+  async getCampaign(id: string, tenantId?: string): Promise<Campaign | undefined> {
+    const conditions = tenantId
+      ? and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId))
+      : eq(campaigns.id, id);
+    const [campaign] = await db.select().from(campaigns).where(conditions);
+    return campaign;
+  }
+
   async getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]> {
     const conditions = tenantId 
       ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.tenantId, tenantId))

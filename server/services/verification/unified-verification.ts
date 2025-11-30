@@ -12,7 +12,7 @@ import { checkInService } from '../check-in-service';
 
 export interface UnifiedVerificationRequest {
   userId: string;
-  taskCompletionId?: number;
+  taskCompletionId?: string;
   taskId: string; // UUID
   tenantId: string;
   creatorId: string;
@@ -40,7 +40,7 @@ export interface UnifiedVerificationResult {
   success: boolean;
   verified: boolean;
   requiresManualReview: boolean;
-  completionId: number;
+  completionId: string;
   pointsAwarded?: number;
   message: string;
   metadata?: Record<string, any>;
@@ -87,7 +87,7 @@ export class UnifiedVerificationService {
             success: false,
             verified: false,
             requiresManualReview: false,
-            completionId: taskCompletionId || 0,
+            completionId: taskCompletionId || '',
             message: urlValidation.error || 'Invalid proof URL',
           };
         }
@@ -186,7 +186,7 @@ export class UnifiedVerificationService {
         success: false,
         verified: false,
         requiresManualReview: false,
-        completionId: taskCompletionId || 0,
+        completionId: taskCompletionId || '',
         message: error.message || 'Verification error occurred',
       };
     }
@@ -196,7 +196,7 @@ export class UnifiedVerificationService {
    * Route to platform-specific or task-type-specific verification service
    */
   private async routeVerification(params: {
-    userId: number;
+    userId: string;
     platform: string;
     taskType: string;
     taskSettings: any;
@@ -215,7 +215,7 @@ export class UnifiedVerificationService {
     switch (taskType.toLowerCase()) {
       case 'website_visit':
         return await websiteVisitVerification.verify({
-          userId: userId.toString(),
+          userId,
           taskType,
           taskSettings,
           trackingToken,
@@ -232,7 +232,7 @@ export class UnifiedVerificationService {
           };
         }
         return await pollQuizVerification.verify({
-          userId: userId.toString(),
+          userId,
           taskType,
           taskSettings,
           responses,
@@ -267,7 +267,7 @@ export class UnifiedVerificationService {
         let userTikTokUsername: string | undefined;
         if (taskType === 'tiktok_post') {
           const user = await db.query.users.findFirst({
-            where: eq(users.id, userId.toString()),
+            where: eq(users.id, userId),
           });
           userTikTokUsername = (user?.socialLinks as any)?.tiktok;
         }
@@ -391,7 +391,7 @@ export class UnifiedVerificationService {
    * Create manual review queue entry
    */
   private async createManualReview(params: {
-    taskCompletionId: number;
+    taskCompletionId: string;
     tenantId: string;
     creatorId: string;
     fanId: string;

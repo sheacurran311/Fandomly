@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import type { IStorage } from '../core/storage';
+import type { IStorage } from '../../core/storage';
 import type { Task, User } from '@shared/schema';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
 import { taskFrequencyService } from '../../services/task-frequency-service';

@@ -14,12 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { FaTwitch } from "react-icons/fa";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useTwitchConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
 
 interface TwitchTaskBuilderProps {
   onSave: (config: any) => void;
@@ -41,6 +42,14 @@ export default function TwitchTaskBuilder({
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Use unified Twitch connection hook
+  const {
+    isConnected: twitchConnected,
+    isLoading: checkingConnection,
+    userInfo: twitchUserInfo,
+    connect: connectTwitch,
+  } = useTwitchConnection();
+
   // Task settings
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
@@ -54,44 +63,16 @@ export default function TwitchTaskBuilder({
   // Verification settings
   const [useApiVerification, setUseApiVerification] = useState(true);
 
-  // Connection status
-  const [twitchConnected, setTwitchConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
-
   // Validation
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
 
-  // Check Twitch connection
+  // Auto-fill channel name when Twitch connects
   useEffect(() => {
-    const checkTwitchConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/twitch', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setTwitchConnected(data.connected);
-        } else {
-          setTwitchConnected(false);
-        }
-      } catch (error) {
-        console.error('[TwitchTaskBuilder] Error checking Twitch connection:', error);
-        setTwitchConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-
-    if (user?.id) {
-      checkTwitchConnection();
+    if (twitchConnected && twitchUserInfo?.username && !channelName && !isEditMode) {
+      setChannelName(twitchUserInfo.username);
     }
-  }, [user?.id, user?.dynamicUserId]);
+  }, [twitchConnected, twitchUserInfo?.username, channelName, isEditMode]);
 
   // Set default values
   useEffect(() => {
@@ -105,15 +86,19 @@ export default function TwitchTaskBuilder({
     }
   }, [taskType, isEditMode, taskName]);
 
-  // Load initial data for edit mode
+  // Load initial data for edit mode - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (isEditMode && initialData) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
-      setPoints(initialData.points || initialData.pointsToReward || 50);
-      setChannelName(initialData.settings?.channelName || '');
-      setChannelId(initialData.settings?.channelId || '');
-      setSubscriptionTier(initialData.settings?.subscriptionTier || 'any');
+      setPoints(initialData.pointsToReward || initialData.points || 50);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      setChannelName(settings.channelName || settings.username || '');
+      setChannelId(settings.channelId || '');
+      setSubscriptionTier(settings.subscriptionTier || 'any');
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [isEditMode, initialData]);
@@ -157,6 +142,8 @@ export default function TwitchTaskBuilder({
           subscriptionTier,
         }),
       },
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onPublish(config);
   };
@@ -178,6 +165,8 @@ export default function TwitchTaskBuilder({
           subscriptionTier,
         }),
       },
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onSave(config);
   };
@@ -224,38 +213,7 @@ export default function TwitchTaskBuilder({
                 <p className="text-sm mt-1">You must connect your Twitch account before creating Twitch tasks.</p>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const socialManager = new SocialIntegrationManager();
-                    const result = await socialManager['twitch'].secureLogin();
-
-                    if (result.success) {
-                      toast({ title: "Twitch Connected! 🎮" });
-                      const response = await fetch('/api/social-connections/twitch', {
-                        headers: {
-                          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                          'Content-Type': 'application/json'
-                        },
-                        credentials: 'include'
-                      });
-
-                      if (response.ok) {
-                        const data = await response.json();
-                        setTwitchConnected(data.connected || false);
-                        setCheckingConnection(false);
-                      }
-                    } else {
-                      toast({
-                        title: "Connection Failed",
-                        description: result.error || "Failed to connect Twitch",
-                        variant: "destructive"
-                      });
-                    }
-                  } catch (error) {
-                    console.error('Twitch connection error:', error);
-                    toast({ title: "Error", description: "Failed to connect Twitch", variant: "destructive" });
-                  }
-                }}
+                onClick={connectTwitch}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 ml-4"
               >
                 Connect Twitch
@@ -358,6 +316,30 @@ export default function TwitchTaskBuilder({
               </p>
             </div>
           )}
+
+          {/* Locked Frequency Display */}
+          <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Label className="text-white font-semibold">Reward Frequency</Label>
+                  <Lock className="h-4 w-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Social engagement tasks are one-time only
+                </p>
+              </div>
+              <Badge variant="outline" className="border-purple-500/30 text-purple-400">
+                One-time
+              </Badge>
+            </div>
+            <Alert className="bg-purple-500/10 border-purple-500/20">
+              <Info className="h-4 w-4 text-purple-400" />
+              <AlertDescription className="text-purple-400 text-sm">
+                This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+              </AlertDescription>
+            </Alert>
+          </div>
 
           <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
             <div className="flex items-center justify-between">

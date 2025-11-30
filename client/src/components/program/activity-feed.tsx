@@ -57,11 +57,24 @@ export function ActivityFeed({
     queryKey: [`/api/programs/${programId}/activity`],
   });
 
-  // Combine and sort by date
+  // Helper to safely parse dates (returns null for invalid/epoch dates)
+  const safeParseDate = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    // Check if valid and not epoch (1970)
+    if (isNaN(date.getTime()) || date.getFullYear() < 2000) return null;
+    return date;
+  };
+
+  // Combine and sort by date - filter out activities with invalid dates
   const allActivity = [
-    ...announcements.map(a => ({ type: 'announcement' as const, data: a, date: new Date(a.createdAt) })),
-    ...recentActivity.map(a => ({ type: 'activity' as const, data: a, date: new Date(a.completion.completedAt) }))
-  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+    ...announcements.map(a => ({ type: 'announcement' as const, data: a, date: safeParseDate(a.createdAt) })),
+    ...recentActivity
+      .filter(a => a.completion?.completedAt) // Only include activities with valid completedAt
+      .map(a => ({ type: 'activity' as const, data: a, date: safeParseDate(a.completion.completedAt) }))
+  ]
+    .filter(item => item.date !== null) // Remove items with invalid dates
+    .sort((a, b) => (b.date as Date).getTime() - (a.date as Date).getTime());
 
   if (allActivity.length === 0) {
     return (
@@ -170,29 +183,42 @@ function AnnouncementCard({
 }
 
 function ActivityCard({ activity }: { activity: Activity }) {
+  // Safely format the completion date
+  const getTimeAgo = () => {
+    if (!activity.completion?.completedAt) return 'recently';
+    try {
+      const date = new Date(activity.completion.completedAt);
+      // Check for invalid or epoch dates
+      if (isNaN(date.getTime()) || date.getFullYear() < 2000) return 'recently';
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch {
+      return 'recently';
+    }
+  };
+
   return (
     <Card className="bg-white border border-gray-200 shadow-sm">
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10 border border-gray-200">
-            <AvatarImage src={activity.user.avatar || undefined} />
+            <AvatarImage src={activity.user?.avatar || undefined} />
             <AvatarFallback className="bg-green-100 text-green-700">
-              {activity.user.username.substring(0, 2).toUpperCase()}
+              {(activity.user?.username || 'UN').substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-gray-900 text-sm">
-              <span className="font-semibold">{activity.user.username}</span>
+              <span className="font-semibold">{activity.user?.username || 'Unknown'}</span>
               {' '}completed{' '}
-              <span className="font-semibold">{activity.task.name}</span>
+              <span className="font-semibold">{activity.task?.name || 'a task'}</span>
             </p>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-gray-600 text-xs">
-                {formatDistanceToNow(new Date(activity.completion.completedAt), { addSuffix: true })}
+                {getTimeAgo()}
               </span>
               <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
                 <Trophy className="h-3 w-3 mr-1" />
-                +{activity.completion.pointsEarned} points
+                +{activity.completion?.pointsEarned || 0} points
               </Badge>
             </div>
           </div>

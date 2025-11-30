@@ -10,18 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
 import { SiTiktok } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useTikTokConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
-import {
-  MultiplierConfig,
-  FrequencySelector,
-  type MultiplierConfigData,
-  type RewardFrequency,
-} from "./config";
 
 interface TikTokTaskBuilderProps {
   onSave: (config: any) => void;
@@ -35,6 +29,15 @@ interface TikTokTaskBuilderProps {
 export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: TikTokTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use unified TikTok connection hook
+  const {
+    isConnected: tiktokConnected,
+    isLoading: checkingConnection,
+    userInfo: tiktokUserInfo,
+    connect: connectTikTok,
+  } = useTikTokConnection();
+  
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(50);
@@ -45,54 +48,31 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-  const [tiktokConnected, setTiktokConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
 
-  // Sprint 3: Advanced configuration
-  const [multiplierConfig, setMultiplierConfig] = useState<MultiplierConfigData>({
-    enabled: false,
-    baseMultiplier: 1.0,
-  });
-  const [rewardFrequency, setRewardFrequency] = useState<RewardFrequency>('one_time');
-
-  // Check if TikTok is connected
+  // Auto-fill username when TikTok connects
   useEffect(() => {
-    const checkTikTokConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/tiktok', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setTiktokConnected(data.connected);
-          
-          // Auto-fill username for follow tasks
-          if (data.connected && data.connection && taskType === 'tiktok_follow' && !username) {
-            const tiktokUsername = data.connection.platformUsername || data.connection.platformDisplayName;
-            if (tiktokUsername) {
-              setUsername(tiktokUsername);
-            }
-          }
-        } else {
-          setTiktokConnected(false);
-        }
-      } catch (error) {
-        console.error('[TikTokTaskBuilder] Error checking TikTok connection:', error);
-        setTiktokConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-    
-    if (user?.id) {
-      checkTikTokConnection();
+    if (tiktokConnected && tiktokUserInfo?.username && taskType === 'tiktok_follow' && !username && !isEditMode) {
+      setUsername(tiktokUserInfo.username);
     }
-  }, [user?.id, user?.dynamicUserId, taskType]);
+  }, [tiktokConnected, tiktokUserInfo?.username, taskType, username, isEditMode]);
+
+  // Load initial data for edit mode - check both settings and customSettings (backend stores in customSettings)
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      setTaskName(initialData.name || '');
+      setDescription(initialData.description || '');
+      setPoints(initialData.pointsToReward || initialData.points || 50);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      setUsername(settings.username || '');
+      setVideoUrl(settings.videoUrl || settings.contentUrl || '');
+      setRequiredText(settings.requiredText || '');
+      setRequiredHashtags(Array.isArray(settings.requiredHashtags) ? settings.requiredHashtags.join(', ') : (settings.requiredHashtags || ''));
+      setUseApiVerification(initialData.verificationMethod === 'api');
+    }
+  }, [isEditMode, initialData]);
 
   useEffect(() => {
     if (!isEditMode && !taskName) {
@@ -167,10 +147,8 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       isDraft: false,
       verificationMethod: useApiVerification ? 'api' : 'manual',
       settings,
-      // Sprint 3: Advanced configuration
-      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
-      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
-      rewardFrequency,
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onPublish(config);
   };
@@ -200,10 +178,8 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       isDraft: true,
       verificationMethod: useApiVerification ? 'api' : 'manual',
       settings,
-      // Sprint 3: Advanced configuration
-      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
-      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
-      rewardFrequency,
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onSave(config);
   };
@@ -248,39 +224,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
                 <p className="text-sm mt-1">You must connect your TikTok account before creating TikTok tasks.</p>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const socialManager = new SocialIntegrationManager();
-                    const result = await socialManager['tiktok'].secureLogin();
-                    
-                    if (result.success) {
-                      toast({ title: "TikTok Connected! 🎵" });
-                      // Re-check connection
-                      const response = await fetch('/api/social-connections/tiktok', {
-                        headers: {
-                          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                          'Content-Type': 'application/json'
-                        },
-                        credentials: 'include'
-                      });
-                      
-                      if (response.ok) {
-                        const data = await response.json();
-                        setTiktokConnected(data.connected || false);
-                        setCheckingConnection(false);
-                      }
-                    } else {
-                      toast({ 
-                        title: "Connection Failed",
-                        description: result.error || "Failed to connect TikTok",
-                        variant: "destructive" 
-                      });
-                    }
-                  } catch (error) {
-                    console.error('TikTok connection error:', error);
-                    toast({ title: "Error", description: "Failed to connect TikTok", variant: "destructive" });
-                  }
-                }}
+                onClick={connectTikTok}
                 className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 ml-4"
               >
                 Connect TikTok
@@ -375,6 +319,30 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
               )}
             </div>
           )}
+          {/* Locked Frequency Display */}
+          <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Label className="text-white font-semibold">Reward Frequency</Label>
+                  <Lock className="h-4 w-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Social engagement tasks are one-time only
+                </p>
+              </div>
+              <Badge variant="outline" className="border-pink-500/30 text-pink-400">
+                One-time
+              </Badge>
+            </div>
+            <Alert className="bg-pink-500/10 border-pink-500/20">
+              <Info className="h-4 w-4 text-pink-400" />
+              <AlertDescription className="text-pink-400 text-sm">
+                This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+              </AlertDescription>
+            </Alert>
+          </div>
+
           <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
             <div className="flex items-center justify-between">
               <Label className="text-white font-semibold">Automatic Verification</Label>
@@ -394,18 +362,6 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
           </div>
         </CardContent>
       </Card>
-
-      {/* Sprint 3: Advanced Configuration */}
-      <MultiplierConfig
-        value={multiplierConfig}
-        onChange={setMultiplierConfig}
-      />
-
-      <FrequencySelector
-        value={rewardFrequency}
-        onChange={setRewardFrequency}
-        showUnlimited={false}
-      />
     </TaskBuilderBase>
   );
 }

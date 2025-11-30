@@ -15,12 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
 import { SiFacebook } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useFacebookConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { FacebookSDKManager } from "@/lib/facebook";
 
 interface FacebookTaskBuilderProps {
   onSave: (config: any) => void;
@@ -34,6 +34,15 @@ interface FacebookTaskBuilderProps {
 export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: FacebookTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use unified Facebook connection hook
+  const {
+    isConnected: facebookConnected,
+    isLoading: checkingConnection,
+    userInfo: facebookUserInfo,
+    connect: connectFacebook,
+  } = useFacebookConnection();
+  
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(50);
@@ -43,8 +52,6 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-  const [facebookConnected, setFacebookConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
 
   // Initialize form with defaults based on task type
   useEffect(() => {
@@ -56,73 +63,35 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     }
   }, [taskType, isEditMode]);
   
-  // Load initial data if editing
+  // Load initial data if editing - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
-      setPoints(initialData.points || 50);
-      if (initialData.settings?.pageUrl) {
-        setPageUrl(initialData.settings.pageUrl);
+      setPoints(initialData.pointsToReward || initialData.points || 50);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      if (settings.pageUrl) {
+        setPageUrl(settings.pageUrl);
       }
-      if (initialData.settings?.postUrl) {
-        setPostUrl(initialData.settings.postUrl);
+      if (settings.postUrl) {
+        setPostUrl(settings.postUrl);
       }
-      if (initialData.settings?.requiredText) {
-        setRequiredText(initialData.settings.requiredText);
+      if (settings.requiredText) {
+        setRequiredText(settings.requiredText);
       }
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [initialData, isEditMode]);
 
-  // Check if Facebook is connected and get page URL
+  // Auto-fill page URL when Facebook connects
   useEffect(() => {
-    const checkFacebookConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/facebook', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setFacebookConnected(data.connected);
-          
-          // Auto-fill page URL for follow tasks if available
-          if (data.connected && data.connection?.profileData) {
-            const fbData = data.connection.profileData;
-            // Try to get page URL from profile data or construct from username/id
-            if (taskType === 'facebook_like_page' && !pageUrl) {
-              // If we have pages, use the first page's URL
-              if (fbData.pages && fbData.pages.length > 0) {
-                const firstPage = fbData.pages[0];
-                setPageUrl(`https://facebook.com/${firstPage.id}`);
-              } else if (fbData.id) {
-                // Fall back to user profile URL
-                setPageUrl(`https://facebook.com/${fbData.id}`);
-              }
-            }
-          }
-        } else {
-          setFacebookConnected(false);
-        }
-      } catch (error) {
-        console.error('[FacebookTaskBuilder] Error checking Facebook connection:', error);
-        setFacebookConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-    
-    if (user?.id) {
-      checkFacebookConnection();
-    } else {
-      setCheckingConnection(false);
+    if (facebookConnected && facebookUserInfo?.id && taskType === 'facebook_like_page' && !pageUrl && !isEditMode) {
+      setPageUrl(`https://facebook.com/${facebookUserInfo.id}`);
     }
-  }, [user?.id, user?.dynamicUserId, taskType]);
+  }, [facebookConnected, facebookUserInfo?.id, taskType, pageUrl, isEditMode]);
 
   const getDefaultValues = () => {
     switch (taskType) {
@@ -207,6 +176,8 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       points,
       isDraft,
       verificationMethod: useApiVerification ? 'api' : 'manual',
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
 
     if (taskType === 'facebook_like_page') {
@@ -317,38 +288,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                   <p className="text-sm mt-1">You must connect your Facebook account before creating Facebook tasks.</p>
                 </div>
                 <Button
-                  onClick={async () => {
-                    try {
-                      await FacebookSDKManager.ensureFBReady('creator');
-                      const result = await FacebookSDKManager.secureLogin('creator');
-                      
-                      if (result.success) {
-                        toast({ title: "Facebook Connected! 📘" });
-                        // Re-check connection to update UI
-                        const response = await fetch('/api/social-connections/facebook', {
-                          headers: {
-                            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                            'Content-Type': 'application/json'
-                          },
-                          credentials: 'include'
-                        });
-                        
-                        if (response.ok) {
-                          const data = await response.json();
-                          setFacebookConnected(data.connected);
-                        }
-                      } else {
-                        toast({ 
-                          title: "Connection Failed",
-                          description: result.error || "Failed to connect Facebook",
-                          variant: "destructive" 
-                        });
-                      }
-                    } catch (error) {
-                      console.error('Facebook connection error:', error);
-                      toast({ title: "Error", description: "Failed to connect Facebook", variant: "destructive" });
-                    }
-                  }}
+                  onClick={connectFacebook}
                   className="bg-[#1877F2] text-white hover:bg-[#1877F2]/80 ml-4"
                 >
                   <SiFacebook className="h-4 w-4 mr-2" />
@@ -471,6 +411,30 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                 )}
               </div>
             )}
+
+            {/* Locked Frequency Display */}
+            <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-white font-semibold">Reward Frequency</Label>
+                    <Lock className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Social engagement tasks are one-time only
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-blue-500/30 text-blue-400">
+                  One-time
+                </Badge>
+              </div>
+              <Alert className="bg-blue-500/10 border-blue-500/20">
+                <Info className="h-4 w-4 text-blue-400" />
+                <AlertDescription className="text-blue-400 text-sm">
+                  This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+                </AlertDescription>
+              </Alert>
+            </div>
 
             {/* API Verification Toggle */}
             <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">

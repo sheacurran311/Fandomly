@@ -1,5 +1,5 @@
 import { Express, Request, Response } from "express";
-import { storage } from '../core/storage';
+import { storage } from '../../core/storage';
 import { db } from '../../db';
 import { authenticateUser, requireFandomlyAdmin, AuthenticatedRequest } from '../../middleware/rbac';
 

@@ -1,4 +1,4 @@
-import type { IStorage } from '../core/storage';
+import type { IStorage } from '../../core/storage';
 import type { Task, User, TaskCompletion } from '@shared/schema';
 
 /**

@@ -11,7 +11,7 @@
  */
 
 import { z, ZodError } from 'zod';
-import * as schemas from '../shared/jsonbSchemas';
+import * as schemas from '../../shared/jsonbSchemas';
 
 // ============================================================================
 // VALIDATION RESULT TYPE
@@ -391,7 +391,7 @@ export async function updateUserProfile(userId: string, profileData: unknown) {
 
 // Example 2: Use middleware in route
 import { validateJsonbMiddleware } from './validation-helpers';
-import { userProfileDataSchema } from '../shared/jsonbSchemas';
+import { userProfileDataSchema } from '../../shared/jsonbSchemas';
 
 app.put('/api/users/:id/profile',
   validateJsonbMiddleware('profileData', userProfileDataSchema),

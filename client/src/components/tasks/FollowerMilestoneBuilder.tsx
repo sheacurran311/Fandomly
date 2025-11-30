@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TaskTimingConfig } from "@/components/templates/TaskTimingConfig";
 import {
   TrendingUp,
   Plus,
@@ -39,16 +38,27 @@ interface FollowerMilestoneConfig {
   
   // Tiered milestones
   tiers: FollowerMilestone[];
-  
-  // Timing (always daily for follower checks)
-  updateCadence: string;
-  rewardFrequency: string;
+}
+
+// API expects this structure
+interface FollowerMilestoneAPIPayload {
+  taskType: 'follower_milestone';
+  name: string;
+  description: string;
+  isDraft: boolean;
+  platform: 'twitter' | 'instagram' | 'tiktok' | 'youtube' | 'spotify';
+  customSettings: {
+    milestoneType: 'single' | 'tiered';
+    singleFollowerCount?: number;
+    singlePoints?: number;
+    tiers?: FollowerMilestone[];
+  };
 }
 
 interface FollowerMilestoneBuilderProps {
   initialConfig?: Partial<FollowerMilestoneConfig>;
-  onSave?: (config: FollowerMilestoneConfig) => void;
-  onPublish?: (config: FollowerMilestoneConfig) => void;
+  onSave?: (config: FollowerMilestoneAPIPayload) => void;
+  onPublish?: (config: FollowerMilestoneAPIPayload) => void;
   onBack?: () => void;
 }
 
@@ -101,20 +111,30 @@ export default function FollowerMilestoneBuilder({
   onPublish,
   onBack,
 }: FollowerMilestoneBuilderProps) {
+  // Handle both local config format and API format (customSettings)
+  const getInitialValue = <T,>(key: keyof FollowerMilestoneConfig, defaultValue: T): T => {
+    if (initialConfig && key in initialConfig && initialConfig[key] !== undefined) {
+      return initialConfig[key] as T;
+    }
+    const customSettings = (initialConfig as any)?.customSettings;
+    if (customSettings && key in customSettings && customSettings[key] !== undefined) {
+      return customSettings[key] as T;
+    }
+    return defaultValue;
+  };
+
   const [config, setConfig] = useState<FollowerMilestoneConfig>({
-    name: initialConfig?.name || "Follower Milestone",
-    description: initialConfig?.description || "Reach follower goals to earn rewards",
-    platform: initialConfig?.platform || 'twitter',
-    milestoneType: initialConfig?.milestoneType || 'tiered',
-    singleFollowerCount: initialConfig?.singleFollowerCount || 1000,
-    singlePoints: initialConfig?.singlePoints || 500,
-    tiers: initialConfig?.tiers || [
+    name: (initialConfig as any)?.name || "Follower Milestone",
+    description: (initialConfig as any)?.description || "Reach follower goals to earn rewards",
+    platform: (initialConfig as any)?.platform || getInitialValue('platform', 'twitter'),
+    milestoneType: getInitialValue('milestoneType', 'tiered'),
+    singleFollowerCount: getInitialValue('singleFollowerCount', 1000),
+    singlePoints: getInitialValue('singlePoints', 500),
+    tiers: getInitialValue('tiers', [
       { followers: 1000, points: 100 },
       { followers: 5000, points: 500 },
       { followers: 10000, points: 1500 },
-    ],
-    updateCadence: 'daily',
-    rewardFrequency: 'one_time',
+    ]),
   });
 
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -191,12 +211,29 @@ export default function FollowerMilestoneBuilder({
     });
   };
 
+  // Build API payload with proper structure
+  const buildAPIPayload = (isDraft: boolean): FollowerMilestoneAPIPayload => {
+    return {
+      taskType: 'follower_milestone',
+      name: config.name,
+      description: config.description,
+      isDraft,
+      platform: config.platform,
+      customSettings: {
+        milestoneType: config.milestoneType,
+        singleFollowerCount: config.milestoneType === 'single' ? config.singleFollowerCount : undefined,
+        singlePoints: config.milestoneType === 'single' ? config.singlePoints : undefined,
+        tiers: config.milestoneType === 'tiered' ? config.tiers : undefined,
+      },
+    };
+  };
+
   const handleSaveDraft = () => {
-    if (onSave) onSave(config);
+    if (onSave) onSave(buildAPIPayload(true));
   };
 
   const handlePublish = () => {
-    if (isValid && onPublish) onPublish(config);
+    if (isValid && onPublish) onPublish(buildAPIPayload(false));
   };
 
   const platformConfig = PLATFORM_CONFIG[config.platform];
@@ -531,24 +568,17 @@ export default function FollowerMilestoneBuilder({
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Timing & Distribution
+              Verification Timing
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Alert className="bg-blue-500/10 border-blue-500/20 mb-4">
+            <Alert className="bg-blue-500/10 border-blue-500/20">
               <Info className="h-4 w-4 text-blue-400" />
               <AlertDescription className="text-gray-300">
                 Follower counts are automatically checked <strong>daily at midnight UTC</strong>. 
-                When a milestone is reached, fans are rewarded immediately.
+                When a milestone is reached, fans are rewarded immediately. Each milestone can only be earned once.
               </AlertDescription>
             </Alert>
-
-            <TaskTimingConfig
-              updateCadence={config.updateCadence}
-              rewardFrequency={config.rewardFrequency}
-              onChange={(timing) => updateConfig(timing)}
-              fixedCadence={true}
-            />
           </CardContent>
         </Card>
       </div>

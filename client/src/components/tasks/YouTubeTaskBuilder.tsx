@@ -15,12 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
 import { SiYoutube } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useYouTubeConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
 
 interface YouTubeTaskBuilderProps {
   onSave: (config: any) => void;
@@ -34,6 +34,15 @@ interface YouTubeTaskBuilderProps {
 export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: YouTubeTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use unified YouTube connection hook
+  const {
+    isConnected: youtubeConnected,
+    isLoading: checkingConnection,
+    userInfo: youtubeUserInfo,
+    connect: connectYouTube,
+  } = useYouTubeConnection();
+  
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(100);
@@ -43,53 +52,16 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-  const [youtubeConnected, setYoutubeConnected] = useState(false);
-  const [youtubeChannel, setYoutubeChannel] = useState<string | null>(null);
-  const [checkingConnection, setCheckingConnection] = useState(true);
+  
+  // Derived from hook
+  const youtubeChannel = youtubeUserInfo?.displayName || youtubeUserInfo?.name || null;
 
-  // Check if YouTube is connected and auto-populate channel
+  // Auto-populate channel URL when YouTube connects
   useEffect(() => {
-    const checkYoutubeConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/youtube', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setYoutubeConnected(data.connected || false);
-          if (data.connected && data.connection) {
-            const ytData = data.connection.profileData || {};
-            const channelTitle = ytData.title || ytData.channelTitle || data.connection.platformDisplayName;
-            const channelId = ytData.channelId || ytData.id || data.connection.platformUserId;
-            
-            setYoutubeChannel(channelTitle || 'Your Channel');
-            // Auto-populate channel URL for subscribe tasks
-            if (taskType === 'youtube_subscribe' && !channelUrl && channelId) {
-              setChannelUrl(`https://youtube.com/channel/${channelId}`);
-            }
-          }
-        } else {
-          setYoutubeConnected(false);
-        }
-      } catch (error) {
-        console.error('[YouTubeTaskBuilder] Error checking YouTube connection:', error);
-        setYoutubeConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-    
-    if (user?.id) {
-      checkYoutubeConnection();
-    } else {
-      setCheckingConnection(false);
+    if (youtubeConnected && youtubeUserInfo?.id && taskType === 'youtube_subscribe' && !channelUrl && !isEditMode) {
+      setChannelUrl(`https://youtube.com/channel/${youtubeUserInfo.id}`);
     }
-  }, [user?.dynamicUserId, user?.id, taskType]);
+  }, [youtubeConnected, youtubeUserInfo?.id, taskType, channelUrl, isEditMode]);
 
   // Initialize form with defaults based on task type
   useEffect(() => {
@@ -101,17 +73,24 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
     }
   }, [taskType, isEditMode]);
   
-  // Load initial data if editing
+  // Load initial data if editing - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
-      setPoints(initialData.points || 100);
-      if (initialData.settings?.channelUrl) {
-        setChannelUrl(initialData.settings.channelUrl);
+      setPoints(initialData.pointsToReward || initialData.points || 100);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      if (settings.channelUrl) {
+        setChannelUrl(settings.channelUrl);
       }
-      if (initialData.settings?.videoUrl) {
-        setVideoUrl(initialData.settings.videoUrl);
+      if (settings.videoUrl) {
+        setVideoUrl(settings.videoUrl);
+      }
+      if (settings.requiredText) {
+        setRequiredText(settings.requiredText);
       }
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
@@ -189,6 +168,8 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
       points,
       isDraft,
       verificationMethod: useApiVerification ? 'api' : 'manual',
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
 
     if (taskType === 'youtube_subscribe') {
@@ -281,45 +262,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
                 <p className="text-sm mt-1">You must connect your YouTube account before creating YouTube tasks.</p>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const socialManager = new SocialIntegrationManager();
-                    const result = await socialManager['youtube'].secureLogin();
-                    
-                    if (result.success) {
-                      toast({ title: "YouTube Connected! 📺" });
-                      // Re-check connection
-                      const response = await fetch('/api/social-connections/youtube', {
-                        headers: {
-                          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                          'Content-Type': 'application/json'
-                        },
-                        credentials: 'include'
-                      });
-                      
-                      if (response.ok) {
-                        const data = await response.json();
-                        setYoutubeConnected(data.connected || false);
-                        if (data.connected && (data.channelTitle || data.channelUrl)) {
-                          setYoutubeChannel(data.channelTitle || 'Your Channel');
-                          if (taskType === 'youtube_subscribe' && !channelUrl && data.channelUrl) {
-                            setChannelUrl(data.channelUrl);
-                          }
-                        }
-                        setCheckingConnection(false);
-                      }
-                    } else {
-                      toast({ 
-                        title: "Connection Failed",
-                        description: result.error || "Failed to connect YouTube",
-                        variant: "destructive" 
-                      });
-                    }
-                  } catch (error) {
-                    console.error('YouTube connection error:', error);
-                    toast({ title: "Error", description: "Failed to connect YouTube", variant: "destructive" });
-                  }
-                }}
+                onClick={connectYouTube}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 ml-4"
               >
                 Connect YouTube
@@ -431,6 +374,30 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
                 )}
               </div>
             )}
+
+            {/* Locked Frequency Display */}
+            <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-white font-semibold">Reward Frequency</Label>
+                    <Lock className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Social engagement tasks are one-time only
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-red-500/30 text-red-400">
+                  One-time
+                </Badge>
+              </div>
+              <Alert className="bg-red-500/10 border-red-500/20">
+                <Info className="h-4 w-4 text-red-400" />
+                <AlertDescription className="text-red-400 text-sm">
+                  This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+                </AlertDescription>
+              </Alert>
+            </div>
 
             {/* API Verification Toggle */}
             <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">

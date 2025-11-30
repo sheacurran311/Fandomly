@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TaskTimingConfig } from "@/components/templates/TaskTimingConfig";
 import {
   Calendar as CalendarIcon,
   Flame,
@@ -44,16 +43,30 @@ interface CheckInTaskConfig {
   
   // Advanced
   countAnyRuleAsCheckIn: boolean;
-  
-  // Timing
-  updateCadence: string;
-  rewardFrequency: string;
+}
+
+// API expects this structure
+interface CheckInTaskAPIPayload {
+  taskType: 'checkin';
+  name: string;
+  description: string;
+  isDraft: boolean;
+  customSettings: {
+    pointsPerCheckIn: number;
+    frequency: 'daily' | 'weekly' | 'monthly';
+    enableStreak: boolean;
+    rewardOnlyStreakCompletions?: boolean;
+    streakMilestones?: StreakMilestone[];
+    celebrationType?: 'none' | 'image' | 'video';
+    celebrationUrl?: string;
+    countAnyRuleAsCheckIn?: boolean;
+  };
 }
 
 interface CheckInTaskBuilderProps {
   initialConfig?: Partial<CheckInTaskConfig>;
-  onSave?: (config: CheckInTaskConfig) => void;
-  onPublish?: (config: CheckInTaskConfig) => void;
+  onSave?: (config: CheckInTaskAPIPayload) => void;
+  onPublish?: (config: CheckInTaskAPIPayload) => void;
   onBack?: () => void;
 }
 
@@ -63,23 +76,35 @@ export default function CheckInTaskBuilder({
   onPublish,
   onBack,
 }: CheckInTaskBuilderProps) {
+  // Handle both local config format and API format (customSettings)
+  const getInitialValue = <T,>(key: keyof CheckInTaskConfig, defaultValue: T): T => {
+    // First check if value exists directly on initialConfig
+    if (initialConfig && key in initialConfig && initialConfig[key] !== undefined) {
+      return initialConfig[key] as T;
+    }
+    // Check if value exists in customSettings (API format)
+    const customSettings = (initialConfig as any)?.customSettings;
+    if (customSettings && key in customSettings && customSettings[key] !== undefined) {
+      return customSettings[key] as T;
+    }
+    return defaultValue;
+  };
+
   const [config, setConfig] = useState<CheckInTaskConfig>({
-    name: initialConfig?.name || "Daily Check-In",
-    description: initialConfig?.description || "Check in every day to earn points",
-    pointsPerCheckIn: initialConfig?.pointsPerCheckIn || 10,
-    frequency: initialConfig?.frequency || 'daily',
-    enableStreak: initialConfig?.enableStreak ?? true,
-    rewardOnlyStreakCompletions: initialConfig?.rewardOnlyStreakCompletions ?? false,
-    streakMilestones: initialConfig?.streakMilestones || [
+    name: (initialConfig as any)?.name || "Daily Check-In",
+    description: (initialConfig as any)?.description || "Check in every day to earn points",
+    pointsPerCheckIn: getInitialValue('pointsPerCheckIn', 10),
+    frequency: getInitialValue('frequency', 'daily'),
+    enableStreak: getInitialValue('enableStreak', true),
+    rewardOnlyStreakCompletions: getInitialValue('rewardOnlyStreakCompletions', false),
+    streakMilestones: getInitialValue('streakMilestones', [
       { consecutiveDays: 3, bonusPoints: 50 },
       { consecutiveDays: 7, bonusPoints: 150 },
       { consecutiveDays: 30, bonusPoints: 1000 },
-    ],
-    celebrationType: initialConfig?.celebrationType || 'none',
-    celebrationUrl: initialConfig?.celebrationUrl || '',
-    countAnyRuleAsCheckIn: initialConfig?.countAnyRuleAsCheckIn ?? false,
-    updateCadence: initialConfig?.updateCadence || 'daily',
-    rewardFrequency: initialConfig?.rewardFrequency || 'daily',
+    ]),
+    celebrationType: getInitialValue('celebrationType', 'none'),
+    celebrationUrl: getInitialValue('celebrationUrl', ''),
+    countAnyRuleAsCheckIn: getInitialValue('countAnyRuleAsCheckIn', false),
   });
 
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -146,12 +171,32 @@ export default function CheckInTaskBuilder({
     });
   };
 
+  // Build API payload with proper structure
+  const buildAPIPayload = (isDraft: boolean): CheckInTaskAPIPayload => {
+    return {
+      taskType: 'checkin',
+      name: config.name,
+      description: config.description,
+      isDraft,
+      customSettings: {
+        pointsPerCheckIn: config.pointsPerCheckIn,
+        frequency: config.frequency,
+        enableStreak: config.enableStreak,
+        rewardOnlyStreakCompletions: config.rewardOnlyStreakCompletions,
+        streakMilestones: config.enableStreak ? config.streakMilestones : undefined,
+        celebrationType: config.celebrationType,
+        celebrationUrl: config.celebrationType !== 'none' ? config.celebrationUrl : undefined,
+        countAnyRuleAsCheckIn: config.countAnyRuleAsCheckIn,
+      },
+    };
+  };
+
   const handleSaveDraft = () => {
-    if (onSave) onSave(config);
+    if (onSave) onSave(buildAPIPayload(true));
   };
 
   const handlePublish = () => {
-    if (isValid && onPublish) onPublish(config);
+    if (isValid && onPublish) onPublish(buildAPIPayload(false));
   };
 
   // Calculate total possible points
@@ -501,24 +546,6 @@ export default function CheckInTaskBuilder({
                 onCheckedChange={(checked) => updateConfig({ countAnyRuleAsCheckIn: checked })}
               />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Timing Configuration */}
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5" />
-              Timing & Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TaskTimingConfig
-              updateCadence={config.updateCadence}
-              rewardFrequency={config.rewardFrequency}
-              onChange={(timing) => updateConfig(timing)}
-              fixedCadence={true}
-            />
           </CardContent>
         </Card>
       </div>

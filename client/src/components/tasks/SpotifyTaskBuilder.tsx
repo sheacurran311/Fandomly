@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
 import { SiSpotify } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useSpotifyConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
 
 interface SpotifyTaskBuilderProps {
   onSave: (config: any) => void;
@@ -29,6 +29,14 @@ interface SpotifyTaskBuilderProps {
 export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: SpotifyTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use unified Spotify connection hook
+  const {
+    isConnected: spotifyConnected,
+    isLoading: checkingConnection,
+    connect: connectSpotify,
+  } = useSpotifyConnection();
+  
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(50);
@@ -37,43 +45,6 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
-
-  // Check if Spotify is connected
-  useEffect(() => {
-    const checkSpotifyConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/spotify', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setSpotifyConnected(data.connected);
-          
-          // Note: Spotify tasks require specific artist/playlist URLs that the creator must provide
-          // We can't auto-fill these as they depend on which artist/playlist the creator wants fans to follow
-          // The connection status is enough to enable the task builder
-        } else {
-          setSpotifyConnected(false);
-        }
-      } catch (error) {
-        console.error('[SpotifyTaskBuilder] Error checking Spotify connection:', error);
-        setSpotifyConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-    
-    if (user?.id) {
-      checkSpotifyConnection();
-    }
-  }, [user?.id, user?.dynamicUserId]);
 
   useEffect(() => {
     if (!isEditMode && !taskName) {
@@ -85,6 +56,22 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
       setPoints(defaults.points);
     }
   }, [taskType, isEditMode]);
+
+  // Load initial data for edit mode - check both settings and customSettings (backend stores in customSettings)
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      setTaskName(initialData.name || '');
+      setDescription(initialData.description || '');
+      setPoints(initialData.pointsToReward || initialData.points || 50);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      setArtistUrl(settings.artistUrl || settings.contentUrl || '');
+      setPlaylistUrl(settings.playlistUrl || settings.contentUrl || '');
+      setUseApiVerification(initialData.verificationMethod === 'api');
+    }
+  }, [isEditMode, initialData]);
 
   useEffect(() => {
     const errors: string[] = [];
@@ -117,6 +104,8 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
       isDraft: false,
       verificationMethod: useApiVerification ? 'api' : 'manual',
       settings: taskType === 'spotify_follow' ? { artistUrl } : { playlistUrl },
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onPublish(config);
   };
@@ -131,6 +120,8 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
       isDraft: true,
       verificationMethod: useApiVerification ? 'api' : 'manual',
       settings: taskType === 'spotify_follow' ? { artistUrl } : { playlistUrl },
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onSave(config);
   };
@@ -175,39 +166,7 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
                 <p className="text-sm mt-1">You must connect your Spotify account before creating Spotify tasks.</p>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const socialManager = new SocialIntegrationManager();
-                    const result = await socialManager['spotify'].secureLogin();
-                    
-                    if (result.success) {
-                      toast({ title: "Spotify Connected! 🎧" });
-                      // Re-check connection
-                      const response = await fetch('/api/social-connections/spotify', {
-                        headers: {
-                          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                          'Content-Type': 'application/json'
-                        },
-                        credentials: 'include'
-                      });
-                      
-                      if (response.ok) {
-                        const data = await response.json();
-                        setSpotifyConnected(data.connected || false);
-                        setCheckingConnection(false);
-                      }
-                    } else {
-                      toast({ 
-                        title: "Connection Failed",
-                        description: result.error || "Failed to connect Spotify",
-                        variant: "destructive" 
-                      });
-                    }
-                  } catch (error) {
-                    console.error('Spotify connection error:', error);
-                    toast({ title: "Error", description: "Failed to connect Spotify", variant: "destructive" });
-                  }
-                }}
+                onClick={connectSpotify}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 ml-4"
               >
                 Connect Spotify
@@ -254,6 +213,30 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
               <Input value={playlistUrl} onChange={(e) => setPlaylistUrl(e.target.value)} placeholder="https://open.spotify.com/playlist/..." className="bg-white/5 border-white/10 text-white" />
             </div>
           )}
+          {/* Locked Frequency Display */}
+          <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Label className="text-white font-semibold">Reward Frequency</Label>
+                  <Lock className="h-4 w-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Social engagement tasks are one-time only
+                </p>
+              </div>
+              <Badge variant="outline" className="border-green-500/30 text-green-400">
+                One-time
+              </Badge>
+            </div>
+            <Alert className="bg-green-500/10 border-green-500/20">
+              <Info className="h-4 w-4 text-green-400" />
+              <AlertDescription className="text-green-400 text-sm">
+                This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+              </AlertDescription>
+            </Alert>
+          </div>
+
           <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
             <div className="flex items-center justify-between">
               <Label className="text-white font-semibold">Automatic Verification</Label>

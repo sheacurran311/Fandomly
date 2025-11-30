@@ -754,6 +754,315 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
   }
 };
 
+// ============================================================================
+// TYPOGRAPHY TEMPLATES
+// ============================================================================
+
+/**
+ * Typography-only templates that can be applied independently of color themes.
+ * These provide quick typography presets without affecting colors.
+ */
+export interface TypographyTemplate {
+  id: string;
+  name: string;
+  description: string;
+  preview: string; // Sample text to show in preview
+  typography: ThemeTemplate['typography'];
+  // Optional layout adjustments that complement the typography
+  layout?: Partial<ThemeTemplate['layout']>;
+}
+
+export const TYPOGRAPHY_TEMPLATES: Record<string, TypographyTemplate> = {
+  // 1. Classic - Elegant serif fonts
+  'classic': {
+    id: 'classic',
+    name: 'Classic',
+    description: 'Elegant serif fonts for a timeless, sophisticated look',
+    preview: 'The quick brown fox',
+    typography: {
+      fontFamily: {
+        heading: "'Playfair Display', Georgia, serif",
+        body: "Georgia, 'Times New Roman', serif",
+        mono: "'Courier New', Courier, monospace"
+      },
+      fontSize: {
+        xs: "0.75rem",
+        sm: "0.875rem",
+        base: "1rem",
+        lg: "1.125rem",
+        xl: "1.25rem",
+        "2xl": "1.5rem",
+        "3xl": "2rem",
+        "4xl": "2.5rem",
+        "5xl": "3.25rem"
+      },
+      fontWeight: {
+        light: 300,
+        normal: 400,
+        medium: 500,
+        semibold: 600,
+        bold: 700,
+        extrabold: 800
+      },
+      lineHeight: {
+        tight: 1.25,
+        normal: 1.6,
+        relaxed: 1.75,
+        loose: 2
+      }
+    },
+    layout: {
+      borderRadius: {
+        none: "0",
+        sm: "0.125rem",
+        md: "0.25rem",
+        lg: "0.375rem",
+        xl: "0.5rem",
+        "2xl": "0.75rem",
+        full: "9999px"
+      },
+      spacing: {
+        mode: "relaxed",
+        scale: 1.1
+      }
+    }
+  },
+
+  // 2. Modern - Clean sans-serif tech look
+  'modern': {
+    id: 'modern',
+    name: 'Modern',
+    description: 'Clean, minimal sans-serif for a contemporary tech feel',
+    preview: 'The quick brown fox',
+    typography: {
+      fontFamily: {
+        heading: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+        body: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+        mono: "'SF Mono', 'Fira Code', Consolas, monospace"
+      },
+      fontSize: {
+        xs: "0.75rem",
+        sm: "0.875rem",
+        base: "1rem",
+        lg: "1.125rem",
+        xl: "1.25rem",
+        "2xl": "1.5rem",
+        "3xl": "1.875rem",
+        "4xl": "2.25rem",
+        "5xl": "3rem"
+      },
+      fontWeight: {
+        light: 300,
+        normal: 400,
+        medium: 500,
+        semibold: 600,
+        bold: 700,
+        extrabold: 800
+      },
+      lineHeight: {
+        tight: 1.25,
+        normal: 1.5,
+        relaxed: 1.625,
+        loose: 1.75
+      }
+    },
+    layout: {
+      borderRadius: {
+        none: "0",
+        sm: "0.25rem",
+        md: "0.5rem",
+        lg: "0.75rem",
+        xl: "1rem",
+        "2xl": "1.5rem",
+        full: "9999px"
+      },
+      spacing: {
+        mode: "normal",
+        scale: 1
+      }
+    }
+  },
+
+  // 3. Bold - High impact headlines
+  'bold': {
+    id: 'bold',
+    name: 'Bold',
+    description: 'High impact headlines with strong visual presence',
+    preview: 'THE QUICK BROWN FOX',
+    typography: {
+      fontFamily: {
+        heading: "Montserrat, 'Arial Black', sans-serif",
+        body: "'Open Sans', Arial, sans-serif",
+        mono: "'Source Code Pro', Consolas, monospace"
+      },
+      fontSize: {
+        xs: "0.75rem",
+        sm: "0.875rem",
+        base: "1rem",
+        lg: "1.125rem",
+        xl: "1.375rem",
+        "2xl": "1.75rem",
+        "3xl": "2.25rem",
+        "4xl": "3rem",
+        "5xl": "4rem"
+      },
+      fontWeight: {
+        light: 400,
+        normal: 500,
+        medium: 600,
+        semibold: 700,
+        bold: 800,
+        extrabold: 900
+      },
+      lineHeight: {
+        tight: 1.1,
+        normal: 1.4,
+        relaxed: 1.6,
+        loose: 1.8
+      }
+    },
+    layout: {
+      borderRadius: {
+        none: "0",
+        sm: "0.25rem",
+        md: "0.5rem",
+        lg: "0.75rem",
+        xl: "1rem",
+        "2xl": "1.25rem",
+        full: "9999px"
+      },
+      spacing: {
+        mode: "tight",
+        scale: 0.9
+      }
+    }
+  },
+
+  // 4. Playful - Rounded friendly fonts
+  'playful': {
+    id: 'playful',
+    name: 'Playful',
+    description: 'Friendly, rounded fonts with a warm, approachable feel',
+    preview: 'The quick brown fox',
+    typography: {
+      fontFamily: {
+        heading: "Quicksand, 'Comic Sans MS', cursive, sans-serif",
+        body: "Nunito, 'Trebuchet MS', sans-serif",
+        mono: "'Fira Code', 'Consolas', monospace"
+      },
+      fontSize: {
+        xs: "0.8rem",
+        sm: "0.9rem",
+        base: "1.05rem",
+        lg: "1.2rem",
+        xl: "1.35rem",
+        "2xl": "1.6rem",
+        "3xl": "2rem",
+        "4xl": "2.5rem",
+        "5xl": "3.25rem"
+      },
+      fontWeight: {
+        light: 300,
+        normal: 400,
+        medium: 500,
+        semibold: 600,
+        bold: 700,
+        extrabold: 800
+      },
+      lineHeight: {
+        tight: 1.3,
+        normal: 1.6,
+        relaxed: 1.8,
+        loose: 2
+      }
+    },
+    layout: {
+      borderRadius: {
+        none: "0",
+        sm: "0.5rem",
+        md: "0.75rem",
+        lg: "1rem",
+        xl: "1.5rem",
+        "2xl": "2rem",
+        full: "9999px"
+      },
+      spacing: {
+        mode: "relaxed",
+        scale: 1.15
+      }
+    }
+  },
+
+  // 5. Professional - Business formal
+  'professional': {
+    id: 'professional',
+    name: 'Professional',
+    description: 'Clean, business-appropriate typography for formal contexts',
+    preview: 'The quick brown fox',
+    typography: {
+      fontFamily: {
+        heading: "Roboto, 'Helvetica Neue', Arial, sans-serif",
+        body: "Roboto, 'Helvetica Neue', Arial, sans-serif",
+        mono: "'Roboto Mono', 'Courier New', monospace"
+      },
+      fontSize: {
+        xs: "0.75rem",
+        sm: "0.875rem",
+        base: "1rem",
+        lg: "1.125rem",
+        xl: "1.25rem",
+        "2xl": "1.5rem",
+        "3xl": "1.875rem",
+        "4xl": "2.25rem",
+        "5xl": "2.75rem"
+      },
+      fontWeight: {
+        light: 300,
+        normal: 400,
+        medium: 500,
+        semibold: 500,
+        bold: 700,
+        extrabold: 700
+      },
+      lineHeight: {
+        tight: 1.25,
+        normal: 1.5,
+        relaxed: 1.65,
+        loose: 1.85
+      }
+    },
+    layout: {
+      borderRadius: {
+        none: "0",
+        sm: "0.125rem",
+        md: "0.25rem",
+        lg: "0.375rem",
+        xl: "0.5rem",
+        "2xl": "0.625rem",
+        full: "9999px"
+      },
+      spacing: {
+        mode: "normal",
+        scale: 1
+      }
+    }
+  }
+};
+
+/**
+ * Get all typography templates as an array
+ */
+export function getAllTypographyTemplates(): TypographyTemplate[] {
+  return Object.values(TYPOGRAPHY_TEMPLATES);
+}
+
+/**
+ * Get a typography template by ID
+ */
+export function getTypographyTemplate(templateId: string): TypographyTemplate | null {
+  return TYPOGRAPHY_TEMPLATES[templateId] || null;
+}
+
 /**
  * Get a theme template by ID
  */

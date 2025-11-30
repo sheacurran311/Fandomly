@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import type { IStorage } from '../core/storage';
+import type { IStorage } from '../../core/storage';
 import { authenticateUser, requireRole, AuthenticatedRequest } from '../../middleware/rbac';
 
 /**

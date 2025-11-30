@@ -654,7 +654,10 @@ export function registerProgramRoutes(app: Express) {
         });
       }
 
-      // Fetch recent task completions with user data
+      // Fetch recent COMPLETED task completions with user data
+      // Only show tasks that have actually been completed (completedAt is not null)
+      const { isNotNull } = await import("drizzle-orm");
+      
       const activity = await db.select({
         completion: taskCompletions,
         user: users,
@@ -663,8 +666,11 @@ export function registerProgramRoutes(app: Express) {
         .from(taskCompletions)
         .leftJoin(users, eq(taskCompletions.userId, users.id))
         .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-        .where(eq(tasks.programId, programId))
-        .orderBy(desc(taskCompletions.createdAt))
+        .where(and(
+          eq(tasks.programId, programId),
+          isNotNull(taskCompletions.completedAt) // Only include actually completed tasks
+        ))
+        .orderBy(desc(taskCompletions.completedAt)) // Order by completion time, not created time
         .limit(20);
 
       res.json(activity);

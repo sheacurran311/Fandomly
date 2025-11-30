@@ -15,17 +15,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Twitter, ArrowLeft, Save, Send, Info, CheckCircle2, AlertCircle, Link as LinkIcon, Plus, Trash2 } from "lucide-react";
+import { Twitter, Info, CheckCircle2, AlertCircle, Lock } from "lucide-react";
 import { useExtractTweetId } from "@/hooks/useTwitterVerification";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
-import { RewardConfiguration, getRewardConfigDefaults, RewardType, UpdateCadence, RewardFrequency } from "./RewardConfiguration";
 
 interface TwitterTaskBuilderProps {
   onSave: (config: any) => void;
@@ -36,108 +34,42 @@ interface TwitterTaskBuilderProps {
   isEditMode?: boolean;
 }
 
-type TwitterTaskType = 'twitter_follow' | 'twitter_like' | 'twitter_retweet' | 'twitter_quote_tweet';
-
-interface PartnerAccount {
-  id: string;
-  handle: string;
-  points: number;
-}
-
 export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: TwitterTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Use the unified Twitter connection hook
+  const { 
+    isConnected: twitterConnected, 
+    isConnecting: checkingConnection,
+    userInfo: twitterUserInfo,
+    connect: connectTwitter,
+    refresh: refreshTwitterConnection
+  } = useTwitterConnection();
+  
+  // Derive twitterHandle from the hook's userInfo
+  const twitterHandle = twitterUserInfo?.username || null;
+  
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [handle, setHandle] = useState('');
   const [tweetUrl, setTweetUrl] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true);
   const [tweetIdValid, setTweetIdValid] = useState<boolean | null>(null);
-  const [twitterConnected, setTwitterConnected] = useState(false);
-  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
-  const [checkingConnection, setCheckingConnection] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-  
-  // Partner accounts for Follow tasks only
-  const [partnerAccounts, setPartnerAccounts] = useState<PartnerAccount[]>([]);
-  const [showAddPartner, setShowAddPartner] = useState(false);
-  const [newPartnerHandle, setNewPartnerHandle] = useState('');
-  const [newPartnerPoints, setNewPartnerPoints] = useState(50);
 
-  // Reward Configuration (Snag-inspired)
-  const rewardDefaults = getRewardConfigDefaults(taskType, 'twitter');
-  const [rewardType, setRewardType] = useState<RewardType>('points');
+  // Simple points reward (cadence and multipliers now handled in campaigns)
   const [pointsToReward, setPointsToReward] = useState(50);
-  const [pointCurrency, setPointCurrency] = useState('default');
-  const [multiplierValue, setMultiplierValue] = useState(1.5);
-  const [currenciesToApply, setCurrenciesToApply] = useState<string[]>([]);
-  const [applyToExistingBalance, setApplyToExistingBalance] = useState(false);
-  const [updateCadence, setUpdateCadence] = useState<UpdateCadence>(rewardDefaults.updateCadence);
-  const [rewardFrequency, setRewardFrequency] = useState<RewardFrequency>(rewardDefaults.rewardFrequency);
 
   const extractTweetId = useExtractTweetId();
 
-  // Check if Twitter is connected and get handle
+  // Auto-populate handle for follow tasks when Twitter is connected
   useEffect(() => {
-    const checkTwitterConnection = async () => {
-      try {
-        // Try the social-connections endpoint first
-        let response = await fetch('/api/social-connections', {
-          credentials: 'include',
-        });
-        
-        if (response.ok) {
-          const connections = await response.json();
-          const twitterConnection = connections.find((conn: any) => 
-            conn.platform === 'twitter' || conn.provider === 'twitter'
-          );
-          
-          if (twitterConnection) {
-            setTwitterConnected(true);
-            setTwitterHandle(twitterConnection.username || twitterConnection.platformUsername || twitterConnection.displayName);
-            // Auto-populate handle for follow tasks
-            if (taskType === 'twitter_follow' && !handle) {
-              setHandle(twitterConnection.username || twitterConnection.platformUsername || twitterConnection.displayName || '');
-            }
-            setCheckingConnection(false);
-            return;
-          }
-        }
-        
-        // Fallback to social/accounts endpoint
-        response = await fetch('/api/social/accounts', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-          },
-        });
-        
-        if (response.ok) {
-          const accounts = await response.json();
-          const twitterAccount = accounts.find((acc: any) => acc.platform === 'twitter');
-          
-          if (twitterAccount) {
-            setTwitterConnected(true);
-            setTwitterHandle(twitterAccount.username || twitterAccount.displayName);
-            // Auto-populate handle for follow tasks
-            if (taskType === 'twitter_follow' && !handle) {
-              setHandle(twitterAccount.username || twitterAccount.displayName || '');
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking Twitter connection:', error);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-
-    if (user?.dynamicUserId || user?.id) {
-      checkTwitterConnection();
-    } else {
-      setCheckingConnection(false);
+    if (twitterConnected && twitterHandle && taskType === 'twitter_follow' && !handle && !isEditMode) {
+      setHandle(twitterHandle);
     }
-  }, [user?.dynamicUserId, user?.id, taskType]);
+  }, [twitterConnected, twitterHandle, taskType, handle, isEditMode]);
 
   // Validate tweet URL when it changes
   const handleTweetUrlChange = async (url: string) => {
@@ -168,23 +100,25 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
     }
   }, [taskType, isEditMode]);
   
-  // Load initial data if editing
+  // Load initial data if editing - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
       setPointsToReward(initialData.pointsToReward || initialData.points || 50);
-      setRewardType(initialData.rewardType || 'points');
-      if (initialData.pointCurrency) setPointCurrency(initialData.pointCurrency);
-      if (initialData.multiplierValue) setMultiplierValue(initialData.multiplierValue);
-      if (initialData.updateCadence) setUpdateCadence(initialData.updateCadence);
-      if (initialData.rewardFrequency) setRewardFrequency(initialData.rewardFrequency);
       
-      if (initialData.settings?.handle) {
-        setHandle(initialData.settings.handle);
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      // Handle can be stored as 'handle' (original) or 'username' (after API normalization)
+      const savedHandle = settings.handle || settings.username;
+      if (savedHandle) {
+        setHandle(savedHandle);
       }
-      if (initialData.settings?.tweetUrl || initialData.settings?.url) {
-        setTweetUrl(initialData.settings.tweetUrl || initialData.settings.url);
+      
+      // URL can be stored in multiple formats
+      if (settings.tweetUrl || settings.url || settings.contentUrl) {
+        setTweetUrl(settings.tweetUrl || settings.url || settings.contentUrl);
       }
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
@@ -221,37 +155,6 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
     }
   };
 
-  const handleAddPartner = () => {
-    if (!newPartnerHandle.trim()) {
-      toast({
-        title: "Invalid Handle",
-        description: "Please enter a Twitter handle",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const partnerId = `partner-${Date.now()}`;
-    setPartnerAccounts([...partnerAccounts, {
-      id: partnerId,
-      handle: newPartnerHandle.startsWith('@') ? newPartnerHandle.substring(1) : newPartnerHandle,
-      points: newPartnerPoints,
-    }]);
-    
-    setNewPartnerHandle('');
-    setNewPartnerPoints(50);
-    setShowAddPartner(false);
-    
-    toast({
-      title: "Partner Account Added",
-      description: `@${newPartnerHandle} will be saved as a separate task`,
-    });
-  };
-
-  const handleRemovePartner = (id: string) => {
-    setPartnerAccounts(partnerAccounts.filter(p => p.id !== id));
-  };
-
   const validateForm = (): string | null => {
     const errors: string[] = [];
 
@@ -266,12 +169,8 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
     if (!description.trim()) {
       errors.push('Description is required');
     }
-    // Validate reward configuration
-    if (rewardType === 'points' && (pointsToReward < 1 || pointsToReward > 10000)) {
+    if (pointsToReward < 1 || pointsToReward > 10000) {
       errors.push('Points must be between 1 and 10,000');
-    }
-    if (rewardType === 'multiplier' && (multiplierValue < 1.01 || multiplierValue > 10)) {
-      errors.push('Multiplier must be between 1.01 and 10.0');
     }
     
     if (taskType === 'twitter_follow') {
@@ -296,7 +195,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
   // Validate on config changes
   useEffect(() => {
     validateForm();
-  }, [taskName, description, pointsToReward, multiplierValue, rewardType, handle, tweetUrl, tweetIdValid, twitterConnected, taskType]);
+  }, [taskName, description, pointsToReward, handle, tweetUrl, tweetIdValid, twitterConnected, taskType]);
 
   const buildTaskConfig = (isDraft: boolean) => {
     const baseConfig = {
@@ -306,18 +205,9 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       platform: 'twitter' as const,
       isDraft,
       verificationMethod: useApiVerification ? 'api' : 'manual',
-      
-      // Reward configuration
-      rewardType,
-      pointsToReward: rewardType === 'points' ? pointsToReward : undefined,
-      pointCurrency: rewardType === 'points' ? pointCurrency : undefined,
-      multiplierValue: rewardType === 'multiplier' ? multiplierValue : undefined,
-      currenciesToApply: rewardType === 'multiplier' ? currenciesToApply : undefined,
-      applyToExistingBalance: rewardType === 'multiplier' ? applyToExistingBalance : undefined,
-      
-      // Timing configuration
-      updateCadence,
-      rewardFrequency,
+      pointsToReward,
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
 
     if (taskType === 'twitter_follow') {
@@ -354,21 +244,6 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
     onSave(mainTask);
     
     // Save partner tasks if they exist (for Follow tasks only)
-    if (taskType === 'twitter_follow' && partnerAccounts.length > 0) {
-      partnerAccounts.forEach((partner) => {
-        const partnerTask = {
-          ...mainTask,
-          name: `Follow @${partner.handle} on Twitter`,
-          description: `Follow @${partner.handle} on Twitter to earn points`,
-          pointsToReward: partner.points,
-          settings: {
-            handle: partner.handle,
-            isPartnerAccount: true,
-          },
-        };
-        onSave(partnerTask);
-      });
-    }
   };
 
   const handlePublishClick = () => {
@@ -382,78 +257,14 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       return;
     }
     
-    // Publish main task
+    // Publish task
     const mainTask = buildTaskConfig(false);
     onPublish(mainTask);
-    
-    // Publish partner tasks if they exist (for Follow tasks only)
-    if (taskType === 'twitter_follow' && partnerAccounts.length > 0) {
-      partnerAccounts.forEach((partner) => {
-        const partnerTask = {
-          ...mainTask,
-          name: `Follow @${partner.handle} on Twitter`,
-          description: `Follow @${partner.handle} on Twitter to earn points`,
-          pointsToReward: partner.points,
-          settings: {
-            handle: partner.handle,
-            isPartnerAccount: true,
-          },
-        };
-        onPublish(partnerTask);
-      });
-      
-      toast({
-        title: "Tasks Published",
-        description: `Published main task and ${partnerAccounts.length} partner task(s)`,
-      });
-    }
   };
 
+  // Use the hook's connect function - it handles everything including toasts
   const handleConnectTwitter = async () => {
-    try {
-      const socialManager = new SocialIntegrationManager();
-      const result = await socialManager['twitter'].secureLogin();
-      
-      if (result.success) {
-        toast({ title: "Twitter/X Connected! 🐦" });
-        // Re-check connection status to update UI
-        const checkTwitterConnection = async () => {
-          try {
-            let response = await fetch('/api/social-connections', {
-              credentials: 'include',
-            });
-            
-            if (response.ok) {
-              const connections = await response.json();
-              const twitterConnection = connections.find((conn: any) => 
-                conn.platform === 'twitter' || conn.provider === 'twitter'
-              );
-              
-              if (twitterConnection) {
-                setTwitterConnected(true);
-                setTwitterHandle(twitterConnection.username || twitterConnection.platformUsername || twitterConnection.displayName);
-                if (taskType === 'twitter_follow' && !handle) {
-                  setHandle(twitterConnection.username || twitterConnection.platformUsername || twitterConnection.displayName || '');
-                }
-                setCheckingConnection(false);
-              }
-            }
-          } catch (error) {
-            console.error('Error checking Twitter connection:', error);
-          }
-        };
-        await checkTwitterConnection();
-      } else {
-        toast({ 
-          title: "Connection Failed",
-          description: result.error || "Failed to connect Twitter",
-          variant: "destructive" 
-        });
-      }
-    } catch (error) {
-      console.error('Twitter connection error:', error);
-      toast({ title: "Error", description: "Failed to connect Twitter", variant: "destructive" });
-    }
+    await connectTwitter();
   };
 
   const previewComponent = (
@@ -465,13 +276,8 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       <div className="space-y-2 text-sm">
         <p><span className="text-blue-400">Type:</span> {taskType.replace('twitter_', '').replace('_', ' ').toUpperCase()}</p>
         <p><span className="text-blue-400">Name:</span> {taskName || 'Untitled Task'}</p>
-        <p><span className="text-blue-400">Reward:</span> {
-          rewardType === 'points' 
-            ? `${pointsToReward} ${pointCurrency} points`
-            : `${multiplierValue}x multiplier`
-        }</p>
-        <p><span className="text-blue-400">Cadence:</span> {updateCadence}</p>
-        <p><span className="text-blue-400">Frequency:</span> {rewardFrequency.replace('_', ' ')}</p>
+        <p><span className="text-blue-400">Reward:</span> {pointsToReward} points</p>
+        <p><span className="text-blue-400">Frequency:</span> One-time only</p>
         <p><span className="text-blue-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
         {taskType === 'twitter_follow' && handle && (
           <p><span className="text-blue-400">Handle:</span> @{handle}</p>
@@ -527,8 +333,11 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
             <CheckCircle2 className="h-4 w-4 text-green-400" />
             <AlertDescription className="text-green-400">
               <strong>Twitter Connected:</strong> @{twitterHandle}
-              {taskType === 'twitter_follow' && (
+              {taskType === 'twitter_follow' && !isEditMode && (
                 <p className="text-sm mt-1">Your handle has been auto-populated below.</p>
+              )}
+              {taskType === 'twitter_follow' && isEditMode && handle && (
+                <p className="text-sm mt-1">Task configured for @{handle}</p>
               )}
             </AlertDescription>
           </Alert>
@@ -599,99 +408,6 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                       : "Your Twitter username (with or without @)"}
                   </p>
                 </div>
-
-                {/* Partner/Sponsor Accounts Section */}
-                <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-white font-semibold">Partner/Sponsor Accounts</Label>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Add other accounts for fans to follow (separate tasks with custom points)
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowAddPartner(true)}
-                      className="border-brand-primary text-brand-primary hover:bg-brand-primary/10"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Partner
-                    </Button>
-                  </div>
-
-                  {/* Partner Accounts List */}
-                  {partnerAccounts.length > 0 && (
-                    <div className="space-y-2 mt-3">
-                      {partnerAccounts.map((partner) => (
-                        <div key={partner.id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/10">
-                          <div>
-                            <p className="text-white font-medium">@{partner.handle}</p>
-                            <p className="text-xs text-gray-400">{partner.points} points</p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleRemovePartner(partner.id)}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add Partner Form */}
-                  {showAddPartner && (
-                    <div className="space-y-3 p-3 bg-brand-dark-bg rounded border border-brand-primary/30 mt-3">
-                      <div className="space-y-2">
-                        <Label className="text-white text-sm">Partner Handle</Label>
-                        <Input
-                          value={newPartnerHandle}
-                          onChange={(e) => setNewPartnerHandle(e.target.value)}
-                          placeholder="@partnerhandle"
-                          className="bg-white/5 border-white/10 text-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white text-sm">Points Reward</Label>
-                        <NumberInput
-                          value={newPartnerPoints}
-                          onChange={(val) => setNewPartnerPoints(val || 50)}
-                          min={1}
-                          max={10000}
-                          className="bg-white/5 border-white/10 text-white"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleAddPartner}
-                          className="bg-brand-primary hover:bg-brand-primary/80"
-                        >
-                          Add
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setShowAddPartner(false);
-                            setNewPartnerHandle('');
-                            setNewPartnerPoints(50);
-                          }}
-                          className="border-white/20 text-white"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -720,6 +436,46 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                 </p>
               </div>
             )}
+
+            {/* Points Reward */}
+            <div className="space-y-2">
+              <Label className="text-white">Points Reward</Label>
+              <NumberInput
+                value={pointsToReward}
+                onChange={(val) => setPointsToReward(val || 50)}
+                min={1}
+                max={10000}
+                className={`bg-white/5 border-white/10 text-white ${!twitterConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={!twitterConnected}
+              />
+              <p className="text-xs text-gray-400">
+                Points awarded when the fan completes this task (1-10,000)
+              </p>
+            </div>
+
+            {/* Locked Frequency Display */}
+            <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-white font-semibold">Reward Frequency</Label>
+                    <Lock className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Social engagement tasks are one-time only
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-blue-500/30 text-blue-400">
+                  One-time
+                </Badge>
+              </div>
+              <Alert className="bg-blue-500/10 border-blue-500/20">
+                <Info className="h-4 w-4 text-blue-400" />
+                <AlertDescription className="text-blue-400 text-sm">
+                  This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+                </AlertDescription>
+              </Alert>
+            </div>
 
             {/* API Verification Toggle */}
             <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
@@ -753,31 +509,6 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
               )}
             </div>
 
-            {/* Reward Configuration (Snag-inspired) */}
-            <RewardConfiguration
-              rewardType={rewardType}
-              onRewardTypeChange={setRewardType}
-              pointsToReward={pointsToReward}
-              onPointsToRewardChange={setPointsToReward}
-              pointCurrency={pointCurrency}
-              onPointCurrencyChange={setPointCurrency}
-              multiplierValue={multiplierValue}
-              onMultiplierValueChange={setMultiplierValue}
-              currenciesToApply={currenciesToApply}
-              onCurrenciesToApplyChange={setCurrenciesToApply}
-              applyToExistingBalance={applyToExistingBalance}
-              onApplyToExistingBalanceChange={setApplyToExistingBalance}
-              updateCadence={updateCadence}
-              onUpdateCadenceChange={setUpdateCadence}
-              rewardFrequency={rewardFrequency}
-              onRewardFrequencyChange={setRewardFrequency}
-              taskType={taskType}
-              platform="twitter"
-              lockCadence={rewardDefaults.lockCadence}
-              lockFrequency={rewardDefaults.lockFrequency}
-              errors={[]}
-            />
-
             {/* Preview */}
             <div className="space-y-2">
               <Label className="text-white">Preview</Label>
@@ -794,7 +525,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                       </div>
                     </div>
                     <Badge variant="outline" className="border-brand-primary text-brand-primary">
-                      +{rewardType === 'points' ? pointsToReward : `${multiplierValue}x`} {rewardType === 'points' ? 'points' : 'multiplier'}
+                      +{pointsToReward} points
                     </Badge>
                   </div>
                   {useApiVerification && (

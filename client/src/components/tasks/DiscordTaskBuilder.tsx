@@ -13,12 +13,13 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { FaDiscord } from "react-icons/fa";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useDiscordConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
-import { SocialIntegrationManager } from "@/lib/social-integrations";
 
 interface DiscordTaskBuilderProps {
   onSave: (config: any) => void;
@@ -40,6 +41,13 @@ export default function DiscordTaskBuilder({
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Use unified Discord connection hook
+  const {
+    isConnected: discordConnected,
+    isLoading: checkingConnection,
+    connect: connectDiscord,
+  } = useDiscordConnection();
+
   // Task settings
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
@@ -54,44 +62,9 @@ export default function DiscordTaskBuilder({
   // Verification settings
   const [useApiVerification, setUseApiVerification] = useState(true);
 
-  // Connection status
-  const [discordConnected, setDiscordConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
-
   // Validation
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
-
-  // Check Discord connection
-  useEffect(() => {
-    const checkDiscordConnection = async () => {
-      try {
-        const response = await fetch('/api/social-connections/discord', {
-          headers: {
-            'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setDiscordConnected(data.connected);
-        } else {
-          setDiscordConnected(false);
-        }
-      } catch (error) {
-        console.error('[DiscordTaskBuilder] Error checking Discord connection:', error);
-        setDiscordConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    };
-
-    if (user?.id) {
-      checkDiscordConnection();
-    }
-  }, [user?.id, user?.dynamicUserId]);
 
   // Set default values
   useEffect(() => {
@@ -105,16 +78,20 @@ export default function DiscordTaskBuilder({
     }
   }, [taskType, isEditMode, taskName]);
 
-  // Load initial data for edit mode
+  // Load initial data for edit mode - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (isEditMode && initialData) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
-      setPoints(initialData.points || initialData.pointsToReward || 50);
-      setServerInviteUrl(initialData.settings?.serverInviteUrl || '');
-      setServerId(initialData.settings?.serverId || '');
-      setRoleId(initialData.settings?.roleId || '');
-      setRequireRole(initialData.settings?.requireRole || taskType === 'discord_verify');
+      setPoints(initialData.pointsToReward || initialData.points || 50);
+      
+      // Check both settings and customSettings (backend stores in customSettings)
+      const settings = initialData.settings || initialData.customSettings || {};
+      
+      setServerInviteUrl(settings.serverInviteUrl || '');
+      setServerId(settings.serverId || '');
+      setRoleId(settings.roleId || '');
+      setRequireRole(settings.requireRole || taskType === 'discord_verify');
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [isEditMode, initialData, taskType]);
@@ -160,6 +137,8 @@ export default function DiscordTaskBuilder({
         roleId: roleId || undefined,
         requireRole,
       },
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onPublish(config);
   };
@@ -179,6 +158,8 @@ export default function DiscordTaskBuilder({
         roleId: roleId || undefined,
         requireRole,
       },
+      // Social engagement tasks are always one-time (cadence/multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onSave(config);
   };
@@ -224,38 +205,7 @@ export default function DiscordTaskBuilder({
                 <p className="text-sm mt-1">You must connect your Discord account before creating Discord tasks.</p>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const socialManager = new SocialIntegrationManager();
-                    const result = await socialManager['discord'].secureLogin();
-
-                    if (result.success) {
-                      toast({ title: "Discord Connected! 🎮" });
-                      const response = await fetch('/api/social-connections/discord', {
-                        headers: {
-                          'x-dynamic-user-id': user?.dynamicUserId || user?.id || '',
-                          'Content-Type': 'application/json'
-                        },
-                        credentials: 'include'
-                      });
-
-                      if (response.ok) {
-                        const data = await response.json();
-                        setDiscordConnected(data.connected || false);
-                        setCheckingConnection(false);
-                      }
-                    } else {
-                      toast({
-                        title: "Connection Failed",
-                        description: result.error || "Failed to connect Discord",
-                        variant: "destructive"
-                      });
-                    }
-                  } catch (error) {
-                    console.error('Discord connection error:', error);
-                    toast({ title: "Error", description: "Failed to connect Discord", variant: "destructive" });
-                  }
-                }}
+                onClick={connectDiscord}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 ml-4"
               >
                 Connect Discord
@@ -365,6 +315,30 @@ export default function DiscordTaskBuilder({
               </p>
             </div>
           )}
+
+          {/* Locked Frequency Display */}
+          <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Label className="text-white font-semibold">Reward Frequency</Label>
+                  <Lock className="h-4 w-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Social engagement tasks are one-time only
+                </p>
+              </div>
+              <Badge variant="outline" className="border-purple-500/30 text-purple-400">
+                One-time
+              </Badge>
+            </div>
+            <Alert className="bg-purple-500/10 border-purple-500/20">
+              <Info className="h-4 w-4 text-purple-400" />
+              <AlertDescription className="text-purple-400 text-sm">
+                This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+              </AlertDescription>
+            </Alert>
+          </div>
 
           <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
             <div className="flex items-center justify-between">

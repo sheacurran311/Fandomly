@@ -10,14 +10,12 @@ import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
 import {
-  MultiplierConfig,
   FrequencySelector,
   WebsiteVisitConfig,
-  type MultiplierConfigData,
   type RewardFrequency,
   type WebsiteVisitConfigData,
 } from "./config";
@@ -49,11 +47,7 @@ export default function WebsiteVisitTaskBuilder({
     destinationUrl: '',
   });
 
-  // Advanced configuration
-  const [multiplierConfig, setMultiplierConfig] = useState<MultiplierConfigData>({
-    enabled: false,
-    baseMultiplier: 1.0,
-  });
+  // Website visits can be recurring (daily/weekly engagement)
   const [rewardFrequency, setRewardFrequency] = useState<RewardFrequency>('one_time');
 
   // Validation
@@ -72,14 +66,6 @@ export default function WebsiteVisitTaskBuilder({
         }
       );
       setRewardFrequency(initialData.rewardFrequency || 'one_time');
-
-      if (initialData.baseMultiplier && initialData.baseMultiplier > 1.0) {
-        setMultiplierConfig({
-          enabled: true,
-          baseMultiplier: initialData.baseMultiplier,
-          multiplierConfig: initialData.multiplierConfig,
-        });
-      }
     }
   }, [isEditMode, initialData]);
 
@@ -125,8 +111,7 @@ export default function WebsiteVisitTaskBuilder({
       settings: {
         websiteConfig,
       },
-      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
-      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
+      // Multipliers handled in campaigns
       rewardFrequency,
     };
     onPublish(config);
@@ -144,8 +129,7 @@ export default function WebsiteVisitTaskBuilder({
       settings: {
         websiteConfig,
       },
-      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
-      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
+      // Multipliers handled in campaigns
       rewardFrequency,
     };
     onSave(config);
@@ -257,14 +241,20 @@ export default function WebsiteVisitTaskBuilder({
       {/* Website Visit Config */}
       <WebsiteVisitConfig value={websiteConfig} onChange={setWebsiteConfig} />
 
-      {/* Advanced Configuration */}
-      <MultiplierConfig value={multiplierConfig} onChange={setMultiplierConfig} />
-
+      {/* Frequency Configuration - Website visits can be recurring */}
       <FrequencySelector
         value={rewardFrequency}
         onChange={setRewardFrequency}
-        showUnlimited={true} // Can allow multiple visits
+        showUnlimited={false}
       />
+
+      {/* Info about campaign-level settings */}
+      <Alert className="bg-blue-500/10 border-blue-500/20">
+        <Info className="h-4 w-4 text-blue-400" />
+        <AlertDescription className="text-blue-400 text-sm">
+          Multipliers and verification cadence can be configured at the campaign level for advanced reward strategies.
+        </AlertDescription>
+      </Alert>
 
       {/* Auto-verification notice */}
       <Alert className="bg-green-500/10 border-green-500/20">

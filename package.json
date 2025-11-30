@@ -16,7 +16,10 @@
     "create-admin": "tsx scripts/create-admin.ts",
     "list-admins": "tsx scripts/list-admins.ts",
     "link-admin": "tsx scripts/link-dynamic-to-admin.ts",
-    "promote-admin": "tsx scripts/promote-to-admin.ts"
+    "promote-admin": "tsx scripts/promote-to-admin.ts",
+    "validate-imports": "tsx scripts/validate-imports.ts",
+    "test-endpoints": "tsx scripts/test-api-endpoints.ts",
+    "verify-build": "npm run validate-imports && npm run test-endpoints"
   },
   "dependencies": {
     "@dynamic-labs/ethereum": "^4.25.8",

@@ -9,16 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { HelpCircle, AlertCircle } from "lucide-react";
+import { HelpCircle, AlertCircle, Lock, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
 import {
-  MultiplierConfig,
-  FrequencySelector,
   PollQuizBuilder,
-  type MultiplierConfigData,
-  type RewardFrequency,
   type PollQuizConfig,
 } from "./config";
 
@@ -52,13 +49,6 @@ export default function PollQuizTaskBuilder({
     questions: [],
   });
 
-  // Advanced configuration
-  const [multiplierConfig, setMultiplierConfig] = useState<MultiplierConfigData>({
-    enabled: false,
-    baseMultiplier: 1.0,
-  });
-  const [rewardFrequency, setRewardFrequency] = useState<RewardFrequency>('one_time');
-
   // Validation
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
@@ -91,15 +81,6 @@ export default function PollQuizTaskBuilder({
       setDescription(initialData.description || '');
       setPoints(initialData.points || 50);
       setPollQuizConfig(initialData.settings?.pollQuizConfig || { type: taskType, questions: [] });
-      setRewardFrequency(initialData.rewardFrequency || 'one_time');
-
-      if (initialData.baseMultiplier && initialData.baseMultiplier > 1.0) {
-        setMultiplierConfig({
-          enabled: true,
-          baseMultiplier: initialData.baseMultiplier,
-          multiplierConfig: initialData.multiplierConfig,
-        });
-      }
     }
   }, [isEditMode, initialData, taskType]);
 
@@ -152,9 +133,8 @@ export default function PollQuizTaskBuilder({
       settings: {
         pollQuizConfig,
       },
-      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
-      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
-      rewardFrequency,
+      // Polls/quizzes are typically one-time (multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onPublish(config);
   };
@@ -171,9 +151,8 @@ export default function PollQuizTaskBuilder({
       settings: {
         pollQuizConfig,
       },
-      baseMultiplier: multiplierConfig.enabled ? multiplierConfig.baseMultiplier : 1.0,
-      multiplierConfig: multiplierConfig.enabled ? multiplierConfig.multiplierConfig : undefined,
-      rewardFrequency,
+      // Polls/quizzes are typically one-time (multipliers handled in campaigns)
+      rewardFrequency: 'one_time' as const,
     };
     onSave(config);
   };
@@ -289,14 +268,31 @@ export default function PollQuizTaskBuilder({
       {/* Poll/Quiz Builder */}
       <PollQuizBuilder value={pollQuizConfig} onChange={setPollQuizConfig} />
 
-      {/* Advanced Configuration */}
-      <MultiplierConfig value={multiplierConfig} onChange={setMultiplierConfig} />
-
-      <FrequencySelector
-        value={rewardFrequency}
-        onChange={setRewardFrequency}
-        showUnlimited={taskType === 'poll'} // Polls can be unlimited, quizzes typically one-time
-      />
+      {/* Locked Frequency Display */}
+      <Card className="bg-white/5 border-white/10">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Label className="text-white font-semibold">Reward Frequency</Label>
+                <Lock className="h-4 w-4 text-gray-400" />
+              </div>
+              <p className="text-xs text-gray-400">
+                {taskType === 'poll' ? 'Polls' : 'Quizzes'} are typically completed once
+              </p>
+            </div>
+            <Badge variant="outline" className="border-purple-500/30 text-purple-400">
+              One-time
+            </Badge>
+          </div>
+          <Alert className="mt-3 bg-purple-500/10 border-purple-500/20">
+            <Info className="h-4 w-4 text-purple-400" />
+            <AlertDescription className="text-purple-400 text-sm">
+              This task can only be completed once per user. Multipliers can be configured at the campaign level.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
 
       {/* Auto-verification notice */}
       <Alert className="bg-green-500/10 border-green-500/20">

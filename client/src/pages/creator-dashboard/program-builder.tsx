@@ -35,6 +35,7 @@ import {
 import { ImageUpload } from "@/components/ui/image-upload";
 import type { Program, Campaign, Task } from "@shared/schema";
 import { THEME_TEMPLATES, getAllThemeTemplates, type ThemeTemplate } from "@shared/theme-templates";
+import { TypographyToolbar } from "@/components/program/typography-toolbar";
 
 interface ProgramWithDetails extends Program {
   campaigns?: Campaign[];
@@ -1277,326 +1278,27 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
-      {/* Typography */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Typography
-          </CardTitle>
-          <p className="text-sm text-gray-400">Customize fonts, sizes, weights, and spacing</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Font Family */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Font Family</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-gray-300 text-sm">Heading Font</Label>
-                <Input
-                  value={customizeData.theme?.typography?.fontFamily?.heading || 'Inter, system-ui, sans-serif'}
-                  onChange={(e) => setCustomizeData({
-                    ...customizeData,
-                    theme: {
-                      ...customizeData.theme,
-                      typography: {
-                        ...customizeData.theme?.typography,
-                        fontFamily: {
-                          ...customizeData.theme?.typography?.fontFamily,
-                          heading: e.target.value
-                        }
-                      }
-                    }
-                  })}
-                  className="mt-1 bg-white/5 border-white/10 text-white"
-                  placeholder="Inter, sans-serif"
-                />
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm">Body Font</Label>
-                <Input
-                  value={customizeData.theme?.typography?.fontFamily?.body || 'Inter, system-ui, sans-serif'}
-                  onChange={(e) => setCustomizeData({
-                    ...customizeData,
-                    theme: {
-                      ...customizeData.theme,
-                      typography: {
-                        ...customizeData.theme?.typography,
-                        fontFamily: {
-                          ...customizeData.theme?.typography?.fontFamily,
-                          body: e.target.value
-                        }
-                      }
-                    }
-                  })}
-                  className="mt-1 bg-white/5 border-white/10 text-white"
-                  placeholder="Inter, sans-serif"
-                />
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm">Monospace Font</Label>
-                <Input
-                  value={customizeData.theme?.typography?.fontFamily?.mono || 'Monaco, Courier, monospace'}
-                  onChange={(e) => setCustomizeData({
-                    ...customizeData,
-                    theme: {
-                      ...customizeData.theme,
-                      typography: {
-                        ...customizeData.theme?.typography,
-                        fontFamily: {
-                          ...customizeData.theme?.typography?.fontFamily,
-                          mono: e.target.value
-                        }
-                      }
-                    }
-                  })}
-                  className="mt-1 bg-white/5 border-white/10 text-white"
-                  placeholder="Monaco, monospace"
-                />
-              </div>
-            </div>
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* Font Sizes */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Font Sizes</Label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl'].map((size) => (
-                <div key={size}>
-                  <Label className="text-gray-300 text-xs">{size.toUpperCase()}</Label>
-                  <Input
-                    value={customizeData.theme?.typography?.fontSize?.[size as keyof typeof customizeData.theme.typography.fontSize] || ''}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        typography: {
-                          ...customizeData.theme?.typography,
-                          fontSize: {
-                            ...customizeData.theme?.typography?.fontSize,
-                            [size]: e.target.value
-                          }
-                        }
-                      }
-                    })}
-                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
-                    placeholder="1rem"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* Font Weights */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Font Weights</Label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['light', 'normal', 'medium', 'semibold', 'bold', 'extrabold'].map((weight) => (
-                <div key={weight}>
-                  <Label className="text-gray-300 text-xs capitalize">{weight}</Label>
-                  <Input
-                    type="number"
-                    min="100"
-                    max="900"
-                    step="100"
-                    value={customizeData.theme?.typography?.fontWeight?.[weight as keyof typeof customizeData.theme.typography.fontWeight] || ''}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        typography: {
-                          ...customizeData.theme?.typography,
-                          fontWeight: {
-                            ...customizeData.theme?.typography?.fontWeight,
-                            [weight]: parseInt(e.target.value)
-                          }
-                        }
-                      }
-                    })}
-                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
-                    placeholder="400"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* Line Heights */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Line Heights</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {['tight', 'normal', 'relaxed', 'loose'].map((height) => (
-                <div key={height}>
-                  <Label className="text-gray-300 text-xs capitalize">{height}</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="3"
-                    step="0.05"
-                    value={customizeData.theme?.typography?.lineHeight?.[height as keyof typeof customizeData.theme.typography.lineHeight] || ''}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        typography: {
-                          ...customizeData.theme?.typography,
-                          lineHeight: {
-                            ...customizeData.theme?.typography?.lineHeight,
-                            [height]: parseFloat(e.target.value)
-                          }
-                        }
-                      }
-                    })}
-                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
-                    placeholder="1.5"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Layout - Border Radius, Spacing, Shadows */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Layout & Design
-          </CardTitle>
-          <p className="text-sm text-gray-400">Customize border radius, spacing, and shadow effects</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Border Radius */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Border Radius</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {['none', 'sm', 'md', 'lg', 'xl', '2xl', 'full'].map((radius) => (
-                <div key={radius}>
-                  <Label className="text-gray-300 text-xs uppercase">{radius}</Label>
-                  <Input
-                    value={customizeData.theme?.layout?.borderRadius?.[radius as keyof typeof customizeData.theme.layout.borderRadius] || ''}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        layout: {
-                          ...customizeData.theme?.layout,
-                          borderRadius: {
-                            ...customizeData.theme?.layout?.borderRadius,
-                            [radius]: e.target.value
-                          }
-                        }
-                      }
-                    })}
-                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
-                    placeholder="0.5rem"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* Spacing */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Spacing</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-300 text-sm">Spacing Mode</Label>
-                <select
-                  value={customizeData.theme?.layout?.spacing?.mode || 'normal'}
-                  onChange={(e) => setCustomizeData({
-                    ...customizeData,
-                    theme: {
-                      ...customizeData.theme,
-                      layout: {
-                        ...customizeData.theme?.layout,
-                        spacing: {
-                          ...customizeData.theme?.layout?.spacing,
-                          mode: e.target.value as 'tight' | 'normal' | 'relaxed'
-                        }
-                      }
-                    }
-                  })}
-                  className="mt-1 w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2"
-                >
-                  <option value="tight">Tight</option>
-                  <option value="normal">Normal</option>
-                  <option value="relaxed">Relaxed</option>
-                </select>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm">Spacing Scale</Label>
-                <Input
-                  type="number"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  value={customizeData.theme?.layout?.spacing?.scale || 1}
-                  onChange={(e) => setCustomizeData({
-                    ...customizeData,
-                    theme: {
-                      ...customizeData.theme,
-                      layout: {
-                        ...customizeData.theme?.layout,
-                        spacing: {
-                          ...customizeData.theme?.layout?.spacing,
-                          scale: parseFloat(e.target.value)
-                        }
-                      }
-                    }
-                  })}
-                  className="mt-1 bg-white/5 border-white/10 text-white"
-                  placeholder="1.0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* Shadows */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Shadow Effects</Label>
-            <div className="space-y-3">
-              {['sm', 'md', 'lg', 'xl', 'inner'].map((shadow) => (
-                <div key={shadow}>
-                  <Label className="text-gray-300 text-sm uppercase">{shadow}</Label>
-                  <Input
-                    value={customizeData.theme?.layout?.shadow?.[shadow as keyof typeof customizeData.theme.layout.shadow] || ''}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        layout: {
-                          ...customizeData.theme?.layout,
-                          shadow: {
-                            ...customizeData.theme?.layout?.shadow,
-                            [shadow]: e.target.value
-                          }
-                        }
-                      }
-                    })}
-                    className="mt-1 bg-white/5 border-white/10 text-white text-xs"
-                    placeholder="0 1px 2px rgba(0,0,0,0.05)"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Typography & Layout - Visual Toolbar */}
+      <TypographyToolbar
+        value={{
+          typography: customizeData.theme?.typography,
+          layout: customizeData.theme?.layout
+        }}
+        onChange={(updates) => {
+          setCustomizeData({
+            ...customizeData,
+            theme: {
+              ...customizeData.theme,
+              typography: updates.typography 
+                ? { ...customizeData.theme?.typography, ...updates.typography }
+                : customizeData.theme?.typography,
+              layout: updates.layout
+                ? { ...customizeData.theme?.layout, ...updates.layout }
+                : customizeData.theme?.layout
+            }
+          });
+        }}
+      />
 
       {/* Page Visibility */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">

@@ -8,9 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TaskTimingConfig } from "@/components/templates/TaskTimingConfig";
 import {
   Users,
   Coins,
@@ -20,12 +18,11 @@ import {
   Info,
   Gift,
   Target,
-  Calendar,
   Trophy,
 } from "lucide-react";
 
 interface QualifyingCondition {
-  type: 'quest_completion' | 'point_threshold' | 'account_age';
+  type: 'quest_completion' | 'point_threshold' | 'account_age' | 'revenue_threshold';
   value: string | number;
 }
 
@@ -47,16 +44,30 @@ interface ReferralTaskConfig {
   // Limits
   maxReferralsPerUser: number | null;
   totalMaxReferrals: number | null;
-  
-  // Timing
-  updateCadence: string;
-  rewardFrequency: string;
+}
+
+// API expects this structure
+interface ReferralTaskAPIPayload {
+  taskType: 'referral';
+  name: string;
+  description: string;
+  isDraft: boolean;
+  customSettings: {
+    referralTier: 'platform_creator_to_creator' | 'platform_fan_to_fan' | 'campaign_fan_to_fan';
+    rewardStructure: 'fixed' | 'percentage' | 'revenue_share';
+    referrerPoints?: number;
+    referredPoints?: number;
+    percentageOfReferred?: number;
+    qualifyingConditions?: QualifyingCondition[];
+    maxReferralsPerUser?: number | null;
+    totalMaxReferrals?: number | null;
+  };
 }
 
 interface ReferralTaskBuilderProps {
   initialConfig?: Partial<ReferralTaskConfig>;
-  onSave?: (config: ReferralTaskConfig) => void;
-  onPublish?: (config: ReferralTaskConfig) => void;
+  onSave?: (config: ReferralTaskAPIPayload) => void;
+  onPublish?: (config: ReferralTaskAPIPayload) => void;
   onBack?: () => void;
 }
 
@@ -66,18 +77,28 @@ export default function ReferralTaskBuilder({
   onPublish,
   onBack,
 }: ReferralTaskBuilderProps) {
+  // Handle both local config format and API format (customSettings)
+  const getInitialValue = <T,>(key: keyof ReferralTaskConfig, defaultValue: T): T => {
+    if (initialConfig && key in initialConfig && initialConfig[key] !== undefined) {
+      return initialConfig[key] as T;
+    }
+    const customSettings = (initialConfig as any)?.customSettings;
+    if (customSettings && key in customSettings && customSettings[key] !== undefined) {
+      return customSettings[key] as T;
+    }
+    return defaultValue;
+  };
+
   const [config, setConfig] = useState<ReferralTaskConfig>({
-    name: initialConfig?.name || "Refer a Friend",
-    description: initialConfig?.description || "Invite friends to join and earn rewards",
-    rewardStructure: initialConfig?.rewardStructure || 'fixed',
-    referrerPoints: initialConfig?.referrerPoints || 100,
-    referredPoints: initialConfig?.referredPoints || 50,
-    percentageOfReferred: initialConfig?.percentageOfReferred || 10,
-    qualifyingConditions: initialConfig?.qualifyingConditions || [],
-    maxReferralsPerUser: initialConfig?.maxReferralsPerUser || null,
-    totalMaxReferrals: initialConfig?.totalMaxReferrals || null,
-    updateCadence: initialConfig?.updateCadence || 'immediate',
-    rewardFrequency: initialConfig?.rewardFrequency || 'one_time',
+    name: (initialConfig as any)?.name || "Refer a Friend",
+    description: (initialConfig as any)?.description || "Invite friends to join and earn rewards",
+    rewardStructure: getInitialValue('rewardStructure', 'fixed'),
+    referrerPoints: getInitialValue('referrerPoints', 100),
+    referredPoints: getInitialValue('referredPoints', 50),
+    percentageOfReferred: getInitialValue('percentageOfReferred', 10),
+    qualifyingConditions: getInitialValue('qualifyingConditions', []),
+    maxReferralsPerUser: getInitialValue('maxReferralsPerUser', null),
+    totalMaxReferrals: getInitialValue('totalMaxReferrals', null),
   });
 
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -133,12 +154,32 @@ export default function ReferralTaskBuilder({
     });
   };
 
+  // Build API payload with proper structure
+  const buildAPIPayload = (isDraft: boolean): ReferralTaskAPIPayload => {
+    return {
+      taskType: 'referral',
+      name: config.name,
+      description: config.description,
+      isDraft,
+      customSettings: {
+        referralTier: 'campaign_fan_to_fan', // Default to campaign fan-to-fan referrals
+        rewardStructure: config.rewardStructure,
+        referrerPoints: config.rewardStructure === 'fixed' ? config.referrerPoints : undefined,
+        referredPoints: config.rewardStructure === 'fixed' ? config.referredPoints : undefined,
+        percentageOfReferred: config.rewardStructure === 'percentage' ? config.percentageOfReferred : undefined,
+        qualifyingConditions: config.qualifyingConditions.length > 0 ? config.qualifyingConditions : undefined,
+        maxReferralsPerUser: config.maxReferralsPerUser,
+        totalMaxReferrals: config.totalMaxReferrals,
+      },
+    };
+  };
+
   const handleSaveDraft = () => {
-    if (onSave) onSave(config);
+    if (onSave) onSave(buildAPIPayload(true));
   };
 
   const handlePublish = () => {
-    if (isValid && onPublish) onPublish(config);
+    if (isValid && onPublish) onPublish(buildAPIPayload(false));
   };
 
   // Preview Component
@@ -484,23 +525,6 @@ export default function ReferralTaskBuilder({
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Timing Configuration */}
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Timing & Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TaskTimingConfig
-              updateCadence={config.updateCadence}
-              rewardFrequency={config.rewardFrequency}
-              onChange={(timing) => updateConfig(timing)}
-            />
           </CardContent>
         </Card>
       </div>
