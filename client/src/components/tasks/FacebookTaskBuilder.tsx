@@ -73,11 +73,14 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       // Check both settings and customSettings (backend stores in customSettings)
       const settings = initialData.settings || initialData.customSettings || {};
       
-      if (settings.pageUrl) {
-        setPageUrl(settings.pageUrl);
+      const derivedPageUrl = settings.pageUrl || settings.profileUrl || settings.contentUrl;
+      const derivedPostUrl = settings.postUrl || settings.contentUrl;
+
+      if (derivedPageUrl) {
+        setPageUrl(derivedPageUrl);
       }
-      if (settings.postUrl) {
-        setPostUrl(settings.postUrl);
+      if (derivedPostUrl) {
+        setPostUrl(derivedPostUrl);
       }
       if (settings.requiredText) {
         setRequiredText(settings.requiredText);

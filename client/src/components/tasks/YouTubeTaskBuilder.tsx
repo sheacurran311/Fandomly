@@ -83,11 +83,16 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
       // Check both settings and customSettings (backend stores in customSettings)
       const settings = initialData.settings || initialData.customSettings || {};
       
-      if (settings.channelUrl) {
-        setChannelUrl(settings.channelUrl);
+      const derivedChannelUrl = settings.channelUrl
+        || (settings.channelId ? `https://youtube.com/channel/${settings.channelId}` : undefined)
+        || settings.contentUrl;
+      const derivedVideoUrl = settings.videoUrl || settings.contentUrl;
+
+      if (derivedChannelUrl) {
+        setChannelUrl(derivedChannelUrl);
       }
-      if (settings.videoUrl) {
-        setVideoUrl(settings.videoUrl);
+      if (derivedVideoUrl) {
+        setVideoUrl(derivedVideoUrl);
       }
       if (settings.requiredText) {
         setRequiredText(settings.requiredText);

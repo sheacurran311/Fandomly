@@ -145,11 +145,14 @@ export default function CreatorYouTubeWidget() {
               {userInfo.title?.charAt(0) || 'Y'}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-white font-medium text-sm truncate">{userInfo.title}</p>
                 <Badge className="bg-green-500/20 text-green-400 text-xs">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Connected
+                </Badge>
+                <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                  Rewarded
                 </Badge>
               </div>
             </div>
@@ -220,7 +223,10 @@ export default function CreatorYouTubeWidget() {
             <Youtube className="h-6 w-6 text-red-400" />
           </div>
           <p className="text-sm text-gray-300 mb-2">Connect your YouTube channel</p>
-          <p className="text-xs text-gray-400 mb-4">Engage with your video audience</p>
+          <p className="text-xs text-gray-400 mb-2">Engage with your video audience</p>
+          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+            +500 Points
+          </Badge>
         </div>
         <Button 
           className="w-full bg-red-600 text-white hover:bg-red-700"

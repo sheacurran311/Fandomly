@@ -35,6 +35,7 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
     isConnected: spotifyConnected,
     isLoading: checkingConnection,
     connect: connectSpotify,
+    userInfo: spotifyUserInfo,
   } = useSpotifyConnection();
   
   const [taskName, setTaskName] = useState('');
@@ -72,6 +73,22 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [isEditMode, initialData]);
+
+  // Auto-populate from connected Spotify profile when creating new tasks
+  useEffect(() => {
+    if (!isEditMode && spotifyConnected && spotifyUserInfo) {
+      const profileUrl =
+        (spotifyUserInfo as any)?.profileData?.external_urls?.spotify ||
+        (spotifyUserInfo.id ? `https://open.spotify.com/user/${spotifyUserInfo.id}` : undefined);
+
+      if (taskType === 'spotify_follow' && !artistUrl && profileUrl) {
+        setArtistUrl(profileUrl);
+      }
+      if (taskType === 'spotify_playlist' && !playlistUrl && profileUrl) {
+        setPlaylistUrl(profileUrl);
+      }
+    }
+  }, [isEditMode, spotifyConnected, spotifyUserInfo, taskType, artistUrl, playlistUrl]);
 
   useEffect(() => {
     const errors: string[] = [];

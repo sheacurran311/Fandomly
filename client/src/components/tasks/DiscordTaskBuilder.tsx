@@ -46,6 +46,7 @@ export default function DiscordTaskBuilder({
     isConnected: discordConnected,
     isLoading: checkingConnection,
     connect: connectDiscord,
+    userInfo: discordUserInfo,
   } = useDiscordConnection();
 
   // Task settings
@@ -95,6 +96,26 @@ export default function DiscordTaskBuilder({
       setUseApiVerification(initialData.verificationMethod === 'api');
     }
   }, [isEditMode, initialData, taskType]);
+
+  // Auto-populate from connected Discord profile when creating new tasks
+  useEffect(() => {
+    if (!isEditMode && discordConnected && discordUserInfo) {
+      const profileData = (discordUserInfo as any)?.profileData || {};
+      const defaultInvite = profileData.inviteUrl || profileData.serverInviteUrl;
+      const defaultServerId = profileData.serverId || profileData.guildId;
+      const defaultRoleId = profileData.roleId;
+
+      if (!serverInviteUrl && defaultInvite) {
+        setServerInviteUrl(defaultInvite);
+      }
+      if (!serverId && defaultServerId) {
+        setServerId(defaultServerId);
+      }
+      if (requireRole && !roleId && defaultRoleId) {
+        setRoleId(defaultRoleId);
+      }
+    }
+  }, [isEditMode, discordConnected, discordUserInfo, serverInviteUrl, serverId, roleId, requireRole]);
 
   // Validation
   useEffect(() => {

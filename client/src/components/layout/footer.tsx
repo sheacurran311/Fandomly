@@ -54,7 +54,7 @@ export default function Footer() {
         
         <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <div className="text-gray-400 text-sm">
-            © 2024 Fandomly. All rights reserved.
+            © 2026 Fandomly, LLC. All Rights Reserved.
           </div>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <Link href="/privacy-policy" className="text-gray-400 hover:text-brand-secondary text-sm transition-colors">Privacy Policy</Link>

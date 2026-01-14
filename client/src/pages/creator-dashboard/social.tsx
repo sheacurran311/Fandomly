@@ -30,7 +30,7 @@ import {
   Unlink,
   Video
 } from "lucide-react";
-import { FaSpotify } from "react-icons/fa";
+import { FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { socialManager } from "@/lib/social-integrations";
 import { useTwitterConnection } from "@/hooks/use-twitter-connection";
@@ -99,6 +99,19 @@ export default function CreatorSocial() {
   const [spotifyFollowers, setSpotifyFollowers] = useState<number>(0);
   const [isCheckingSpotifyStatus, setIsCheckingSpotifyStatus] = useState(true);
 
+  // Discord connection state
+  const [discordConnected, setDiscordConnected] = useState(false);
+  const [discordConnecting, setDiscordConnecting] = useState(false);
+  const [discordDisplayName, setDiscordDisplayName] = useState<string | null>(null);
+  const [isCheckingDiscordStatus, setIsCheckingDiscordStatus] = useState(true);
+
+  // Twitch connection state
+  const [twitchConnected, setTwitchConnected] = useState(false);
+  const [twitchConnecting, setTwitchConnecting] = useState(false);
+  const [twitchDisplayName, setTwitchDisplayName] = useState<string | null>(null);
+  const [twitchFollowers, setTwitchFollowers] = useState<number>(0);
+  const [isCheckingTwitchStatus, setIsCheckingTwitchStatus] = useState(true);
+
   // Check all social platform statuses when user becomes available
   useEffect(() => {
     if (user?.dynamicUserId) {
@@ -107,6 +120,8 @@ export default function CreatorSocial() {
       checkTiktokStatus();
       checkYoutubeStatus();
       checkSpotifyStatus();
+      checkDiscordStatus();
+      checkTwitchStatus();
       // Load saved active page ID from localStorage
       const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
       if (savedActivePageId) {
@@ -129,7 +144,9 @@ export default function CreatorSocial() {
       if (!data || !data.type || 
           (!data.type.includes('OAUTH') && 
            !data.type.includes('AUTH_SUCCESS') &&
-           !data.type.includes('TIKTOK'))) {
+           !data.type.includes('TIKTOK') &&
+           !data.type.includes('discord') &&
+           !data.type.includes('twitch'))) {
         return;
       }
 
@@ -146,6 +163,28 @@ export default function CreatorSocial() {
           checkYoutubeStatus();
         } else if (platform === 'spotify') {
           checkSpotifyStatus();
+        } else if (platform === 'discord') {
+          checkDiscordStatus();
+        } else if (platform === 'twitch') {
+          checkTwitchStatus();
+        }
+      }
+      
+      // Handle Discord OAuth callback - save connection from parent window (has session)
+      // Note: Primary save is done by social-integrations.ts secureLogin, this is a backup
+      if (data.type === 'discord-oauth-result') {
+        if (data.result?.success) {
+          // Just refresh status - the secureLogin method handles saving
+          checkDiscordStatus();
+        }
+      }
+      
+      // Handle Twitch OAuth callback - save connection from parent window (has session)
+      // Note: Primary save is done by social-integrations.ts secureLogin, this is a backup
+      if (data.type === 'twitch-oauth-result') {
+        if (data.result?.success) {
+          // Just refresh status - the secureLogin method handles saving
+          checkTwitchStatus();
         }
       }
     };
@@ -328,6 +367,108 @@ export default function CreatorSocial() {
     } finally {
       setIsCheckingSpotifyStatus(false);
       console.log('[Creator Social] Spotify status check complete');
+    }
+  };
+
+  const checkDiscordStatus = async () => {
+    console.log('[Creator Social] Starting Discord status check...');
+    try {
+      setIsCheckingDiscordStatus(true);
+      const response = await fetch('/api/social-connections/discord', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        console.error('[Creator Social] Discord status check failed:', response.status);
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('[Creator Social] Discord raw response:', data);
+      
+      const connected = data.connected;
+      const connection = data.connection;
+      console.log('[Creator Social] Discord status check:', { connected, connection });
+      
+      setDiscordConnected(connected);
+      if (connected && connection) {
+        const displayName = 
+          connection.platformDisplayName || 
+          connection.platformUsername ||
+          connection.profileData?.username ||
+          null;
+        console.log('[Creator Social] Discord extracted:', { displayName });
+        setDiscordDisplayName(displayName);
+      } else {
+        console.log('[Creator Social] Discord not connected, clearing state');
+        setDiscordDisplayName(null);
+      }
+    } catch (error) {
+      console.error('[Creator Social] Error checking Discord status:', error);
+      setDiscordConnected(false);
+      setDiscordDisplayName(null);
+    } finally {
+      setIsCheckingDiscordStatus(false);
+      console.log('[Creator Social] Discord status check complete');
+    }
+  };
+
+  const checkTwitchStatus = async () => {
+    console.log('[Creator Social] Starting Twitch status check...');
+    try {
+      setIsCheckingTwitchStatus(true);
+      const response = await fetch('/api/social-connections/twitch', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        console.error('[Creator Social] Twitch status check failed:', response.status);
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('[Creator Social] Twitch raw response:', data);
+      
+      const connected = data.connected;
+      const connection = data.connection;
+      console.log('[Creator Social] Twitch status check:', { connected, connection });
+      
+      setTwitchConnected(connected);
+      if (connected && connection) {
+        const profile = connection.profileData;
+        const displayName = 
+          connection.platformDisplayName || 
+          profile?.display_name ||
+          profile?.login ||
+          null;
+        const followers = 
+          profile?.followers || 
+          profile?.follower_count || 
+          0;
+        console.log('[Creator Social] Twitch extracted:', { displayName, followers });
+        setTwitchDisplayName(displayName);
+        setTwitchFollowers(followers);
+      } else {
+        console.log('[Creator Social] Twitch not connected, clearing state');
+        setTwitchDisplayName(null);
+        setTwitchFollowers(0);
+      }
+    } catch (error) {
+      console.error('[Creator Social] Error checking Twitch status:', error);
+      setTwitchConnected(false);
+      setTwitchDisplayName(null);
+      setTwitchFollowers(0);
+    } finally {
+      setIsCheckingTwitchStatus(false);
+      console.log('[Creator Social] Twitch status check complete');
     }
   };
 
@@ -518,6 +659,109 @@ export default function CreatorSocial() {
     }
   };
 
+  const connectDiscord = async () => {
+    try {
+      setDiscordConnecting(true);
+      const discordAPI = socialManager['discord'];
+      const result = await discordAPI.secureLogin();
+      if (result.success) {
+        await checkDiscordStatus();
+        toast({
+          title: "Discord Connected! 🎮",
+          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Discord",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Discord login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (e: any) {
+      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect Discord', variant: 'destructive' });
+    } finally {
+      setDiscordConnecting(false);
+    }
+  };
+
+  const disconnectDiscord = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('discord');
+      if (result.success) {
+        setDiscordConnected(false);
+        setDiscordDisplayName(null);
+        toast({
+          title: "Discord Disconnected",
+          description: "Successfully disconnected from Discord",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Discord disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from Discord. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const connectTwitch = async () => {
+    try {
+      setTwitchConnecting(true);
+      const twitchAPI = socialManager['twitch'];
+      const result = await twitchAPI.secureLogin();
+      if (result.success) {
+        await checkTwitchStatus();
+        toast({
+          title: "Twitch Connected! 🎮",
+          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Twitch",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Twitch login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (e: any) {
+      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect Twitch', variant: 'destructive' });
+    } finally {
+      setTwitchConnecting(false);
+    }
+  };
+
+  const disconnectTwitch = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('twitch');
+      if (result.success) {
+        setTwitchConnected(false);
+        setTwitchDisplayName(null);
+        setTwitchFollowers(0);
+        toast({
+          title: "Twitch Disconnected",
+          description: "Successfully disconnected from Twitch",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Twitch disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from Twitch. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+
   const loadFacebookPages = async () => {
     try {
       const pages = await FacebookSDKManager.getUserPages();
@@ -652,6 +896,8 @@ export default function CreatorSocial() {
     if (tiktokConnected) count++;
     if (youtubeConnected) count++;
     if (spotifyConnected) count++;
+    if (discordConnected) count++;
+    if (twitchConnected) count++;
     return count;
   };
 
@@ -672,7 +918,10 @@ export default function CreatorSocial() {
     if (spotifyConnected) {
       total += spotifyFollowers;
     }
-    // Facebook page followers would be added here when available
+    if (twitchConnected) {
+      total += twitchFollowers;
+    }
+    // Facebook page followers and Discord don't have follower counts
     return total;
   };
 
@@ -748,6 +997,26 @@ export default function CreatorSocial() {
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
       isManaged: true // Flag to show it's managed separately
+    },
+    {
+      platform: "Discord",
+      icon: FaDiscord,
+      handle: discordConnected && discordDisplayName ? discordDisplayName : "Not connected",
+      followers: "—", // Discord doesn't have public follower counts
+      engagement: discordConnected ? "Active" : "—",
+      connected: discordConnected,
+      color: "text-purple-400",
+      bgColor: "bg-purple-400/20"
+    },
+    {
+      platform: "Twitch",
+      icon: FaTwitch,
+      handle: twitchConnected && twitchDisplayName ? twitchDisplayName : "Not connected",
+      followers: twitchConnected ? `${formatFollowers(twitchFollowers)} Followers` : "0 Followers",
+      engagement: twitchConnected ? "Active" : "—",
+      connected: twitchConnected,
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/20"
     }
   ];
 
@@ -758,7 +1027,9 @@ export default function CreatorSocial() {
     tiktok: true,
     facebook: true,
     youtube: true,
-    spotify: true
+    spotify: true,
+    discord: true,
+    twitch: true
   });
 
   const toggleFilter = (platform: keyof typeof activityFilters) => {
@@ -875,15 +1146,25 @@ export default function CreatorSocial() {
                           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                             <h4 className="text-white font-medium">{account.platform}</h4>
                             {account.connected ? (
-                              <Badge className="bg-green-500/20 text-green-400 text-xs flex-shrink-0">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Connected
-                              </Badge>
+                              <>
+                                <Badge className="bg-green-500/20 text-green-400 text-xs flex-shrink-0">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Connected
+                                </Badge>
+                                <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs flex-shrink-0">
+                                  Rewarded
+                                </Badge>
+                              </>
                             ) : (
-                              <Badge variant="outline" className="border-gray-500/30 text-gray-400 text-xs flex-shrink-0">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Not Connected
-                              </Badge>
+                              <>
+                                <Badge variant="outline" className="border-gray-500/30 text-gray-400 text-xs flex-shrink-0">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  Not Connected
+                                </Badge>
+                                <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs flex-shrink-0">
+                                  +500 Points
+                                </Badge>
+                              </>
                             )}
                           </div>
                           <p className="text-sm text-gray-400 truncate">{account.handle}</p>
@@ -1080,6 +1361,54 @@ export default function CreatorSocial() {
                                 data-testid="button-connect-spotify-social"
                               >
                                 {spotifyConnecting ? 'Connecting...' : 'Connect'}
+                              </Button>
+                            )
+                          ) : account.platform === 'Discord' ? (
+                            account.connected ? (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-white hover:bg-white/10"
+                                  onClick={disconnectDiscord}
+                                  data-testid="button-disconnect-discord-social"
+                                >
+                                  <Unlink className="h-4 w-4 mr-1" />
+                                  Disconnect
+                                </Button>
+                              </>
+                            ) : (
+                              <Button 
+                                className="bg-purple-600 hover:bg-purple-700" 
+                                onClick={connectDiscord} 
+                                disabled={discordConnecting}
+                                data-testid="button-connect-discord-social"
+                              >
+                                {discordConnecting ? 'Connecting...' : 'Connect'}
+                              </Button>
+                            )
+                          ) : account.platform === 'Twitch' ? (
+                            account.connected ? (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/20 text-white hover:bg-white/10"
+                                  onClick={disconnectTwitch}
+                                  data-testid="button-disconnect-twitch-social"
+                                >
+                                  <Unlink className="h-4 w-4 mr-1" />
+                                  Disconnect
+                                </Button>
+                              </>
+                            ) : (
+                              <Button 
+                                className="bg-purple-600 hover:bg-purple-700" 
+                                onClick={connectTwitch} 
+                                disabled={twitchConnecting}
+                                data-testid="button-connect-twitch-social"
+                              >
+                                {twitchConnecting ? 'Connecting...' : 'Connect'}
                               </Button>
                             )
                           ) : (

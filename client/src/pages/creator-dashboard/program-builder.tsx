@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fetchApi, queryClient } from "@/lib/queryClient";
@@ -30,8 +31,22 @@ import {
   Pin,
   Trash2,
   Edit,
-  Send
+  Send,
+  Twitter,
+  Instagram,
+  Facebook,
+  Youtube,
+  Video,
+  Loader2,
+  Check,
+  Globe,
+  Gift
 } from "lucide-react";
+import { FaDiscord, FaTwitch, FaSpotify, FaTiktok } from "react-icons/fa";
+import { FacebookSDKManager } from "@/lib/facebook";
+import { socialManager } from "@/lib/social-integrations";
+import { TwitterSDKManager } from "@/lib/twitter";
+import { useToast } from "@/hooks/use-toast";
 import { ImageUpload } from "@/components/ui/image-upload";
 import type { Program, Campaign, Task } from "@shared/schema";
 import { THEME_TEMPLATES, getAllThemeTemplates, type ThemeTemplate } from "@shared/theme-templates";
@@ -220,11 +235,16 @@ function ProgramCustomizer({
   campaigns?: Campaign[];
   tasks?: Task[];
 }) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const [recentlyConnected, setRecentlyConnected] = useState<Set<string>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [publishSlug, setPublishSlug] = useState(program.slug || "");
   const [customizeData, setCustomizeData] = useState({
     displayName: program.name,
+    pointsName: program.pointsName || 'Points',
     bio: program.description || '',
     // Program-specific images
     headerImage: program.pageConfig?.headerImage || '',
@@ -241,8 +261,6 @@ function ProgramCustomizer({
       discord: '',
       website: '',
     },
-    // Custom domain
-    customDomain: program.pageConfig?.customDomain || '',
     // Theme settings
     theme: program.pageConfig?.theme || {
       mode: 'light' as 'light' | 'dark' | 'custom',
@@ -270,6 +288,258 @@ function ProgramCustomizer({
     },
   });
 
+  // Fetch social connections
+  const { data: socialConnectionsData, refetch: refetchConnections } = useQuery({
+    queryKey: ['/api/social-connections'],
+    queryFn: async () => {
+      const response = await fetchApi('/api/social-connections');
+      return response;
+    },
+  });
+
+  const connectedPlatforms = new Set(
+    socialConnectionsData?.connections?.map((c: any) => c.platform) || []
+  );
+
+  // Social platform connection handlers
+  const handleConnectTwitter = async () => {
+    setConnectingPlatform('twitter');
+    try {
+      const result = await TwitterSDKManager.secureLogin('creator');
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('twitter'));
+        toast({
+          title: "Twitter Connected! +500 Points",
+          description: `Successfully connected your Twitter account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect Twitter",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting Twitter",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectInstagram = async () => {
+    setConnectingPlatform('instagram');
+    try {
+      const instagramAPI = socialManager['instagram'];
+      const result = await instagramAPI.secureLogin();
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('instagram'));
+        toast({
+          title: "Instagram Connected! +500 Points",
+          description: `Successfully connected your Instagram account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect Instagram",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting Instagram",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectDiscord = async () => {
+    setConnectingPlatform('discord');
+    try {
+      const discordAPI = socialManager['discord'];
+      const result = await discordAPI.secureLogin();
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('discord'));
+        toast({
+          title: "Discord Connected! +500 Points",
+          description: `Successfully connected your Discord account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect Discord",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting Discord",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectFacebook = async () => {
+    setConnectingPlatform('facebook');
+    try {
+      const result = await FacebookSDKManager.login();
+      if (result.authResponse) {
+        setRecentlyConnected(prev => new Set(prev).add('facebook'));
+        toast({
+          title: "Facebook Connected! +500 Points",
+          description: `Successfully connected your Facebook account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect Facebook",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting Facebook",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectTikTok = async () => {
+    setConnectingPlatform('tiktok');
+    try {
+      const tiktokAPI = socialManager['tiktok'];
+      const result = await tiktokAPI.secureLogin();
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('tiktok'));
+        toast({
+          title: "TikTok Connected! +500 Points",
+          description: `Successfully connected your TikTok account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect TikTok",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting TikTok",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectYouTube = async () => {
+    setConnectingPlatform('youtube');
+    try {
+      const youtubeAPI = socialManager['youtube'];
+      const result = await youtubeAPI.secureLogin();
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('youtube'));
+        toast({
+          title: "YouTube Connected! +500 Points",
+          description: `Successfully connected your YouTube account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect YouTube",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting YouTube",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectSpotify = async () => {
+    setConnectingPlatform('spotify');
+    try {
+      const spotifyAPI = socialManager['spotify'];
+      const result = await spotifyAPI.secureLogin();
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('spotify'));
+        toast({
+          title: "Spotify Connected! +500 Points",
+          description: `Successfully connected your Spotify account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect Spotify",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting Spotify",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  const handleConnectTwitch = async () => {
+    setConnectingPlatform('twitch');
+    try {
+      const twitchAPI = socialManager['twitch'];
+      const result = await twitchAPI.secureLogin();
+      if (result.success) {
+        setRecentlyConnected(prev => new Set(prev).add('twitch'));
+        toast({
+          title: "Twitch Connected! +500 Points",
+          description: `Successfully connected your Twitch account`,
+        });
+        refetchConnections();
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect Twitch",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "An error occurred while connecting Twitch",
+        variant: "destructive",
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
   const updateProgramMutation = useMutation({
     mutationFn: async (data: any) => {
       return fetchApi(`/api/programs/${program.id}`, {
@@ -286,6 +556,7 @@ function ProgramCustomizer({
   const handleSave = () => {
     const saveData = {
       name: customizeData.displayName,
+      pointsName: customizeData.pointsName,
       description: customizeData.bio,
       pageConfig: {
         ...program.pageConfig,
@@ -293,7 +564,6 @@ function ProgramCustomizer({
         logo: customizeData.logo,
         brandColors: customizeData.brandColors,
         socialLinks: customizeData.socialLinks,
-        customDomain: customizeData.customDomain,
         theme: customizeData.theme,
         visibility: {
           showProfile: customizeData.showProfile,
@@ -390,7 +660,7 @@ function ProgramCustomizer({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
-              onClick={() => window.location.href = '/creator-dashboard/campaigns'}
+              onClick={() => setLocation('/creator-dashboard/campaigns')}
               variant="outline"
               className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
             >
@@ -400,7 +670,7 @@ function ProgramCustomizer({
             </Button>
 
             <Button
-              onClick={() => window.location.href = '/creator-dashboard/tasks/create'}
+              onClick={() => setLocation('/creator-dashboard/tasks/create')}
               variant="outline"
               className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
             >
@@ -410,7 +680,7 @@ function ProgramCustomizer({
             </Button>
 
             <Button
-              onClick={() => window.location.href = '/creator-dashboard/rewards'}
+              onClick={() => setLocation('/creator-dashboard/rewards')}
               variant="outline"
               className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
             >
@@ -437,6 +707,18 @@ function ProgramCustomizer({
               className="bg-white/5 border-white/10 text-white mt-1"
               placeholder="My Loyalty Program"
             />
+          </div>
+          <div>
+            <Label className="text-white">Points Name</Label>
+            <Input
+              value={customizeData.pointsName}
+              onChange={(e) => setCustomizeData({ ...customizeData, pointsName: e.target.value })}
+              className="bg-white/5 border-white/10 text-white mt-1"
+              placeholder="Points, Stars, Coins, etc."
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              What you'll call the rewards fans earn (e.g., "Thunder Points", "Luna Coins")
+            </p>
           </div>
           <div>
             <Label className="text-white">Description</Label>
@@ -498,54 +780,343 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
-      {/* Social Links & Custom Domain */}
+      {/* Social Connections - Earn Points */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <ExternalLink className="h-5 w-5" />
-            Social Links & Custom Domain
+            <Gift className="h-5 w-5 text-green-400" />
+            Connect Social Accounts
           </CardTitle>
-          <p className="text-sm text-gray-400">Add social media links and custom domain for your program</p>
+          <p className="text-sm text-gray-400">Connect your social accounts to earn platform points</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label className="text-white">Twitter URL</Label>
-            <Input
-              value={customizeData.socialLinks?.twitter || ''}
-              onChange={(e) => setCustomizeData({
-                ...customizeData,
-                socialLinks: { ...customizeData.socialLinks, twitter: e.target.value }
-              })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="https://twitter.com/yourhandle"
-            />
+          {/* Twitter Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Twitter className="h-5 w-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Twitter / X</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('twitter') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'twitter')?.platformUsername || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('twitter') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('twitter') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectTwitter}
+                disabled={connectingPlatform === 'twitter'}
+                variant="outline"
+                className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+              >
+                {connectingPlatform === 'twitter' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
           </div>
-          <div>
-            <Label className="text-white">Instagram URL</Label>
-            <Input
-              value={customizeData.socialLinks?.instagram || ''}
-              onChange={(e) => setCustomizeData({
-                ...customizeData,
-                socialLinks: { ...customizeData.socialLinks, instagram: e.target.value }
-              })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="https://instagram.com/yourhandle"
-            />
+
+          {/* Instagram Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center">
+                <Instagram className="h-5 w-5 text-pink-400" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Instagram</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('instagram') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'instagram')?.platformUsername || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('instagram') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('instagram') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectInstagram}
+                disabled={connectingPlatform === 'instagram'}
+                variant="outline"
+                className="border-pink-500/30 text-pink-400 hover:bg-pink-500/10"
+              >
+                {connectingPlatform === 'instagram' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
           </div>
-          <div>
-            <Label className="text-white">Discord URL</Label>
-            <Input
-              value={customizeData.socialLinks?.discord || ''}
-              onChange={(e) => setCustomizeData({
-                ...customizeData,
-                socialLinks: { ...customizeData.socialLinks, discord: e.target.value }
-              })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="https://discord.gg/yourinvite"
-            />
+
+          {/* Discord Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <FaDiscord className="h-5 w-5 text-purple-400" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Discord</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('discord') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'discord')?.platformUsername || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('discord') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('discord') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectDiscord}
+                disabled={connectingPlatform === 'discord'}
+                variant="outline"
+                className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+              >
+                {connectingPlatform === 'discord' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
           </div>
+
+          {/* Facebook Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center">
+                <Facebook className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Facebook</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('facebook') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'facebook')?.platformDisplayName || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('facebook') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('facebook') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectFacebook}
+                disabled={connectingPlatform === 'facebook'}
+                variant="outline"
+                className="border-blue-600/30 text-blue-500 hover:bg-blue-600/10"
+              >
+                {connectingPlatform === 'facebook' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* TikTok Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center">
+                <FaTiktok className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-medium text-white">TikTok</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('tiktok') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'tiktok')?.platformUsername || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('tiktok') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('tiktok') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectTikTok}
+                disabled={connectingPlatform === 'tiktok'}
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10"
+              >
+                {connectingPlatform === 'tiktok' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* YouTube Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Youtube className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <p className="font-medium text-white">YouTube</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('youtube') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'youtube')?.platformDisplayName || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('youtube') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('youtube') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectYouTube}
+                disabled={connectingPlatform === 'youtube'}
+                variant="outline"
+                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+              >
+                {connectingPlatform === 'youtube' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Spotify Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <FaSpotify className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Spotify</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('spotify') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'spotify')?.platformDisplayName || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('spotify') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('spotify') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectSpotify}
+                disabled={connectingPlatform === 'spotify'}
+                variant="outline"
+                className="border-green-500/30 text-green-500 hover:bg-green-500/10"
+              >
+                {connectingPlatform === 'spotify' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Twitch Connection */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-600/20 flex items-center justify-center">
+                <FaTwitch className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Twitch</p>
+                <p className="text-xs text-gray-400">
+                  {connectedPlatforms.has('twitch') 
+                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'twitch')?.platformDisplayName || 'Connected'
+                    : 'Not connected'}
+                </p>
+              </div>
+            </div>
+            {connectedPlatforms.has('twitch') ? (
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-400" />
+                {recentlyConnected.has('twitch') ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
+                ) : (
+                  <span className="text-green-400 text-sm font-medium">Connected</span>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectTwitch}
+                disabled={connectingPlatform === 'twitch'}
+                variant="outline"
+                className="border-purple-600/30 text-purple-500 hover:bg-purple-600/10"
+              >
+                {connectingPlatform === 'twitch' ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                ) : (
+                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Website URL - keep this as a manual input */}
+          <Separator className="bg-white/10" />
           <div>
-            <Label className="text-white">Website URL</Label>
+            <Label className="text-white flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Website URL
+            </Label>
             <Input
               value={customizeData.socialLinks?.website || ''}
               onChange={(e) => setCustomizeData({
@@ -555,20 +1126,8 @@ function ProgramCustomizer({
               className="bg-white/5 border-white/10 text-white mt-1"
               placeholder="https://yourwebsite.com"
             />
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          <div>
-            <Label className="text-white">Custom Domain</Label>
-            <Input
-              value={customizeData.customDomain || ''}
-              onChange={(e) => setCustomizeData({ ...customizeData, customDomain: e.target.value })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="program.yourdomain.com"
-            />
             <p className="text-xs text-gray-400 mt-1">
-              Enter your custom domain (e.g., loyalty.yourbrand.com). DNS configuration required.
+              Your website will be displayed on your program page
             </p>
           </div>
         </CardContent>

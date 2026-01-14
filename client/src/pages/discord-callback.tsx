@@ -3,7 +3,7 @@
  *
  * Handles the OAuth callback from Discord
  * Exchanges authorization code for access token
- * Saves the connection to the database
+ * Sends data back to parent window for saving (popup shares data, parent saves)
  */
 
 import { useEffect, useRef } from "react";
@@ -128,26 +128,46 @@ export default function DiscordCallback() {
         const userData = await userResponse.json();
         console.log("[Discord Callback] User profile fetched:", userData.username);
 
-        // Save the connection to the database
+        const displayName = userData.global_name || userData.username;
+
+        // Prepare connection data to send to parent
+        const connectionData = {
+          platform: "discord",
+          platformUserId: userData.id,
+          platformUsername: userData.username,
+          platformDisplayName: displayName,
+          accessToken: accessToken,
+          refreshToken: tokenData.refresh_token || null,
+          profileData: {
+            avatar: userData.avatar,
+            verified: userData.verified || false,
+          },
+        };
+
+        // If opened in popup, send data to parent for saving
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            {
+              type: "discord-oauth-result",
+              result: {
+                success: true,
+                displayName,
+                connectionData, // Parent will save this
+              },
+            },
+            window.location.origin
+          );
+          window.close();
+          return;
+        }
+
+        // If not in popup (direct navigation), try to save here
         const saveResponse = await fetch("/api/social-connections", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            platform: "discord",
-            platformUserId: userData.id,
-            username: userData.username,
-            displayName: userData.global_name || userData.username,
-            accessToken: accessToken,
-            refreshToken: tokenData.refresh_token || null,
-            profileUrl: `https://discord.com/users/${userData.id}`,
-            profileImage: userData.avatar
-              ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-              : "",
-            verified: userData.verified || false,
-            followers: 0, // Discord doesn't have a follower count
-          }),
+          body: JSON.stringify(connectionData),
           credentials: "include",
         });
 
@@ -158,25 +178,6 @@ export default function DiscordCallback() {
 
         console.log("[Discord Callback] Connection saved successfully");
 
-        const displayName = userData.global_name || userData.username;
-
-        // If opened in popup, send success to parent
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            {
-              type: "discord-oauth-result",
-              result: {
-                success: true,
-                displayName,
-              },
-            },
-            window.location.origin
-          );
-          window.close();
-          return;
-        }
-
-        // Otherwise show toast and redirect
         toast({
           title: "Discord Connected! 🎉",
           description: `Successfully connected ${displayName}`,

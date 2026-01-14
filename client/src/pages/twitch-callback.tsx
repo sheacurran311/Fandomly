@@ -3,7 +3,7 @@
  *
  * Handles the OAuth callback from Twitch
  * Exchanges authorization code for access token
- * Saves the connection to the database
+ * Sends data back to parent window for saving (popup shares data, parent saves)
  */
 
 import { useEffect, useRef } from "react";
@@ -128,24 +128,47 @@ export default function TwitchCallback() {
         const userData = await userResponse.json();
         console.log("[Twitch Callback] User profile fetched:", userData.login);
 
-        // Save the connection to the database
+        const displayName = userData.display_name || userData.login;
+
+        // Prepare connection data to send to parent
+        const connectionData = {
+          platform: "twitch",
+          platformUserId: userData.id,
+          platformUsername: userData.login,
+          platformDisplayName: displayName,
+          accessToken: accessToken,
+          refreshToken: tokenData.refresh_token || null,
+          profileData: {
+            profile_image_url: userData.profile_image_url,
+            broadcaster_type: userData.broadcaster_type,
+            description: userData.description,
+          },
+        };
+
+        // If opened in popup, send data to parent for saving
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            {
+              type: "twitch-oauth-result",
+              result: {
+                success: true,
+                displayName,
+                connectionData, // Parent will save this
+              },
+            },
+            window.location.origin
+          );
+          window.close();
+          return;
+        }
+
+        // If not in popup (direct navigation), try to save here
         const saveResponse = await fetch("/api/social-connections", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            platform: "twitch",
-            platformUserId: userData.id,
-            username: userData.login,
-            displayName: userData.display_name,
-            accessToken: accessToken,
-            refreshToken: tokenData.refresh_token || null,
-            profileUrl: `https://twitch.tv/${userData.login}`,
-            profileImage: userData.profile_image_url || "",
-            verified: userData.broadcaster_type === "partner",
-            followers: 0, // Would need additional API call to get follower count
-          }),
+          body: JSON.stringify(connectionData),
           credentials: "include",
         });
 
@@ -156,25 +179,6 @@ export default function TwitchCallback() {
 
         console.log("[Twitch Callback] Connection saved successfully");
 
-        const displayName = userData.display_name;
-
-        // If opened in popup, send success to parent
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            {
-              type: "twitch-oauth-result",
-              result: {
-                success: true,
-                displayName,
-              },
-            },
-            window.location.origin
-          );
-          window.close();
-          return;
-        }
-
-        // Otherwise show toast and redirect
         toast({
           title: "Twitch Connected! 🎉",
           description: `Successfully connected ${displayName}`,

@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --background: #101636;
+  --background: #0a0118;
   --foreground: #ffffff;
-  --muted: #0e1430;
+  --muted: #0d1226;
   --muted-foreground: #9aa4d6;
-  --popover: #0e1430;
+  --popover: #0a0118;
   --popover-foreground: #ffffff;
-  --card: #0f1738;
+  --card: #0a0d14;
   --card-foreground: #ffffff;
   --border: #1e2450;
   --input: #1e2450;
@@ -28,9 +28,9 @@
   --brand-primary: #e10698;
   --brand-secondary: #14feee;
   --brand-accent: #14feee;
-  --brand-dark-purple: #101636;
+  --brand-dark-purple: #0a0118;
   --brand-blue: #14feee;
-  --brand-dark-bg: #101636;
+  --brand-dark-bg: #0a0118;
   
   /* Brand Color Variations for Dynamic Theming */
   --brand-primary-rgb: 225, 6, 152;
@@ -44,13 +44,13 @@
 }
 
 .dark {
-  --background: #101636;
+  --background: #0a0118;
   --foreground: #ffffff;
-  --muted: #0e1430;
+  --muted: #0d1226;
   --muted-foreground: #9aa4d6;
-  --popover: #0e1430;
+  --popover: #0a0118;
   --popover-foreground: #ffffff;
-  --card: #0f1738;
+  --card: #0a0d14;
   --card-foreground: #ffffff;
   --border: #1e2450;
   --input: #1e2450;
@@ -72,7 +72,7 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    background: #101636;
+    background: #0a0118;
     color: #ffffff;
   }
 
@@ -144,8 +144,8 @@
   .bg-brand-primary { background-color: var(--brand-primary); }
   .bg-brand-secondary { background-color: var(--brand-secondary); }
   .bg-brand-accent { background-color: var(--brand-accent); }
-  .bg-brand-dark-purple { background-color: #0f1738; }
-  .bg-brand-dark-bg { background-color: #101636; }
+  .bg-brand-dark-purple { background-color: #0a0118; }
+  .bg-brand-dark-bg { background-color: #0a0118; }
   .border-brand-primary { border-color: var(--brand-primary); }
   .border-brand-secondary { border-color: var(--brand-secondary); }
   .border-brand-accent { border-color: var(--brand-accent); }
@@ -296,7 +296,83 @@
   .animated-border {
     position: relative;
     border: 2px solid transparent;
-    background: linear-gradient(#101636, #101636) padding-box,
+    background: linear-gradient(#0a0118, #0a0118) padding-box,
                 linear-gradient(135deg, #e10698, #14feee) border-box;
+  }
+
+  /* ========== Hero Background Connectivity Visuals ========== */
+  
+  /* Dot Grid Pattern */
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(20, 254, 238, 0.3) 1px, transparent 1px),
+                      radial-gradient(circle, rgba(225, 6, 152, 0.2) 1px, transparent 1px);
+    background-size: 50px 50px, 50px 50px;
+    background-position: 0 0, 25px 25px;
+  }
+
+  /* Connection line flow animation */
+  @keyframes flow-line {
+    0% {
+      stroke-dashoffset: 200;
+      opacity: 0;
+    }
+    20% {
+      opacity: 0.8;
+    }
+    80% {
+      opacity: 0.8;
+    }
+    100% {
+      stroke-dashoffset: 0;
+      opacity: 0;
+    }
+  }
+
+  .connection-line {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: flow-line 4s ease-in-out infinite;
+    will-change: stroke-dashoffset, opacity;
+  }
+
+  /* Pulsing node animation */
+  @keyframes pulse-node {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.5);
+    }
+  }
+
+  .pulse-node {
+    animation: pulse-node 3s ease-in-out infinite;
+    transform-origin: center;
+    will-change: opacity, transform;
+  }
+
+  /* Radial vignette for center focus */
+  .bg-radial-vignette {
+    background: radial-gradient(
+      ellipse 80% 60% at 50% 50%,
+      transparent 0%,
+      transparent 40%,
+      rgba(10, 1, 24, 0.4) 70%,
+      rgba(10, 1, 24, 0.8) 100%
+    );
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .connection-line,
+    .pulse-node {
+      animation: none;
+    }
+    
+    .dot-grid {
+      opacity: 0.2;
+    }
   }
 }

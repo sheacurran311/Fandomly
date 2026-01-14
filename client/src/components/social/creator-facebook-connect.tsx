@@ -54,13 +54,20 @@ export default function CreatorFacebookConnect() {
                 )}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-white">{userInfo.name}</p>
-                <p className="text-xs text-gray-400">Connected to Facebook</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-white">{userInfo.name}</p>
+                  <Badge className="bg-green-500/20 text-green-400 text-xs">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                  <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                    Rewarded
+                  </Badge>
+                </div>
                 {userInfo.email && (
                   <p className="text-xs text-gray-500">{userInfo.email}</p>
                 )}
               </div>
-              <CheckCircle className="h-5 w-5 text-green-500" />
             </div>
 
             {pages && pages.length > 0 && (
@@ -124,7 +131,10 @@ export default function CreatorFacebookConnect() {
                 <Facebook className="h-6 w-6 text-blue-500" />
               </div>
               <p className="text-sm text-white font-medium mb-1">Connect Facebook</p>
-              <p className="text-xs text-gray-400">Manage your Facebook pages and reach your audience</p>
+              <p className="text-xs text-gray-400 mb-2">Manage your Facebook pages and reach your audience</p>
+              <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                +500 Points
+              </Badge>
             </div>
             
             <Button 

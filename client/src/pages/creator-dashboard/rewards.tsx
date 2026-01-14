@@ -13,10 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye, Video as VideoIcon, AlertCircle, Image, ExternalLink } from "lucide-react";
+import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye, Video as VideoIcon, AlertCircle, Image, ExternalLink, Sparkles } from "lucide-react";
 import type { Reward } from "@shared/schema";
 import { insertRewardSchema } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
@@ -24,6 +25,7 @@ import DashboardCard from "@/components/dashboard/dashboard-card";
 import { VideoUpload } from "@/components/ui/video-upload";
 import { useNftCollections, useNftTemplates, type NftCollection, type NftTemplate } from "@/hooks/useCrossmint";
 import { Link } from "wouter";
+import PlatformRewards from "@/components/rewards/platform-rewards";
 
 // Form schema extending insertRewardSchema with additional validation
 const rewardCreationFormSchema = insertRewardSchema.extend({
@@ -67,6 +69,7 @@ export default function RewardsManagement() {
   const { toast } = useToast();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedRewardType, setSelectedRewardType] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>("your-rewards");
 
   // Fetch creator's rewards
   const { data: rewards = [], isLoading: rewardsLoading, refetch } = useQuery({
@@ -117,35 +120,54 @@ export default function RewardsManagement() {
     <DashboardLayout userType="creator">
       <div className="p-6">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  Reward Management
-                </h1>
-                <p className="text-gray-400">
-                  Create and manage rewards for your fans to redeem with points
-                </p>
-              </div>
-              
-              <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-brand-primary hover:bg-brand-primary/80">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Reward
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-2xl bg-brand-dark-bg border-white/10 max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-white">Create New Reward</DialogTitle>
-                  </DialogHeader>
-                  <RewardCreationForm onSubmit={handleCreateReward} onCancel={() => setCreateModalOpen(false)} />
-                </DialogContent>
-              </Dialog>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Rewards
+            </h1>
+            <p className="text-gray-400">
+              Manage your fan rewards and view your platform points
+            </p>
           </div>
 
-          {/* Stats Cards */}
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="bg-white/5 border border-white/10 mb-6">
+              <TabsTrigger 
+                value="your-rewards" 
+                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+              >
+                <Gift className="h-4 w-4 mr-2" />
+                Your Rewards
+              </TabsTrigger>
+              <TabsTrigger 
+                value="platform" 
+                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Platform Points
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="your-rewards" className="mt-0">
+              {/* Create Reward Button */}
+              <div className="flex justify-end mb-6">
+                <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-brand-primary hover:bg-brand-primary/80">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Reward
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-2xl bg-brand-dark-bg border-white/10 max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="text-white">Create New Reward</DialogTitle>
+                    </DialogHeader>
+                    <RewardCreationForm onSubmit={handleCreateReward} onCancel={() => setCreateModalOpen(false)} />
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <DashboardCard
               title="Total Rewards"
@@ -215,6 +237,12 @@ export default function RewardsManagement() {
               </div>
             )}
           </div>
+            </TabsContent>
+
+            <TabsContent value="platform" className="mt-0">
+              <PlatformRewards />
+            </TabsContent>
+          </Tabs>
         </div>
     </DashboardLayout>
   );

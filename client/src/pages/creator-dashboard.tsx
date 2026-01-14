@@ -8,6 +8,8 @@ import CreatorTwitterWidget from "@/components/social/creator-twitter-widget";
 import CreatorTikTokWidget from "@/components/social/creator-tiktok-widget";
 import CreatorYouTubeWidget from "@/components/social/creator-youtube-widget";
 import CreatorSpotifyWidget from "@/components/social/creator-spotify-widget";
+import CreatorDiscordWidget from "@/components/social/creator-discord-widget";
+import CreatorTwitchWidget from "@/components/social/creator-twitch-widget";
 import RevenueWidget from "@/components/dashboard/revenue-widget";
 import LeaderboardWidget from "@/components/dashboard/leaderboard-widget";
 import NewFansWidget from "@/components/dashboard/new-fans-widget";
@@ -434,6 +436,8 @@ export default function CreatorDashboard() {
                 <CreatorTikTokWidget />
                 <CreatorYouTubeWidget />
                 <CreatorSpotifyWidget />
+                <CreatorDiscordWidget />
+                <CreatorTwitchWidget />
               </div>
             </div>
 

@@ -5,8 +5,12 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { URLSearchParams } from "url";
 import { storage } from '../../core/storage';
 import { db } from '../../db';
-import { socialConnections } from "@shared/schema";
+import { socialConnections, users } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { platformPointsService } from '../../services/points/platform-points-service';
+
+// Points awarded for connecting a social account
+const SOCIAL_CONNECTION_POINTS = 500;
 
 // Server-side code idempotency
 const usedCodeCache = new Map<string, number>(); // code -> expiryMillis
@@ -341,14 +345,14 @@ async function refreshSpotifyToken(refreshToken: string) {
 // Discord OAuth token exchange
 async function exchangeDiscordToken(code: string, redirectUri: string) {
   console.log('[Discord Token Exchange] Request details:', {
-    hasClientId: !!process.env.DISCORD_APP_ID,
-    hasClientSecret: !!process.env.DISCORD_PUBLIC_KEY,
+    hasClientId: !!process.env.DISCORD_CLIENT_ID,
+    hasClientSecret: !!process.env.DISCORD_CLIENT_SECRET,
     redirectUri,
     codeLength: code.length
   });
 
-  if (!process.env.DISCORD_APP_ID || !process.env.DISCORD_PUBLIC_KEY) {
-    throw new Error('Discord client credentials not configured');
+  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET) {
+    throw new Error('Discord client credentials not configured. Required: DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET');
   }
 
   const response = await fetch('https://discord.com/api/oauth2/token', {
@@ -357,8 +361,8 @@ async function exchangeDiscordToken(code: string, redirectUri: string) {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
-      client_id: process.env.DISCORD_APP_ID,
-      client_secret: process.env.DISCORD_PUBLIC_KEY,
+      client_id: process.env.DISCORD_CLIENT_ID,
+      client_secret: process.env.DISCORD_CLIENT_SECRET,
       grant_type: 'authorization_code',
       code,
       redirect_uri: redirectUri
@@ -1521,8 +1525,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Discord token exchange
-  app.post('/api/social/discord/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Discord token exchange (no auth required - OAuth code is the auth, connection saving requires auth)
+  app.post('/api/social/discord/token', async (req, res) => {
     try {
       const { code, redirect_uri } = req.body;
       if (!code || !redirect_uri) {
@@ -1540,8 +1544,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Discord user info
-  app.get('/api/social/discord/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Discord user info (uses OAuth access token for auth, not session)
+  app.get('/api/social/discord/me', async (req, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1557,8 +1561,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitch token exchange
-  app.post('/api/social/twitch/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Twitch token exchange (no auth required - OAuth code is the auth, connection saving requires auth)
+  app.post('/api/social/twitch/token', async (req, res) => {
     try {
       const { code, redirect_uri } = req.body;
       if (!code || !redirect_uri) {
@@ -1576,8 +1580,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitch user info
-  app.get('/api/social/twitch/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Twitch user info (uses OAuth access token for auth, not session)
+  app.get('/api/social/twitch/me', async (req, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1619,9 +1623,14 @@ export function registerSocialRoutes(app: Express) {
       await storage.saveSocialAccount(dynamicUserId, platform, accountData);
       
       // 2. Also save to socialConnections table for consistency across all pages
+      let isNewConnection = false;
+      let internalUserId: string | null = null;
+      
       try {
         const user = await storage.getUserByDynamicId(dynamicUserId);
         if (user) {
+          internalUserId = user.id;
+          
           // Check if connection already exists in socialConnections table
           const existingConnection = await db.query.socialConnections.findFirst({
             where: and(
@@ -1656,6 +1665,7 @@ export function registerSocialRoutes(app: Express) {
                 platform,
                 ...connectionData,
               });
+            isNewConnection = true;
             console.log(`[Social Connect] Created ${platform} in socialConnections table for user ${user.id}`);
           }
         }
@@ -1664,8 +1674,34 @@ export function registerSocialRoutes(app: Express) {
         // Don't fail the request if the sync fails
       }
       
+      // Award platform points for new social connection
+      let pointsAwarded = 0;
+      if (isNewConnection && internalUserId) {
+        try {
+          await platformPointsService.awardPoints(
+            internalUserId,
+            SOCIAL_CONNECTION_POINTS,
+            'social_connection_reward',
+            {
+              platform,
+              platformUsername: accountData?.user?.username || accountData?.username,
+            }
+          );
+          pointsAwarded = SOCIAL_CONNECTION_POINTS;
+          console.log(`[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${internalUserId} for connecting ${platform}`);
+        } catch (pointsError) {
+          console.error(`[Social Connect] Error awarding points:`, pointsError);
+          // Don't fail the connection if points award fails
+        }
+      }
+      
       console.log(`[Social Connect] Successfully saved ${platform} account for user ${dynamicUserId}`);
-      res.json({ success: true, message: `${platform} account connected successfully` });
+      res.json({ 
+        success: true, 
+        message: `${platform} account connected successfully`,
+        pointsAwarded,
+        isNewConnection
+      });
     } catch (error) {
       console.error('Social connect error:', error);
       res.status(500).json({ error: 'Failed to connect social account' });

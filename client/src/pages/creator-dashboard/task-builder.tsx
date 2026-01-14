@@ -88,6 +88,18 @@ export default function TaskBuilder() {
     }
   }, [existingTask, selectedTemplate]);
 
+  // Pre-select program/campaign when editing existing task
+  useEffect(() => {
+    if (existingTask && isEditMode) {
+      if (existingTask.programId) {
+        setSelectedProgramId(existingTask.programId);
+      }
+      if (existingTask.campaignId) {
+        setSelectedCampaignId(existingTask.campaignId);
+      }
+    }
+  }, [existingTask, isEditMode]);
+
   const handleSelectTemplate = (template: TaskTemplateType) => {
     setSelectedTemplate(template);
   };

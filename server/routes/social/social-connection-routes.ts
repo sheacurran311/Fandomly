@@ -3,8 +3,12 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { socialConnections } from '@shared/schema';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
+import { platformPointsService } from '../../services/points/platform-points-service';
 
 const router = Router();
+
+// Points awarded for connecting a social account
+const SOCIAL_CONNECTION_POINTS = 500;
 
 /**
  * GET /api/social-connections
@@ -161,6 +165,24 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         .returning();
 
       savedConnection = newConnection;
+
+      // Award platform points for new social connection
+      try {
+        await platformPointsService.awardPoints(
+          userId,
+          SOCIAL_CONNECTION_POINTS,
+          'social_connection_reward',
+          {
+            platform,
+            platformUsername,
+            connectionId: newConnection.id,
+          }
+        );
+        console.log(`[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+      } catch (pointsError) {
+        console.error(`[Social Connection] Error awarding points:`, pointsError);
+        // Don't fail the connection if points award fails
+      }
     }
 
     // Also sync to old storage system for backwards compatibility
@@ -204,7 +226,9 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         platformUsername: savedConnection.platformUsername,
         platformDisplayName: savedConnection.platformDisplayName,
         profileData: savedConnection.profileData,
-      }
+      },
+      pointsAwarded: !existingConnection ? SOCIAL_CONNECTION_POINTS : 0,
+      isNewConnection: !existingConnection,
     });
   } catch (error) {
     console.error('Error saving social connection:', error);

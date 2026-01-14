@@ -36,6 +36,12 @@ export const baseSocialTaskSettings = z.object({
   // ============================================
   contentUrl: z.string().url().optional(), // Universal: link to post/video/tweet
   contentId: z.string().optional(), // Platform content ID (for API calls)
+  // Common platform-specific URLs (kept optional to preserve in storage)
+  pageUrl: z.string().optional(), // Facebook page URL
+  channelUrl: z.string().optional(), // YouTube channel URL
+  playlistUrl: z.string().optional(), // Spotify playlist URL
+  artistUrl: z.string().optional(), // Spotify artist URL
+  profileUrl: z.string().optional(), // Generic profile URL fallback
 
   // ============================================
   // VERIFICATION REQUIREMENTS

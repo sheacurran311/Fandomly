@@ -41,7 +41,7 @@ import {
   Check
 } from "lucide-react";
 import { Twitter, Youtube } from "lucide-react";
-import { FaSpotify } from "react-icons/fa";
+import { FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { socialManager } from "@/lib/social-integrations";
 import { useCreatorVerification } from "@/hooks/useCreatorVerification";
@@ -102,6 +102,18 @@ export default function Profile() {
   const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
   const [isCheckingSpotifyStatus, setIsCheckingSpotifyStatus] = useState(true);
   
+  // Discord connection state
+  const [discordConnecting, setDiscordConnecting] = useState(false);
+  const [discordConnected, setDiscordConnected] = useState(false);
+  const [discordDisplayName, setDiscordDisplayName] = useState<string | null>(null);
+  const [isCheckingDiscordStatus, setIsCheckingDiscordStatus] = useState(true);
+  
+  // Twitch connection state
+  const [twitchConnecting, setTwitchConnecting] = useState(false);
+  const [twitchConnected, setTwitchConnected] = useState(false);
+  const [twitchDisplayName, setTwitchDisplayName] = useState<string | null>(null);
+  const [isCheckingTwitchStatus, setIsCheckingTwitchStatus] = useState(true);
+  
   // Check social connections status when user becomes available
   useEffect(() => {
     if (user?.dynamicUserId) {
@@ -110,6 +122,8 @@ export default function Profile() {
       checkTiktokStatus();
       checkYoutubeStatus();
       checkSpotifyStatus();
+      checkDiscordStatus();
+      checkTwitchStatus();
     }
   }, [user?.dynamicUserId]);
 
@@ -265,6 +279,64 @@ export default function Profile() {
       setSpotifyDisplayName(null);
     } finally {
       setIsCheckingSpotifyStatus(false);
+    }
+  };
+  
+  const checkDiscordStatus = async () => {
+    try {
+      setIsCheckingDiscordStatus(true);
+      const response = await fetch('/api/social-connections/discord', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setDiscordConnected(data.connected);
+        if (data.connected && data.connectionData) {
+          setDiscordDisplayName(data.connectionData.displayName || data.connectionData.username || null);
+        }
+      } else {
+        setDiscordConnected(false);
+        setDiscordDisplayName(null);
+      }
+    } catch (error) {
+      console.error('[Profile] Error checking Discord status:', error);
+      setDiscordConnected(false);
+      setDiscordDisplayName(null);
+    } finally {
+      setIsCheckingDiscordStatus(false);
+    }
+  };
+  
+  const checkTwitchStatus = async () => {
+    try {
+      setIsCheckingTwitchStatus(true);
+      const response = await fetch('/api/social-connections/twitch', {
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTwitchConnected(data.connected);
+        if (data.connected && data.connectionData) {
+          setTwitchDisplayName(data.connectionData.displayName || data.connectionData.username || null);
+        }
+      } else {
+        setTwitchConnected(false);
+        setTwitchDisplayName(null);
+      }
+    } catch (error) {
+      console.error('[Profile] Error checking Twitch status:', error);
+      setTwitchConnected(false);
+      setTwitchDisplayName(null);
+    } finally {
+      setIsCheckingTwitchStatus(false);
     }
   };
   
@@ -587,6 +659,134 @@ export default function Profile() {
       toast({
         title: "Disconnect Failed",
         description: "Failed to disconnect from Spotify. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const connectDiscord = async () => {
+    try {
+      setDiscordConnecting(true);
+      const discordAPI = socialManager['discord'];
+      const result = await discordAPI.secureLogin();
+      if (result.success) {
+        await checkDiscordStatus();
+        toast({
+          title: "Discord Connected!",
+          description: result.displayName ? `Connected as ${result.displayName}` : "Successfully connected to Discord",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Discord Connect Failed",
+          description: result.error || "Failed to connect to Discord.",
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('[Profile] Discord connect error:', error);
+      toast({
+        title: "Discord Connect Failed",
+        description: "Failed to connect to Discord. Please try again.",
+        variant: 'destructive',
+      });
+    } finally {
+      setDiscordConnecting(false);
+    }
+  };
+  
+  const disconnectDiscord = async () => {
+    try {
+      const response = await fetch('/api/social-connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ platform: 'discord' }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setDiscordConnected(false);
+        setDiscordDisplayName(null);
+        toast({
+          title: "Discord Disconnected",
+          description: "Successfully disconnected from Discord",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Discord disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from Discord. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const connectTwitch = async () => {
+    try {
+      setTwitchConnecting(true);
+      const twitchAPI = socialManager['twitch'];
+      const result = await twitchAPI.secureLogin();
+      if (result.success) {
+        await checkTwitchStatus();
+        toast({
+          title: "Twitch Connected!",
+          description: result.displayName ? `Connected as ${result.displayName}` : "Successfully connected to Twitch",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Twitch Connect Failed",
+          description: result.error || "Failed to connect to Twitch.",
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('[Profile] Twitch connect error:', error);
+      toast({
+        title: "Twitch Connect Failed",
+        description: "Failed to connect to Twitch. Please try again.",
+        variant: 'destructive',
+      });
+    } finally {
+      setTwitchConnecting(false);
+    }
+  };
+  
+  const disconnectTwitch = async () => {
+    try {
+      const response = await fetch('/api/social-connections/disconnect', {
+        method: 'POST',
+        headers: {
+          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ platform: 'twitch' }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setTwitchConnected(false);
+        setTwitchDisplayName(null);
+        toast({
+          title: "Twitch Disconnected",
+          description: "Successfully disconnected from Twitch",
+          duration: 3000,
+        });
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (error) {
+      console.error('Twitch disconnect error:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect from Twitch. Please try again.",
         variant: 'destructive',
       });
     }
@@ -1139,6 +1339,7 @@ export default function Profile() {
                     {isConnectedToFacebook ? (
                       <div className="flex gap-2 items-center">
                         <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                        <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -1164,15 +1365,18 @@ export default function Profile() {
                         </Button>
                       </div>
                     ) : (
-                      <Button 
-                        size="sm" 
-                        className="bg-[#1877F2] text-white hover:bg-[#1877F2]/80"
-                        onClick={connectFacebook}
-                        disabled={facebookConnecting}
-                        data-testid="button-login-facebook-profile"
-                      >
-                        {facebookConnecting ? 'Connecting…' : 'Login with Facebook'}
-                      </Button>
+                      <div className="flex gap-2 items-center">
+                        <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                        <Button 
+                          size="sm" 
+                          className="bg-[#1877F2] text-white hover:bg-[#1877F2]/80"
+                          onClick={connectFacebook}
+                          disabled={facebookConnecting}
+                          data-testid="button-login-facebook-profile"
+                        >
+                          {facebookConnecting ? 'Connecting…' : 'Login with Facebook'}
+                        </Button>
+                      </div>
                     )}
                   </div>
                   
@@ -1189,6 +1393,7 @@ export default function Profile() {
                     {twitterConnected ? (
                       <div className="flex gap-2 items-center">
                         <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                        <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -1209,15 +1414,18 @@ export default function Profile() {
                         </Button>
                       </div>
                     ) : (
-                      <Button 
-                        size="sm" 
-                        className="bg-black text-white hover:bg-black/80"
-                        onClick={connectTwitter}
-                        disabled={twitterConnecting}
-                        data-testid="button-connect-twitter-profile"
-                      >
-                        {twitterConnecting ? 'Connecting…' : 'Connect'}
-                      </Button>
+                      <div className="flex gap-2 items-center">
+                        <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                        <Button 
+                          size="sm" 
+                          className="bg-black text-white hover:bg-black/80"
+                          onClick={connectTwitter}
+                          disabled={twitterConnecting}
+                          data-testid="button-connect-twitter-profile"
+                        >
+                          {twitterConnecting ? 'Connecting…' : 'Connect'}
+                        </Button>
+                      </div>
                     )}
                   </div>
 
@@ -1239,6 +1447,7 @@ export default function Profile() {
                       {instagramConnected ? (
                         <div className="flex gap-2 items-center">
                           <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -1259,15 +1468,18 @@ export default function Profile() {
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white"
-                          size="sm" 
-                          onClick={connectInstagram}
-                          disabled={instagramConnecting}
-                          data-testid="button-connect-instagram"
-                        >
-                          {instagramConnecting ? 'Connecting...' : 'Connect'}
-                        </Button>
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                          <Button 
+                            className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white"
+                            size="sm" 
+                            onClick={connectInstagram}
+                            disabled={instagramConnecting}
+                            data-testid="button-connect-instagram"
+                          >
+                            {instagramConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1290,6 +1502,7 @@ export default function Profile() {
                       {tiktokConnected ? (
                         <div className="flex gap-2 items-center">
                           <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -1310,15 +1523,18 @@ export default function Profile() {
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          className="bg-black text-white hover:bg-black/80"
-                          size="sm" 
-                          onClick={connectTiktok}
-                          disabled={tiktokConnecting}
-                          data-testid="button-connect-tiktok"
-                        >
-                          {tiktokConnecting ? 'Connecting...' : 'Connect'}
-                        </Button>
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                          <Button 
+                            className="bg-black text-white hover:bg-black/80"
+                            size="sm" 
+                            onClick={connectTiktok}
+                            disabled={tiktokConnecting}
+                            data-testid="button-connect-tiktok"
+                          >
+                            {tiktokConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1341,6 +1557,7 @@ export default function Profile() {
                       {youtubeConnected ? (
                         <div className="flex gap-2 items-center">
                           <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -1361,15 +1578,18 @@ export default function Profile() {
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          className="bg-red-600 text-white hover:bg-red-700"
-                          size="sm" 
-                          onClick={connectYoutube}
-                          disabled={youtubeConnecting}
-                          data-testid="button-connect-youtube"
-                        >
-                          {youtubeConnecting ? 'Connecting...' : 'Connect'}
-                        </Button>
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                          <Button 
+                            className="bg-red-600 text-white hover:bg-red-700"
+                            size="sm" 
+                            onClick={connectYoutube}
+                            disabled={youtubeConnecting}
+                            data-testid="button-connect-youtube"
+                          >
+                            {youtubeConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1392,6 +1612,7 @@ export default function Profile() {
                       {spotifyConnected ? (
                         <div className="flex gap-2 items-center">
                           <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -1412,18 +1633,127 @@ export default function Profile() {
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          className="bg-green-600 text-white hover:bg-green-700"
-                          size="sm" 
-                          onClick={connectSpotify}
-                          disabled={spotifyConnecting}
-                          data-testid="button-connect-spotify"
-                        >
-                          {spotifyConnecting ? 'Connecting...' : 'Connect'}
-                        </Button>
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                          <Button 
+                            className="bg-green-600 text-white hover:bg-green-700"
+                            size="sm" 
+                            onClick={connectSpotify}
+                            disabled={spotifyConnecting}
+                            data-testid="button-connect-spotify"
+                          >
+                            {spotifyConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
+
+                  {/* Discord integration */}
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FaDiscord className="h-5 w-5 text-[#5865F2]" />
+                        <div>
+                          <div className="text-white font-medium">Discord</div>
+                          <div className="text-xs text-gray-400">
+                            {discordConnected && discordDisplayName ? 
+                              `Connected as ${discordDisplayName}` : 
+                              "Connect your Discord account"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      {discordConnected ? (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={() => window.open('https://discord.com/app', '_blank')}
+                          >
+                            Open Discord
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={disconnectDiscord}
+                            data-testid="button-disconnect-discord"
+                          >
+                            <Unlink className="h-4 w-4 mr-1" />
+                            Disconnect
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                          <Button 
+                            className="bg-[#5865F2] text-white hover:bg-[#5865F2]/80"
+                            size="sm" 
+                            onClick={connectDiscord}
+                            disabled={discordConnecting}
+                            data-testid="button-connect-discord"
+                          >
+                            {discordConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  {/* Twitch integration */}
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FaTwitch className="h-5 w-5 text-[#9146FF]" />
+                        <div>
+                          <div className="text-white font-medium">Twitch</div>
+                          <div className="text-xs text-gray-400">
+                            {twitchConnected && twitchDisplayName ? 
+                              `Connected as ${twitchDisplayName}` : 
+                              "Connect your Twitch account"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      {twitchConnected ? (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={() => window.open(`https://twitch.tv/${twitchDisplayName}`, '_blank')}
+                          >
+                            Channel
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/20 text-white hover:bg-white/10"
+                            onClick={disconnectTwitch}
+                            data-testid="button-disconnect-twitch"
+                          >
+                            <Unlink className="h-4 w-4 mr-1" />
+                            Disconnect
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 items-center">
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                          <Button 
+                            className="bg-[#9146FF] text-white hover:bg-[#9146FF]/80"
+                            size="sm" 
+                            onClick={connectTwitch}
+                            disabled={twitchConnecting}
+                            data-testid="button-connect-twitch"
+                          >
+                            {twitchConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  
                 </CardContent>
               </Card>
 

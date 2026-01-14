@@ -24,6 +24,8 @@ export default function SimplifiedSocialWidgets() {
     youtube: false,
     spotify: false,
     instagram: false,
+    discord: false,
+    twitch: false,
   });
 
   useEffect(() => {
@@ -113,6 +115,40 @@ export default function SimplifiedSocialWidgets() {
       statuses.spotify = false;
     }
 
+    // Check Discord
+    try {
+      const response = await fetch('/api/social-connections/discord', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        statuses.discord = data.connected;
+      }
+    } catch (error) {
+      statuses.discord = false;
+    }
+
+    // Check Twitch
+    try {
+      const response = await fetch('/api/social-connections/twitch', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        statuses.twitch = data.connected;
+      }
+    } catch (error) {
+      statuses.twitch = false;
+    }
+
     setConnectionStatus(statuses);
   };
 
@@ -151,6 +187,20 @@ export default function SimplifiedSocialWidgets() {
       color: "text-green-500", 
       bgColor: "bg-green-500/20",
       connected: connectionStatus.spotify,
+    },
+    { 
+      platform: "Discord", 
+      icon: LinkIcon, 
+      color: "text-indigo-400", 
+      bgColor: "bg-indigo-400/20",
+      connected: connectionStatus.discord,
+    },
+    { 
+      platform: "Twitch", 
+      icon: Youtube, 
+      color: "text-violet-400", 
+      bgColor: "bg-violet-400/20",
+      connected: connectionStatus.twitch,
     },
     { 
       platform: "Instagram", 

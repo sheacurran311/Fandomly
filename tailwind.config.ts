@@ -55,7 +55,8 @@ export default {
         "brand-primary": "var(--color-brand-primary, var(--color-primary, #8B5CF6))",
         "brand-secondary": "var(--color-brand-secondary, var(--color-secondary, #EC4899))",
         "brand-accent": "var(--color-brand-accent, var(--color-accent, #F59E0B))",
-        "brand-dark-bg": "#0f172a",
+        "brand-dark-bg": "#0a0118",
+        "brand-dark-purple": "#0a0118",
         sidebar: {
           DEFAULT: "var(--sidebar-background)",
           foreground: "var(--sidebar-foreground)",

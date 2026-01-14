@@ -65,6 +65,19 @@ export default function FanSocial() {
   const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
   const [spotifyFollowers, setSpotifyFollowers] = useState<number>(0);
   const [isCheckingSpotifyStatus, setIsCheckingSpotifyStatus] = useState(true);
+
+  // Discord connection state
+  const [discordConnected, setDiscordConnected] = useState(false);
+  const [discordConnecting, setDiscordConnecting] = useState(false);
+  const [discordDisplayName, setDiscordDisplayName] = useState<string | null>(null);
+  const [isCheckingDiscordStatus, setIsCheckingDiscordStatus] = useState(true);
+
+  // Twitch connection state
+  const [twitchConnected, setTwitchConnected] = useState(false);
+  const [twitchConnecting, setTwitchConnecting] = useState(false);
+  const [twitchDisplayName, setTwitchDisplayName] = useState<string | null>(null);
+  const [twitchFollowers, setTwitchFollowers] = useState<number>(0);
+  const [isCheckingTwitchStatus, setIsCheckingTwitchStatus] = useState(true);
   
   // Check social connections status when user becomes available
   useEffect(() => {
@@ -74,8 +87,189 @@ export default function FanSocial() {
       checkTiktokStatus();
       checkYoutubeStatus();
       checkSpotifyStatus();
+      checkDiscordStatus();
+      checkTwitchStatus();
     }
   }, [user?.dynamicUserId]);
+
+  const checkDiscordStatus = async () => {
+    try {
+      setIsCheckingDiscordStatus(true);
+      const response = await fetch('/api/social-connections/discord', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const connected = data.connected;
+        const connection = data.connection;
+        
+        setDiscordConnected(connected);
+        if (connected && connection) {
+          const profile = connection.profileData;
+          const displayName = connection.platformDisplayName || profile?.global_name || profile?.username || null;
+          setDiscordDisplayName(displayName);
+        } else {
+          setDiscordDisplayName(null);
+        }
+      }
+    } catch (error) {
+      console.error('[Fan Social] Error checking Discord status:', error);
+      setDiscordConnected(false);
+      setDiscordDisplayName(null);
+    } finally {
+      setIsCheckingDiscordStatus(false);
+    }
+  };
+
+  const connectDiscord = async () => {
+    try {
+      setDiscordConnecting(true);
+      const discordAPI = socialManager['discord'];
+      const result = await discordAPI.secureLogin();
+      if (result.success) {
+        await checkDiscordStatus();
+        toast({
+          title: "Discord Connected! 💬",
+          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Discord",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Discord login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Discord connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: error.message || 'Failed to connect Discord.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDiscordConnecting(false);
+    }
+  };
+
+  const disconnectDiscord = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('discord');
+      
+      if (result.success) {
+        setDiscordConnected(false);
+        setDiscordDisplayName(null);
+        toast({
+          title: "Discord Disconnected",
+          description: "Successfully disconnected from Discord",
+        });
+      }
+    } catch (error) {
+      console.error('Error disconnecting Discord:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect Discord. Please try again.",
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const checkTwitchStatus = async () => {
+    try {
+      setIsCheckingTwitchStatus(true);
+      const response = await fetch('/api/social-connections/twitch', {
+        headers: {
+          'x-dynamic-user-id': user?.dynamicUserId || '',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const connected = data.connected;
+      const connection = data.connection;
+      
+      setTwitchConnected(connected);
+      if (connected && connection) {
+        const profile = connection.profileData;
+        const displayName = 
+          connection.platformDisplayName || 
+          profile?.display_name ||
+          profile?.login ||
+          null;
+        const followers = 
+          profile?.followers || 
+          profile?.follower_count || 
+          0;
+        setTwitchDisplayName(displayName);
+        setTwitchFollowers(followers);
+      } else {
+        setTwitchDisplayName(null);
+        setTwitchFollowers(0);
+      }
+    } catch (error) {
+      console.error('[Fan Social] Error checking Twitch status:', error);
+      setTwitchConnected(false);
+      setTwitchDisplayName(null);
+      setTwitchFollowers(0);
+    } finally {
+      setIsCheckingTwitchStatus(false);
+    }
+  };
+
+  const connectTwitch = async () => {
+    try {
+      setTwitchConnecting(true);
+      const twitchAPI = socialManager['twitch'];
+      const result = await twitchAPI.secureLogin();
+      if (result.success) {
+        await checkTwitchStatus();
+        toast({
+          title: "Twitch Connected! 🎮",
+          description: result.displayName ? `Connected as ${result.displayName}` : "Successfully connected to Twitch",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || 'Twitch login failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Twitch connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: error.message || 'Failed to connect Twitch.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTwitchConnecting(false);
+    }
+  };
+
+  const disconnectTwitch = async () => {
+    try {
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('twitch');
+      
+      if (result.success) {
+        setTwitchConnected(false);
+        setTwitchDisplayName(null);
+        setTwitchFollowers(0);
+      }
+    } catch (error) {
+      console.error('Error disconnecting Twitch:', error);
+    }
+  };
 
   const checkTwitterStatus = async () => {
     try {
@@ -604,6 +798,28 @@ export default function FanSocial() {
       description: "Connect to participate in Spotify campaigns"
     },
     {
+      platform: "Discord",
+      icon: MessageSquare,
+      handle: discordConnected && discordDisplayName ? discordDisplayName : "Your Discord",
+      followers: 0,
+      connected: discordConnected,
+      color: "text-indigo-400",
+      bgColor: "bg-indigo-500/20",
+      buttonColor: "border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10",
+      description: "Connect Discord to verify community tasks"
+    },
+    {
+      platform: "Twitch",
+      icon: Video,
+      handle: twitchConnected && twitchDisplayName ? twitchDisplayName : "Your Twitch",
+      followers: twitchFollowers,
+      connected: twitchConnected,
+      color: "text-purple-400",
+      bgColor: "bg-purple-500/20",
+      buttonColor: "border-purple-500/30 text-purple-300 hover:bg-purple-500/10",
+      description: "Connect Twitch to participate in stream tasks"
+    },
+    {
       platform: "Facebook",
       icon: Facebook,
       handle: facebookConnected ? (user?.email || "Connected") : "Connect Facebook",
@@ -709,52 +925,67 @@ export default function FanSocial() {
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        {account.connected ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="border-white/20 text-gray-300 hover:bg-white/10"
-                            onClick={() => {
-                              if (account.platform === 'Facebook') disconnectFacebook();
-                              else if (account.platform === 'Twitter') disconnectTwitter();
-                              else if (account.platform === 'TikTok') disconnectTiktok();
-                              else if (account.platform === 'YouTube') disconnectYoutube();
-                              else if (account.platform === 'Spotify') disconnectSpotify();
-                            }}
-                            data-testid={`button-disconnect-${account.platform.toLowerCase()}-fan`}
-                          >
-                            <Unlink className="h-3 w-3" />
-                          </Button>
-                        ) : (
-                          <Button 
-                            variant="outline" 
-                            className={account.buttonColor}
-                            onClick={() => {
-                              if (account.platform === 'Facebook') connectFacebook();
-                              else if (account.platform === 'Twitter') connectTwitter();
-                              else if (account.platform === 'TikTok') connectTiktok();
-                              else if (account.platform === 'YouTube') connectYoutube();
-                              else if (account.platform === 'Spotify') connectSpotify();
-                            }}
-                            disabled={
-                              (account.platform === 'Facebook' && facebookConnecting) ||
-                              (account.platform === 'Twitter' && twitterConnecting) ||
-                              (account.platform === 'TikTok' && tiktokConnecting) ||
-                              (account.platform === 'YouTube' && youtubeConnecting) ||
-                              (account.platform === 'Spotify' && spotifyConnecting) ||
-                              account.platform === 'Instagram'
-                            }
-                            data-testid={`button-connect-${account.platform.toLowerCase()}-fan`}
-                          >
-                            {(
-                              (account.platform === 'Facebook' && facebookConnecting) ||
-                              (account.platform === 'Twitter' && twitterConnecting) ||
-                              (account.platform === 'TikTok' && tiktokConnecting) ||
-                              (account.platform === 'YouTube' && youtubeConnecting) ||
-                              (account.platform === 'Spotify' && spotifyConnecting)
-                            ) ? 'Connecting…' : account.platform === 'Instagram' ? 'Coming Soon' : 'Connect'}
-                          </Button>
-                        )}
+                    {account.connected ? (
+                      <div className="flex gap-2 items-center">
+                        <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                        <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">Rewarded</Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="border-white/20 text-gray-300 hover:bg-white/10"
+                          onClick={() => {
+                            if (account.platform === 'Facebook') disconnectFacebook();
+                            else if (account.platform === 'Twitter') disconnectTwitter();
+                            else if (account.platform === 'TikTok') disconnectTiktok();
+                            else if (account.platform === 'YouTube') disconnectYoutube();
+                            else if (account.platform === 'Spotify') disconnectSpotify();
+                            else if (account.platform === 'Discord') disconnectDiscord();
+                            else if (account.platform === 'Twitch') disconnectTwitch();
+                          }}
+                          data-testid={`button-disconnect-${account.platform.toLowerCase()}-fan`}
+                        >
+                          <Unlink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 items-center">
+                        <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
+                        <Button 
+                          variant="outline" 
+                          className={account.buttonColor}
+                          onClick={() => {
+                            if (account.platform === 'Facebook') connectFacebook();
+                            else if (account.platform === 'Twitter') connectTwitter();
+                            else if (account.platform === 'TikTok') connectTiktok();
+                            else if (account.platform === 'YouTube') connectYoutube();
+                            else if (account.platform === 'Spotify') connectSpotify();
+                            else if (account.platform === 'Discord') connectDiscord();
+                            else if (account.platform === 'Twitch') connectTwitch();
+                          }}
+                          disabled={
+                            (account.platform === 'Facebook' && facebookConnecting) ||
+                            (account.platform === 'Twitter' && twitterConnecting) ||
+                            (account.platform === 'TikTok' && tiktokConnecting) ||
+                            (account.platform === 'YouTube' && youtubeConnecting) ||
+                            (account.platform === 'Spotify' && spotifyConnecting) ||
+                            (account.platform === 'Discord' && discordConnecting) ||
+                            (account.platform === 'Twitch' && twitchConnecting) ||
+                            account.platform === 'Instagram'
+                          }
+                          data-testid={`button-connect-${account.platform.toLowerCase()}-fan`}
+                        >
+                          {(
+                            (account.platform === 'Facebook' && facebookConnecting) ||
+                            (account.platform === 'Twitter' && twitterConnecting) ||
+                            (account.platform === 'TikTok' && tiktokConnecting) ||
+                            (account.platform === 'YouTube' && youtubeConnecting) ||
+                            (account.platform === 'Spotify' && spotifyConnecting) ||
+                            (account.platform === 'Discord' && discordConnecting) ||
+                            (account.platform === 'Twitch' && twitchConnecting)
+                          ) ? 'Connecting…' : account.platform === 'Instagram' ? 'Coming Soon' : 'Connect'}
+                        </Button>
+                      </div>
+                    )}
                       </div>
                     </div>
                   );

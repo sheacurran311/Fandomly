@@ -1,5 +1,6 @@
 // Social Media Integration APIs
 import FacebookSDK, { type FacebookUser, type FacebookPage } from './facebook';
+import { getDynamicUserId } from './queryClient';
 
 export interface SocialMediaAccount {
   platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify' | 'discord' | 'twitch';
@@ -609,12 +610,12 @@ export class DiscordAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_DISCORD_APP_ID || '';
+    this.clientId = import.meta.env.VITE_DISCORD_CLIENT_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI || `${origin}/discord-callback`;
 
     if (!this.clientId) {
-      console.warn('Discord: VITE_DISCORD_APP_ID not configured');
+      console.warn('Discord: VITE_DISCORD_CLIENT_ID not configured');
     }
   }
 
@@ -662,13 +663,50 @@ export class DiscordAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = (event: MessageEvent) => {
+        const onMsg = async (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'discord-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(event.data.result);
+          
+          // If the popup sent connection data, save it from parent window (which has session)
+          if (event.data.result?.success && event.data.result?.connectionData) {
+            try {
+              console.log('[Discord secureLogin] Saving connection from parent window...');
+              const dynamicUserId = getDynamicUserId();
+              if (!dynamicUserId) {
+                console.error('[Discord secureLogin] No Dynamic user ID available');
+                resolve({ success: false, error: 'User not authenticated' });
+                return;
+              }
+              
+              const saveResponse = await fetch('/api/social-connections', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-dynamic-user-id': dynamicUserId,
+                },
+                body: JSON.stringify(event.data.result.connectionData),
+                credentials: 'include',
+              });
+              
+              if (!saveResponse.ok) {
+                const errorText = await saveResponse.text();
+                console.error('[Discord secureLogin] Failed to save connection:', errorText);
+                resolve({ success: false, error: `Failed to save connection: ${errorText}` });
+                return;
+              }
+              
+              console.log('[Discord secureLogin] Connection saved successfully');
+              resolve({ success: true, displayName: event.data.result.displayName });
+            } catch (error) {
+              console.error('[Discord secureLogin] Error saving connection:', error);
+              resolve({ success: false, error: 'Failed to save connection' });
+            }
+          } else {
+            resolve(event.data.result);
+          }
         };
 
         window.addEventListener('message', onMsg);
@@ -794,13 +832,50 @@ export class TwitchAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = (event: MessageEvent) => {
+        const onMsg = async (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'twitch-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(event.data.result);
+          
+          // If the popup sent connection data, save it from parent window (which has session)
+          if (event.data.result?.success && event.data.result?.connectionData) {
+            try {
+              console.log('[Twitch secureLogin] Saving connection from parent window...');
+              const dynamicUserId = getDynamicUserId();
+              if (!dynamicUserId) {
+                console.error('[Twitch secureLogin] No Dynamic user ID available');
+                resolve({ success: false, error: 'User not authenticated' });
+                return;
+              }
+              
+              const saveResponse = await fetch('/api/social-connections', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-dynamic-user-id': dynamicUserId,
+                },
+                body: JSON.stringify(event.data.result.connectionData),
+                credentials: 'include',
+              });
+              
+              if (!saveResponse.ok) {
+                const errorText = await saveResponse.text();
+                console.error('[Twitch secureLogin] Failed to save connection:', errorText);
+                resolve({ success: false, error: `Failed to save connection: ${errorText}` });
+                return;
+              }
+              
+              console.log('[Twitch secureLogin] Connection saved successfully');
+              resolve({ success: true, displayName: event.data.result.displayName });
+            } catch (error) {
+              console.error('[Twitch secureLogin] Error saving connection:', error);
+              resolve({ success: false, error: 'Failed to save connection' });
+            }
+          } else {
+            resolve(event.data.result);
+          }
         };
 
         window.addEventListener('message', onMsg);

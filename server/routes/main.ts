@@ -27,6 +27,7 @@ import { registerYouTubeTaskRoutes } from "./tasks/youtube-task-routes";
 import { registerSpotifyTaskRoutes } from "./tasks/spotify-task-routes";
 import { registerTikTokTaskRoutes } from "./tasks/tiktok-task-routes";
 import { registerLeaderboardRoutes } from "./programs/leaderboard-routes";
+import { registerBetaSignupRoutes } from "./beta-signup-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -3397,6 +3398,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register leaderboard routes (Sprint 8)
   registerLeaderboardRoutes(app);
+
+  // Register beta signup routes (public - no auth required)
+  registerBetaSignupRoutes(app);
 
   // Register task routes
   const { registerTaskRoutes } = await import("./tasks/task-routes");

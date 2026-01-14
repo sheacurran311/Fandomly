@@ -25,7 +25,7 @@ interface PointTransaction {
 export class PlatformPointsService {
   /**
    * Award platform points to a user
-   * Updates users.profileData.fandomlyPoints
+   * Updates users.profileData.fandomlyPoints and stores transaction in pointsTransactions array
    */
   async awardPoints(
     userId: string,
@@ -47,20 +47,37 @@ export class PlatformPointsService {
       const currentPoints = (user.profileData as any)?.fandomlyPoints || 0;
       const newBalance = currentPoints + points;
 
-      // Update user's platform points balance
+      // Create transaction record
+      const transaction = {
+        id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        points,
+        source,
+        metadata,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Get existing transactions (keep last 100 for MVP)
+      const existingTransactions = (user.profileData as any)?.pointsTransactions || [];
+      const updatedTransactions = [transaction, ...existingTransactions].slice(0, 100);
+
+      // Update user's platform points balance and transactions
       await db
         .update(users)
         .set({
           profileData: sql`jsonb_set(
-            COALESCE(profile_data, '{}'::jsonb),
-            '{fandomlyPoints}',
-            ${newBalance}::text::jsonb
+            jsonb_set(
+              COALESCE(profile_data, '{}'::jsonb),
+              '{fandomlyPoints}',
+              ${newBalance}::text::jsonb
+            ),
+            '{pointsTransactions}',
+            ${JSON.stringify(updatedTransactions)}::jsonb
           )`,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
 
-      console.log(`[Platform Points] Awarded ${points} points to user ${userId}. New balance: ${newBalance}`);
+      console.log(`[Platform Points] Awarded ${points} points to user ${userId}. New balance: ${newBalance}. Source: ${source}`);
 
       return {
         success: true,
@@ -95,15 +112,30 @@ export class PlatformPointsService {
 
   /**
    * Get platform points transaction history
-   * Note: For MVP, we're tracking in platformTaskCompletions table
-   * Future: Create dedicated platformPointTransactions table for full audit trail
+   * Combines stored transactions in profileData with platformTaskCompletions
    */
   async getTransactionHistory(
     userId: string,
     limit: number = 50
   ): Promise<PointTransaction[]> {
     try {
-      // Query platformTaskCompletions for awarded points
+      // Get stored transactions from user's profileData
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      const storedTransactions: PointTransaction[] = ((user?.profileData as any)?.pointsTransactions || []).map(
+        (tx: any) => ({
+          id: tx.id,
+          userId,
+          points: tx.points,
+          source: tx.source,
+          metadata: tx.metadata,
+          createdAt: new Date(tx.createdAt),
+        })
+      );
+
+      // Also query platformTaskCompletions for task completion rewards
       const completions = await db.query.platformTaskCompletions.findMany({
         where: (completions, { eq }) => eq(completions.userId, userId),
         orderBy: (completions, { desc }) => [desc(completions.createdAt)],
@@ -118,14 +150,14 @@ export class PlatformPointsService {
         },
       });
 
-      // Transform to transaction format
-      const transactions: PointTransaction[] = completions
+      // Transform completions to transaction format
+      const taskTransactions: PointTransaction[] = completions
         .filter(c => c.status === 'completed' || c.status === 'verified')
         .map(completion => ({
-          id: completion.id,
+          id: `task_${completion.id}`,
           userId: completion.userId,
           points: completion.pointsAwarded,
-          source: `task_completion`,
+          source: 'platform_task_completion',
           metadata: {
             taskId: completion.taskId,
             taskName: (completion as any).task?.name,
@@ -135,7 +167,12 @@ export class PlatformPointsService {
           createdAt: completion.createdAt,
         }));
 
-      return transactions;
+      // Combine and sort all transactions by date
+      const allTransactions = [...storedTransactions, ...taskTransactions]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit);
+
+      return allTransactions;
     } catch (error) {
       console.error('[Platform Points] Error getting transaction history:', error);
       return [];

@@ -309,7 +309,9 @@ class FacebookSDKManager {
 
     // Save connection to database
     try {
-      const dynamicUserId = localStorage.getItem('dynamic_user_id') || (window as any).__dynamicUserId;
+      // Import getDynamicUserId for consistent user ID retrieval
+      const { getDynamicUserId } = await import('./queryClient');
+      const dynamicUserId = getDynamicUserId();
       console.log('[FB Manager] Saving connection to database...');
       
       if (dynamicUserId) {

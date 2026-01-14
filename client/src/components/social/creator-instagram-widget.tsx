@@ -51,11 +51,14 @@ export default function CreatorInstagramWidget() {
               />
             )}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-white font-medium text-sm truncate">@{userInfo.username}</p>
                 <Badge className="bg-green-500/20 text-green-400 text-xs">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Connected
+                </Badge>
+                <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                  Rewarded
                 </Badge>
               </div>
               {userInfo.name && (
@@ -154,9 +157,12 @@ export default function CreatorInstagramWidget() {
             <Instagram className="h-6 w-6 text-pink-400" />
           </div>
           <p className="text-sm text-gray-300 mb-2">Connect Instagram Business</p>
-          <p className="text-xs text-gray-400 mb-4">
+          <p className="text-xs text-gray-400 mb-2">
             Enable messaging for fan campaigns
           </p>
+          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+            +500 Points
+          </Badge>
         </div>
 
         {/* Features Preview */}

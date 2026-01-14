@@ -809,8 +809,8 @@ export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive
 // Advanced Campaign Types & Rewards
 export const rewardTypeEnum = pgEnum('reward_type', ['points', 'raffle', 'nft', 'badge', 'multiplier']);
 export const socialPlatformEnum = pgEnum('social_platform', [
-  'facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify', 
-  'apple_music', 'discord', 'telegram', 'system'
+  'facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify',
+  'apple_music', 'discord', 'telegram', 'twitch', 'system'
 ]);
 
 // Snag-Inspired Task System Enums
@@ -827,15 +827,19 @@ export const taskTypeEnum = pgEnum('task_type', [
   // Twitter/X tasks (consistent prefixing)
   'twitter_follow', 'twitter_mention', 'twitter_retweet', 'twitter_like', 'twitter_include_name', 'twitter_include_bio', 'twitter_hashtag_post', 'twitter_quote_tweet',
   // Facebook tasks  
-  'facebook_like_page', 'facebook_like_photo', 'facebook_like_post', 'facebook_share_post', 'facebook_share_page', 'facebook_comment_post', 'facebook_comment_photo',
+  'facebook_like_page', 'facebook_like_photo', 'facebook_like_post', 'facebook_share_post', 'facebook_share_page', 'facebook_comment_post', 'facebook_comment_photo', 'facebook_share', 'facebook_join_group',
   // Instagram tasks
   'instagram_follow', 'instagram_like_post', 'comment_code', 'mention_story', 'keyword_comment',
   // YouTube tasks
-  'youtube_like', 'youtube_subscribe', 'youtube_share', 'youtube_comment',
+  'youtube_like', 'youtube_subscribe', 'youtube_share', 'youtube_comment', 'youtube_watch',
   // TikTok tasks
-  'tiktok_follow', 'tiktok_like', 'tiktok_share', 'tiktok_comment', 'tiktok_post',
+  'tiktok_follow', 'tiktok_like', 'tiktok_share', 'tiktok_comment', 'tiktok_post', 'tiktok_duet', 'tiktok_stitch',
   // Spotify tasks
-  'spotify_follow', 'spotify_playlist', 'spotify_album',
+  'spotify_follow', 'spotify_playlist', 'spotify_album', 'spotify_save_track', 'spotify_save_album',
+  // Twitch tasks
+  'twitch_follow', 'twitch_subscribe', 'twitch_watch',
+  // Discord tasks
+  'discord_join', 'discord_verify', 'discord_react', 'discord_message',
   // Engagement & Rewards tasks (new)
   'check_in', 'follower_milestone', 'complete_profile',
   // Sprint 2: Interactive & Link tasks
@@ -2735,5 +2739,31 @@ export type NftMint = typeof nftMints.$inferSelect;
 export type InsertNftMint = typeof nftMints.$inferInsert;
 export type NftDelivery = typeof nftDeliveries.$inferSelect;
 export type InsertNftDelivery = typeof nftDeliveries.$inferInsert;
+
+// ============================================================================
+// BETA SIGNUPS - Email capture for beta program
+// ============================================================================
+
+export const betaSignups = pgTable("beta_signups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").unique().notNull(),
+  userType: text("user_type").default("unknown"), // "creator" | "fan" | "brand"
+  source: text("source").default("landing_page"),
+  metadata: jsonb("metadata").$type<{
+    referrer?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBetaSignupSchema = createInsertSchema(betaSignups).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BetaSignup = typeof betaSignups.$inferSelect;
+export type InsertBetaSignup = z.infer<typeof insertBetaSignupSchema>;
 
 
