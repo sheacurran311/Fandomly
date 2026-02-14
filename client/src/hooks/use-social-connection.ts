@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
+import { fetchApi } from '@/lib/queryClient';
+import { socialManager } from '@/lib/social-integrations';
+import { TwitterSDKManager } from '@/lib/twitter';
+import InstagramSDKManager from '@/lib/instagram';
+import { FacebookSDKManager } from '@/lib/facebook';
 
 export type SocialPlatform = 'twitter' | 'tiktok' | 'instagram' | 'youtube' | 'spotify' | 'twitch' | 'discord' | 'facebook';
 
@@ -94,9 +100,17 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
       error: null,
     });
 
+    // Stable references for user fields to avoid re-render loops
+    const userIdRef = useRef(user?.id);
+    const dynamicUserIdRef = useRef((user as any)?.dynamicUserId || user?.id);
+    userIdRef.current = user?.id;
+    dynamicUserIdRef.current = (user as any)?.dynamicUserId || user?.id;
+
     // Check connection status from API
     const checkStatus = useCallback(async () => {
-      if (!user?.id) {
+      const uid = userIdRef.current;
+      const dynamicUid = dynamicUserIdRef.current;
+      if (!uid) {
         setState(prev => ({ ...prev, isLoading: false }));
         return;
       }
@@ -104,7 +118,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
       try {
         const response = await fetch(`/api/social-connections/${platform}`, {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
+            'x-dynamic-user-id': dynamicUid || uid || '',
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -185,87 +199,103 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
           error: 'Failed to check connection status',
         }));
       }
-    }, [user?.id, user, config.name]);
+    }, [config.name]);  // Stable callback - uses refs for user data
 
-    // Initial status check
+    // Initial status check (runs once on mount + when user ID changes)
     useEffect(() => {
-      checkStatus();
-    }, [checkStatus]);
+      if (user?.id) {
+        checkStatus();
+      }
+    }, [user?.id, checkStatus]);
 
-    // Connect to the platform via OAuth
+    // Connect to the platform via OAuth using the standardized secureLogin() approach
     const connect = useCallback(async () => {
       if (!user?.id || state.isConnecting) return;
 
       setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
       try {
-        const userType = user.userType === 'creator' ? 'creator' : 'fan';
-        const dynamicUserId = (user as any)?.dynamicUserId || user.id;
+        // Normalize userType: only 'creator' or 'fan' are valid for SDK managers
+        const rawUserType = user.userType || 'fan';
+        const userType = (rawUserType === 'creator' || rawUserType === 'brand') ? 'creator' : 'fan';
 
-        // Start OAuth flow via popup
-        const width = 600;
-        const height = 700;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
+        // Call the appropriate secureLogin() method for each platform
+        // These open popups directly to the OAuth provider (e.g. Google, TikTok)
+        // and use postMessage to communicate results back via callback pages
+        let result: { success: boolean; error?: string };
 
-        const popup = window.open(
-          `/api/auth/${platform}?userType=${userType}&dynamicUserId=${dynamicUserId}`,
-          `${platform}_oauth`,
-          `width=${width},height=${height},left=${left},top=${top},popup=yes`
-        );
-
-        if (!popup) {
-          throw new Error('Popup was blocked. Please allow popups for this site.');
-        }
-
-        // Poll for popup close and check connection
-        const pollInterval = setInterval(async () => {
-          if (popup.closed) {
-            clearInterval(pollInterval);
-            // Give the backend a moment to process
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            await checkStatus();
-            
-            // Check if we're now connected
-            const response = await fetch(`/api/social-connections/${platform}`, {
-              headers: {
-                'x-dynamic-user-id': dynamicUserId,
-                'Content-Type': 'application/json'
-              },
-              credentials: 'include'
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              if (data.connected) {
-                toast({
-                  title: `${config.name} Connected! ${config.emoji}`,
-                  description: data.connection?.platformUsername 
-                    ? `Successfully connected @${data.connection.platformUsername}`
-                    : 'Successfully connected',
-                  duration: 3000,
+        switch (platform) {
+          case 'twitter': {
+            const twitterResult = await TwitterSDKManager.secureLogin(userType);
+            result = twitterResult;
+            // Twitter secureLogin doesn't save the connection from the popup (auth context issue)
+            // So we need to save it from the parent window which has proper auth
+            if (twitterResult.success && twitterResult.user) {
+              try {
+                await fetchApi('/api/social-connections', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    platform: 'twitter',
+                    platformUserId: twitterResult.user.id,
+                    platformUsername: twitterResult.user.username,
+                    platformDisplayName: twitterResult.user.name,
+                    accessToken: twitterResult.accessToken,
+                    refreshToken: twitterResult.refreshToken,
+                    profileData: {
+                      profileImageUrl: twitterResult.user.profileImageUrl,
+                      followersCount: twitterResult.user.followersCount,
+                      followingCount: twitterResult.user.followingCount,
+                    },
+                  }),
                 });
+                console.log('[useSocialConnection] Twitter connection saved from parent window');
+              } catch (saveErr) {
+                console.warn('[useSocialConnection] Twitter save failed (popup may have saved):', saveErr);
               }
             }
-            
-            setState(prev => ({ ...prev, isConnecting: false }));
+            break;
           }
-        }, 500);
+          case 'instagram':
+            // Instagram only supports creator/business auth -- always use 'creator'
+            result = await InstagramSDKManager.secureLogin('creator');
+            break;
+          case 'facebook':
+            result = await FacebookSDKManager.secureLogin(userType);
+            break;
+          case 'tiktok':
+          case 'youtube':
+          case 'spotify':
+          case 'discord':
+          case 'twitch':
+            result = await socialManager[platform].secureLogin();
+            break;
+          default:
+            result = { success: false, error: `Unsupported platform: ${platform}` };
+        }
 
-        // Timeout after 5 minutes
-        setTimeout(() => {
-          clearInterval(pollInterval);
-          if (!popup.closed) {
-            popup.close();
-          }
-          setState(prev => ({ ...prev, isConnecting: false }));
-        }, 5 * 60 * 1000);
+        if (result.success) {
+          // Refresh connection status from API to get full user info
+          await checkStatus();
+          // Invalidate shared social connections cache
+          invalidateSocialConnections();
 
+          toast({
+            title: `${config.name} Connected! ${config.emoji}`,
+            description: 'Successfully connected',
+            duration: 3000,
+          });
+        } else if (result.error && result.error !== 'Authorization cancelled') {
+          // Only show error toast for actual errors, not user cancellations
+          toast({
+            title: 'Connection Failed',
+            description: result.error || `Failed to connect ${config.name}. Please try again.`,
+            variant: 'destructive',
+          });
+        }
       } catch (error: any) {
         const errorMsg = error?.message || 'An error occurred';
         setState(prev => ({
           ...prev,
-          isConnecting: false,
           error: errorMsg,
         }));
 
@@ -274,6 +304,8 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
           description: errorMsg,
           variant: 'destructive',
         });
+      } finally {
+        setState(prev => ({ ...prev, isConnecting: false }));
       }
     }, [user, state.isConnecting, checkStatus, toast, config.name, config.emoji]);
 
@@ -302,6 +334,9 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
             userInfo: null,
             error: null,
           });
+
+          // Invalidate shared social connections cache
+          invalidateSocialConnections();
 
           toast({
             title: `${config.name} Disconnected`,

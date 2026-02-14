@@ -1,7 +1,25 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getAuthToken } from "@dynamic-labs/sdk-react-core";
 
-// Helper to get current Dynamic user ID from multiple sources
+// Store for JWT access token (in memory for security)
+let accessTokenStorage: string | null = null;
+
+/**
+ * Set the JWT access token (called by AuthContext)
+ */
+export function setAccessToken(token: string | null) {
+  accessTokenStorage = token;
+}
+
+/**
+ * Get the current JWT access token
+ */
+export function getAccessToken(): string | null {
+  return accessTokenStorage;
+}
+
+/**
+ * Helper to get current Dynamic user ID from multiple sources (legacy support)
+ */
 export function getDynamicUserId(): string | null {
   try {
     // 1. Current window (for parent window)
@@ -34,14 +52,51 @@ export function getDynamicUserId(): string | null {
   return null;
 }
 
+/**
+ * Build auth headers for API requests
+ * Supports both JWT (new) and Dynamic user ID (legacy)
+ */
+export function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  
+  // Prefer JWT if available
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+    return headers;
+  }
+  
+  // Fall back to legacy Dynamic user ID
+  const dynamicUserId = getDynamicUserId();
+  if (dynamicUserId) {
+    headers["x-dynamic-user-id"] = dynamicUserId;
+  }
+  
+  return headers;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    
+    // Check for token expiration
+    if (res.status === 401) {
+      try {
+        const json = JSON.parse(text);
+        if (json.code === 'TOKEN_EXPIRED') {
+          // Trigger token refresh (handled by AuthContext)
+          window.dispatchEvent(new CustomEvent('auth:token-expired'));
+        }
+      } catch {}
+    }
+    
     throw new Error(`${res.status}: ${text}`);
   }
 }
 
-// Traditional apiRequest function (method first)
+/**
+ * Traditional apiRequest function (method first)
+ */
 export async function apiRequest(
   method: string,
   url: string,
@@ -49,20 +104,8 @@ export async function apiRequest(
 ): Promise<Response> {
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
   
-  // Add Dynamic auth token for authenticated requests
-  const authToken = getAuthToken();
-  if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
-  }
-
-  // Add Dynamic user ID header for backend authentication
-  const dynamicUserId = getDynamicUserId();
-  if (dynamicUserId) {
-    headers["x-dynamic-user-id"] = dynamicUserId;
-    console.log(`[Auth] Adding user ID header: ${dynamicUserId} for ${method} ${url}`);
-  } else {
-    console.warn(`[Auth] No Dynamic user ID available for ${method} ${url}`);
-  }
+  // Add auth headers
+  Object.assign(headers, getAuthHeaders());
 
   const res = await fetch(url, {
     method,
@@ -75,7 +118,9 @@ export async function apiRequest(
   return res;
 }
 
-// Fetch wrapper for URL-first pattern with options (returns JSON)
+/**
+ * Fetch wrapper for URL-first pattern with options (returns JSON)
+ */
 export async function fetchApi(
   url: string,
   options?: {
@@ -87,26 +132,8 @@ export async function fetchApi(
   const method = options?.method || "GET";
   const headers: Record<string, string> = { "Content-Type": "application/json", ...options?.headers };
   
-  // Add Dynamic auth token for authenticated requests
-  const authToken = getAuthToken();
-  if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
-  }
-
-  // Add Dynamic user ID header for backend authentication
-  const dynamicUserId = getDynamicUserId();
-  if (dynamicUserId) {
-    headers["x-dynamic-user-id"] = dynamicUserId;
-    console.log(`[Auth] Adding user ID header: ${dynamicUserId} for ${method} ${url}`);
-  } else {
-    console.warn(`[Auth] No Dynamic user ID available for ${method} ${url}`);
-    console.log(`[Auth] Dynamic user ID debug for ${method} ${url}:`, {
-      fromWindow: (window as any).__dynamicUserId || null,
-      fromStorage: localStorage.getItem("twitter_dynamic_user_id") || null,
-      fromOpener: ((window as any).opener && (window as any).opener.__dynamicUserId) || null,
-      fromOpenerStorage: ((window as any).opener && (window as any).opener.localStorage?.getItem("twitter_dynamic_user_id")) || null
-    });
-  }
+  // Add auth headers
+  Object.assign(headers, getAuthHeaders());
 
   const res = await fetch(url, {
     method,
@@ -127,17 +154,8 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
     
-    // Add Dynamic auth token for authenticated queries
-    const authToken = getAuthToken();
-    if (authToken) {
-      headers["Authorization"] = `Bearer ${authToken}`;
-    }
-
-    // Add Dynamic user ID header for backend authentication
-    const dynamicUserId = getDynamicUserId();
-    if (dynamicUserId) {
-      headers["x-dynamic-user-id"] = dynamicUserId;
-    }
+    // Add auth headers
+    Object.assign(headers, getAuthHeaders());
 
     const res = await fetch(queryKey.join("/") as string, {
       headers,

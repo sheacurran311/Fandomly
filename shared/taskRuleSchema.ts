@@ -172,6 +172,8 @@ export const completeProfileSettingsSchema = z.object({
     "interests",
     "twitter",
     "instagram",
+    "facebook",
+    "tiktok",
     "discord",
     "telegram",
     "youtube",

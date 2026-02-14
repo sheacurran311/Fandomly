@@ -163,7 +163,7 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
                   </div>
                   {!isCollapsed && isExpanded && (
                     <div className="ml-4 mt-1 space-y-1">
-                      {item.submenu.map((subItem) => {
+                      {item.submenu?.map((subItem) => {
                         const subIsActive = location === subItem.href;
                         const SubIcon = subItem.icon;
                         return (

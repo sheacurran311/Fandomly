@@ -101,12 +101,48 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   router.get('/program/:programId', async (req: Request, res: Response) => {
     try {
       const { programId } = req.params;
+      console.log(`[Task Completions API] Fetching completions for program ${programId}`);
       const completions = await storage.getTaskCompletionsByProgram(programId);
-
+      console.log(`[Task Completions API] Returning ${completions.length} completions for program ${programId}`);
       res.json(completions);
     } catch (error) {
       console.error('Error fetching program task completions:', error);
       res.status(500).json({ error: 'Failed to fetch task completions for program' });
+    }
+  });
+
+  // ==============================================
+  // GET /api/task-completions/tenant/:tenantId
+  // Get all task completions for a tenant (fallback for tasks without programId)
+  // ==============================================
+  router.get('/tenant/:tenantId', async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      console.log(`[Task Completions API] Fetching completions for tenant ${tenantId}`);
+      
+      const { db } = await import("../../db");
+      const { eq, and, or, desc } = await import("drizzle-orm");
+      const { taskCompletions, tasks } = await import("@shared/schema");
+      
+      // Get completions for tasks belonging to this tenant
+      const rows = await db
+        .select({ task_completions: taskCompletions, task: tasks })
+        .from(taskCompletions)
+        .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+        .where(eq(tasks.tenantId, tenantId))
+        .orderBy(desc(taskCompletions.completedAt));
+      
+      const completions = rows.map(r => ({
+        ...r.task_completions,
+        taskName: r.task?.name,
+        taskProgramId: r.task?.programId,
+      }));
+      
+      console.log(`[Task Completions API] Returning ${completions.length} completions for tenant ${tenantId}`);
+      res.json(completions);
+    } catch (error) {
+      console.error('Error fetching tenant task completions:', error);
+      res.status(500).json({ error: 'Failed to fetch task completions for tenant' });
     }
   });
 
@@ -358,7 +394,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         userId: req.user.id,
         taskId: task.id,
         taskCompletionId: completionId,
-        tenantId: task.tenantId,
+        tenantId: task.tenantId ?? '',
         rewardType: 'points',
         amount: pointsToAward,
         currency: task.pointCurrency || 'default',
@@ -485,7 +521,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         userId: req.user.id,
         taskId: task.id,
         taskCompletionId: completion.id,
-        tenantId: task.tenantId,
+        tenantId: task.tenantId ?? '',
         rewardType: 'points',
         amount: totalPoints,
         currency: task.pointCurrency || 'default',
@@ -704,15 +740,18 @@ export function createTaskCompletionRoutes(storage: IStorage) {
           return res.status(400).json({ error: 'Unsupported platform' });
       }
 
-      // Update task completion with verification result
+      // Update task completion with verification result and award points
+      let pointsAwarded = 0;
       if (result.verified) {
-        await updateTaskCompletion(taskCompletionId, result, 'api_poll');
+        const updateResult = await updateTaskCompletion(taskCompletionId, result, 'api_poll');
+        pointsAwarded = updateResult.pointsAwarded || 0;
       }
 
       res.json({
         success: result.verified,
         verified: result.verified,
-        message: result.message,
+        message: result.verified ? `Task verified! +${pointsAwarded} points awarded` : result.message,
+        pointsAwarded,
         proof: result.proof,
         error: result.error
       });

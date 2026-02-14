@@ -10,12 +10,23 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
 import { SiTiktok } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useTikTokConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Task type to verification tier mapping for TikTok
+// TikTok has limited API access, most tasks are T3 (manual)
+// Comment tasks with required text can be T2 (code-based)
+const TIKTOK_TASK_TIERS: Record<string, VerificationTier> = {
+  tiktok_follow: 'T3',
+  tiktok_like: 'T3',
+  tiktok_comment: 'T2',
+  tiktok_post: 'T3',
+};
 
 interface TikTokTaskBuilderProps {
   onSave: (config: any) => void;
@@ -24,11 +35,16 @@ interface TikTokTaskBuilderProps {
   taskType: 'tiktok_follow' | 'tiktok_like' | 'tiktok_comment' | 'tiktok_post';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
-export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: TikTokTaskBuilderProps) {
+export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: TikTokTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get verification tier for this task type
+  const tier = TIKTOK_TASK_TIERS[taskType] || 'T3';
+  const tierGuidance = TIER_GUIDANCE[tier];
   
   // Use unified TikTok connection hook
   const {
@@ -40,7 +56,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
   
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(50);
+  const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [username, setUsername] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [requiredText, setRequiredText] = useState(''); // For comment tasks
@@ -76,22 +92,26 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
 
   useEffect(() => {
     if (!isEditMode && !taskName) {
+      // Get tier-appropriate recommended points
+      const taskTier = TIKTOK_TASK_TIERS[taskType] || 'T3';
+      const guidance = TIER_GUIDANCE[taskTier];
+      
       let defaults;
       switch (taskType) {
         case 'tiktok_follow':
-          defaults = { name: 'Follow on TikTok', description: 'Follow us on TikTok!', points: 50 };
+          defaults = { name: 'Follow on TikTok', description: 'Follow us on TikTok!', points: 20 }; // T3: Lower for manual
           break;
         case 'tiktok_like':
-          defaults = { name: 'Like Our TikTok Video', description: 'Like our TikTok video!', points: 25 };
+          defaults = { name: 'Like Our TikTok Video', description: 'Like our TikTok video!', points: 15 }; // T3: Lower for manual
           break;
         case 'tiktok_comment':
-          defaults = { name: 'Comment on TikTok Video', description: 'Leave a comment on our TikTok video!', points: 50 };
+          defaults = { name: 'Comment on TikTok Video', description: 'Leave a comment on our TikTok video!', points: guidance.recommendedPoints }; // T2: 40 pts
           break;
         case 'tiktok_post':
-          defaults = { name: 'Create TikTok Post', description: 'Create your own TikTok with our hashtag and earn points!', points: 100 };
+          defaults = { name: 'Create TikTok Post', description: 'Create your own TikTok with our hashtag and earn points!', points: 25 }; // T3: UGC manual
           break;
         default:
-          defaults = { name: '', description: '', points: 50 };
+          defaults = { name: '', description: '', points: guidance.recommendedPoints };
       }
       setTaskName(defaults.name);
       setDescription(defaults.description);
@@ -206,6 +226,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       description="Create TikTok-based tasks for your fans"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -214,8 +235,9 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
       helpText="TikTok tasks help grow your presence on TikTok."
       exampleUse="Offer 50 points for following you on TikTok or 25 points for liking a video."
     >
+      <div className="space-y-6">
       {!tiktokConnected && !checkingConnection && (
-        <Alert className="mb-4 bg-red-500/10 border-red-500/20">
+        <Alert className="bg-red-500/10 border-red-500/20">
           <AlertCircle className="h-4 w-4 text-red-400" />
           <AlertDescription className="text-red-400">
             <div className="flex items-center justify-between">
@@ -234,7 +256,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
         </Alert>
       )}
       {tiktokConnected && (
-        <Alert className="mb-4 bg-green-500/10 border-green-500/20">
+        <Alert className="bg-green-500/10 border-green-500/20">
           <CheckCircle2 className="h-4 w-4 text-green-400" />
           <AlertDescription className="text-green-400">
             <strong>TikTok Connected</strong> - Your TikTok account is linked and ready to use.
@@ -262,9 +284,56 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
             <Label className="text-white">Description</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} className="bg-white/5 border-white/10 text-white" />
           </div>
+          {/* Verification Tier Guidance */}
+          <div className={`p-4 rounded-lg border ${
+            tier === 'T1' ? 'bg-green-500/10 border-green-500/30' :
+            tier === 'T2' ? 'bg-blue-500/10 border-blue-500/30' :
+            'bg-amber-500/10 border-amber-500/30'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              {tier === 'T1' ? <ShieldCheck className="h-4 w-4 text-green-400" /> :
+               tier === 'T2' ? <Shield className="h-4 w-4 text-blue-400" /> :
+               <ShieldAlert className="h-4 w-4 text-amber-400" />}
+              <span className={`font-medium ${
+                tier === 'T1' ? 'text-green-400' :
+                tier === 'T2' ? 'text-blue-400' :
+                'text-amber-400'
+              }`}>{tierGuidance.label}</span>
+              <Badge variant="outline" className={`text-xs ${
+                tier === 'T1' ? 'border-green-500/30 text-green-400' :
+                tier === 'T2' ? 'border-blue-500/30 text-blue-400' :
+                'border-amber-500/30 text-amber-400'
+              }`}>
+                {tierGuidance.trustLevel}
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+            <p className={`text-sm font-medium ${
+              tier === 'T1' ? 'text-green-400' :
+              tier === 'T2' ? 'text-blue-400' :
+              'text-amber-400'
+            }`}>{tierGuidance.pointsRange}</p>
+            {tierGuidance.warning && (
+              <p className="text-xs text-amber-400 mt-2">{tierGuidance.warning}</p>
+            )}
+            {tierGuidance.tip && (
+              <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-white">Points Reward</Label>
-            <NumberInput value={points} onChange={(val) => setPoints(val || 1)} min={1} max={10000} allowEmpty={false} className="bg-white/5 border-white/10 text-white" />
+            <div className="flex items-center justify-between">
+              <Label className="text-white">Points Reward</Label>
+              <span className="text-xs text-gray-400">
+                Recommended: {tierGuidance.recommendedPoints} pts
+              </span>
+            </div>
+            <NumberInput value={points} onChange={(val) => setPoints(val || tierGuidance.recommendedPoints)} min={1} max={10000} allowEmpty={false} className="bg-white/5 border-white/10 text-white" />
+            {tier === 'T3' && points > 25 && (
+              <p className="text-xs text-amber-400">
+                ⚠️ High points for a manually verified task. Consider lowering to reduce abuse potential.
+              </p>
+            )}
           </div>
           {taskType === 'tiktok_follow' ? (
             <div className="space-y-2">
@@ -362,6 +431,7 @@ export default function TikTokTaskBuilder({ onSave, onPublish, onBack, taskType,
           </div>
         </CardContent>
       </Card>
+      </div>
     </TaskBuilderBase>
   );
 }

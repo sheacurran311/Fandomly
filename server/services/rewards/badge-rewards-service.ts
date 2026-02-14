@@ -8,6 +8,7 @@ import { db } from '../../db';
 import { sql, eq, and, isNull } from "drizzle-orm";
 import { nftMints, fandomlyBadgeTemplates, users } from "@shared/schema";
 import { CrossmintService } from "../nft/crossmint-service";
+import { getWalletService } from "../wallet/wallet-service";
 
 interface BadgeReward {
   badgeTemplateId: string;
@@ -25,11 +26,23 @@ interface BadgeReward {
   };
 }
 
+/** Raw SQL leaderboard row (snake_case from views) */
+interface LeaderboardRow {
+  user_id?: string;
+  username?: string;
+  rank?: number;
+  total_points?: number;
+  points?: number;
+  total_points_earned?: number;
+  campaign_id?: string;
+  program_id?: string;
+}
+
 export class BadgeRewardsService {
   private crossmint: CrossmintService;
 
   constructor(crossmintApiKey: string) {
-    this.crossmint = new CrossmintService(crossmintApiKey);
+    this.crossmint = new CrossmintService({ apiKey: crossmintApiKey, environment: 'staging' });
   }
 
   /**
@@ -52,18 +65,20 @@ export class BadgeRewardsService {
 
     const rewards: BadgeReward[] = [];
 
-    for (const performer of topPerformers.rows) {
+    const rows = topPerformers.rows as LeaderboardRow[];
+    for (const performer of rows) {
       let badgeTemplateId: string | null = null;
       let badgeName: string = '';
 
       // Determine which badge to award
-      if (performer.rank === 1) {
+      const rank = performer.rank ?? 0;
+      if (rank === 1) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('platform_champion', period);
         badgeName = `${period === 'all-time' ? 'All-Time' : period === 'week' ? 'Weekly' : 'Monthly'} Global Champion`;
-      } else if (performer.rank <= 3) {
+      } else if (rank <= 3) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('platform_top3', period);
         badgeName = `Top 3 Platform Leader (${period})`;
-      } else if (performer.rank <= 10) {
+      } else if (rank <= 10) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('platform_top10', period);
         badgeName = `Top 10 Platform Leader (${period})`;
       }
@@ -79,27 +94,31 @@ export class BadgeRewardsService {
         );
 
         if (!existingBadge) {
-          // Get user wallet info
-          const userResult = await db.execute(sql`
-            SELECT wallet_address, wallet_chain FROM users WHERE id = ${performer.user_id}
-          `);
+          // Get or create user wallet (lazy wallet creation)
+          const walletService = getWalletService();
+          const walletResult = await walletService.ensureUserHasWallet(performer.user_id);
 
-          const user = userResult.rows[0];
-          if (user?.wallet_address) {
+          if (walletResult.success && walletResult.wallet) {
             rewards.push({
               badgeTemplateId,
               userId: performer.user_id,
-              username: performer.username,
-              walletAddress: user.wallet_address,
-              chain: user.wallet_chain || 'polygon',
-              reason: `Achieved rank #${performer.rank} on ${period} platform leaderboard`,
+              username: performer.username ?? '',
+              walletAddress: walletResult.wallet.address,
+              chain: walletResult.wallet.chain,
+              reason: `Achieved rank #${rank} on ${period} platform leaderboard`,
               contextData: {
                 leaderboardType: 'platform',
-                rank: performer.rank,
-                points: performer.total_points,
+                rank,
+                points: performer.total_points ?? 0,
                 period
               }
             });
+            
+            if (walletResult.isNew) {
+              console.log(`[Badge] Created wallet for user ${performer.user_id} to receive badge`);
+            }
+          } else {
+            console.warn(`[Badge] Could not get/create wallet for user ${performer.user_id}: ${walletResult.error}`);
           }
         }
       }
@@ -130,20 +149,22 @@ export class BadgeRewardsService {
     `);
 
     const rewards: BadgeReward[] = [];
+    const campaignRows = topPerformers.rows as LeaderboardRow[];
 
-    for (const performer of topPerformers.rows) {
+    for (const performer of campaignRows) {
       let badgeTemplateId: string | null = null;
       let badgeName: string = '';
+      const rank = performer.rank ?? 0;
 
-      if (performer.rank === 1) {
+      if (rank === 1) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('campaign_winner', period);
         badgeName = 'Campaign Winner';
-      } else if (performer.rank <= 3) {
+      } else if (rank <= 3) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('campaign_top3', period);
         badgeName = 'Top 3 Campaign Finisher';
       }
 
-      if (badgeTemplateId && performer.user_id) {
+      if (badgeTemplateId && performer.user_id && performer.username) {
         // Check if user already has this badge for this campaign
         const existingBadge = await this.checkExistingBadge(
           performer.user_id,
@@ -154,27 +175,32 @@ export class BadgeRewardsService {
         );
 
         if (!existingBadge) {
-          const userResult = await db.execute(sql`
-            SELECT wallet_address, wallet_chain FROM users WHERE id = ${performer.user_id}
-          `);
+          // Get or create user wallet (lazy wallet creation)
+          const walletService = getWalletService();
+          const walletResult = await walletService.ensureUserHasWallet(performer.user_id);
 
-          const user = userResult.rows[0];
-          if (user?.wallet_address) {
+          if (walletResult.success && walletResult.wallet) {
             rewards.push({
               badgeTemplateId,
               userId: performer.user_id,
-              username: performer.username,
-              walletAddress: user.wallet_address,
-              chain: user.wallet_chain || 'polygon',
-              reason: `Achieved rank #${performer.rank} in campaign`,
+              username: performer.username ?? '',
+              walletAddress: walletResult.wallet.address,
+              chain: walletResult.wallet.chain,
+              reason: `Achieved rank #${rank} in campaign`,
               contextData: {
                 leaderboardType: 'campaign',
                 scopeId: campaignId,
-                rank: performer.rank,
-                points: performer.points,
+                rank,
+                points: performer.points ?? 0,
                 period
               }
             });
+            
+            if (walletResult.isNew) {
+              console.log(`[Badge] Created wallet for user ${performer.user_id} to receive campaign badge`);
+            }
+          } else {
+            console.warn(`[Badge] Could not get/create wallet for user ${performer.user_id}: ${walletResult.error}`);
           }
         }
       }
@@ -200,19 +226,21 @@ export class BadgeRewardsService {
     `);
 
     const rewards: BadgeReward[] = [];
+    const programRows = topPerformers.rows as LeaderboardRow[];
 
-    for (const performer of topPerformers.rows) {
+    for (const performer of programRows) {
       let badgeTemplateId: string | null = null;
+      const rank = performer.rank ?? 0;
 
-      if (performer.rank === 1) {
+      if (rank === 1) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('program_mvp', 'all-time');
-      } else if (performer.rank <= 3) {
+      } else if (rank <= 3) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('program_top3', 'all-time');
-      } else if (performer.rank <= 10) {
+      } else if (rank <= 10) {
         badgeTemplateId = await this.getOrCreateBadgeTemplate('program_top10', 'all-time');
       }
 
-      if (badgeTemplateId && performer.user_id) {
+      if (badgeTemplateId && performer.user_id && performer.username) {
         const existingBadge = await this.checkExistingBadge(
           performer.user_id,
           badgeTemplateId,
@@ -222,26 +250,31 @@ export class BadgeRewardsService {
         );
 
         if (!existingBadge) {
-          const userResult = await db.execute(sql`
-            SELECT wallet_address, wallet_chain FROM users WHERE id = ${performer.user_id}
-          `);
+          // Get or create user wallet (lazy wallet creation)
+          const walletService = getWalletService();
+          const walletResult = await walletService.ensureUserHasWallet(performer.user_id);
 
-          const user = userResult.rows[0];
-          if (user?.wallet_address) {
+          if (walletResult.success && walletResult.wallet) {
             rewards.push({
               badgeTemplateId,
               userId: performer.user_id,
-              username: performer.username,
-              walletAddress: user.wallet_address,
-              chain: user.wallet_chain || 'polygon',
-              reason: `Achieved rank #${performer.rank} in program`,
+              username: performer.username ?? '',
+              walletAddress: walletResult.wallet.address,
+              chain: walletResult.wallet.chain,
+              reason: `Achieved rank #${rank} in program`,
               contextData: {
                 leaderboardType: 'program',
                 scopeId: programId,
-                rank: performer.rank,
-                points: performer.total_points_earned
+                rank,
+                points: performer.total_points_earned ?? 0
               }
             });
+            
+            if (walletResult.isNew) {
+              console.log(`[Badge] Created wallet for user ${performer.user_id} to receive program badge`);
+            }
+          } else {
+            console.warn(`[Badge] Could not get/create wallet for user ${performer.user_id}: ${walletResult.error}`);
           }
         }
       }
@@ -341,7 +374,7 @@ export class BadgeRewardsService {
     `);
 
     if (existing.rows.length > 0) {
-      return existing.rows[0].id;
+      return String((existing.rows[0] as { id: unknown }).id);
     }
 
     // Create new template
@@ -364,7 +397,7 @@ export class BadgeRewardsService {
       RETURNING id
     `);
 
-    return result.rows[0].id;
+    return String((result.rows[0] as { id: unknown }).id);
   }
 
   /**
@@ -404,15 +437,15 @@ export class BadgeRewardsService {
           SELECT * FROM fandomly_badge_templates WHERE id = ${reward.badgeTemplateId}
         `);
 
-        const badge = badgeResult.rows[0];
-        if (!badge) {
+        const badgeRow = badgeResult.rows[0] as { name?: string; description?: string; image_url?: string; category?: string } | undefined;
+        if (!badgeRow) {
           console.error(`❌ Badge template not found: ${reward.badgeTemplateId}`);
           continue;
         }
 
         // Mint badge using Crossmint
         const mintId = `badge-${reward.badgeTemplateId}-${reward.userId}-${Date.now()}`;
-        const collectionId = `fandomly-badges-${badge.category}`;
+        const collectionId = `fandomly-badges-${badgeRow.category ?? 'default'}`;
 
         // Use Crossmint service to mint badge
         const mintResult = await this.crossmint.createAndMintBadge({
@@ -421,10 +454,10 @@ export class BadgeRewardsService {
           collectionDescription: 'Exclusive badges for top performers on Fandomly',
           collectionImageUrl: 'https://fandomly.io/badges/collection-icon.png',
           badgeTemplateId: reward.badgeTemplateId,
-          badgeName: badge.name,
-          badgeDescription: badge.description,
-          badgeImageUrl: badge.image_url,
-          badgeCategory: badge.category,
+          badgeName: badgeRow.name ?? 'Badge',
+          badgeDescription: badgeRow.description ?? '',
+          badgeImageUrl: badgeRow.image_url ?? '',
+          badgeCategory: badgeRow.category ?? 'default',
           badgeCriteria: reward.reason,
           badgeRequirements: [`Rank #${reward.contextData.rank}`, `${reward.contextData.points} points`],
           recipientAddress: reward.walletAddress,
@@ -433,6 +466,7 @@ export class BadgeRewardsService {
         });
 
         // Record mint in database
+        const actionId = String((mintResult as { mint?: { actionId?: unknown } }).mint?.actionId ?? '');
         await db.execute(sql`
           INSERT INTO nft_mints (
             crossmint_action_id,
@@ -445,7 +479,7 @@ export class BadgeRewardsService {
             context_data,
             status
           ) VALUES (
-            ${mintResult.mint.actionId},
+            ${actionId},
             ${collectionId},
             ${reward.badgeTemplateId},
             ${reward.userId},
@@ -486,8 +520,8 @@ export class BadgeRewardsService {
     `);
 
     const campaignBadges: BadgeReward[] = [];
-    for (const campaign of campaigns.rows) {
-      const badges = await this.awardCampaignBadges(campaign.id);
+    for (const campaign of campaigns.rows as { id: unknown }[]) {
+      const badges = await this.awardCampaignBadges(String(campaign.id));
       campaignBadges.push(...badges);
     }
 
@@ -497,8 +531,8 @@ export class BadgeRewardsService {
     `);
 
     const programBadges: BadgeReward[] = [];
-    for (const program of programs.rows) {
-      const badges = await this.awardProgramBadges(program.id);
+    for (const program of programs.rows as { id: unknown }[]) {
+      const badges = await this.awardProgramBadges(String(program.id));
       programBadges.push(...badges);
     }
 

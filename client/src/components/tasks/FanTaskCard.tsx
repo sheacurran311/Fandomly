@@ -11,7 +11,8 @@ import {
   isTaskCompleted,
   isTaskInProgress,
   getCurrentStreak,
-  canCheckInToday
+  canCheckInToday,
+  invalidateTaskCompletionQueries
 } from '@/hooks/useTaskCompletion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,12 +22,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import TaskCompletionModalRouter from '@/components/modals/TaskCompletionModalRouter';
+import { cn } from '@/lib/utils';
 
 interface FanTaskCardProps {
   task: Task;
   completion?: TaskCompletion;
   tenantId: string;
-  // Optional theme customization for public pages
   themeColors?: {
     background?: string;
     text?: {
@@ -63,7 +64,6 @@ export function FanTaskCard({
   const completeTask = useCompleteTask();
   const checkIn = useCheckIn();
 
-  // Calculate completion state first (before using these values)
   const completed = isTaskCompleted(completion);
   const inProgress = isTaskInProgress(completion);
   const canStartAgain = (completion as any)?.isAvailableAgain === true;
@@ -72,42 +72,30 @@ export function FanTaskCard({
   const canCheckIn = canCheckInToday(completion);
   const isVerified = completion?.verifiedAt != null;
 
-  // Check if task is a social media task that can be verified
   const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
   const needsVerification = isSocialTask && inProgress && !completed;
 
   // Task icon mapping
   const getTaskIcon = () => {
     switch (task.taskType) {
-      case 'check_in':
-        return <Flame className="w-5 h-5 text-orange-500" />;
-      case 'referral':
-        return <Users className="w-5 h-5 text-blue-500" />;
-      case 'follower_milestone':
-        return <Target className="w-5 h-5 text-purple-500" />;
-      case 'complete_profile':
-        return <Star className="w-5 h-5 text-yellow-500" />;
-      default:
-        return <Trophy className="w-5 h-5 text-green-500" />;
+      case 'check_in': return <Flame className="w-5 h-5 text-orange-500" />;
+      case 'referral': return <Users className="w-5 h-5 text-blue-500" />;
+      case 'follower_milestone': return <Target className="w-5 h-5 text-purple-500" />;
+      case 'complete_profile': return <Star className="w-5 h-5 text-yellow-500" />;
+      default: return <Trophy className="w-5 h-5 text-green-500" />;
     }
   };
 
   // Handle task start
   const handleStart = async () => {
-    // For social media tasks, show completion modal directly
-    const isSocialTask = ['twitter', 'facebook', 'instagram', 'youtube', 'spotify', 'tiktok'].includes(task.platform || '');
-
     if (isSocialTask) {
-      // Open modal for social tasks
       setIsModalOpen(true);
       return;
     }
 
-    // For non-social tasks (check-in, referral, etc.), create task completion
     try {
       setIsProcessing(true);
       await startTask.mutateAsync({ taskId: task.id, tenantId });
-
       toast({
         title: 'Task Started!',
         description: `You've started "${task.name}"`,
@@ -123,24 +111,18 @@ export function FanTaskCard({
     }
   };
 
-  // Handle modal success (task completion submitted)
   const handleModalSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+    // Invalidate all task completion related queries across the app
+    invalidateTaskCompletionQueries(queryClient);
     setIsModalOpen(false);
   };
 
-  // Handle check-in
   const handleCheckIn = async () => {
     try {
       setIsProcessing(true);
-      const result = await checkIn.mutateAsync({ 
-        taskId: task.id, 
-        tenantId 
-      });
-      
+      const result = await checkIn.mutateAsync({ taskId: task.id, tenantId });
       toast({
-        title: '🔥 Check-In Successful!',
+        title: 'Check-In Successful!',
         description: (
           <div>
             <p className="font-semibold">+{result.pointsAwarded} points</p>
@@ -159,19 +141,16 @@ export function FanTaskCard({
     }
   };
 
-  // Handle task completion
   const handleComplete = async () => {
     if (!completion) return;
-    
     try {
       setIsProcessing(true);
       const result = await completeTask.mutateAsync({
         completionId: completion.id,
         verificationMethod: 'auto',
       });
-      
       toast({
-        title: '✅ Task Completed!',
+        title: 'Task Completed!',
         description: (
           <div>
             <p className="font-semibold">{task.name}</p>
@@ -190,28 +169,21 @@ export function FanTaskCard({
     }
   };
 
-  // Handle social task verification
   const handleVerify = async () => {
     if (!completion) return;
-    
     try {
       setIsVerifying(true);
-      
-      // Call verification endpoint
       const response = await apiRequest('POST', `/api/task-completions/${completion.id}/verify`, {
         platform: task.platform,
         taskType: task.taskType,
-        targetData: task.targetData || {}, // Task metadata with IDs to verify
+        targetData: (task.customSettings as Record<string, unknown>) || {},
       });
-      
       const result = await response.json();
-      
       if (result.verified) {
-        // Invalidate queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-        
+        // Invalidate all task completion related queries across the app
+        invalidateTaskCompletionQueries(queryClient);
         toast({
-          title: '✅ Task Verified!',
+          title: 'Task Verified!',
           description: result.message || 'Your task has been successfully verified',
         });
       } else {
@@ -232,48 +204,66 @@ export function FanTaskCard({
     }
   };
 
-  // Check if task is available
   const isAvailable = () => {
-    if (task.startTime && new Date() < new Date(task.startTime)) {
-      return false;
-    }
-    if (task.endTime && new Date() > new Date(task.endTime)) {
-      return false;
-    }
+    if (task.startTime && new Date() < new Date(task.startTime)) return false;
+    if (task.endTime && new Date() > new Date(task.endTime)) return false;
     return true;
   };
 
   const available = isAvailable();
 
+  // Theme-aware styles
+  const cardBg = isThemeDark ? 'rgba(255,255,255,0.04)' : '#ffffff';
+  const cardBorder = isThemeDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+  const cardHoverBorder = isThemeDark ? 'rgba(255,255,255,0.15)' : '#d1d5db';
+  const subtleBg = isThemeDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  const subtleBorder = isThemeDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
   return (
     <Card
-      className={`overflow-hidden transition-all hover:shadow-lg ${
-        canStartAgain ? 'border-blue-400 dark:border-blue-600' : // Blue for available again
-        completed ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
-        inProgress ? 'border-blue-200 dark:border-blue-800' :
-        !available ? 'opacity-60' : ''
-      }`}
+      className={cn(
+        "overflow-hidden transition-all duration-200 hover:shadow-lg",
+        !themeColors && (
+          canStartAgain ? 'border-blue-400 dark:border-blue-600' :
+          completed ? 'border-green-500/20' :
+          inProgress ? 'border-blue-500/20' :
+          !available ? 'opacity-60' : ''
+        )
+      )}
       style={themeColors ? {
-        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
-        borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'
+        backgroundColor: cardBg,
+        borderColor: cardBorder,
       } : undefined}
+      onMouseEnter={(e) => {
+        if (themeColors) {
+          (e.currentTarget as HTMLElement).style.borderColor = cardHoverBorder;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (themeColors) {
+          (e.currentTarget as HTMLElement).style.borderColor = cardBorder;
+        }
+      }}
     >
-      <CardContent className="p-6">
+      {/* Top accent */}
+      {completed && (
+        <div className="h-px bg-green-500/40" />
+      )}
+
+      <CardContent className="p-5">
         {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-start gap-3 flex-1">
-            <div className="mt-1">
-              {getTaskIcon()}
-            </div>
-            <div className="flex-1">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="mt-0.5 shrink-0">{getTaskIcon()}</div>
+            <div className="flex-1 min-w-0">
               <h3
-                className="font-semibold text-lg leading-tight mb-1"
+                className="font-semibold text-base leading-tight mb-1 truncate"
                 style={brandColors ? { color: brandColors.primary } : undefined}
               >
                 {task.name}
               </h3>
               <p
-                className="text-sm text-muted-foreground line-clamp-2"
+                className="text-sm text-muted-foreground line-clamp-2 leading-relaxed"
                 style={themeColors ? { color: themeColors.text?.secondary } : undefined}
               >
                 {task.description}
@@ -282,140 +272,121 @@ export function FanTaskCard({
           </div>
 
           {/* Status Badge */}
-          {completed && isVerified && (
-            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
-              <Shield className="w-3 h-3 mr-1" />
-              Verified
-            </Badge>
-          )}
-          {completed && !isVerified && (
-            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
-              <CheckCircle2 className="w-3 h-3 mr-1" />
-              Completed
-            </Badge>
-          )}
-          {inProgress && !completed && (
-            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700">
-              <Clock className="w-3 h-3 mr-1" />
-              In Progress
-            </Badge>
-          )}
-          {!available && (
-            <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400">
-              <Lock className="w-3 h-3 mr-1" />
-              Locked
-            </Badge>
-          )}
+          <div className="shrink-0 ml-2">
+            {completed && isVerified && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/25 text-[10px] px-1.5 h-5">
+                <Shield className="w-2.5 h-2.5 mr-1" />
+                Verified
+              </Badge>
+            )}
+            {completed && !isVerified && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/25 text-[10px] px-1.5 h-5">
+                <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                Done
+              </Badge>
+            )}
+            {inProgress && !completed && (
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/25 text-[10px] px-1.5 h-5">
+                <Clock className="w-2.5 h-2.5 mr-1" />
+                Active
+              </Badge>
+            )}
+            {!available && (
+              <Badge variant="outline" className="bg-white/5 text-white/40 border-white/10 text-[10px] px-1.5 h-5">
+                <Lock className="w-2.5 h-2.5 mr-1" />
+                Locked
+              </Badge>
+            )}
+          </div>
         </div>
 
-        {/* Progress Bar (for in-progress tasks) */}
+        {/* Progress */}
         {inProgress && !completed && progress > 0 && (
-          <div className="mb-4">
-            <div className="flex justify-between text-xs text-muted-foreground mb-1">
-              <span>Progress</span>
-              <span>{progress}%</span>
+          <div className="mb-3">
+            <div className="flex justify-between text-xs mb-1">
+              <span style={themeColors ? { color: themeColors.text?.tertiary } : undefined} className="text-muted-foreground">Progress</span>
+              <span className="font-medium" style={themeColors ? { color: themeColors.text?.primary } : undefined}>{progress}%</span>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-1.5" />
           </div>
         )}
 
-        {/* Check-in Streak Display */}
+        {/* Streak */}
         {task.taskType === 'check_in' && streak > 0 && (
-          <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <div>
-                <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
-                  {streak} Day Streak! 🔥
-                </p>
-                <p className="text-xs text-orange-700 dark:text-orange-300">
-                  Keep it going!
-                </p>
-              </div>
-            </div>
+          <div
+            className="mb-3 p-2.5 rounded-lg flex items-center gap-2"
+            style={{ backgroundColor: isThemeDark ? 'rgba(249,115,22,0.08)' : 'rgba(249,115,22,0.05)', border: `1px solid ${isThemeDark ? 'rgba(249,115,22,0.15)' : 'rgba(249,115,22,0.12)'}` }}
+          >
+            <Flame className="w-4 h-4 text-orange-500" />
+            <span className="text-sm font-semibold" style={themeColors ? { color: themeColors.text?.primary } : undefined}>
+              {streak} Day Streak
+            </span>
           </div>
         )}
 
-        {/* Reward Display */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Reward */}
+        <div
+          className="flex items-center justify-between mb-3 p-2.5 rounded-lg"
+          style={{ backgroundColor: subtleBg, border: `1px solid ${subtleBorder}` }}
+        >
           <div className="flex items-center gap-2">
-            <Gift className="w-4 h-4 text-primary" />
+            <Gift className="w-4 h-4" style={brandColors ? { color: brandColors.primary } : undefined} />
             <span
-              className="text-sm font-medium"
+              className="text-sm font-semibold"
               style={themeColors ? { color: themeColors.text?.primary } : undefined}
             >
               {task.pointsToReward || 0} {pointsName}
             </span>
           </div>
-
-          {task.rewardFrequency === 'daily' && (
-            <Badge variant="secondary" className="text-xs">
-              Daily
-            </Badge>
-          )}
-          {task.rewardFrequency === 'recurring' && (
-            <Badge variant="secondary" className="text-xs">
-              Recurring
+          {task.rewardFrequency && task.rewardFrequency !== 'one_time' && (
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+              {task.rewardFrequency === 'daily' ? 'Daily' : task.rewardFrequency === 'weekly' ? 'Weekly' : 'Recurring'}
             </Badge>
           )}
           {task.rewardFrequency === 'one_time' && (
-            <Badge variant="secondary" className="text-xs">
-              One-Time
-            </Badge>
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5">One-Time</Badge>
           )}
         </div>
 
         {/* Action Button */}
         <div className="flex gap-2">
           {!available && (
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled
-            >
-              <Lock className="w-4 h-4 mr-2" />
+            <Button variant="outline" className="w-full" disabled size="sm">
+              <Lock className="w-3.5 h-3.5 mr-1.5" />
               Locked
             </Button>
           )}
 
-          {/* Show "Complete Again" for repeatable tasks that are eligible */}
           {completed && canStartAgain && (
             <Button
               onClick={handleStart}
               disabled={!available || isProcessing}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+              className="w-full text-white"
+              size="sm"
+              style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
               Complete Again
             </Button>
           )}
 
-          {/* Show countdown timer for completed but not yet eligible */}
           {completed && !canStartAgain && (completion as any)?.nextAvailableAt && (
-            <div className="space-y-2 w-full">
-              <Button
-                disabled
-                className="w-full bg-green-500/20 text-green-400"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
+            <div className="space-y-1.5 w-full">
+              <Button disabled className="w-full bg-green-500/10 text-green-400" size="sm">
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                 Completed
               </Button>
               {(completion as any).timeRemaining && (
-                <p className="text-xs text-center" style={themeColors ? { color: themeColors.text?.tertiary } : undefined}>
+                <p className="text-[10px] text-center" style={themeColors ? { color: themeColors.text?.tertiary } : undefined}>
                   Available in {(completion as any).timeRemaining.hours}h {(completion as any).timeRemaining.minutes}m
                 </p>
               )}
             </div>
           )}
 
-          {/* Regular completed (one-time tasks) */}
           {available && completed && !canStartAgain && !(completion as any)?.nextAvailableAt && (
-            <Button
-              variant="outline"
-              className="w-full bg-green-500/20 text-green-400"
-              disabled
-            >
-              <CheckCircle2 className="w-4 h-4 mr-2" />
+            <Button variant="outline" className="w-full bg-green-500/10 text-green-400 border-green-500/20" disabled size="sm">
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
               Completed
             </Button>
           )}
@@ -424,11 +395,12 @@ export function FanTaskCard({
             <Button
               onClick={handleStart}
               disabled={isProcessing}
-              className="w-full text-white hover:opacity-90"
+              className="w-full text-white"
+              size="sm"
               style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {isProcessing ? 'Starting...' : 'Start Task'}
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
             </Button>
           )}
 
@@ -436,13 +408,12 @@ export function FanTaskCard({
             <Button
               onClick={handleCheckIn}
               disabled={isProcessing || !canCheckIn}
-              className="w-full text-white hover:opacity-90"
+              className="w-full text-white"
+              size="sm"
               style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
-              {isProcessing ? 'Checking in...' :
-               !canCheckIn ? 'Already Checked In Today' :
-               'Check In'}
-              <Flame className="w-4 h-4 ml-2" />
+              {isProcessing ? 'Checking in...' : !canCheckIn ? 'Already Checked In' : 'Check In'}
+              <Flame className="w-3.5 h-3.5 ml-1.5" />
             </Button>
           )}
 
@@ -450,11 +421,12 @@ export function FanTaskCard({
             <Button
               onClick={handleComplete}
               disabled={isProcessing || progress < 100}
-              className="w-full text-white hover:opacity-90"
+              className="w-full text-white"
+              size="sm"
               style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {isProcessing ? 'Completing...' : 'Complete Task'}
-              <CheckCircle2 className="w-4 h-4 ml-2" />
+              <CheckCircle2 className="w-3.5 h-3.5 ml-1.5" />
             </Button>
           )}
 
@@ -462,24 +434,24 @@ export function FanTaskCard({
             <Button
               onClick={handleVerify}
               disabled={isVerifying}
-              variant="default"
-              className="w-full text-white hover:opacity-90"
+              className="w-full text-white"
+              size="sm"
               style={brandColors ? { backgroundColor: brandColors.primary } : undefined}
             >
               {isVerifying ? 'Verifying...' : 'Verify Task'}
-              <Shield className="w-4 h-4 ml-2" />
+              <Shield className="w-3.5 h-3.5 ml-1.5" />
             </Button>
           )}
         </div>
 
-        {/* Time Constraints Info */}
+        {/* Time Constraints */}
         {(task.startTime || task.endTime) && (
-          <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+          <div className="mt-3 pt-2.5 border-t text-[10px]" style={themeColors ? { borderColor: subtleBorder, color: themeColors.text?.tertiary } : undefined}>
             {task.startTime && new Date() < new Date(task.startTime) && (
-              <p>Starts: {new Date(task.startTime).toLocaleDateString()}</p>
+              <p className="text-muted-foreground">Starts: {new Date(task.startTime).toLocaleDateString()}</p>
             )}
             {task.endTime && (
-              <p>Ends: {new Date(task.endTime).toLocaleDateString()}</p>
+              <p className="text-muted-foreground">Ends: {new Date(task.endTime).toLocaleDateString()}</p>
             )}
           </div>
         )}
@@ -496,4 +468,3 @@ export function FanTaskCard({
     </Card>
   );
 }
-

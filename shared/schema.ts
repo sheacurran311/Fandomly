@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, decimal, pgEnum, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, decimal, pgEnum, serial, numeric, bigint, date, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -145,6 +145,7 @@ export const socialConnections = pgTable("social_connections", {
   profileData: jsonb("profile_data").$type<{
     followers?: number;
     following?: number;
+    mediaCount?: number;
     verified?: boolean;
     profilePictureUrl?: string;
     bio?: string;
@@ -170,7 +171,20 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   walletAddress: text("wallet_address"),
   walletChain: text("wallet_chain"),
-  userType: text("user_type").notNull().default("fan"), // "creator" | "fan" | "brand"
+  
+  // Authentication Provider Fields (replacing Dynamic)
+  primaryAuthProvider: text("primary_auth_provider"), // 'google' | 'twitter' | 'instagram' | 'tiktok' | 'youtube' | 'spotify' | 'discord' | 'twitch' | 'facebook'
+  googleId: text("google_id").unique(), // Google's unique user ID (sub claim)
+  linkedAccounts: jsonb("linked_accounts").$type<{
+    providers: Array<{
+      provider: string;
+      providerId: string;
+      email?: string;
+      linkedAt: string;
+    }>;
+  }>(),
+  
+  userType: text("user_type").notNull().default("pending"), // "pending" | "fan" | "creator" | "brand"
   
   // Brand/Agency Support
   brandType: text("brand_type"), // 'single' | 'agency' | null (for non-brand users)
@@ -568,7 +582,36 @@ export const loyaltyPrograms = pgTable("loyalty_programs", {
       mode: 'light' | 'dark' | 'custom'; // Preset or custom
       backgroundColor?: string; // Custom background color
       textColor?: string; // Custom text color
+      templateId?: string;
+      typography?: {
+        fontFamily?: { heading?: string; body?: string; mono?: string };
+        fontSize?: Record<string, string> & { xs?: string; sm?: string; base?: string; lg?: string; xl?: string; '2xl'?: string; '3xl'?: string; '4xl'?: string; '5xl'?: string };
+        fontWeight?: Record<string, string | number> & { light?: number; normal?: number; medium?: number; semibold?: number; bold?: number; extrabold?: number };
+        lineHeight?: Record<string, string | number> & { tight?: number; normal?: number; relaxed?: number; loose?: number };
+      };
+      layout?: {
+        borderRadius?: Record<string, string>;
+        [k: string]: unknown;
+      };
+      colors?: {
+        primary?: string;
+        secondary?: string;
+        accent?: string;
+        tertiary?: string;
+        background?: string;
+        surface?: string;
+        surfaceHover?: string;
+        border?: string;
+        success?: string;
+        warning?: string;
+        error?: string;
+        info?: string;
+        text?: { primary?: string; secondary?: string; tertiary?: string };
+        [k: string]: unknown;
+      };
     };
+    creatorDetails?: Record<string, unknown>;
+    location?: string;
     customDomain?: string;
     socialLinks?: {
       twitter?: string;
@@ -641,6 +684,11 @@ export const rewards = pgTable("rewards", {
       blockchain: string; // "ethereum" | "solana" | "polygon" | "bsc"
       rarity?: string;
       collection?: string;
+    };
+    nftData?: {
+      collectionId?: string;
+      templateId?: string;
+      autoMintOnRedeem?: boolean;
     };
     tokenAmount?: string;
     experienceDetails?: string;
@@ -810,7 +858,8 @@ export const campaignStatusEnum = pgEnum('campaign_status', ['active', 'inactive
 export const rewardTypeEnum = pgEnum('reward_type', ['points', 'raffle', 'nft', 'badge', 'multiplier']);
 export const socialPlatformEnum = pgEnum('social_platform', [
   'facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify',
-  'apple_music', 'discord', 'telegram', 'twitch', 'system'
+  'apple_music', 'discord', 'telegram', 'twitch', 'system', 'interactive',
+  'kick', 'patreon'
 ]);
 
 // Snag-Inspired Task System Enums
@@ -837,13 +886,19 @@ export const taskTypeEnum = pgEnum('task_type', [
   // Spotify tasks
   'spotify_follow', 'spotify_playlist', 'spotify_album', 'spotify_save_track', 'spotify_save_album',
   // Twitch tasks
-  'twitch_follow', 'twitch_subscribe', 'twitch_watch',
+  'twitch_follow', 'twitch_subscribe', 'twitch_watch', 'twitch_chat_code',
   // Discord tasks
-  'discord_join', 'discord_verify', 'discord_react', 'discord_message',
-  // Engagement & Rewards tasks (new)
+  'discord_join', 'discord_verify', 'discord_react', 'discord_message', 'discord_message_code',
+  // Kick tasks (new platform)
+  'kick_follow', 'kick_subscribe', 'kick_chat_code', 'kick_redeem_reward',
+  // Patreon tasks (new platform)
+  'patreon_support', 'patreon_tier_check',
+  // Engagement & Rewards tasks
   'check_in', 'follower_milestone', 'complete_profile',
   // Sprint 2: Interactive & Link tasks
   'website_visit', 'poll', 'quiz',
+  // Group goal tasks
+  'group_reactions', 'group_viewers',
   // Generic tasks (legacy)
   'follow', 'join', 'repost', 'referral'
 ]);
@@ -1082,7 +1137,33 @@ export const tasks = pgTable("tasks", {
   // ['fan', 'creator', 'creator-athlete', 'creator-musician', 'creator-content-creator']
   
   // ============================================
-  // SECTION 6: STATUS & ANALYTICS
+  // SECTION 6: VERIFICATION SYSTEM (Loyalty Engine Enhancement)
+  // ============================================
+  // Verification tier determines risk-adjusted scoring
+  // T1: API verified (full points) - Spotify, YouTube, Discord, Twitch, Twitter Basic
+  // T2: Code verified (85% points) - Code-in-comment/repost
+  // T3: Starter pack (50% points) - Honor system with embedded profiles
+  verificationTier: text("verification_tier").default('T3'), // 'T1' | 'T2' | 'T3'
+  
+  // Verification method determines how task completion is verified
+  verificationMethod: text("verification_method").default('manual'),
+  // 'api' | 'code_comment' | 'code_repost' | 'hashtag' | 'starter_pack' | 'manual'
+  
+  // Is this a starter pack task (one-time per platform per tenant)
+  isStarterPack: boolean("is_starter_pack").default(false),
+  
+  // Group goal configuration (for community goals)
+  isGroupGoal: boolean("is_group_goal").default(false),
+  groupGoalConfig: jsonb("group_goal_config").$type<{
+    metricType?: 'followers' | 'likes' | 'views' | 'comments' | 'shares' | 'reactions' | 'subscribers';
+    targetValue?: number;
+    hashtag?: string;
+    contentId?: string;
+    contentUrl?: string;
+  }>(),
+  
+  // ============================================
+  // SECTION 7: STATUS & ANALYTICS
   // ============================================
   isActive: boolean("is_active").default(true),
   isDraft: boolean("is_draft").default(false),
@@ -1266,7 +1347,16 @@ export const taskCompletions = pgTable("task_completions", {
   
   // Validation
   verifiedAt: timestamp("verified_at"), // When completion was verified
-  verificationMethod: text("verification_method"), // 'auto' | 'manual' | 'api'
+  verificationMethod: text("verification_method"), // 'auto' | 'manual' | 'api' | 'code_comment' | 'code_repost' | 'starter_pack'
+  
+  // Code-based verification tracking
+  verificationCodeId: varchar("verification_code_id"), // Link to verification code used
+  verificationCodeUsed: varchar("verification_code_used", { length: 8 }), // The actual code that was matched
+  verificationConfidence: text("verification_confidence"), // 'high' | 'medium' | 'low'
+  verificationTier: text("verification_tier"), // 'T1' | 'T2' | 'T3' (copied from task for reference)
+  
+  // Campaign association (for starter pack campaign exceptions)
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1341,8 +1431,8 @@ export const manualReviewQueue = pgTable("manual_review_queue", {
 // Verification Attempts - Audit log of all verification attempts
 export const verificationAttempts = pgTable("verification_attempts", {
   id: serial("id").primaryKey(),
-  taskCompletionId: integer("task_completion_id").notNull(),
-  userId: integer("user_id").notNull(),
+  taskCompletionId: varchar("task_completion_id").notNull(),
+  userId: varchar("user_id").notNull(),
 
   platform: varchar("platform", { length: 50 }).notNull(),
   verificationMethod: varchar("verification_method", { length: 50 }).notNull(),
@@ -2741,6 +2831,278 @@ export type NftDelivery = typeof nftDeliveries.$inferSelect;
 export type InsertNftDelivery = typeof nftDeliveries.$inferInsert;
 
 // ============================================================================
+// VERIFICATION SYSTEM - Code-based verification for social tasks
+// ============================================================================
+
+// Verification tier enum for risk-adjusted scoring
+export const verificationTierEnum = pgEnum('verification_tier', ['T1', 'T2', 'T3']);
+
+// Verification method enum
+export const verificationMethodEnum = pgEnum('verification_method', [
+  'api',           // T1: Direct API verification (Spotify, YouTube, Discord, Twitch, Twitter Basic)
+  'code_comment',  // T2: Code in comment
+  'code_repost',   // T2: Code in quote/repost
+  'hashtag',       // Group: Hashtag tracking for group goals
+  'starter_pack',  // T3: Embedded profile, honor system
+  'manual'         // T3: Manual review by creator
+]);
+
+// Code type enum for verification codes
+export const codeTypeEnum = pgEnum('code_type', ['comment', 'repost', 'hashtag']);
+
+// Group goal status enum
+export const groupGoalStatusEnum = pgEnum('group_goal_status', ['active', 'completed', 'expired', 'cancelled']);
+
+// Group goal metric type enum
+export const groupGoalMetricEnum = pgEnum('group_goal_metric', [
+  'followers', 'likes', 'views', 'comments', 'shares', 'reactions', 'subscribers', 'concurrent_viewers'
+]);
+
+// Verification Codes Table - Unique codes for each fan per task
+export const verificationCodes = pgTable("verification_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 8 }).notNull().unique(),
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  fanId: varchar("fan_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  
+  // Code configuration
+  codeType: codeTypeEnum("code_type").notNull(),
+  
+  // Usage tracking
+  isUsed: boolean("is_used").default(false),
+  usedAt: timestamp("used_at"),
+  
+  // Expiration (optional - some codes may expire)
+  expiresAt: timestamp("expires_at"),
+  
+  // Verification result
+  verificationData: jsonb("verification_data").$type<{
+    platform?: string;
+    contentId?: string;
+    authorId?: string;
+    authorUsername?: string;
+    commentText?: string;
+    matchedAt?: string;
+    confidence?: number;
+  }>(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const verificationCodesRelations = relations(verificationCodes, ({ one }) => ({
+  task: one(tasks, {
+    fields: [verificationCodes.taskId],
+    references: [tasks.id],
+  }),
+  fan: one(users, {
+    fields: [verificationCodes.fanId],
+    references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [verificationCodes.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Group Goals Table - Community goals with collective rewards
+export const groupGoals = pgTable("group_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  creatorId: varchar("creator_id").notNull().references(() => creators.id, { onDelete: 'cascade' }),
+  
+  // Goal definition
+  platform: socialPlatformEnum("platform").notNull(),
+  metricType: groupGoalMetricEnum("metric_type").notNull(),
+  targetValue: integer("target_value").notNull(),
+  currentValue: integer("current_value").default(0),
+  
+  // Hashtag for participation tracking (optional)
+  hashtag: varchar("hashtag", { length: 50 }),
+  
+  // Content being tracked (e.g., specific post/video)
+  contentId: varchar("content_id"),
+  contentUrl: text("content_url"),
+  
+  // Rewards
+  pointsPerParticipant: integer("points_per_participant").notNull().default(50),
+  bonusPointsOnCompletion: integer("bonus_points_on_completion").default(0),
+  
+  // Status
+  status: groupGoalStatusEnum("status").default('active'),
+  completedAt: timestamp("completed_at"),
+  
+  // Progress tracking
+  lastCheckedAt: timestamp("last_checked_at"),
+  checkCount: integer("check_count").default(0),
+  
+  // Time constraints
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const groupGoalsRelations = relations(groupGoals, ({ one, many }) => ({
+  task: one(tasks, {
+    fields: [groupGoals.taskId],
+    references: [tasks.id],
+  }),
+  tenant: one(tenants, {
+    fields: [groupGoals.tenantId],
+    references: [tenants.id],
+  }),
+  creator: one(creators, {
+    fields: [groupGoals.creatorId],
+    references: [creators.id],
+  }),
+  participants: many(groupGoalParticipants),
+}));
+
+// Group Goal Participants Table - Fans enrolled in group goals
+export const groupGoalParticipants = pgTable("group_goal_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupGoalId: varchar("group_goal_id").notNull().references(() => groupGoals.id, { onDelete: 'cascade' }),
+  fanId: varchar("fan_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Participation tracking
+  joinedAt: timestamp("joined_at").defaultNow(),
+  
+  // Rewards (awarded when goal completes)
+  rewardedAt: timestamp("rewarded_at"),
+  pointsAwarded: integer("points_awarded"),
+  
+  // Contribution tracking (optional - for future use)
+  contributionData: jsonb("contribution_data").$type<{
+    hashtagPostUrl?: string;
+    engagementProof?: string;
+    contributedAt?: string;
+  }>(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const groupGoalParticipantsRelations = relations(groupGoalParticipants, ({ one }) => ({
+  groupGoal: one(groupGoals, {
+    fields: [groupGoalParticipants.groupGoalId],
+    references: [groupGoals.id],
+  }),
+  fan: one(users, {
+    fields: [groupGoalParticipants.fanId],
+    references: [users.id],
+  }),
+}));
+
+// Starter Pack Completions Table - One-time starter pack completions per platform per tenant
+export const starterPackCompletions = pgTable("starter_pack_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fanId: varchar("fan_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  platform: socialPlatformEnum("platform").notNull(),
+  
+  // Campaign-specific completion (NULL for global, set for campaign-specific)
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }),
+  
+  // Link to task completion record
+  taskCompletionId: varchar("task_completion_id").references(() => taskCompletions.id, { onDelete: 'set null' }),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'set null' }),
+  
+  // Points awarded (for reference)
+  pointsAwarded: integer("points_awarded"),
+  
+  completedAt: timestamp("completed_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const starterPackCompletionsRelations = relations(starterPackCompletions, ({ one }) => ({
+  fan: one(users, {
+    fields: [starterPackCompletions.fanId],
+    references: [users.id],
+  }),
+  tenant: one(tenants, {
+    fields: [starterPackCompletions.tenantId],
+    references: [tenants.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [starterPackCompletions.campaignId],
+    references: [campaigns.id],
+  }),
+  taskCompletion: one(taskCompletions, {
+    fields: [starterPackCompletions.taskCompletionId],
+    references: [taskCompletions.id],
+  }),
+  task: one(tasks, {
+    fields: [starterPackCompletions.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+// Zod schemas and types for new tables
+export const insertVerificationCodeSchema = createInsertSchema(verificationCodes);
+export const insertGroupGoalSchema = createInsertSchema(groupGoals);
+export const insertGroupGoalParticipantSchema = createInsertSchema(groupGoalParticipants);
+export const insertStarterPackCompletionSchema = createInsertSchema(starterPackCompletions);
+
+export type VerificationCode = typeof verificationCodes.$inferSelect;
+export type InsertVerificationCode = typeof verificationCodes.$inferInsert;
+export type GroupGoal = typeof groupGoals.$inferSelect;
+export type InsertGroupGoal = typeof groupGoals.$inferInsert;
+export type GroupGoalParticipant = typeof groupGoalParticipants.$inferSelect;
+export type InsertGroupGoalParticipant = typeof groupGoalParticipants.$inferInsert;
+export type StarterPackCompletion = typeof starterPackCompletions.$inferSelect;
+export type InsertStarterPackCompletion = typeof starterPackCompletions.$inferInsert;
+
+// ============================================================================
+// FAN PLATFORM HANDLES - T3 Manual Verification System
+// ============================================================================
+// Stores fan-claimed handles for platforms where OAuth isn't available (T3 verification)
+// Used for manual verification workflow where creators check fan profiles directly
+
+export const fanPlatformHandles = pgTable("fan_platform_handles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: socialPlatformEnum("platform").notNull(),
+  
+  // Handle data
+  handle: varchar("handle", { length: 100 }).notNull(),
+  normalizedHandle: varchar("normalized_handle", { length: 100 }), // lowercase, no @ prefix
+  
+  // Validation status
+  formatValid: boolean("format_valid").default(false), // Passes regex validation
+  manuallyVerified: boolean("manually_verified").default(false), // Creator verified
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by").references(() => users.id),
+  
+  // Link to OAuth connection if they later connect
+  socialConnectionId: varchar("social_connection_id").references(() => socialConnections.id, { onDelete: 'set null' }),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const fanPlatformHandlesRelations = relations(fanPlatformHandles, ({ one }) => ({
+  user: one(users, {
+    fields: [fanPlatformHandles.userId],
+    references: [users.id],
+  }),
+  verifier: one(users, {
+    fields: [fanPlatformHandles.verifiedBy],
+    references: [users.id],
+  }),
+  socialConnection: one(socialConnections, {
+    fields: [fanPlatformHandles.socialConnectionId],
+    references: [socialConnections.id],
+  }),
+}));
+
+export const insertFanPlatformHandleSchema = createInsertSchema(fanPlatformHandles);
+export type FanPlatformHandle = typeof fanPlatformHandles.$inferSelect;
+export type InsertFanPlatformHandle = typeof fanPlatformHandles.$inferInsert;
+
+// ============================================================================
 // BETA SIGNUPS - Email capture for beta program
 // ============================================================================
 
@@ -2766,4 +3128,158 @@ export const insertBetaSignupSchema = createInsertSchema(betaSignups).omit({
 export type BetaSignup = typeof betaSignups.$inferSelect;
 export type InsertBetaSignup = z.infer<typeof insertBetaSignupSchema>;
 
+// ============================================================================
+// SOCIAL ANALYTICS - Sync Preferences, Account Metrics, Content, Content Metrics
+// ============================================================================
 
+// Sync Preferences - Creator-controlled sync toggles per platform
+export const syncPreferences = pgTable("sync_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text("platform").notNull(), // matches social_connections.platform
+  syncEnabled: boolean("sync_enabled").default(true),
+  syncFrequencyMinutes: integer("sync_frequency_minutes").default(60),
+  lastSyncAt: timestamp("last_sync_at"),
+  nextSyncAt: timestamp("next_sync_at"),
+  syncStatus: text("sync_status").default("idle"), // 'idle' | 'syncing' | 'error'
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const syncPreferencesRelations = relations(syncPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [syncPreferences.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertSyncPreferenceSchema = createInsertSchema(syncPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type SyncPreference = typeof syncPreferences.$inferSelect;
+export type InsertSyncPreference = typeof syncPreferences.$inferInsert;
+
+// Platform Account Metrics Daily - Daily snapshots of account-level metrics
+export const platformAccountMetricsDaily = pgTable("platform_account_metrics_daily", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text("platform").notNull(),
+  date: date("date").notNull(),
+  followers: integer("followers"),
+  following: integer("following"),
+  totalPosts: integer("total_posts"),
+  totalViews: bigint("total_views", { mode: "number" }),
+  totalLikes: bigint("total_likes", { mode: "number" }),
+  totalComments: bigint("total_comments", { mode: "number" }),
+  engagementRate: numeric("engagement_rate", { precision: 5, scale: 2 }),
+  subscribers: integer("subscribers"),
+  platformSpecific: jsonb("platform_specific").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const platformAccountMetricsDailyRelations = relations(platformAccountMetricsDaily, ({ one }) => ({
+  user: one(users, {
+    fields: [platformAccountMetricsDaily.userId],
+    references: [users.id],
+  }),
+}));
+
+export type PlatformAccountMetricsDaily = typeof platformAccountMetricsDaily.$inferSelect;
+export type InsertPlatformAccountMetricsDaily = typeof platformAccountMetricsDaily.$inferInsert;
+
+// Platform Content - Individual content items (posts, videos, streams, etc.)
+export const platformContent = pgTable("platform_content", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text("platform").notNull(),
+  platformContentId: text("platform_content_id").notNull(),
+  contentType: text("content_type").notNull(), // 'post' | 'video' | 'reel' | 'story' | 'stream' | 'track' | 'short'
+  title: text("title"),
+  description: text("description"),
+  url: text("url"),
+  thumbnailUrl: text("thumbnail_url"),
+  publishedAt: timestamp("published_at"),
+  rawData: jsonb("raw_data").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const platformContentRelations = relations(platformContent, ({ one, many }) => ({
+  user: one(users, {
+    fields: [platformContent.userId],
+    references: [users.id],
+  }),
+  metrics: many(platformContentMetrics),
+}));
+
+export type PlatformContent = typeof platformContent.$inferSelect;
+export type InsertPlatformContent = typeof platformContent.$inferInsert;
+
+// Platform Content Metrics - Time-series metrics per content item
+export const platformContentMetrics = pgTable("platform_content_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  contentId: uuid("content_id").notNull().references(() => platformContent.id, { onDelete: 'cascade' }),
+  date: date("date").notNull(),
+  views: bigint("views", { mode: "number" }).default(0),
+  likes: bigint("likes", { mode: "number" }).default(0),
+  comments: bigint("comments", { mode: "number" }).default(0),
+  shares: bigint("shares", { mode: "number" }).default(0),
+  saves: bigint("saves", { mode: "number" }).default(0),
+  impressions: bigint("impressions", { mode: "number" }).default(0),
+  reach: bigint("reach", { mode: "number" }).default(0),
+  engagementRate: numeric("engagement_rate", { precision: 5, scale: 2 }),
+  watchTimeMinutes: numeric("watch_time_minutes"),
+  platformSpecific: jsonb("platform_specific").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const platformContentMetricsRelations = relations(platformContentMetrics, ({ one }) => ({
+  content: one(platformContent, {
+    fields: [platformContentMetrics.contentId],
+    references: [platformContent.id],
+  }),
+}));
+
+export type PlatformContentMetrics = typeof platformContentMetrics.$inferSelect;
+export type InsertPlatformContentMetrics = typeof platformContentMetrics.$inferInsert;
+
+// Sync Log - Audit trail for all sync operations
+export const syncLog = pgTable("sync_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text("platform").notNull(),
+  syncType: text("sync_type").notNull(), // 'account_metrics' | 'content_list' | 'content_metrics' | 'full'
+  status: text("status").notNull(), // 'started' | 'completed' | 'failed'
+  itemsSynced: integer("items_synced").default(0),
+  errorDetails: text("error_details"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  durationMs: integer("duration_ms"),
+});
+
+export const syncLogRelations = relations(syncLog, ({ one }) => ({
+  user: one(users, {
+    fields: [syncLog.userId],
+    references: [users.id],
+  }),
+}));
+
+export type SyncLog = typeof syncLog.$inferSelect;
+export type InsertSyncLog = typeof syncLog.$inferInsert;
+
+// Additional inferred types for tables used by services
+export type SocialConnection = typeof socialConnections.$inferSelect;
+export type CreatorFacebookPage = typeof creatorFacebookPages.$inferSelect;
+export type SocialCampaignTask = typeof socialCampaignTasks.$inferSelect;
+export type PlatformTaskCompletion = typeof platformTaskCompletions.$inferSelect;
+export type ManualReviewQueueItem = typeof manualReviewQueue.$inferSelect;
+export type VerificationAttempt = typeof verificationAttempts.$inferSelect;
+export type PlatformPointsTransaction = typeof platformPointsTransactions.$inferSelect;
+export type ProgramAnnouncement = typeof programAnnouncements.$inferSelect;
+export type ActiveMultiplier = typeof activeMultipliers.$inferSelect;
+export type CheckInStreak = typeof checkInStreaks.$inferSelect;
+export type WebsiteVisitTracking = typeof websiteVisitTracking.$inferSelect;
+export type PollQuizResponse = typeof pollQuizResponses.$inferSelect;

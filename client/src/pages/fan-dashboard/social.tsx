@@ -1,7 +1,10 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { useToast } from "@/hooks/use-toast";
+import { useFanStats } from "@/hooks/use-fan-dashboard";
+import { apiRequest } from "@/lib/queryClient";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,18 +35,36 @@ import {
   Video
 } from "lucide-react";
 import { FaSpotify } from "react-icons/fa";
-import { TwitterSDKManager } from "@/lib/twitter";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import { socialManager } from "@/lib/social-integrations";
 
 export default function FanSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { data: fanStats } = useFanStats();
+  
+  // Get task completion stats for platform breakdown
+  const { data: taskStats } = useQuery({
+    queryKey: ['/api/fan/dashboard/task-stats'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/fan/dashboard/task-completion-stats?timeframe=monthly');
+      return response.json();
+    },
+    enabled: !!user,
+  });
+
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [facebookConnecting, setFacebookConnecting] = useState(false);
-  const [twitterConnected, setTwitterConnected] = useState(false);
-  const [twitterConnecting, setTwitterConnecting] = useState(false);
-  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
-  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  
+  // Use the unified Twitter connection hook (handles saving connections properly)
+  const {
+    isConnected: twitterConnected,
+    isConnecting: twitterConnecting,
+    userInfo: twitterUserInfo,
+    connect: connectTwitter,
+    disconnect: disconnectTwitter,
+  } = useTwitterConnection();
+  const twitterHandle = twitterUserInfo?.username || null;
   
   // TikTok connection state
   const [tiktokConnected, setTiktokConnected] = useState(false);
@@ -80,10 +101,10 @@ export default function FanSocial() {
   const [isCheckingTwitchStatus, setIsCheckingTwitchStatus] = useState(true);
   
   // Check social connections status when user becomes available
+  // Note: Twitter status is managed by useTwitterConnection hook automatically
   useEffect(() => {
     if (user?.dynamicUserId) {
       checkFacebookStatus();
-      checkTwitterStatus();
       checkTiktokStatus();
       checkYoutubeStatus();
       checkSpotifyStatus();
@@ -271,39 +292,6 @@ export default function FanSocial() {
     }
   };
 
-  const checkTwitterStatus = async () => {
-    try {
-      setIsCheckingTwitterStatus(true);
-      const response = await fetch('/api/social-connections/twitter', {
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.connected && data.connection) {
-          setTwitterConnected(true);
-          setTwitterHandle(data.connection.platformUsername || data.connection.platformDisplayName);
-        } else {
-          setTwitterConnected(false);
-          setTwitterHandle(null);
-        }
-      } else {
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-      }
-    } catch (error) {
-      console.error('[Fan Social] Error checking Twitter status:', error);
-      setTwitterConnected(false);
-      setTwitterHandle(null);
-    } finally {
-      setIsCheckingTwitterStatus(false);
-    }
-  };
-
   const checkTiktokStatus = async () => {
     console.log('[Fan Social] Starting TikTok status check...');
     try {
@@ -372,7 +360,7 @@ export default function FanSocial() {
         await checkTiktokStatus();
         toast({
           title: "TikTok Connected! 🎵",
-          description: result.username ? `Connected @${result.username}` : "Successfully connected to TikTok",
+          description: (result as { username?: string }).username ? `Connected @${(result as { username?: string }).username}` : "Successfully connected to TikTok",
         });
       } else {
         toast({
@@ -467,6 +455,10 @@ export default function FanSocial() {
 
   const disconnectFacebook = async () => {
     try {
+      // Disconnect from backend first
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('facebook');
+      // Then logout from Facebook SDK
       await FacebookSDKManager.secureLogout();
       setFacebookConnected(false);
       toast({
@@ -483,39 +475,7 @@ export default function FanSocial() {
     }
   };
 
-  const connectTwitter = async () => {
-    try {
-      setTwitterConnecting(true);
-      const result = await TwitterSDKManager.secureLogin('fan', (user as any)?.dynamicUserId || user?.id);
-      if (result.success && result.user) {
-        setTwitterConnected(true);
-        setTwitterHandle(result.user.username);
-      }
-    } finally {
-      setTwitterConnecting(false);
-    }
-  };
-
-  const disconnectTwitter = async () => {
-    try {
-      // Call backend to remove connection
-      const response = await fetch('/api/social/twitter', {
-        method: 'DELETE',
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-      }
-    } catch (error) {
-      console.error('Twitter disconnect error:', error);
-    }
-  };
+  // Twitter connect/disconnect are now handled by useTwitterConnection hook
 
   const checkYoutubeStatus = async () => {
     try {
@@ -832,45 +792,12 @@ export default function FanSocial() {
     }
   ];
 
-  // Available campaigns fans can participate in
-  const availableCampaigns = [
-    {
-      id: "1",
-      title: "Like & Follow Campaign",
-      creator: "Aerial Ace Athletics",
-      platform: "Facebook",
-      icon: ThumbsUp,
-      points: 50,
-      description: "Like our latest post and follow our page",
-      participants: 247,
-      timeLeft: "5 days left",
-      requirements: ["Follow page", "Like post", "Valid for 24 hours"]
-    },
-    {
-      id: "2", 
-      title: "Comment Engagement",
-      creator: "Luna Music",
-      platform: "Instagram",
-      icon: MessageSquare,
-      points: 100,
-      description: "Comment on our latest track release",
-      participants: 189,
-      timeLeft: "3 days left",
-      requirements: ["Follow account", "Comment with #LunaVibes", "Tag a friend"]
-    },
-    {
-      id: "3",
-      title: "Share Campaign",
-      creator: "Tech Hub",
-      platform: "Twitter",
-      icon: Share,
-      points: 200,
-      description: "Share our tech tips thread",
-      participants: 156,
-      timeLeft: "1 week left",
-      requirements: ["Follow @TechHub", "Retweet with comment", "Use #TechTips"]
-    }
-  ];
+  // Calculate real stats from fanStats
+  const totalPointsEarned = fanStats?.totalPoints || 0;
+  const programsJoined = fanStats?.programsEnrolledCount || 0;
+  
+  // Note: Available campaigns now use real data from the tasks page
+  // This section shows connected platforms which can be used for social tasks
 
   return (
     <DashboardLayout userType="fan">
@@ -999,52 +926,42 @@ export default function FanSocial() {
             <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
               <CardHeader>
                 <CardTitle className="text-white flex items-center justify-between">
-                  <span>Available Campaigns</span>
-                  <Button variant="outline" size="sm" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                  <span>Social Tasks</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+                    onClick={() => window.location.href = '/fan-dashboard/tasks'}
+                  >
                     <Eye className="h-4 w-4 mr-1" />
                     View All
                   </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {availableCampaigns.map((campaign) => {
-                    const Icon = campaign.icon;
-                    return (
-                      <div key={campaign.id} className="p-4 rounded-lg bg-white/5 border border-white/10">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 rounded-lg bg-brand-primary/20">
-                              <Icon className="h-5 w-5 text-brand-primary" />
-                            </div>
-                            <div>
-                              <h4 className="text-white font-medium">{campaign.title}</h4>
-                              <p className="text-sm text-gray-400">{campaign.creator}</p>
-                            </div>
-                          </div>
-                          <Badge className="bg-brand-primary/20 text-brand-primary">
-                            +{campaign.points} pts
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-300 mb-3">{campaign.description}</p>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-xs text-gray-400">
-                            <span>{campaign.participants} participants</span>
-                            <span>{campaign.timeLeft}</span>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            <strong>Requirements:</strong> {campaign.requirements.join(" • ")}
-                          </div>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          className="w-full mt-3 bg-brand-primary hover:bg-brand-primary/80"
-                        >
-                          Participate
-                        </Button>
-                      </div>
-                    );
-                  })}
+                <div className="text-center py-8">
+                  <Target className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                  <h4 className="text-white font-medium mb-2">Connect Your Accounts</h4>
+                  <p className="text-sm text-gray-400 mb-4">
+                    Link your social accounts above to unlock social tasks and earn points
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 mb-4">
+                    {!twitterConnected && (
+                      <Badge className="bg-blue-500/20 text-blue-400">Twitter tasks available</Badge>
+                    )}
+                    {!youtubeConnected && (
+                      <Badge className="bg-red-500/20 text-red-400">YouTube tasks available</Badge>
+                    )}
+                    {!tiktokConnected && (
+                      <Badge className="bg-pink-500/20 text-pink-400">TikTok tasks available</Badge>
+                    )}
+                    {!spotifyConnected && (
+                      <Badge className="bg-green-500/20 text-green-400">Spotify tasks available</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Once connected, social tasks from your enrolled creators will appear here
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -1056,21 +973,21 @@ export default function FanSocial() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {/* Personal Stats */}
+                  {/* Personal Stats - Real data from fanStats */}
                   <div>
                     <h4 className="text-white font-medium mb-3">Your Activity</h4>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-300">Campaigns Joined</span>
-                        <span className="text-sm font-medium text-white">12</span>
+                        <span className="text-sm text-gray-300">Programs Joined</span>
+                        <span className="text-sm font-medium text-white">{programsJoined}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-300">Total Points Earned</span>
-                        <span className="text-sm font-medium text-white">2,450</span>
+                        <span className="text-sm font-medium text-white">{totalPointsEarned.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-300">Success Rate</span>
-                        <span className="text-sm font-medium text-white">92%</span>
+                        <span className="text-sm text-gray-300">Rewards Claimed</span>
+                        <span className="text-sm font-medium text-white">{fanStats?.rewardsEarned || 0}</span>
                       </div>
                     </div>
                   </div>
@@ -1094,30 +1011,39 @@ export default function FanSocial() {
                     </div>
                   </div>
 
-                  {/* Platform Performance */}
+                  {/* Connected Platforms Status */}
                   <div>
-                    <h4 className="text-white font-medium mb-3">Platform Performance</h4>
+                    <h4 className="text-white font-medium mb-3">Connected Platforms</h4>
                     <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs text-gray-300">Facebook Campaigns</span>
-                          <span className="text-xs font-medium text-white">85%</span>
-                        </div>
-                        <Progress value={85} className="h-2" />
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-300">Twitter</span>
+                        <Badge className={twitterConnected ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}>
+                          {twitterConnected ? "Connected" : "Not Connected"}
+                        </Badge>
                       </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs text-gray-300">Instagram Campaigns</span>
-                          <span className="text-xs font-medium text-white">67%</span>
-                        </div>
-                        <Progress value={67} className="h-2" />
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-300">TikTok</span>
+                        <Badge className={tiktokConnected ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}>
+                          {tiktokConnected ? "Connected" : "Not Connected"}
+                        </Badge>
                       </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs text-gray-300">Twitter Campaigns</span>
-                          <span className="text-xs font-medium text-white">42%</span>
-                        </div>
-                        <Progress value={42} className="h-2" />
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-300">YouTube</span>
+                        <Badge className={youtubeConnected ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}>
+                          {youtubeConnected ? "Connected" : "Not Connected"}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-300">Spotify</span>
+                        <Badge className={spotifyConnected ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}>
+                          {spotifyConnected ? "Connected" : "Not Connected"}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-300">Discord</span>
+                        <Badge className={discordConnected ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}>
+                          {discordConnected ? "Connected" : "Not Connected"}
+                        </Badge>
                       </div>
                     </div>
                   </div>

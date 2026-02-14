@@ -26,7 +26,8 @@ export function registerInstagramTaskRoutes(app: Express) {
   app.post('/api/social/user/instagram', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { username } = req.body;
-      const userId = req.userId!;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
       if (!username) {
         return res.status(400).json({ error: 'Username is required' });
@@ -93,7 +94,8 @@ export function registerInstagramTaskRoutes(app: Express) {
    */
   app.get('/api/social/user/instagram', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.userId!;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
       const connection = await db.query.socialConnections.findFirst({
         where: and(
@@ -124,7 +126,8 @@ export function registerInstagramTaskRoutes(app: Express) {
   app.post('/api/tasks/instagram/:taskId/start', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { taskId } = req.params;
-      const userId = req.userId!;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
       console.log('[Instagram Tasks] Starting task:', { taskId, userId });
 
@@ -133,7 +136,7 @@ export function registerInstagramTaskRoutes(app: Express) {
         where: and(
           eq(tasks.id, taskId),
           eq(tasks.platform, 'instagram'),
-          eq(tasks.status, 'active')
+          eq(tasks.isActive, true)
         )
       });
 
@@ -187,25 +190,27 @@ export function registerInstagramTaskRoutes(app: Express) {
         taskId,
         type: task.taskType,
         started: true,
-        expiresAt: task.expiresAt
+        expiresAt: task.endTime
       };
 
       if (task.taskType === 'comment_code') {
         response.nonce = nonce;
-        response.mediaUrl = task.requirements?.mediaUrl;
+        response.mediaUrl = (task.customSettings as any)?.mediaUrl;
         response.instructions = `Comment exactly "${nonce}" on the Instagram post`;
       } else if (task.taskType === 'mention_story') {
-        const creatorUsername = task.requirements?.creatorUsername;
+        const settings = task.customSettings as any;
+        const creatorUsername = settings?.creatorUsername;
         response.creatorUsername = creatorUsername;
         response.instructions = `Post an Instagram Story and mention @${creatorUsername}`;
-        if (task.requirements?.requireHashtag) {
-          response.requireHashtag = task.requirements.requireHashtag;
-          response.instructions += ` with ${task.requirements.requireHashtag}`;
+        if (settings?.requireHashtag) {
+          response.requireHashtag = settings.requireHashtag;
+          response.instructions += ` with ${settings.requireHashtag}`;
         }
       } else if (task.taskType === 'keyword_comment') {
-        response.keyword = task.requirements?.keyword;
-        response.mediaUrl = task.requirements?.mediaUrl;
-        response.instructions = `Comment with "${task.requirements?.keyword}" on the Instagram post`;
+        const settings = task.customSettings as any;
+        response.keyword = settings?.keyword;
+        response.mediaUrl = settings?.mediaUrl;
+        response.instructions = `Comment with "${settings?.keyword}" on the Instagram post`;
       }
 
       console.log('[Instagram Tasks] ✅ Task started');
@@ -224,7 +229,8 @@ export function registerInstagramTaskRoutes(app: Express) {
   app.get('/api/tasks/instagram/:taskId/status', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { taskId } = req.params;
-      const userId = req.userId!;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
       // Check if completed
       const completion = await db.query.taskCompletions.findFirst({
@@ -263,7 +269,7 @@ export function registerInstagramTaskRoutes(app: Express) {
         completed: false,
         verified: false,
         nonce,
-        expiresAt: task?.expiresAt
+        expiresAt: task?.endTime
       });
 
     } catch (error) {
@@ -279,7 +285,8 @@ export function registerInstagramTaskRoutes(app: Express) {
   app.post('/api/tasks/instagram/comment-code', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { mediaId, mediaUrl, rewardPoints, expiresAt, title, description } = req.body;
-      const creatorId = req.userId!;
+      const creatorId = req.user?.id;
+      if (!creatorId) return res.status(401).json({ error: 'Authentication required' });
 
       console.log('[Instagram Tasks] Creating comment-code task:', {
         creatorId,
@@ -312,12 +319,12 @@ export function registerInstagramTaskRoutes(app: Express) {
         creatorId,
         platform: 'instagram',
         taskType: 'comment_code',
-        title: title || 'Comment on Instagram Post',
+        name: title || 'Comment on Instagram Post',
         description: description || 'Comment with your unique code on the post',
-        pointsReward: rewardPoints,
-        status: 'active',
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-        requirements: {
+        pointsToReward: rewardPoints,
+        isActive: true,
+        endTime: expiresAt ? new Date(expiresAt) : null,
+        customSettings: {
           mediaId,
           mediaUrl,
           taskType: 'comment_code'
@@ -344,7 +351,8 @@ export function registerInstagramTaskRoutes(app: Express) {
   app.post('/api/tasks/instagram/mention-story', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { rewardPoints, requireHashtag, expiresAt, title, description } = req.body;
-      const creatorId = req.userId!;
+      const creatorId = req.user?.id;
+      if (!creatorId) return res.status(401).json({ error: 'Authentication required' });
 
       console.log('[Instagram Tasks] Creating mention-story task:', {
         creatorId,
@@ -377,12 +385,12 @@ export function registerInstagramTaskRoutes(app: Express) {
         creatorId,
         platform: 'instagram',
         taskType: 'mention_story',
-        title: title || 'Mention in Instagram Story',
+        name: title || 'Mention in Instagram Story',
         description: description || `Post a story mentioning @${instagramConnection.platformUsername}`,
-        pointsReward: rewardPoints,
-        status: 'active',
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-        requirements: {
+        pointsToReward: rewardPoints,
+        isActive: true,
+        endTime: expiresAt ? new Date(expiresAt) : null,
+        customSettings: {
           creatorUsername: instagramConnection.platformUsername,
           requireHashtag: requireHashtag || null,
           taskType: 'mention_story'
@@ -409,7 +417,8 @@ export function registerInstagramTaskRoutes(app: Express) {
   app.post('/api/tasks/instagram/keyword-comment', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { mediaId, mediaUrl, keyword, rewardPoints, expiresAt, title, description } = req.body;
-      const creatorId = req.userId!;
+      const creatorId = req.user?.id;
+      if (!creatorId) return res.status(401).json({ error: 'Authentication required' });
 
       console.log('[Instagram Tasks] Creating keyword-comment task:', {
         creatorId,
@@ -443,12 +452,12 @@ export function registerInstagramTaskRoutes(app: Express) {
         creatorId,
         platform: 'instagram',
         taskType: 'keyword_comment',
-        title: title || 'Comment with Keyword',
+        name: title || 'Comment with Keyword',
         description: description || `Comment with "${keyword}" on the post`,
-        pointsReward: rewardPoints,
-        status: 'active',
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-        requirements: {
+        pointsToReward: rewardPoints,
+        isActive: true,
+        endTime: expiresAt ? new Date(expiresAt) : null,
+        customSettings: {
           mediaId,
           mediaUrl,
           keyword,

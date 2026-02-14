@@ -209,7 +209,8 @@ export class TwitterVerificationService {
       }
 
       // Get fan's Twitter user data
-      const fanTwitterData = await storage.getSocialAccount(fanUserId, 'twitter');
+      const accounts = await storage.getSocialAccounts(fanUserId);
+      const fanTwitterData = accounts?.find((a: { platform?: string }) => a.platform === 'twitter');
       if (!fanTwitterData?.platformUserId) {
         return { verified: false, error: 'Twitter user ID not found' };
       }
@@ -267,7 +268,8 @@ export class TwitterVerificationService {
         return { verified: false, error: 'Twitter account not connected' };
       }
 
-      const fanTwitterData = await storage.getSocialAccount(fanUserId, 'twitter');
+      const accounts = await storage.getSocialAccounts(fanUserId);
+      const fanTwitterData = accounts?.find((a: { platform?: string }) => a.platform === 'twitter');
       if (!fanTwitterData?.platformUserId) {
         return { verified: false, error: 'Twitter user ID not found' };
       }
@@ -316,7 +318,8 @@ export class TwitterVerificationService {
         return { verified: false, error: 'Twitter account not connected' };
       }
 
-      const fanTwitterData = await storage.getSocialAccount(fanUserId, 'twitter');
+      const accounts = await storage.getSocialAccounts(fanUserId);
+      const fanTwitterData = accounts?.find((a: { platform?: string }) => a.platform === 'twitter');
       if (!fanTwitterData?.platformUserId) {
         return { verified: false, error: 'Twitter user ID not found' };
       }
@@ -367,7 +370,8 @@ export class TwitterVerificationService {
         return { verified: false, error: 'Twitter account not connected' };
       }
 
-      const fanTwitterData = await storage.getSocialAccount(fanUserId, 'twitter');
+      const accounts = await storage.getSocialAccounts(fanUserId);
+      const fanTwitterData = accounts?.find((a: { platform?: string }) => a.platform === 'twitter');
       if (!fanTwitterData?.platformUserId) {
         return { verified: false, error: 'Twitter user ID not found' };
       }
@@ -419,7 +423,8 @@ export class TwitterVerificationService {
         return [];
       }
 
-      const twitterData = await storage.getSocialAccount(userId, 'twitter');
+      const accounts = await storage.getSocialAccounts(userId);
+      const twitterData = accounts?.find((a: { platform?: string }) => a.platform === 'twitter');
       if (!twitterData?.platformUserId) {
         console.log('[Twitter] No Twitter user ID found');
         return [];

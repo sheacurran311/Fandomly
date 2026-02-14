@@ -85,13 +85,16 @@ export async function matchAndVerifyTask(
           progress: 100,
           completionData: {
             ...completionData,
-            verificationProof: {
-              platform,
-              taskType,
-              ...targetData,
-              verifiedAt: new Date().toISOString(),
-              webhookEvent: true
-            }
+            metadata: {
+              ...(typeof completionData?.metadata === 'object' && completionData?.metadata ? completionData.metadata : {}),
+              verificationProof: {
+                platform,
+                taskType,
+                ...targetData,
+                verifiedAt: new Date().toISOString(),
+                webhookEvent: true
+              }
+            },
           },
           completedAt: new Date(),
           updatedAt: new Date()

@@ -1,4 +1,3 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 

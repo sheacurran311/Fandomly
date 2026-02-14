@@ -13,13 +13,20 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FaDiscord } from "react-icons/fa";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useDiscordConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Discord has excellent API support via bot - all tasks are T1 (fully automated)
+const DISCORD_TASK_TIERS: Record<string, VerificationTier> = {
+  discord_join: 'T1',
+  discord_verify: 'T1',
+};
 
 interface DiscordTaskBuilderProps {
   onSave: (config: any) => void;
@@ -28,6 +35,7 @@ interface DiscordTaskBuilderProps {
   taskType: 'discord_join' | 'discord_verify';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
 export default function DiscordTaskBuilder({
@@ -37,9 +45,14 @@ export default function DiscordTaskBuilder({
   taskType,
   initialData,
   isEditMode,
+  programSelector,
 }: DiscordTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Get verification tier for this task type (all Discord tasks are T1)
+  const tier = DISCORD_TASK_TIERS[taskType] || 'T1';
+  const tierGuidance = TIER_GUIDANCE[tier];
 
   // Use unified Discord connection hook
   const {
@@ -52,7 +65,7 @@ export default function DiscordTaskBuilder({
   // Task settings
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(50);
+  const [points, setPoints] = useState(tierGuidance.recommendedPoints);
 
   // Discord-specific settings
   const [serverInviteUrl, setServerInviteUrl] = useState('');
@@ -70,9 +83,10 @@ export default function DiscordTaskBuilder({
   // Set default values
   useEffect(() => {
     if (!isEditMode && !taskName) {
+      // All Discord tasks are T1 with API verification
       const defaults = taskType === 'discord_join'
-        ? { name: 'Join Our Discord Server', description: 'Join our Discord community!', points: 100 }
-        : { name: 'Get Discord Member Role', description: 'Verify your Discord membership!', points: 150 };
+        ? { name: 'Join Our Discord Server', description: 'Join our Discord community!', points: 75 }
+        : { name: 'Get Discord Member Role', description: 'Verify your Discord membership!', points: 100 }; // Higher for role verification
       setTaskName(defaults.name);
       setDescription(defaults.description);
       setPoints(defaults.points);
@@ -208,6 +222,7 @@ export default function DiscordTaskBuilder({
       description="Create Discord community engagement tasks"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -216,8 +231,9 @@ export default function DiscordTaskBuilder({
       helpText="Discord tasks help build your community on Discord."
       exampleUse="Offer 100 points for joining your Discord server or 150 points for obtaining a specific member role."
     >
+      <div className="space-y-6">
       {!discordConnected && !checkingConnection && (
-        <Alert className="mb-4 bg-red-500/10 border-red-500/20">
+        <Alert className="bg-red-500/10 border-red-500/20">
           <AlertCircle className="h-4 w-4 text-red-400" />
           <AlertDescription className="text-red-400">
             <div className="flex items-center justify-between">
@@ -237,7 +253,7 @@ export default function DiscordTaskBuilder({
       )}
 
       {discordConnected && (
-        <Alert className="mb-4 bg-green-500/10 border-green-500/20">
+        <Alert className="bg-green-500/10 border-green-500/20">
           <CheckCircle2 className="h-4 w-4 text-green-400" />
           <AlertDescription className="text-green-400">
             <strong>Discord Connected</strong> - Your Discord account is linked and ready to use.
@@ -272,11 +288,32 @@ export default function DiscordTaskBuilder({
             />
           </div>
 
+          {/* Verification Tier Guidance */}
+          <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="h-4 w-4 text-green-400" />
+              <span className="font-medium text-green-400">{tierGuidance.label}</span>
+              <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+                {tierGuidance.trustLevel}
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+            <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+            {tierGuidance.tip && (
+              <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-white">Points Reward</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-white">Points Reward</Label>
+              <span className="text-xs text-gray-400">
+                Recommended: {tierGuidance.recommendedPoints} pts
+              </span>
+            </div>
             <NumberInput
               value={points}
-              onChange={(val) => setPoints(val || 1)}
+              onChange={(val) => setPoints(val || tierGuidance.recommendedPoints)}
               min={1}
               max={10000}
               allowEmpty={false}
@@ -384,6 +421,7 @@ export default function DiscordTaskBuilder({
           </div>
         </CardContent>
       </Card>
+      </div>
     </TaskBuilderBase>
   );
 }

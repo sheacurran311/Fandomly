@@ -184,7 +184,7 @@ export class CreatorReferralService {
       return 0;
     }
 
-    const percentage = parseFloat(referral.commissionPercentage);
+    const percentage = parseFloat(referral.commissionPercentage ?? '0');
     const commission = paymentAmount * (percentage / 100);
 
     // Update totals
@@ -370,6 +370,7 @@ export class FanReferralService {
       .where(eq(fanReferrals.id, referralId));
 
     // Award Fandomly Points to referring fan
+    if (!referral.referringFanId) return;
     await fandomlyPointsService.awardPoints(
       referral.referringFanId,
       points,
@@ -402,7 +403,7 @@ export class FanReferralService {
       return;
     }
 
-    const percentage = parseFloat(referral.percentageValue);
+    const percentage = parseFloat(referral.percentageValue ?? '0');
     const bonusPoints = Math.floor(points * (percentage / 100));
 
     // Update tracking
@@ -415,13 +416,13 @@ export class FanReferralService {
       .where(eq(fanReferrals.id, referral.id));
 
     // Award bonus Fandomly Points to referring fan
-    if (bonusPoints > 0) {
+    if (bonusPoints > 0 && referral.referringFanId) {
       await fandomlyPointsService.awardPoints(
         referral.referringFanId,
         bonusPoints,
         'fan_referral_percentage',
         `Earned ${bonusPoints} bonus points (${percentage}% of friend's ${points} points)`,
-        { referralId: referral.id, referredFanId }
+        { referralId: referral.id ?? undefined, referredFanId }
       );
     }
   }
@@ -470,7 +471,7 @@ export class FanReferralService {
       totalPointsEarned: referral.totalPointsReferrerEarned,
       percentageRewardsActive: referral.percentageRewardsEnabled && 
         (!referral.percentageExpiresAt || new Date() < referral.percentageExpiresAt),
-      percentageValue: parseFloat(referral.percentageValue),
+      percentageValue: parseFloat(referral.percentageValue ?? '0'),
       percentageExpiresAt: referral.percentageExpiresAt,
       referredFans: referredFans.map(r => ({
         id: r.referredFanId,
@@ -531,12 +532,13 @@ export class CreatorTaskReferralService {
       return existing;
     }
 
-    // Generate code and URL
+    // Generate code and URL (creator has displayName, not username; use displayName for slug)
+    const creatorSlug = creator.displayName?.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) || creatorId.slice(0, 8);
     const baseCode = generateUniqueCode('TASK');
-    const code = `${creator.username}-${baseCode}`;
+    const code = `${creatorSlug}-${baseCode}`;
     const url = generateReferralUrl('task', {
       code,
-      creatorUrl: creator.username,
+      creatorUrl: creatorSlug,
       taskId: task.id
     });
 
@@ -593,12 +595,13 @@ export class CreatorTaskReferralService {
       return existing;
     }
 
-    // Generate code and URL
+    // Generate code and URL (creator has displayName, not username; use displayName for slug)
+    const creatorSlug = creator.displayName?.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) || creatorId.slice(0, 8);
     const baseCode = generateUniqueCode('CAMP');
-    const code = `${creator.username}-${baseCode}`;
+    const code = `${creatorSlug}-${baseCode}`;
     const url = generateReferralUrl('campaign', {
       code,
-      creatorUrl: creator.username,
+      creatorUrl: creatorSlug,
       campaignId: campaign.id
     });
 
@@ -770,10 +773,10 @@ export class CreatorTaskReferralService {
 
     const stats = {
       totalShares: referrals.length,
-      totalClicks: referrals.reduce((sum, r) => sum + r.clickCount, 0),
+      totalClicks: referrals.reduce((sum, r) => sum + (r.clickCount ?? 0), 0),
       totalSignups: referrals.filter(r => r.signupDate).length,
       totalCompletions: referrals.filter(r => r.completedTaskDate).length,
-      totalPointsEarned: referrals.reduce((sum, r) => sum + r.totalCreatorPointsEarned, 0),
+      totalPointsEarned: referrals.reduce((sum, r) => sum + (r.totalCreatorPointsEarned ?? 0), 0),
       referrals: referrals.map(r => ({
         id: r.id,
         code: r.referralCode,
@@ -781,10 +784,10 @@ export class CreatorTaskReferralService {
         type: r.referralType,
         taskId: r.taskId,
         campaignId: r.campaignId,
-        clicks: r.clickCount,
+        clicks: r.clickCount ?? 0,
         friendJoined: !!r.signupDate,
         taskCompleted: !!r.completedTaskDate,
-        pointsEarned: r.totalCreatorPointsEarned,
+        pointsEarned: r.totalCreatorPointsEarned ?? 0,
         createdAt: r.createdAt
       }))
     };
@@ -809,7 +812,7 @@ export class CreatorTaskReferralService {
 
     for (const ref of referrals) {
       const current = fanTotals.get(ref.referringFanId) || 0;
-      fanTotals.set(ref.referringFanId, current + ref.totalCreatorPointsEarned);
+      fanTotals.set(ref.referringFanId, current + (ref.totalCreatorPointsEarned ?? 0));
       
       if (!fanData.has(ref.referringFanId)) {
         fanData.set(ref.referringFanId, {

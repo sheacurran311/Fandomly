@@ -1,25 +1,27 @@
 /**
  * Poll/Quiz Task Completion Modal
  *
- * Modal for completing poll and quiz tasks
+ * Modal for completing poll and quiz tasks with consistent layout.
  */
 
 import { useState } from "react";
-import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@shared/schema";
-import { HelpCircle, Trophy, Sparkles, CheckCircle } from "lucide-react";
+import { HelpCircle, Trophy, Sparkles, CheckCircle, XCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import PollQuizViewer from "@/components/tasks/viewers/PollQuizViewer";
 import type { PollQuizConfig } from "@/components/tasks/config/PollQuizBuilder";
+import TaskCompletionModalLayout from "../TaskCompletionModalLayout";
+import { invalidateTaskCompletionQueries } from "@/hooks/useTaskCompletion";
 
 interface PollQuizCompletionModalProps {
   task: Task;
   onClose: () => void;
   onSuccess: () => void;
-  completionId?: number;
+  completionId?: string;
 }
 
 export default function PollQuizCompletionModal({
@@ -39,11 +41,15 @@ export default function PollQuizCompletionModal({
 
   if (!pollQuizConfig) {
     return (
-      <Alert variant="destructive">
-        <AlertDescription>Invalid poll/quiz configuration</AlertDescription>
-      </Alert>
+      <div className="p-6 text-center">
+        <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+        <p className="text-sm text-white/60">Invalid poll/quiz configuration</p>
+        <Button onClick={onClose} variant="ghost" className="mt-4">Close</Button>
+      </div>
     );
   }
+
+  const isQuiz = pollQuizConfig.type === 'quiz';
 
   // Submit answers mutation
   const submitMutation = useMutation({
@@ -76,19 +82,16 @@ export default function PollQuizCompletionModal({
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+      // Invalidate all task completion related queries across the app
+      invalidateTaskCompletionQueries(queryClient);
 
-      // Show results
       setResults(data);
       setShowResults(true);
 
-      // Calculate score for quizzes
-      if (pollQuizConfig.type === 'quiz') {
+      if (isQuiz) {
         const score = data.score || 0;
         const totalQuestions = pollQuizConfig.questions.length;
         const percentage = (score / totalQuestions) * 100;
-
         const passed = pollQuizConfig.requirePerfectScore
           ? percentage === 100
           : percentage >= (pollQuizConfig.passingScore || 0);
@@ -108,7 +111,6 @@ export default function PollQuizCompletionModal({
           }, 2000);
         }
       } else {
-        // Poll - always success
         toast({
           title: "Poll Submitted!",
           description: `Thanks for sharing your opinion! You earned ${task.pointsToReward} points.`,
@@ -133,107 +135,90 @@ export default function PollQuizCompletionModal({
     submitMutation.mutate(answers);
   };
 
-  // Show results view
+  // Results view
   if (showResults && results) {
     const score = results.score || 0;
     const totalQuestions = pollQuizConfig.questions.length;
     const percentage = (score / totalQuestions) * 100;
-    const passed = pollQuizConfig.type === 'poll' || (
+    const passed = !isQuiz || (
       pollQuizConfig.requirePerfectScore
         ? percentage === 100
         : percentage >= (pollQuizConfig.passingScore || 0)
     );
 
     return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            {passed ? (
-              <CheckCircle className="w-6 h-6 text-green-500" />
-            ) : (
-              <HelpCircle className="w-6 h-6 text-red-500" />
-            )}
-            <DialogTitle>
-              {pollQuizConfig.type === 'poll' ? 'Poll Submitted!' : passed ? 'Quiz Passed!' : 'Quiz Complete'}
-            </DialogTitle>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          {pollQuizConfig.type === 'quiz' && (
-            <div className="text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-2 border-purple-500">
-                <Trophy className="w-12 h-12 text-purple-400" />
-              </div>
-
-              <div>
-                <h3 className="text-3xl font-bold text-white mb-2">{percentage}%</h3>
-                <p className="text-gray-400">
-                  {score} out of {totalQuestions} questions correct
-                </p>
-              </div>
-
-              {passed && (
-                <Alert className="bg-green-500/10 border-green-500/20">
-                  <Sparkles className="h-4 w-4 text-green-400" />
-                  <AlertDescription className="text-green-400">
-                    <strong>Congratulations!</strong> You earned {task.pointsToReward} points!
-                    {pollQuizConfig.perfectScoreMultiplier && percentage === 100 && (
-                      <p className="mt-1">
-                        Perfect score bonus: {pollQuizConfig.perfectScoreMultiplier}x multiplier applied!
-                      </p>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {!passed && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    You need {pollQuizConfig.passingScore}% to pass. Try again!
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
+      <div className="flex flex-col items-center py-6 space-y-5">
+        {/* Result Icon */}
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
+          passed
+            ? "bg-green-500/10 border-2 border-green-500/30"
+            : "bg-red-500/10 border-2 border-red-500/30"
+        }`}>
+          {passed ? (
+            <Trophy className="w-10 h-10 text-green-400" />
+          ) : (
+            <XCircle className="w-10 h-10 text-red-400" />
           )}
-
-          {pollQuizConfig.type === 'poll' && (
-            <Alert className="bg-green-500/10 border-green-500/20">
-              <CheckCircle className="h-4 w-4 text-green-400" />
-              <AlertDescription className="text-green-400">
-                <strong>Thank you!</strong> Your opinion has been recorded. You earned {task.pointsToReward} points!
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Button onClick={onClose} className="w-full">
-            Close
-          </Button>
         </div>
-      </>
+
+        {/* Result Title */}
+        <div className="text-center space-y-1">
+          <h3 className="text-xl font-bold text-white">
+            {!isQuiz ? "Poll Submitted!" : passed ? "Quiz Passed!" : "Not Quite..."}
+          </h3>
+          {isQuiz && (
+            <p className="text-3xl font-bold text-white">{percentage}%</p>
+          )}
+          <p className="text-sm text-white/50">
+            {!isQuiz
+              ? "Thanks for sharing your opinion!"
+              : `${score} out of ${totalQuestions} correct`}
+          </p>
+        </div>
+
+        {/* Success/Fail Message */}
+        {passed ? (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20 w-full">
+            <Sparkles className="h-4 w-4 text-green-400 shrink-0" />
+            <p className="text-sm text-green-400">
+              You earned <strong>{task.pointsToReward} points!</strong>
+              {isQuiz && pollQuizConfig.perfectScoreMultiplier && percentage === 100 && (
+                <> Perfect score bonus: {pollQuizConfig.perfectScoreMultiplier}x multiplier!</>
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 w-full">
+            <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+            <p className="text-sm text-red-400">
+              You need {pollQuizConfig.passingScore}% to pass. Try again!
+            </p>
+          </div>
+        )}
+
+        <Button onClick={onClose} className="w-full">
+          Close
+        </Button>
+      </div>
     );
   }
 
+  // Main quiz/poll view
   return (
-    <>
-      <DialogHeader>
-        <div className="flex items-center gap-3 mb-2">
-          <HelpCircle className="w-6 h-6 text-purple-500" />
-          <DialogTitle>{task.name}</DialogTitle>
-        </div>
-        <DialogDescription>
-          {task.description || (pollQuizConfig.type === 'poll' ? 'Share your opinion' : 'Test your knowledge')}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="py-4">
-        <PollQuizViewer
-          config={pollQuizConfig}
-          onSubmit={handleSubmit}
-          onCancel={onClose}
-          isSubmitting={submitMutation.isPending}
-        />
-      </div>
-    </>
+    <TaskCompletionModalLayout
+      platform="interactive"
+      icon={<HelpCircle className="h-5 w-5" />}
+      taskName={task.name}
+      taskDescription={task.description || (isQuiz ? 'Test your knowledge' : 'Share your opinion')}
+      pointsReward={task.pointsToReward || 0}
+      hideFooter={true}
+    >
+      <PollQuizViewer
+        config={pollQuizConfig}
+        onSubmit={handleSubmit}
+        onCancel={onClose}
+        isSubmitting={submitMutation.isPending}
+      />
+    </TaskCompletionModalLayout>
   );
 }

@@ -1,6 +1,6 @@
 import { fetchApi } from "@/lib/queryClient";
 
-type UserType = "creator" | "fan";
+type UserType = "creator" | "fan" | string;  // 'string' allows 'auth' and other neutral values
 
 // Module-level guards to prevent duplicate flows
 let twitterLoginInFlight = false;
@@ -63,7 +63,14 @@ function getEnvRedirectUri(): string {
 function getEnvScopes(): string {
   const fromEnv = import.meta.env.VITE_TWITTER_SCOPES as string | undefined;
   if (fromEnv && fromEnv.trim().length > 0) return fromEnv.trim();
-  return "users.read tweet.read tweet.write offline.access";
+  // Required scopes for all Twitter verification tasks:
+  // - users.read: Read user profiles
+  // - tweet.read: Read tweets for content verification
+  // - tweet.write: For future write operations
+  // - follows.read: Verify follow relationships (GET /2/users/{id}/following)
+  // - like.read: Verify likes (GET /2/users/{id}/liked_tweets)
+  // - offline.access: Get refresh tokens for long-lived access
+  return "users.read tweet.read tweet.write follows.read like.read offline.access";
 }
 
 function getClientId(): string {
@@ -72,38 +79,7 @@ function getClientId(): string {
   return clientId;
 }
 
-function getDynamicUserId(): string | null {
-  // Try multiple sources for Dynamic user ID
-  try {
-    // 1. Current window (for parent window)
-    if ((window as any).__dynamicUserId) {
-      return (window as any).__dynamicUserId;
-    }
-    
-    // 2. localStorage (for popup window)
-    const fromStorage = localStorage.getItem("twitter_dynamic_user_id");
-    if (fromStorage) {
-      return fromStorage;
-    }
-    
-    // 3. Opener window (for popup window)
-    if ((window as any).opener && (window as any).opener.__dynamicUserId) {
-      return (window as any).opener.__dynamicUserId;
-    }
-    
-    // 4. Opener's localStorage (for popup window)
-    if ((window as any).opener && (window as any).opener.localStorage) {
-      const fromOpenerStorage = (window as any).opener.localStorage.getItem("twitter_dynamic_user_id");
-      if (fromOpenerStorage) {
-        return fromOpenerStorage;
-      }
-    }
-  } catch (e) {
-    console.warn('[Twitter] Error accessing Dynamic user ID:', e);
-  }
-  
-  return null;
-}
+// getDynamicUserId removed - no longer using Dynamic auth provider
 
 export class TwitterSDKManager {
   static async getAuthUrl(userType: UserType, state?: string, forcedRedirectUri?: string): Promise<string> {
@@ -116,7 +92,7 @@ export class TwitterSDKManager {
 
     const clientId = getClientId();
     const redirectUri = forcedRedirectUri || getEnvRedirectUri();
-    const scope = "users.read tweet.read tweet.write offline.access";
+    const scope = getEnvScopes();
 
     // 1) Create verifier & challenge for PKCE
     const verifier = generateRandomString(64);
@@ -148,14 +124,14 @@ export class TwitterSDKManager {
     return url;
   }
 
-  static async secureLogin(userType: UserType, dynamicUserIdParam?: string): Promise<TwitterLoginResult> {
+  static async secureLogin(userType: UserType): Promise<TwitterLoginResult> {
     if (twitterLoginInFlight) {
       return { success: false, error: "Twitter auth already in progress" };
     }
     twitterLoginInFlight = true;
     
     try {
-      // Clear any stale state first (do NOT clear twitter_dynamic_user_id preemptively)
+      // Clear any stale state first
       try {
         localStorage.removeItem("twitter_oauth_state");
         localStorage.removeItem("twitter_pkce_verifier");
@@ -177,16 +153,6 @@ export class TwitterSDKManager {
       try { (window as any).__twitterState = stateValue; } catch {}
       
       console.log(`[Twitter] Starting OAuth with state: ${stateValue}`);
-
-      // CRITICAL: Store Dynamic user ID for popup access
-      const dynamicUserId = dynamicUserIdParam || getDynamicUserId();
-      if (dynamicUserId) {
-        localStorage.setItem("twitter_dynamic_user_id", dynamicUserId);
-        try { (window as any).__dynamicUserId = dynamicUserId; } catch {}
-        console.log(`[Twitter] Stored Dynamic user ID for popup: ${dynamicUserId}`);
-      } else {
-        console.warn('[Twitter] No Dynamic user ID available - connection may fail');
-      }
 
       const redirectUri = getEnvRedirectUri();
       console.log("[Twitter] Using redirectUri:", redirectUri);
@@ -348,17 +314,14 @@ export class TwitterSDKManager {
         hasVerifier: !!verifier
       });
 
-      const token = await this.exchangeCodeForToken(code, verifier);
+      const tokenResult = await this.exchangeCodeForToken(code, verifier);
       
-      console.log(`[Twitter] exchangeCodeForToken returned:`, token ? `token (${token.substring(0, 10)}...)` : 'null');
+      console.log(`[Twitter] exchangeCodeForToken returned:`, tokenResult ? `token (${tokenResult.accessToken.substring(0, 10)}...)` : 'null');
       
       // Clean up state and pkce map entries AFTER token exchange success
       try { localStorage.removeItem('twitter_oauth_state'); } catch {}
-      try { localStorage.removeItem('twitter_dynamic_user_id'); } catch {}
       try { if ((window as any).opener) (window as any).opener.localStorage?.removeItem('twitter_oauth_state'); } catch {}
-      try { if ((window as any).opener) (window as any).opener.localStorage?.removeItem('twitter_dynamic_user_id'); } catch {}
       try { if ((window as any).opener) (window as any).opener.__twitterState = null; } catch {}
-      // Do NOT clear parent's __dynamicUserId; Dynamic SDK owns auth state
 
       // Clean up PKCE mapping after exchange
       try {
@@ -374,17 +337,19 @@ export class TwitterSDKManager {
 
       // No PKCE mapping to clear for confidential clients
       
-      if (!token) {
+      if (!tokenResult) {
         console.error('[Twitter] Token exchange returned null - failing callback');
         return { success: false, error: "Token exchange failed" };
       }
 
-      const user = await this.fetchUserInfo(token);
+      const { accessToken, refreshToken } = tokenResult;
+      const user = await this.fetchUserInfo(accessToken);
       const userType = state.includes("_creator_") ? "creator" : state.includes("_fan_") ? "fan" : undefined;
 
       const result: TwitterLoginResult = {
         success: true,
-        accessToken: token,
+        accessToken,
+        refreshToken,
         user,
         state,
         userType,
@@ -393,25 +358,41 @@ export class TwitterSDKManager {
       // Persist result for reuse if a second callback run occurs
       try { if (state) sessionStorage.setItem(`tw_cb_result_${state}`, JSON.stringify(result)); } catch {}
 
-      try {
-        const dynamicUserId = getDynamicUserId();
-        console.log(`[Twitter] Callback - Dynamic user ID check:`, {
-          fromWindow: (window as any).__dynamicUserId || null,
-          fromStorage: localStorage.getItem("twitter_dynamic_user_id") || null,
-          fromOpener: ((window as any).opener && (window as any).opener.__dynamicUserId) || null,
-          final: dynamicUserId
-        });
-        console.log(`[Twitter] Attempting to save connection: dynamicUserId=${dynamicUserId ? 'present' : 'missing'}, user=${user ? 'present' : 'missing'}`);
-        if (dynamicUserId && user) {
-          const payload = { platform: "twitter", accountData: { user, connectedAt: new Date().toISOString() } };
-          console.log(`[Twitter] Saving connection payload:`, payload);
-          const connectResult = await fetchApi("/api/social/connect", { method: "POST", body: JSON.stringify(payload) });
-          console.log(`[Twitter] Connection save result:`, connectResult);
-        } else {
-          console.warn(`[Twitter] Cannot save connection: dynamicUserId=${!!dynamicUserId}, user=${!!user}`);
+      // Save connection via the authenticated endpoint (supports cookie auth)
+      if (user) {
+        try {
+          console.log(`[Twitter] Saving connection via /api/social-connections...`);
+          const savePayload = {
+            platform: "twitter",
+            platformUserId: user.id,
+            platformUsername: user.username,
+            platformDisplayName: user.name,
+            accessToken,
+            refreshToken,
+            profileData: {
+              profileImageUrl: user.profileImageUrl,
+              followersCount: user.followersCount,
+              followingCount: user.followingCount,
+            },
+          };
+          const saveRes = await fetch("/api/social-connections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(savePayload),
+          });
+          if (saveRes.ok) {
+            const saveData = await saveRes.json();
+            console.log(`[Twitter] Connection saved successfully:`, saveData);
+          } else {
+            const errText = await saveRes.text();
+            console.warn(`[Twitter] Connection save via /api/social-connections failed (${saveRes.status}):`, errText);
+          }
+        } catch (connectError) {
+          console.error('[Twitter] Failed to save connection, but OAuth succeeded:', connectError);
         }
-      } catch (connectError) {
-        console.error('[Twitter] Failed to save connection, but OAuth succeeded:', connectError);
+      } else {
+        console.warn(`[Twitter] Cannot save connection: no user info available`);
       }
 
       return result;
@@ -424,7 +405,7 @@ export class TwitterSDKManager {
   // Track used codes to prevent reuse
   private static usedCodes = new Set<string>();
 
-  static async exchangeCodeForToken(code: string, codeVerifier: string): Promise<string | null> {
+  static async exchangeCodeForToken(code: string, codeVerifier: string): Promise<{ accessToken: string; refreshToken?: string } | null> {
     const lockKey = `tw_code_lock_${code.slice(0,24)}`;
     if (sessionStorage.getItem(lockKey)) {
       console.warn("[Twitter] Duplicate code exchange blocked by session lock");
@@ -434,14 +415,18 @@ export class TwitterSDKManager {
 
     try {
       const redirectUri = getEnvRedirectUri();
-      const dynamicUserId = getDynamicUserId();
       
       const data = await fetchApi("/api/social/twitter/token", {
         method: "POST",
-        body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier, dynamicUserId })
+        body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier })
       });
       
-      return data?.access_token ?? null;
+      if (!data?.access_token) return null;
+      
+      return {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      };
     } catch (e) {
       console.error("[Twitter] Token exchange error:", e);
       return null;
@@ -450,9 +435,7 @@ export class TwitterSDKManager {
 
   static async fetchUserInfo(accessToken: string): Promise<TwitterUserInfo | undefined> {
     try {
-      const dynamicUserId = getDynamicUserId();
       const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` };
-      if (dynamicUserId) headers["x-dynamic-user-id"] = dynamicUserId;
 
       const res = await fetch("/api/social/twitter/user", { headers, credentials: "include" });
       const data = await res.json();

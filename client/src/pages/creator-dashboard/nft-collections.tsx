@@ -124,7 +124,7 @@ export default function NftCollectionsPage() {
 // ============================================================================
 
 function CollectionCard({ collection }: { collection: NftCollection }) {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   const metadata = collection.metadata as any;
   const totalSupply = metadata?.totalSupply || 0;

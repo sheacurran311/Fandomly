@@ -1,5 +1,5 @@
 import { db } from '../../db';
-import { users } from "@shared/schema";
+import { users, platformPointsTransactions } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -60,7 +60,7 @@ export class PlatformPointsService {
       const existingTransactions = (user.profileData as any)?.pointsTransactions || [];
       const updatedTransactions = [transaction, ...existingTransactions].slice(0, 100);
 
-      // Update user's platform points balance and transactions
+      // Update user's platform points balance and transactions in profile_data (legacy)
       await db
         .update(users)
         .set({
@@ -76,6 +76,16 @@ export class PlatformPointsService {
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
+
+      // Also insert into platform_points_transactions table for unified querying
+      // This ensures charts, leaderboards, and history all use the same data source
+      await db.insert(platformPointsTransactions).values({
+        userId,
+        points,
+        source,
+        description: `${points >= 0 ? 'Earned' : 'Spent'} ${Math.abs(points)} platform points from ${source}`,
+        metadata: metadata ?? undefined,
+      });
 
       console.log(`[Platform Points] Awarded ${points} points to user ${userId}. New balance: ${newBalance}. Source: ${source}`);
 
@@ -156,15 +166,15 @@ export class PlatformPointsService {
         .map(completion => ({
           id: `task_${completion.id}`,
           userId: completion.userId,
-          points: completion.pointsAwarded,
+          points: completion.pointsAwarded ?? 0,
           source: 'platform_task_completion',
           metadata: {
             taskId: completion.taskId,
             taskName: (completion as any).task?.name,
-            completedAt: completion.completedAt,
-            verifiedAt: completion.verifiedAt,
+            completedAt: completion.completedAt ?? null,
+            verifiedAt: completion.verifiedAt ?? null,
           },
-          createdAt: completion.createdAt,
+          createdAt: completion.createdAt ?? new Date(),
         }));
 
       // Combine and sort all transactions by date

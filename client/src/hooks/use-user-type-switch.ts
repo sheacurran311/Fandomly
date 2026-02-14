@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
 import { FacebookSDKManager } from "@/lib/facebook";
 
 interface SwitchUserTypeRequest {
@@ -14,7 +14,7 @@ export function useUserTypeSwitch() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { user: dynamicUser } = useDynamicContext();
+  const { user, refreshUser } = useAuth();
 
   return useMutation({
     mutationFn: async ({ userId, userType }: SwitchUserTypeRequest) => {
@@ -34,19 +34,12 @@ export function useUserTypeSwitch() {
     onSuccess: async (data) => {
       console.log("User type switch successful:", data);
       
-      // Invalidate and refetch user queries with correct key that matches useAuth
-      if (dynamicUser?.userId) {
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user", dynamicUser.userId] });
-        await queryClient.refetchQueries({ queryKey: ["/api/auth/user", dynamicUser.userId] });
-        
-        // Immediately update cache to prevent race conditions
-        queryClient.setQueryData(["/api/auth/user", dynamicUser.userId], (prev: any) => ({
-          ...prev,
-          userType: data.userType,
-          onboardingState: data.onboardingState ?? prev?.onboardingState
-        }));
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/role"] });
+      // CRITICAL: Refresh the auth context to pick up the new userType
+      // This updates the React state that the auth router uses for routing
+      await refreshUser();
+      
+      // Also invalidate React Query caches
+      await queryClient.invalidateQueries();
       
       toast({
         title: "Account Type Changed",

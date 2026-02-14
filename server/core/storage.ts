@@ -237,7 +237,7 @@ export class DatabaseStorage implements IStorage {
         totalSteps: userType === "creator" ? 3 : 2,
         completedSteps: [],
         isCompleted: false,
-        lastOnboardingRoute: null
+        lastOnboardingRoute: undefined
       };
       
       const [updatedUser] = await db
@@ -590,9 +590,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRewardRedemptionsByProgram(programId: string): Promise<RewardRedemption[]> {
-    return await db.select().from(rewardRedemptions)
-      .where(eq(rewardRedemptions.programId, programId))
+    const rows = await db.select({ redemption: rewardRedemptions })
+      .from(rewardRedemptions)
+      .innerJoin(rewards, eq(rewardRedemptions.rewardId, rewards.id))
+      .where(eq(rewards.programId, programId))
       .orderBy(desc(rewardRedemptions.redeemedAt));
+    return rows.map(r => r.redemption);
   }
 
   async updateRewardRedemption(id: string, updates: Partial<InsertRewardRedemption>): Promise<RewardRedemption> {
@@ -1055,29 +1058,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]> {
-    // Join with tasks table to filter by programId
-    const completions = await db
-      .select({
-        id: taskCompletions.id,
-        taskId: taskCompletions.taskId,
-        userId: taskCompletions.userId,
-        tenantId: taskCompletions.tenantId,
-        status: taskCompletions.status,
-        progress: taskCompletions.progress,
-        completionData: taskCompletions.completionData,
-        pointsAwarded: taskCompletions.pointsAwarded,
-        startedAt: taskCompletions.startedAt,
-        completedAt: taskCompletions.completedAt,
-        verifiedAt: taskCompletions.verifiedAt,
-        createdAt: taskCompletions.createdAt,
-        updatedAt: taskCompletions.updatedAt,
-      })
+    console.log(`[Storage] Getting task completions for program ${programId}`);
+    
+    // First check what tasks exist for this program
+    const programTasks = await db
+      .select({ id: tasks.id, name: tasks.name, programId: tasks.programId })
+      .from(tasks)
+      .where(eq(tasks.programId, programId));
+    console.log(`[Storage] Found ${programTasks.length} tasks for program ${programId}:`, programTasks);
+    
+    const rows = await db
+      .select({ task_completions: taskCompletions, task: tasks })
       .from(taskCompletions)
       .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
       .where(eq(tasks.programId, programId))
       .orderBy(desc(taskCompletions.completedAt));
-
-    return completions as TaskCompletion[];
+    
+    console.log(`[Storage] Found ${rows.length} completions for program ${programId}:`, 
+      rows.map(r => ({ 
+        completionId: r.task_completions.id, 
+        status: r.task_completions.status,
+        taskId: r.task_completions.taskId,
+        taskProgramId: r.task?.programId 
+      }))
+    );
+    
+    return rows.map(r => r.task_completions) as TaskCompletion[];
   }
 
   async createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion> {

@@ -12,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Filter, Download } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 
 export default function ActivityPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -160,7 +159,7 @@ export default function ActivityPage() {
                         {activity.description}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {activity.timestamp ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true }) : 'Unknown time'}
+                        {activity.timestamp || 'Unknown time'}
                       </p>
                     </div>
                     <div className="text-xs text-gray-500 capitalize">

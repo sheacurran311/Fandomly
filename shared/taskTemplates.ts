@@ -219,8 +219,14 @@ export const spotifyTaskSchema = z.discriminatedUnion("taskType", [
 ]);
 
 // Core task template catalog - Global templates available to all creators
+// Each template now includes verification tier (T1/T2/T3) and method
 export const CORE_TASK_TEMPLATES = [
-  // Twitter/X Templates
+  // ============================================================================
+  // T1 - API VERIFIED TASKS (100% points)
+  // Platforms with full API verification: Spotify, YouTube, Discord, Twitch, Twitter Basic
+  // ============================================================================
+  
+  // Twitter/X Templates (T1 with Basic tier API)
   {
     id: "twitter-follow",
     name: "Follow on X (Twitter)",
@@ -228,9 +234,12 @@ export const CORE_TASK_TEMPLATES = [
     platform: "twitter" as const,
     taskType: "twitter_follow" as const,
     category: "social",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 50,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 50,
     isGlobal: true,
@@ -243,11 +252,32 @@ export const CORE_TASK_TEMPLATES = [
     platform: "twitter" as const,
     taskType: "twitter_retweet" as const,
     category: "social",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 100,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 100,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-like",
+    name: "Like Tweet",
+    description: "Fans like a specific tweet",
+    platform: "twitter" as const,
+    taskType: "twitter_like" as const,
+    category: "social",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "api" as const,
+    },
+    defaultPoints: 25,
     isGlobal: true,
     isActive: true,
   },
@@ -258,154 +288,32 @@ export const CORE_TASK_TEMPLATES = [
     platform: "twitter" as const,
     taskType: "twitter_mention" as const,
     category: "social",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 75,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 75,
     isGlobal: true,
     isActive: true,
   },
 
-  // Facebook Templates
-  {
-    id: "facebook-like-page",
-    name: "Like Facebook Page",
-    description: "Fans like your Facebook page",
-    platform: "facebook" as const,
-    taskType: "facebook_like_page" as const,
-    category: "social",
-    defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 50,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "facebook-like-post",
-    name: "Like Facebook Post",
-    description: "Fans like a specific Facebook post",
-    platform: "facebook" as const,
-    taskType: "facebook_like_post" as const,
-    category: "social",
-    defaultConfig: {
-      points: 25,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 25,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "facebook-share-post",
-    name: "Share Facebook Post",
-    description: "Fans share a specific Facebook post",
-    platform: "facebook" as const,
-    taskType: "facebook_share_post" as const,
-    category: "social",
-    defaultConfig: {
-      points: 100,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 100,
-    isGlobal: true,
-    isActive: true,
-  },
-
-  // Instagram Templates
-  {
-    id: "instagram-follow",
-    name: "Follow on Instagram",
-    description: "Fans follow your Instagram account",
-    platform: "instagram" as const,
-    taskType: "instagram_follow" as const,
-    category: "social",
-    defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 50,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "instagram-like-post",
-    name: "Like Instagram Post",
-    description: "Fans like a specific Instagram post",
-    platform: "instagram" as const,
-    taskType: "instagram_like_post" as const,
-    category: "social",
-    defaultConfig: {
-      points: 25,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 25,
-    isGlobal: true,
-    isActive: true,
-  },
-
-  // YouTube Templates
-  {
-    id: "youtube-subscribe",
-    name: "Subscribe on YouTube",
-    description: "Fans subscribe to your YouTube channel",
-    platform: "youtube" as const,
-    taskType: "youtube_subscribe" as const,
-    category: "social",
-    defaultConfig: {
-      points: 100,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 100,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "youtube-like",
-    name: "Like YouTube Video",
-    description: "Fans like a specific YouTube video",
-    platform: "youtube" as const,
-    taskType: "youtube_like" as const,
-    category: "social",
-    defaultConfig: {
-      points: 25,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 25,
-    isGlobal: true,
-    isActive: true,
-  },
-
-  // TikTok Templates
-  {
-    id: "tiktok-follow",
-    name: "Follow on TikTok",
-    description: "Fans follow your TikTok account",
-    platform: "tiktok" as const,
-    taskType: "tiktok_follow" as const,
-    category: "social",
-    defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 50,
-    isGlobal: true,
-    isActive: true,
-  },
-
-  // Spotify Templates  
+  // Spotify Templates (T1 - Full API access)
   {
     id: "spotify-follow",
     name: "Follow on Spotify",
     description: "Fans follow your Spotify artist profile",
     platform: "spotify" as const,
     taskType: "spotify_follow" as const,
-    category: "social",
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 50,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 50,
     isGlobal: true,
@@ -417,125 +325,429 @@ export const CORE_TASK_TEMPLATES = [
     description: "Fans follow a specific Spotify playlist",
     platform: "spotify" as const,
     taskType: "spotify_playlist" as const,
-    category: "social",
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
-      points: 75,
-      verificationMethod: "manual" as const,
+      points: 40,
+      verificationMethod: "api" as const,
     },
-    defaultPoints: 75,
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "spotify-save-track",
+    name: "Save Track on Spotify",
+    description: "Fans save a track to their Spotify library",
+    platform: "spotify" as const,
+    taskType: "spotify_save_track" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 30,
+      verificationMethod: "api" as const,
+    },
+    defaultPoints: 30,
     isGlobal: true,
     isActive: true,
   },
 
-  // Additional Facebook Templates
-  {
-    id: "facebook-follow",
-    name: "Follow on Facebook",
-    description: "Fans like your Facebook page",
-    platform: "facebook" as const,
-    taskType: "facebook_like_page" as const,
-    category: "social",
-    defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 50,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "facebook-like",
-    name: "Like Facebook Post",
-    description: "Fans like a specific Facebook post",
-    platform: "facebook" as const,
-    taskType: "facebook_like_post" as const,
-    category: "social",
-    defaultConfig: {
-      points: 25,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 25,
-    isGlobal: true,
-    isActive: true,
-  },
-
-  // Additional Instagram Templates
-  {
-    id: "instagram-follow",
-    name: "Follow on Instagram",
-    description: "Fans follow your Instagram account",
-    platform: "instagram" as const,
-    taskType: "instagram_follow" as const,
-    category: "social",
-    defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 50,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "instagram-like",
-    name: "Like Instagram Post",
-    description: "Fans like a specific Instagram post",
-    platform: "instagram" as const,
-    taskType: "instagram_like_post" as const,
-    category: "social",
-    defaultConfig: {
-      points: 25,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 25,
-    isGlobal: true,
-    isActive: true,
-  },
-
-  // Additional YouTube Templates
+  // YouTube Templates (T1 - Full API access)
   {
     id: "youtube-subscribe",
     name: "Subscribe on YouTube",
     description: "Fans subscribe to your YouTube channel",
     platform: "youtube" as const,
     taskType: "youtube_subscribe" as const,
-    category: "social",
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 100,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 100,
     isGlobal: true,
     isActive: true,
   },
+  // NOTE: youtube_like is T3 because YouTube API doesn't expose per-user like data
+  // Only aggregate like counts are available, not individual user likes
   {
     id: "youtube-like",
     name: "Like YouTube Video",
-    description: "Fans like a specific YouTube video",
+    description: "Fans like a specific YouTube video (manual verification)",
     platform: "youtube" as const,
     taskType: "youtube_like" as const,
     category: "social",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 15, // Reduced for T3 (50% of typical)
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 15,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Discord Templates (T1 - Full API access via bot)
+  {
+    id: "discord-join",
+    name: "Join Discord Server",
+    description: "Fans join your Discord community",
+    platform: "discord" as const,
+    taskType: "discord_join" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 75,
+      verificationMethod: "api" as const,
+    },
+    defaultPoints: 75,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "discord-role",
+    name: "Get Discord Role",
+    description: "Fans earn a specific role in your Discord server",
+    platform: "discord" as const,
+    taskType: "discord_role" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "api" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "discord-react",
+    name: "React to Discord Message",
+    description: "Fans react to a specific message with an emoji",
+    platform: "discord" as const,
+    taskType: "discord_react" as const,
+    category: "social",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 25,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 25,
     isGlobal: true,
     isActive: true,
   },
 
-  // TikTok Templates
+  // Twitch Templates (T1 - Full API access)
   {
-    id: "tiktok-follow",
-    name: "Follow on TikTok",
-    description: "Fans follow your TikTok account",
-    platform: "tiktok" as const,
-    taskType: "tiktok_follow" as const,
-    category: "social",
+    id: "twitch-follow",
+    name: "Follow on Twitch",
+    description: "Fans follow your Twitch channel",
+    platform: "twitch" as const,
+    taskType: "twitch_follow" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 50,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitch-subscribe",
+    name: "Subscribe on Twitch",
+    description: "Fans subscribe to your Twitch channel (paid)",
+    platform: "twitch" as const,
+    taskType: "twitch_subscribe" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 200,
+      verificationMethod: "api" as const,
+    },
+    defaultPoints: 200,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // ============================================================================
+  // T2 - CODE VERIFIED TASKS (85% points)
+  // Tasks verified via unique code in comment or quote tweet
+  // ============================================================================
+  
+  // Twitter Quote Tweet with Code (T2)
+  {
+    id: "twitter-quote-tweet",
+    name: "Quote Tweet with Code",
+    description: "Fans quote tweet with their unique verification code",
+    platform: "twitter" as const,
+    taskType: "twitter_quote_tweet" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_repost" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 85, // 85% of 100
+      verificationMethod: "code_repost" as const,
+    },
+    defaultPoints: 85,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-reply-code",
+    name: "Reply with Code",
+    description: "Fans reply to a tweet with their unique verification code",
+    platform: "twitter" as const,
+    taskType: "twitter_reply_code" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Instagram Code Verification (T2)
+  {
+    id: "instagram-comment-code",
+    name: "Comment with Code on Instagram",
+    description: "Fans comment with their unique verification code",
+    platform: "instagram" as const,
+    taskType: "comment_code" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "instagram-keyword-comment",
+    name: "Comment with Keyword on Instagram",
+    description: "Fans comment with specific keyword (code verification)",
+    platform: "instagram" as const,
+    taskType: "keyword_comment" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // YouTube Comment with Code (T2)
+  {
+    id: "youtube-comment",
+    name: "Comment with Code on YouTube",
+    description: "Fans comment on a video with their unique verification code",
+    platform: "youtube" as const,
+    taskType: "youtube_comment" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Facebook Comment with Code (T2)
+  {
+    id: "facebook-comment-post",
+    name: "Comment with Code on Facebook Post",
+    description: "Fans comment with their unique verification code",
+    platform: "facebook" as const,
+    taskType: "facebook_comment_post" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-comment-photo",
+    name: "Comment with Code on Facebook Photo",
+    description: "Fans comment with their unique verification code",
+    platform: "facebook" as const,
+    taskType: "facebook_comment_photo" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // TikTok Comment with Code (T2)
+  {
+    id: "tiktok-comment",
+    name: "Comment with Code on TikTok",
+    description: "Fans comment on a video with their unique verification code",
+    platform: "tiktok" as const,
+    taskType: "tiktok_comment" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Discord Message with Code (T2)
+  {
+    id: "discord-message-code",
+    name: "Discord Message with Code",
+    description: "Fans send a message with their verification code in a channel",
+    platform: "discord" as const,
+    taskType: "discord_message_code" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Instagram Story Mention (T2 - via webhook)
+  {
+    id: "instagram-mention-story",
+    name: "Mention in Instagram Story",
+    description: "Fans mention you in their Instagram Story",
+    platform: "instagram" as const,
+    taskType: "mention_story" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 65, // 85% of ~75
+      verificationMethod: "code_comment" as const,
+    },
+    defaultPoints: 65,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // ============================================================================
+  // T3 - STARTER PACK TASKS (50% points)
+  // Honor system tasks with embedded profile - one-time per platform per tenant
+  // ============================================================================
+  
+  // Instagram Starter Pack (T3)
+  {
+    id: "instagram-follow",
+    name: "Follow on Instagram (Starter Pack)",
+    description: "Follow the creator's Instagram account - one-time starter task",
+    platform: "instagram" as const,
+    taskType: "instagram_follow" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "starter_pack" as const,
+    isStarterPack: true,
+    defaultConfig: {
+      points: 25, // 50% of 50
+      verificationMethod: "starter_pack" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "instagram-like-post",
+    name: "Like Instagram Post",
+    description: "Fans like a specific Instagram post",
+    platform: "instagram" as const,
+    taskType: "instagram_like_post" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 15, // 50% of ~25
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 15,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // TikTok Starter Pack (T3)
+  {
+    id: "tiktok-follow",
+    name: "Follow on TikTok (Starter Pack)",
+    description: "Follow the creator's TikTok account - one-time starter task",
+    platform: "tiktok" as const,
+    taskType: "tiktok_follow" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "starter_pack" as const,
+    isStarterPack: true,
+    defaultConfig: {
+      points: 25, // 50% of 50
+      verificationMethod: "starter_pack" as const,
+    },
+    defaultPoints: 25,
     isGlobal: true,
     isActive: true,
   },
@@ -545,134 +757,215 @@ export const CORE_TASK_TEMPLATES = [
     description: "Fans like a specific TikTok video",
     platform: "tiktok" as const,
     taskType: "tiktok_like" as const,
-    category: "social",
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
     defaultConfig: {
-      points: 25,
+      points: 15, // 50% of ~25
       verificationMethod: "manual" as const,
+    },
+    defaultPoints: 15,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Facebook Starter Pack (T3)
+  {
+    id: "facebook-like-page",
+    name: "Like Facebook Page (Starter Pack)",
+    description: "Like the creator's Facebook page - one-time starter task",
+    platform: "facebook" as const,
+    taskType: "facebook_like_page" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "starter_pack" as const,
+    isStarterPack: true,
+    defaultConfig: {
+      points: 25, // 50% of 50
+      verificationMethod: "starter_pack" as const,
     },
     defaultPoints: 25,
     isGlobal: true,
     isActive: true,
   },
+  {
+    id: "facebook-like-post",
+    name: "Like Facebook Post",
+    description: "Fans like a specific Facebook post",
+    platform: "facebook" as const,
+    taskType: "facebook_like_post" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 15,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 15,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-share-post",
+    name: "Share Facebook Post",
+    description: "Fans share a specific Facebook post",
+    platform: "facebook" as const,
+    taskType: "facebook_share_post" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
 
-  // Comment Task Templates
+  // ============================================================================
+  // KICK TEMPLATES (New Platform)
+  // ============================================================================
+  
+  // Kick T1 - API Verified
   {
-    id: "twitter-quote-tweet",
-    name: "Quote Tweet",
-    description: "Fans quote tweet a specific post",
-    platform: "twitter" as const,
-    taskType: "twitter_quote_tweet" as const,
-    category: "social",
-    defaultConfig: {
-      points: 150,
-      verificationMethod: "manual" as const,
-    },
-    defaultPoints: 150,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "facebook-comment-post",
-    name: "Comment on Facebook Post",
-    description: "Fans comment on a specific Facebook post",
-    platform: "facebook" as const,
-    taskType: "facebook_comment_post" as const,
-    category: "social",
+    id: "kick-follow",
+    name: "Follow on Kick",
+    description: "Fans follow your Kick channel",
+    platform: "kick" as const,
+    taskType: "kick_follow" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 50,
-      verificationMethod: "manual" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 50,
     isGlobal: true,
     isActive: true,
   },
   {
-    id: "facebook-comment-photo",
-    name: "Comment on Facebook Photo",
-    description: "Fans comment on a specific Facebook photo",
-    platform: "facebook" as const,
-    taskType: "facebook_comment_photo" as const,
-    category: "social",
+    id: "kick-subscribe",
+    name: "Subscribe on Kick",
+    description: "Fans subscribe to your Kick channel (paid)",
+    platform: "kick" as const,
+    taskType: "kick_subscribe" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
+      points: 200,
+      verificationMethod: "api" as const,
     },
-    defaultPoints: 50,
+    defaultPoints: 200,
     isGlobal: true,
     isActive: true,
   },
   {
-    id: "instagram-comment-code",
-    name: "Comment with Code on Instagram",
-    description: "Fans comment with unique verification code (automatic verification)",
-    platform: "instagram" as const,
-    taskType: "comment_code" as const,
-    category: "social",
-    defaultConfig: {
-      points: 30,
-      verificationMethod: "automatic" as const,
-    },
-    defaultPoints: 30,
-    isGlobal: true,
-    isActive: true,
-  },
-  {
-    id: "instagram-mention-story",
-    name: "Mention in Instagram Story",
-    description: "Fans mention you in their Instagram Story (automatic verification)",
-    platform: "instagram" as const,
-    taskType: "mention_story" as const,
-    category: "social",
+    id: "kick-redeem-reward",
+    name: "Redeem Kick Channel Reward",
+    description: "Fans redeem a specific channel reward on Kick",
+    platform: "kick" as const,
+    taskType: "kick_redeem_reward" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
       points: 75,
-      verificationMethod: "automatic" as const,
+      verificationMethod: "api" as const,
     },
     defaultPoints: 75,
     isGlobal: true,
     isActive: true,
   },
+  
+  // Kick T2 - Code Verified
   {
-    id: "instagram-keyword-comment",
-    name: "Comment with Keyword on Instagram",
-    description: "Fans comment with specific keyword (automatic verification)",
-    platform: "instagram" as const,
-    taskType: "keyword_comment" as const,
-    category: "social",
+    id: "kick-chat-code",
+    name: "Chat with Code on Kick",
+    description: "Fans send a chat message with their unique verification code",
+    platform: "kick" as const,
+    taskType: "kick_chat_code" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
     defaultConfig: {
-      points: 30,
-      verificationMethod: "automatic" as const,
+      points: 40,
+      verificationMethod: "code_comment" as const,
     },
-    defaultPoints: 30,
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // ============================================================================
+  // PATREON TEMPLATES (New Platform)
+  // ============================================================================
+  
+  {
+    id: "patreon-support",
+    name: "Support on Patreon",
+    description: "Fans become a patron and support you on Patreon",
+    platform: "patreon" as const,
+    taskType: "patreon_support" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 200,
+      verificationMethod: "api" as const,
+    },
+    defaultPoints: 200,
     isGlobal: true,
     isActive: true,
   },
   {
-    id: "youtube-comment",
-    name: "Comment on YouTube Video",
-    description: "Fans comment on a specific YouTube video",
-    platform: "youtube" as const,
-    taskType: "youtube_comment" as const,
-    category: "social",
+    id: "patreon-tier-check",
+    name: "Patreon Tier Membership",
+    description: "Fans maintain a specific tier level on Patreon",
+    platform: "patreon" as const,
+    taskType: "patreon_tier_check" as const,
+    category: "trust_anchor",
+    verificationTier: "T1" as const,
+    verificationMethod: "api" as const,
+    isStarterPack: false,
     defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
+      points: 150,
+      verificationMethod: "api" as const,
     },
-    defaultPoints: 50,
+    defaultPoints: 150,
     isGlobal: true,
     isActive: true,
   },
+
+  // ============================================================================
+  // TWITCH CHAT CODE (T2 - New Task Type)
+  // ============================================================================
+  
   {
-    id: "tiktok-comment",
-    name: "Comment on TikTok Video",
-    description: "Fans comment on a specific TikTok video",
-    platform: "tiktok" as const,
-    taskType: "tiktok_comment" as const,
-    category: "social",
+    id: "twitch-chat-code",
+    name: "Chat with Code on Twitch",
+    description: "Fans send a chat message with their unique verification code during stream",
+    platform: "twitch" as const,
+    taskType: "twitch_chat_code" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_comment" as const,
+    isStarterPack: false,
     defaultConfig: {
-      points: 50,
-      verificationMethod: "manual" as const,
+      points: 40,
+      verificationMethod: "code_comment" as const,
     },
-    defaultPoints: 50,
+    defaultPoints: 40,
     isGlobal: true,
     isActive: true,
   },
@@ -723,6 +1016,26 @@ export const PLATFORM_TASK_TYPES = {
     { value: "playlist", label: "Follow Playlist", icon: "Music" },
     { value: "album", label: "Save Album", icon: "Disc" },
   ],
+  kick: [
+    { value: "kick_follow", label: "Follow Channel", icon: "UserPlus" },
+    { value: "kick_subscribe", label: "Subscribe", icon: "Star" },
+    { value: "kick_chat_code", label: "Chat with Code", icon: "MessageCircle" },
+    { value: "kick_redeem_reward", label: "Redeem Reward", icon: "Gift" },
+  ],
+  patreon: [
+    { value: "patreon_support", label: "Become a Patron", icon: "Heart" },
+    { value: "patreon_tier_check", label: "Tier Membership", icon: "Award" },
+  ],
+  twitch: [
+    { value: "twitch_follow", label: "Follow Channel", icon: "UserPlus" },
+    { value: "twitch_subscribe", label: "Subscribe", icon: "Star" },
+    { value: "twitch_chat_code", label: "Chat with Code", icon: "MessageCircle" },
+  ],
+  discord: [
+    { value: "discord_join", label: "Join Server", icon: "Users" },
+    { value: "discord_react", label: "React to Message", icon: "ThumbsUp" },
+    { value: "discord_message_code", label: "Message with Code", icon: "MessageSquare" },
+  ],
 } as const;
 
 // Export types for platform-specific schemas
@@ -741,3 +1054,779 @@ export type PlatformTaskConfig =
   | YouTubeTaskConfig 
   | TikTokTaskConfig 
   | SpotifyTaskConfig;
+
+// ============================================================================
+// VERIFICATION TIER SYSTEM
+// ============================================================================
+
+/**
+ * VERIFICATION TIER SYSTEM - TRANSPARENT GUIDANCE
+ * 
+ * Tiers indicate verification reliability and guide recommended point values.
+ * NO HIDDEN MULTIPLIERS - what you set is what fans receive.
+ * 
+ * - T1 (High Trust): Fully API verified - Recommended 50-200 points
+ *   Platforms: Spotify, YouTube, Discord, Twitch, Twitter (Basic tier)
+ *   These tasks can be 100% verified through platform APIs.
+ * 
+ * - T2 (Medium Trust): Code-verified - Recommended 30-85 points
+ *   Methods: Code-in-comment, code-in-quote-tweet
+ *   Fans include a unique code that we can verify in their post.
+ * 
+ * - T3 (Lower Trust): Honor system - Recommended 15-25 points
+ *   Methods: Starter pack tasks, manual verification
+ *   Cannot be automatically verified - relies on fan honesty.
+ *   Use lower points to discourage abuse.
+ */
+export type VerificationTier = 'T1' | 'T2' | 'T3';
+
+/**
+ * Verification Methods:
+ * - api: Direct API check (T1)
+ * - code_comment: Unique code in comment (T2)
+ * - code_repost: Unique code in quote/repost (T2)
+ * - hashtag: Campaign hashtag tracking (Group goals)
+ * - starter_pack: Embedded profile with honor system (T3)
+ * - manual: Manual creator review (T3)
+ */
+export type VerificationMethod = 
+  | 'api' 
+  | 'code_comment' 
+  | 'code_repost' 
+  | 'hashtag' 
+  | 'starter_pack' 
+  | 'manual';
+
+/**
+ * Creator-facing guidance for each verification tier
+ * Display this in the task creation UI to help creators set appropriate points
+ */
+export const TIER_GUIDANCE: Record<VerificationTier, {
+  label: string;
+  trustLevel: string;
+  description: string;
+  pointsRange: string;
+  recommendedPoints: number;
+  warning?: string;
+  tip?: string;
+}> = {
+  'T1': {
+    label: 'API Verified',
+    trustLevel: 'High Trust',
+    description: 'This task is automatically verified through the platform\'s API. Fans must complete the action to earn points.',
+    pointsRange: '50-200 points recommended',
+    recommendedPoints: 50,
+    tip: 'These are your most reliable tasks. Award higher points to encourage verified engagement.',
+  },
+  'T2': {
+    label: 'Code Verified',
+    trustLevel: 'Medium Trust',
+    description: 'Fans receive a unique code to include in their comment or post. We verify the code was posted.',
+    pointsRange: '30-85 points recommended',
+    recommendedPoints: 40,
+    tip: 'Great for platforms where direct API verification isn\'t available. The code system prevents most abuse.',
+  },
+  'T3': {
+    label: 'Honor System',
+    trustLevel: 'Lower Trust',
+    description: 'This task cannot be automatically verified. Fans confirm completion on the honor system.',
+    pointsRange: '15-25 points recommended',
+    recommendedPoints: 25,
+    warning: 'Use lower points for these tasks since they can\'t be verified. This helps prevent abuse.',
+    tip: 'Starter pack tasks are great for onboarding, but use code-verified tasks for higher rewards.',
+  },
+};
+
+/**
+ * Get guidance for a specific tier
+ */
+export function getTierGuidance(tier: VerificationTier) {
+  return TIER_GUIDANCE[tier];
+}
+
+/**
+ * Task Template with verification tier information
+ */
+export interface TaskTemplateWithVerification {
+  id: string;
+  name: string;
+  description: string;
+  platform: string;
+  taskType: string;
+  category: string;
+  verificationTier: VerificationTier;
+  verificationMethod: VerificationMethod;
+  isStarterPack?: boolean;
+  isGroupGoal?: boolean;
+  defaultConfig: {
+    points: number;
+    verificationMethod: string;
+  };
+  defaultPoints: number;
+  isGlobal: boolean;
+  isActive: boolean;
+}
+
+/**
+ * Task Type Verification Mapping
+ * Maps task types to their verification tier and method
+ */
+export const TASK_TYPE_VERIFICATION: Record<string, {
+  tier: VerificationTier;
+  method: VerificationMethod;
+  isStarterPack?: boolean;
+}> = {
+  // ============================================================================
+  // T1 - API Verified (Full Points - 100%)
+  // Platforms: Spotify, YouTube (subscribe only), Discord, Twitch, Twitter, Kick, Patreon
+  // ============================================================================
+  
+  // Spotify (full API access)
+  'spotify_follow': { tier: 'T1', method: 'api' },
+  'spotify_playlist': { tier: 'T1', method: 'api' },
+  'spotify_album': { tier: 'T1', method: 'api' },
+  'spotify_save_track': { tier: 'T1', method: 'api' },
+  
+  // YouTube (only subscribe is T1 - likes/shares are T3)
+  'youtube_subscribe': { tier: 'T1', method: 'api' },
+  
+  // Discord (bot API access)
+  'discord_join': { tier: 'T1', method: 'api' },
+  'discord_role': { tier: 'T1', method: 'api' },
+  'discord_react': { tier: 'T1', method: 'api' },
+  
+  // Twitch (Helix API access)
+  'twitch_follow': { tier: 'T1', method: 'api' },
+  'twitch_subscribe': { tier: 'T1', method: 'api' },
+  
+  // Twitter/X (PAYG API access)
+  'twitter_follow': { tier: 'T1', method: 'api' },
+  'twitter_like': { tier: 'T1', method: 'api' },
+  'twitter_retweet': { tier: 'T1', method: 'api' },
+  'twitter_mention': { tier: 'T1', method: 'api' },
+  
+  // Kick (new platform - T1 API access)
+  'kick_follow': { tier: 'T1', method: 'api' },
+  'kick_subscribe': { tier: 'T1', method: 'api' },
+  'kick_redeem_reward': { tier: 'T1', method: 'api' },
+  
+  // Patreon (new platform - T1 API access)
+  'patreon_support': { tier: 'T1', method: 'api' },
+  'patreon_tier_check': { tier: 'T1', method: 'api' },
+  
+  // ============================================================================
+  // T2 - Code Verified (85% Points)
+  // Tasks verified via unique code in comment or quote tweet
+  // ============================================================================
+  
+  // Instagram comment/code tasks
+  'comment_code': { tier: 'T2', method: 'code_comment' },
+  'keyword_comment': { tier: 'T2', method: 'code_comment' },
+  'instagram_comment_code': { tier: 'T2', method: 'code_comment' },
+  'mention_story': { tier: 'T2', method: 'code_comment' },
+  
+  // YouTube comment with code
+  'youtube_comment': { tier: 'T2', method: 'code_comment' },
+  'youtube_comment_code': { tier: 'T2', method: 'code_comment' },
+  
+  // Facebook comment with code
+  'facebook_comment_post': { tier: 'T2', method: 'code_comment' },
+  'facebook_comment_photo': { tier: 'T2', method: 'code_comment' },
+  'facebook_comment_code': { tier: 'T2', method: 'code_comment' },
+  
+  // TikTok comment with code
+  'tiktok_comment': { tier: 'T2', method: 'code_comment' },
+  'tiktok_comment_code': { tier: 'T2', method: 'code_comment' },
+  
+  // Twitter quote/reply with code
+  'twitter_quote_tweet': { tier: 'T2', method: 'code_repost' },
+  'twitter_reply_code': { tier: 'T2', method: 'code_comment' },
+  
+  // Discord message with code
+  'discord_message_code': { tier: 'T2', method: 'code_comment' },
+  
+  // Twitch chat with code (new)
+  'twitch_chat_code': { tier: 'T2', method: 'code_comment' },
+  
+  // Kick chat with code (new platform)
+  'kick_chat_code': { tier: 'T2', method: 'code_comment' },
+  
+  // ============================================================================
+  // T3 - Starter Pack / Manual (50% Points)
+  // Honor system tasks - one-time per platform per tenant
+  // ============================================================================
+  
+  // Instagram Starter Pack
+  'instagram_follow': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
+  'starter_instagram_follow': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
+  'instagram_like_post': { tier: 'T3', method: 'manual' },
+  
+  // TikTok Starter Pack
+  'tiktok_follow': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
+  'starter_tiktok_follow': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
+  'tiktok_like': { tier: 'T3', method: 'manual' },
+  'tiktok_share': { tier: 'T3', method: 'manual' },
+  'tiktok_duet': { tier: 'T3', method: 'manual' },
+  'tiktok_stitch': { tier: 'T3', method: 'manual' },
+  
+  // Facebook Starter Pack
+  'facebook_like_page': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
+  'starter_facebook_like': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
+  'facebook_like_post': { tier: 'T3', method: 'manual' },
+  'facebook_share_post': { tier: 'T3', method: 'manual' },
+  
+  // YouTube (likes/shares are T3 - no per-user API)
+  'youtube_like': { tier: 'T3', method: 'manual' },
+  'youtube_share': { tier: 'T3', method: 'manual' },
+  
+  // ============================================================================
+  // Group Goals (T1 Aggregate - verified via platform metrics API)
+  // ============================================================================
+  'group_likes': { tier: 'T1', method: 'hashtag' },
+  'group_views': { tier: 'T1', method: 'hashtag' },
+  'group_comments': { tier: 'T1', method: 'hashtag' },
+  'group_reactions': { tier: 'T1', method: 'hashtag' },
+  'group_retweets': { tier: 'T1', method: 'hashtag' },
+  'group_viewers': { tier: 'T1', method: 'hashtag' },
+};
+
+/**
+ * Get verification info for a task type
+ */
+export function getTaskVerificationInfo(taskType: string): {
+  tier: VerificationTier;
+  method: VerificationMethod;
+  isStarterPack: boolean;
+} {
+  const info = TASK_TYPE_VERIFICATION[taskType];
+  if (info) {
+    return {
+      tier: info.tier,
+      method: info.method,
+      isStarterPack: info.isStarterPack || false,
+    };
+  }
+  
+  // Default to T3/manual for unknown task types
+  return {
+    tier: 'T3',
+    method: 'manual',
+    isStarterPack: false,
+  };
+}
+
+// ============================================================================
+// DISCORD & TWITCH PLATFORM TASK TYPES
+// ============================================================================
+
+// Add Discord and Twitch to PLATFORM_TASK_TYPES
+export const EXTENDED_PLATFORM_TASK_TYPES = {
+  ...PLATFORM_TASK_TYPES,
+  discord: [
+    { value: "discord_join", label: "Join Server", icon: "Users", tier: "T1" },
+    { value: "discord_role", label: "Get Role", icon: "Shield", tier: "T1" },
+    { value: "discord_react", label: "React to Message", icon: "ThumbsUp", tier: "T1" },
+    { value: "discord_message_code", label: "Message with Code", icon: "MessageSquare", tier: "T2" },
+  ],
+  twitch: [
+    { value: "twitch_follow", label: "Follow Channel", icon: "UserPlus", tier: "T1" },
+    { value: "twitch_subscribe", label: "Subscribe", icon: "Star", tier: "T1" },
+    { value: "twitch_chat_code", label: "Chat with Code", icon: "MessageCircle", tier: "T2" },
+  ],
+} as const;
+
+// ============================================================================
+// STARTER PACK TEMPLATES
+// ============================================================================
+
+/**
+ * Starter Pack Templates
+ * Low-friction onboarding tasks with embedded profiles.
+ * One-time per platform per tenant (with campaign exception).
+ */
+export const STARTER_PACK_TEMPLATES: TaskTemplateWithVerification[] = [
+  {
+    id: "starter-instagram-follow",
+    name: "Follow on Instagram",
+    description: "Follow the creator on Instagram to stay updated with their content",
+    platform: "instagram",
+    taskType: "starter_instagram_follow",
+    category: "starter_pack",
+    verificationTier: "T3",
+    verificationMethod: "starter_pack",
+    isStarterPack: true,
+    defaultConfig: {
+      points: 25, // 50% of typical follow task
+      verificationMethod: "starter_pack",
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "starter-tiktok-follow",
+    name: "Follow on TikTok",
+    description: "Follow the creator on TikTok to see their latest videos",
+    platform: "tiktok",
+    taskType: "starter_tiktok_follow",
+    category: "starter_pack",
+    verificationTier: "T3",
+    verificationMethod: "starter_pack",
+    isStarterPack: true,
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "starter_pack",
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "starter-facebook-like",
+    name: "Like Facebook Page",
+    description: "Like the creator's Facebook page for updates",
+    platform: "facebook",
+    taskType: "starter_facebook_like",
+    category: "starter_pack",
+    verificationTier: "T3",
+    verificationMethod: "starter_pack",
+    isStarterPack: true,
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "starter_pack",
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+];
+
+// ============================================================================
+// CODE VERIFICATION TEMPLATES
+// ============================================================================
+
+/**
+ * Code Verification Templates
+ * Tasks that require fans to include a unique code in their engagement.
+ */
+export const CODE_VERIFICATION_TEMPLATES: TaskTemplateWithVerification[] = [
+  {
+    id: "instagram-comment-code",
+    name: "Comment with Code on Instagram",
+    description: "Leave a comment with your unique verification code",
+    platform: "instagram",
+    taskType: "instagram_comment_code",
+    category: "code_verification",
+    verificationTier: "T2",
+    verificationMethod: "code_comment",
+    defaultConfig: {
+      points: 40, // 85% of typical comment task
+      verificationMethod: "code_comment",
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "tiktok-comment-code",
+    name: "Comment with Code on TikTok",
+    description: "Leave a comment with your unique verification code",
+    platform: "tiktok",
+    taskType: "tiktok_comment_code",
+    category: "code_verification",
+    verificationTier: "T2",
+    verificationMethod: "code_comment",
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment",
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "youtube-comment-code",
+    name: "Comment with Code on YouTube",
+    description: "Leave a comment with your unique verification code",
+    platform: "youtube",
+    taskType: "youtube_comment_code",
+    category: "code_verification",
+    verificationTier: "T2",
+    verificationMethod: "code_comment",
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment",
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-comment-code",
+    name: "Comment with Code on Facebook",
+    description: "Leave a comment with your unique verification code",
+    platform: "facebook",
+    taskType: "facebook_comment_code",
+    category: "code_verification",
+    verificationTier: "T2",
+    verificationMethod: "code_comment",
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment",
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-quote-code",
+    name: "Quote Tweet with Code",
+    description: "Quote tweet with your unique verification code",
+    platform: "twitter",
+    taskType: "twitter_quote_code",
+    category: "code_verification",
+    verificationTier: "T2",
+    verificationMethod: "code_repost",
+    defaultConfig: {
+      points: 85, // 85% of typical quote tweet task
+      verificationMethod: "code_repost",
+    },
+    defaultPoints: 85,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-reply-code",
+    name: "Reply with Code",
+    description: "Reply to a tweet with your unique verification code",
+    platform: "twitter",
+    taskType: "twitter_reply_code",
+    category: "code_verification",
+    verificationTier: "T2",
+    verificationMethod: "code_comment",
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "code_comment",
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+];
+
+// ============================================================================
+// T1 API-VERIFIED TEMPLATES
+// ============================================================================
+
+/**
+ * T1 API-Verified Templates
+ * Tasks with full API verification (Spotify, YouTube, Discord, Twitch, Twitter Basic)
+ */
+export const T1_VERIFIED_TEMPLATES: TaskTemplateWithVerification[] = [
+  // Spotify
+  {
+    id: "spotify-follow-artist",
+    name: "Follow Artist on Spotify",
+    description: "Follow the creator on Spotify",
+    platform: "spotify",
+    taskType: "spotify_follow",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "api",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "spotify-follow-playlist",
+    name: "Follow Playlist on Spotify",
+    description: "Follow a specific Spotify playlist",
+    platform: "spotify",
+    taskType: "spotify_playlist",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 40,
+      verificationMethod: "api",
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "spotify-save-track",
+    name: "Save Track on Spotify",
+    description: "Save a specific track to your Spotify library",
+    platform: "spotify",
+    taskType: "spotify_save_track",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 30,
+      verificationMethod: "api",
+    },
+    defaultPoints: 30,
+    isGlobal: true,
+    isActive: true,
+  },
+  // YouTube
+  {
+    id: "youtube-subscribe-t1",
+    name: "Subscribe on YouTube",
+    description: "Subscribe to the creator's YouTube channel",
+    platform: "youtube",
+    taskType: "youtube_subscribe",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 100,
+      verificationMethod: "api",
+    },
+    defaultPoints: 100,
+    isGlobal: true,
+    isActive: true,
+  },
+  // Discord
+  {
+    id: "discord-join-server",
+    name: "Join Discord Server",
+    description: "Join the creator's Discord community",
+    platform: "discord",
+    taskType: "discord_join",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 75,
+      verificationMethod: "api",
+    },
+    defaultPoints: 75,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "discord-get-role",
+    name: "Get Discord Role",
+    description: "Earn a specific role in the Discord server",
+    platform: "discord",
+    taskType: "discord_role",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "api",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "discord-react-message",
+    name: "React to Discord Message",
+    description: "React to a specific message with an emoji",
+    platform: "discord",
+    taskType: "discord_react",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "api",
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+  // Twitch
+  {
+    id: "twitch-follow-channel",
+    name: "Follow on Twitch",
+    description: "Follow the creator's Twitch channel",
+    platform: "twitch",
+    taskType: "twitch_follow",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "api",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitch-subscribe",
+    name: "Subscribe on Twitch",
+    description: "Subscribe to the creator's Twitch channel (paid)",
+    platform: "twitch",
+    taskType: "twitch_subscribe",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 200,
+      verificationMethod: "api",
+    },
+    defaultPoints: 200,
+    isGlobal: true,
+    isActive: true,
+  },
+  // Twitter (Basic tier)
+  {
+    id: "twitter-follow-t1",
+    name: "Follow on X (Twitter)",
+    description: "Follow the creator on X (Twitter)",
+    platform: "twitter",
+    taskType: "twitter_follow",
+    category: "trust_anchor",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "api",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-like-t1",
+    name: "Like Tweet",
+    description: "Like a specific tweet",
+    platform: "twitter",
+    taskType: "twitter_like",
+    category: "social",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "api",
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-retweet-t1",
+    name: "Retweet",
+    description: "Retweet a specific tweet",
+    platform: "twitter",
+    taskType: "twitter_retweet",
+    category: "social",
+    verificationTier: "T1",
+    verificationMethod: "api",
+    defaultConfig: {
+      points: 75,
+      verificationMethod: "api",
+    },
+    defaultPoints: 75,
+    isGlobal: true,
+    isActive: true,
+  },
+];
+
+// ============================================================================
+// GROUP GOAL TEMPLATES
+// ============================================================================
+
+/**
+ * Group Goal Templates
+ * Community goals where everyone enrolled is rewarded when the goal is met.
+ */
+export const GROUP_GOAL_TEMPLATES: TaskTemplateWithVerification[] = [
+  {
+    id: "group-instagram-likes",
+    name: "Help Post Reach X Likes",
+    description: "Everyone enrolled gets rewarded when the post reaches the like goal",
+    platform: "instagram",
+    taskType: "group_likes",
+    category: "group_goal",
+    verificationTier: "T2",
+    verificationMethod: "hashtag",
+    isGroupGoal: true,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "hashtag",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "group-youtube-views",
+    name: "Help Video Reach X Views",
+    description: "Everyone enrolled gets rewarded when the video reaches the view goal",
+    platform: "youtube",
+    taskType: "group_views",
+    category: "group_goal",
+    verificationTier: "T2",
+    verificationMethod: "hashtag",
+    isGroupGoal: true,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "hashtag",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "group-tiktok-views",
+    name: "Help TikTok Reach X Views",
+    description: "Everyone enrolled gets rewarded when the video reaches the view goal",
+    platform: "tiktok",
+    taskType: "group_views",
+    category: "group_goal",
+    verificationTier: "T2",
+    verificationMethod: "hashtag",
+    isGroupGoal: true,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "hashtag",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "group-twitter-retweets",
+    name: "Help Tweet Reach X Retweets",
+    description: "Everyone enrolled gets rewarded when the tweet reaches the retweet goal",
+    platform: "twitter",
+    taskType: "group_retweets",
+    category: "group_goal",
+    verificationTier: "T2",
+    verificationMethod: "hashtag",
+    isGroupGoal: true,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: "hashtag",
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+];
+
+// ============================================================================
+// COMBINED TEMPLATES WITH VERIFICATION
+// ============================================================================
+
+/**
+ * All templates combined with verification information
+ */
+export const ALL_VERIFIED_TEMPLATES: TaskTemplateWithVerification[] = [
+  ...T1_VERIFIED_TEMPLATES,
+  ...CODE_VERIFICATION_TEMPLATES,
+  ...STARTER_PACK_TEMPLATES,
+  ...GROUP_GOAL_TEMPLATES,
+];

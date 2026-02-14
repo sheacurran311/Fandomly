@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FanTaskCard } from '@/components/tasks/FanTaskCard';
+import FanTaskCard from '@/components/fan/FanTaskCard';
 import { FanTasksTable } from '@/components/tasks/FanTasksTable';
 import { PlatformTaskCard } from '@/components/tasks/PlatformTaskCard';
 import { useUserTaskCompletions } from '@/hooks/useTaskCompletion';
@@ -140,7 +140,7 @@ export default function FanTasksPage() {
 
   // Calculate task type breakdown
   const taskTypeBreakdown = tasks.reduce((acc: any, task: Task) => {
-    const type = task.type || 'other';
+    const type = task.taskType || 'other';
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {});
@@ -331,7 +331,7 @@ export default function FanTasksPage() {
       {/* Creator Tasks Section */}
       <div className="mb-4">
         <h2 className="text-2xl font-bold text-white mb-2">Creator Tasks</h2>
-        <p className="text-sm text-gray-400">Complete tasks from creators you follow to earn creator-specific rewards</p>
+        <p className="text-sm text-gray-400">Complete tasks from creators you're enrolled with to earn creator-specific rewards</p>
       </div>
 
       {/* Filters & Search */}
@@ -425,8 +425,8 @@ export default function FanTasksPage() {
                 task={task}
                 progress={{
                   completed: completion?.status === 'completed',
-                  progress: completion?.progress || 0,
-                  currentStreak: completion?.currentStreak || 0,
+                  progress: completion?.progress ?? 0,
+                  currentStreak: (completion?.completionData as { currentStreak?: number })?.currentStreak ?? 0,
                 }}
                 programName={task.programName}
                 programImage={task.programImage}

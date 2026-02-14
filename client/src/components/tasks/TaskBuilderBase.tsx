@@ -26,6 +26,9 @@ interface TaskBuilderBaseProps {
   // Preview
   previewComponent?: ReactNode;
   
+  // Program/Campaign selector rendered above the main form
+  programSelector?: ReactNode;
+  
   // Actions
   onBack?: () => void;
   onSaveDraft?: () => void;
@@ -49,6 +52,7 @@ export default function TaskBuilderBase({
   category,
   children,
   previewComponent,
+  programSelector,
   onBack,
   onSaveDraft,
   onPreview,
@@ -60,10 +64,10 @@ export default function TaskBuilderBase({
   exampleUse,
 }: TaskBuilderBaseProps) {
   return (
-    <div className="min-h-screen bg-brand-dark-bg">
+    <div className="w-full">
       {/* Header */}
       <div className="border-b border-white/10 bg-brand-dark-purple/50 backdrop-blur-lg sticky top-0 z-10">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="w-full px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {onBack && (
@@ -143,8 +147,15 @@ export default function TaskBuilderBase({
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
+      <div className="w-full px-4 sm:px-6 py-6">
+        {/* Program/Campaign Selector */}
+        {programSelector && (
+          <div className="mb-6">
+            {programSelector}
+          </div>
+        )}
+
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Configuration */}
           <div className="lg:col-span-2 space-y-6">
             {/* Validation Errors */}
@@ -192,7 +203,7 @@ export default function TaskBuilderBase({
           </div>
 
           {/* Right Column - Preview & Help */}
-          <div className="lg:sticky lg:top-24 space-y-6 self-start">
+          <div className="lg:sticky lg:top-20 space-y-6 self-start">
             {/* Live Preview */}
             {previewComponent && (
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">

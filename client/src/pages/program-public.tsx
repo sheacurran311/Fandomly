@@ -63,7 +63,7 @@ export default function ProgramPublic() {
   const isPreviewMode = !!programId; // Preview uses programId instead of slug
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'campaigns' | 'tasks' | 'rewards'>('dashboard');
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
 
   // Fetch program public data (or preview data)
   const { data: programData, isLoading } = useQuery<ProgramPublicData>({
@@ -104,26 +104,26 @@ export default function ProgramPublic() {
     if (theme?.colors) {
       console.log('✨ [FRONTEND] Using Phase 1 enhanced theme structure');
       // Brand colors
-      root.style.setProperty('--color-primary', theme.colors.primary);
-      root.style.setProperty('--color-secondary', theme.colors.secondary);
-      root.style.setProperty('--color-accent', theme.colors.accent);
+      root.style.setProperty('--color-primary', theme.colors.primary ?? '');
+      root.style.setProperty('--color-secondary', theme.colors.secondary ?? '');
+      root.style.setProperty('--color-accent', theme.colors.accent ?? '');
 
       // Surface colors
-      root.style.setProperty('--color-background', theme.colors.background);
-      root.style.setProperty('--color-surface', theme.colors.surface);
-      root.style.setProperty('--color-surface-hover', theme.colors.surfaceHover);
+      root.style.setProperty('--color-background', theme.colors.background ?? '');
+      root.style.setProperty('--color-surface', theme.colors.surface ?? '');
+      root.style.setProperty('--color-surface-hover', theme.colors.surfaceHover ?? '');
 
       // Text colors
-      root.style.setProperty('--color-text-primary', theme.colors.text.primary);
-      root.style.setProperty('--color-text-secondary', theme.colors.text.secondary);
-      root.style.setProperty('--color-text-tertiary', theme.colors.text.tertiary);
+      root.style.setProperty('--color-text-primary', theme.colors.text?.primary ?? '');
+      root.style.setProperty('--color-text-secondary', theme.colors.text?.secondary ?? '');
+      root.style.setProperty('--color-text-tertiary', theme.colors.text?.tertiary ?? '');
 
       // UI state colors
-      root.style.setProperty('--color-border', theme.colors.border);
-      root.style.setProperty('--color-success', theme.colors.success);
-      root.style.setProperty('--color-warning', theme.colors.warning);
-      root.style.setProperty('--color-error', theme.colors.error);
-      root.style.setProperty('--color-info', theme.colors.info);
+      root.style.setProperty('--color-border', theme.colors.border ?? '');
+      root.style.setProperty('--color-success', theme.colors.success ?? '');
+      root.style.setProperty('--color-warning', theme.colors.warning ?? '');
+      root.style.setProperty('--color-error', theme.colors.error ?? '');
+      root.style.setProperty('--color-info', theme.colors.info ?? '');
     } else {
       console.log('📦 [FRONTEND] Using Phase 0 basic theme structure');
       // Fallback to Phase 0 basic colors for backward compatibility
@@ -155,40 +155,43 @@ export default function ProgramPublic() {
     if (theme?.typography) {
       // Font families
       if (theme.typography.fontFamily) {
-        root.style.setProperty('--font-heading', theme.typography.fontFamily.heading);
-        root.style.setProperty('--font-body', theme.typography.fontFamily.body);
-        root.style.setProperty('--font-mono', theme.typography.fontFamily.mono);
+        root.style.setProperty('--font-heading', theme.typography.fontFamily.heading ?? '');
+        root.style.setProperty('--font-body', theme.typography.fontFamily.body ?? '');
+        root.style.setProperty('--font-mono', theme.typography.fontFamily.mono ?? '');
       }
 
       // Font sizes
       if (theme.typography.fontSize) {
-        root.style.setProperty('--font-size-xs', theme.typography.fontSize.xs);
-        root.style.setProperty('--font-size-sm', theme.typography.fontSize.sm);
-        root.style.setProperty('--font-size-base', theme.typography.fontSize.base);
-        root.style.setProperty('--font-size-lg', theme.typography.fontSize.lg);
-        root.style.setProperty('--font-size-xl', theme.typography.fontSize.xl);
-        root.style.setProperty('--font-size-2xl', theme.typography.fontSize['2xl']);
-        root.style.setProperty('--font-size-3xl', theme.typography.fontSize['3xl']);
-        root.style.setProperty('--font-size-4xl', theme.typography.fontSize['4xl']);
-        root.style.setProperty('--font-size-5xl', theme.typography.fontSize['5xl']);
+        const fs = theme.typography.fontSize;
+        root.style.setProperty('--font-size-xs', fs.xs ?? '');
+        root.style.setProperty('--font-size-sm', fs.sm ?? '');
+        root.style.setProperty('--font-size-base', fs.base ?? '');
+        root.style.setProperty('--font-size-lg', fs.lg ?? '');
+        root.style.setProperty('--font-size-xl', fs.xl ?? '');
+        root.style.setProperty('--font-size-2xl', (fs as Record<string, string>)['2xl'] ?? '');
+        root.style.setProperty('--font-size-3xl', (fs as Record<string, string>)['3xl'] ?? '');
+        root.style.setProperty('--font-size-4xl', (fs as Record<string, string>)['4xl'] ?? '');
+        root.style.setProperty('--font-size-5xl', (fs as Record<string, string>)['5xl'] ?? '');
       }
 
       // Font weights
       if (theme.typography.fontWeight) {
-        root.style.setProperty('--font-weight-light', String(theme.typography.fontWeight.light));
-        root.style.setProperty('--font-weight-normal', String(theme.typography.fontWeight.normal));
-        root.style.setProperty('--font-weight-medium', String(theme.typography.fontWeight.medium));
-        root.style.setProperty('--font-weight-semibold', String(theme.typography.fontWeight.semibold));
-        root.style.setProperty('--font-weight-bold', String(theme.typography.fontWeight.bold));
-        root.style.setProperty('--font-weight-extrabold', String(theme.typography.fontWeight.extrabold));
+        const fw = theme.typography.fontWeight;
+        root.style.setProperty('--font-weight-light', String(fw.light ?? ''));
+        root.style.setProperty('--font-weight-normal', String(fw.normal ?? ''));
+        root.style.setProperty('--font-weight-medium', String(fw.medium ?? ''));
+        root.style.setProperty('--font-weight-semibold', String(fw.semibold ?? ''));
+        root.style.setProperty('--font-weight-bold', String(fw.bold ?? ''));
+        root.style.setProperty('--font-weight-extrabold', String(fw.extrabold ?? ''));
       }
 
       // Line heights
       if (theme.typography.lineHeight) {
-        root.style.setProperty('--line-height-tight', String(theme.typography.lineHeight.tight));
-        root.style.setProperty('--line-height-normal', String(theme.typography.lineHeight.normal));
-        root.style.setProperty('--line-height-relaxed', String(theme.typography.lineHeight.relaxed));
-        root.style.setProperty('--line-height-loose', String(theme.typography.lineHeight.loose));
+        const lh = theme.typography.lineHeight;
+        root.style.setProperty('--line-height-tight', String(lh.tight ?? ''));
+        root.style.setProperty('--line-height-normal', String(lh.normal ?? ''));
+        root.style.setProperty('--line-height-relaxed', String(lh.relaxed ?? ''));
+        root.style.setProperty('--line-height-loose', String(lh.loose ?? ''));
       }
     }
 
@@ -196,27 +199,29 @@ export default function ProgramPublic() {
     if (theme?.layout) {
       // Border radius
       if (theme.layout.borderRadius) {
-        root.style.setProperty('--border-radius-none', theme.layout.borderRadius.none);
-        root.style.setProperty('--border-radius-sm', theme.layout.borderRadius.sm);
-        root.style.setProperty('--border-radius-md', theme.layout.borderRadius.md);
-        root.style.setProperty('--border-radius-lg', theme.layout.borderRadius.lg);
-        root.style.setProperty('--border-radius-xl', theme.layout.borderRadius.xl);
-        root.style.setProperty('--border-radius-2xl', theme.layout.borderRadius['2xl']);
-        root.style.setProperty('--border-radius-full', theme.layout.borderRadius.full);
+        const br = theme.layout.borderRadius as Record<string, string>;
+        root.style.setProperty('--border-radius-none', br.none ?? '');
+        root.style.setProperty('--border-radius-sm', br.sm ?? '');
+        root.style.setProperty('--border-radius-md', br.md ?? '');
+        root.style.setProperty('--border-radius-lg', br.lg ?? '');
+        root.style.setProperty('--border-radius-xl', br.xl ?? '');
+        root.style.setProperty('--border-radius-2xl', br['2xl'] ?? '');
+        root.style.setProperty('--border-radius-full', br.full ?? '');
       }
 
       // Spacing scale
-      if (theme.layout.spacing) {
-        root.style.setProperty('--spacing-scale', String(theme.layout.spacing.scale));
+      if (theme.layout?.spacing && typeof theme.layout.spacing === 'object' && theme.layout.spacing !== null && 'scale' in theme.layout.spacing) {
+        root.style.setProperty('--spacing-scale', String((theme.layout.spacing as { scale?: number }).scale));
       }
 
       // Shadows
-      if (theme.layout.shadow) {
-        root.style.setProperty('--shadow-sm', theme.layout.shadow.sm);
-        root.style.setProperty('--shadow-md', theme.layout.shadow.md);
-        root.style.setProperty('--shadow-lg', theme.layout.shadow.lg);
-        root.style.setProperty('--shadow-xl', theme.layout.shadow.xl);
-        root.style.setProperty('--shadow-inner', theme.layout.shadow.inner);
+      const shadow = theme.layout?.shadow as { sm?: string; md?: string; lg?: string; xl?: string; inner?: string } | undefined;
+      if (shadow) {
+        root.style.setProperty('--shadow-sm', shadow.sm ?? '');
+        root.style.setProperty('--shadow-md', shadow.md ?? '');
+        root.style.setProperty('--shadow-lg', shadow.lg ?? '');
+        root.style.setProperty('--shadow-xl', shadow.xl ?? '');
+        root.style.setProperty('--shadow-inner', shadow.inner ?? '');
       }
     }
 
@@ -447,16 +452,16 @@ export default function ProgramPublic() {
 
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
               <Button 
-                onClick={() => setIsFollowing(!isFollowing)}
-                className={isFollowing ? "" : "text-white"}
-                style={isFollowing ? {
+                onClick={() => setIsEnrolled(!isEnrolled)}
+                className={isEnrolled ? "" : "text-white"}
+                style={isEnrolled ? {
                   backgroundColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
                   color: themeColors.text.primary
                 } : {
                   backgroundColor: brandColors.primary,
                 }}
               >
-                {isFollowing ? (
+                {isEnrolled ? (
                   <>
                     <Heart className="h-4 w-4 mr-2 fill-current" />
                     Enrolled
@@ -515,13 +520,13 @@ export default function ProgramPublic() {
                   <MessageCircle className="h-5 w-5" />
                 </Button>
               )}
-              {socialLinks.website && (
+              {(socialLinks as { website?: string }).website && (
                 <Button 
                   variant="ghost" 
                   size="icon"
                   className="hover:bg-brand-primary/10"
                   style={{ color: themeColors.text.tertiary }}
-                  onClick={() => window.open(socialLinks.website, '_blank')}
+                  onClick={() => window.open((socialLinks as { website?: string }).website, '_blank')}
                 >
                   <Globe className="h-5 w-5" />
                 </Button>
@@ -633,7 +638,7 @@ export default function ProgramPublic() {
                 <ActivityFeed 
                   programId={programData.id} 
                   creatorName={creator.displayName}
-                  creatorAvatar={creator.imageUrl}
+                  creatorAvatar={creator.imageUrl ?? undefined}
                 />
               </TabsContent>
 
@@ -642,13 +647,13 @@ export default function ProgramPublic() {
               </TabsContent>
 
               <TabsContent value="campaigns" className="mt-0">
-                <CampaignsTab campaigns={campaigns} pointsName={programData.pointsName} />
+                <CampaignsTab campaigns={campaigns} pointsName={programData.pointsName ?? 'Points'} />
               </TabsContent>
 
               <TabsContent value="tasks" className="mt-0">
                 <TasksTab 
                   tasks={tasks} 
-                  pointsName={programData.pointsName}
+                  pointsName={programData.pointsName ?? 'Points'}
                   themeColors={themeColors}
                   brandColors={brandColors}
                   isThemeDark={isThemeDark}
@@ -1061,7 +1066,7 @@ function TasksTab({
               key={task.id}
               task={task}
               completion={completionMap.get(task.id)}
-              tenantId={task.tenantId}
+              tenantId={task.tenantId ?? ''}
               themeColors={themeColors}
               brandColors={brandColors}
               pointsName={pointsName}

@@ -48,20 +48,27 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     const programs = await programsResponse.json();
 
     // ====================
-    // 1. TOTAL FANS (enrolled in programs)
+    // 1. TOTAL FANS (enrolled in programs) - deduplicated
     // ====================
-    let totalFans = 0;
+    const uniqueFanIds = new Set<string>();
     for (const program of programs) {
       try {
         const fansResponse = await fetch(`/api/fan-programs/program/${program.id}`);
         if (fansResponse.ok) {
           const programFans = await fansResponse.json();
-          totalFans += programFans.length;
+          // Add each fan's ID to the set (automatically deduplicates)
+          // Exclude the creator themselves from the fan count
+          programFans.forEach((fan: any) => {
+            if (fan.fanId && fan.fanId !== creatorId) {
+              uniqueFanIds.add(fan.fanId);
+            }
+          });
         }
       } catch (error) {
         console.warn(`Failed to fetch fans for program ${program.id}:`, error);
       }
     }
+    const totalFans = uniqueFanIds.size;
 
     // ====================
     // 2. TOTAL REVENUE (ALL-TIME)
@@ -74,16 +81,49 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     // 3. TASKS COMPLETED (ALL-TIME)
     // ====================
     let tasksCompleted = 0;
+    const processedTenantIds = new Set<string>(); // Track tenants we've already queried
+    
     try {
       // Get all task completions for each program
       for (const program of programs) {
+        console.log(`[Creator Dashboard] Fetching completions for program ${program.id} (tenant: ${program.tenantId})`);
         const completionsResponse = await fetch(`/api/task-completions/program/${program.id}`);
         if (completionsResponse.ok) {
           const completions = await completionsResponse.json();
+          console.log(`[Creator Dashboard] Got ${completions.length} completions for program ${program.id}:`, completions);
           // Count only completed or claimed tasks
-          tasksCompleted += completions.filter((c: any) =>
+          const programCompleted = completions.filter((c: any) =>
             c.status === 'completed' || c.status === 'claimed'
           ).length;
+          console.log(`[Creator Dashboard] ${programCompleted} completed/claimed for program ${program.id}`);
+          tasksCompleted += programCompleted;
+          
+          // If we found completions, mark this tenant as processed
+          if (completions.length > 0) {
+            processedTenantIds.add(program.tenantId);
+          }
+        } else {
+          console.warn(`[Creator Dashboard] Failed to fetch completions for program ${program.id}: ${completionsResponse.status}`);
+        }
+      }
+      
+      // Fallback: If no completions found via programId, try by tenantId
+      // This handles tasks that were created before programId was required
+      if (tasksCompleted === 0 && programs.length > 0) {
+        console.log(`[Creator Dashboard] No completions found by programId, trying tenantId fallback`);
+        for (const program of programs) {
+          if (processedTenantIds.has(program.tenantId)) continue;
+          
+          const tenantCompletionsResponse = await fetch(`/api/task-completions/tenant/${program.tenantId}`);
+          if (tenantCompletionsResponse.ok) {
+            const tenantCompletions = await tenantCompletionsResponse.json();
+            console.log(`[Creator Dashboard] Got ${tenantCompletions.length} completions for tenant ${program.tenantId}:`, tenantCompletions);
+            const tenantCompleted = tenantCompletions.filter((c: any) =>
+              c.status === 'completed' || c.status === 'claimed'
+            ).length;
+            tasksCompleted += tenantCompleted;
+            processedTenantIds.add(program.tenantId);
+          }
         }
       }
     } catch (error) {
@@ -120,27 +160,32 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      // Historical fan count (fans who joined before 30 days ago)
-      let previousFans = 0;
+      // Historical fan count (fans who joined before 30 days ago) - deduplicated
+      const previousUniqueFanIds = new Set<string>();
       for (const program of programs) {
         try {
           const fansResponse = await fetch(`/api/fan-programs/program/${program.id}`);
           if (fansResponse.ok) {
             const programFans = await fansResponse.json();
-            previousFans += programFans.filter((fan: any) =>
-              new Date(fan.joinedAt) < thirtyDaysAgo
-            ).length;
+            programFans
+              .filter((fan: any) => new Date(fan.joinedAt) < thirtyDaysAgo)
+              .forEach((fan: any) => {
+                if (fan.fanId && fan.fanId !== creatorId) {
+                  previousUniqueFanIds.add(fan.fanId);
+                }
+              });
           }
         } catch (error) {
           console.warn(`Failed to calculate historical fans for program ${program.id}:`, error);
         }
       }
+      const previousFans = previousUniqueFanIds.size;
 
       if (previousFans > 0 && totalFans !== previousFans) {
         const fansChangeValue = ((totalFans - previousFans) / previousFans) * 100;
         fansChange = {
           value: Math.abs(parseFloat(fansChangeValue.toFixed(1))),
-          type: fansChangeValue >= 0 ? 'increase' : 'decrease',
+          type: (fansChangeValue >= 0 ? 'increase' : 'decrease') as 'increase' | 'decrease',
           period: 'vs last month'
         };
       }
@@ -166,7 +211,7 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         const tasksChangeValue = ((tasksCompleted - previousTasksCompleted) / previousTasksCompleted) * 100;
         tasksChange = {
           value: Math.abs(parseFloat(tasksChangeValue.toFixed(1))),
-          type: tasksChangeValue >= 0 ? 'increase' : 'decrease',
+          type: (tasksChangeValue >= 0 ? 'increase' : 'decrease') as 'increase' | 'decrease',
           period: 'vs last month'
         };
       }
@@ -191,7 +236,7 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         const rewardsChangeValue = ((rewardsRedeemed - previousRewardsRedeemed) / previousRewardsRedeemed) * 100;
         rewardsChange = {
           value: Math.abs(parseFloat(rewardsChangeValue.toFixed(1))),
-          type: rewardsChangeValue >= 0 ? 'increase' : 'decrease',
+          type: (rewardsChangeValue >= 0 ? 'increase' : 'decrease') as 'increase' | 'decrease',
           period: 'vs last month'
         };
       }
@@ -240,12 +285,12 @@ const fetchCreatorActivity = async (
 
     const activities = await response.json();
 
-    // Map to expected format
+    // Map to expected format with formatted timestamp
     return activities.map((activity: any) => ({
       id: activity.id,
       type: activity.type,
       description: activity.description,
-      timestamp: activity.timestamp,
+      timestamp: formatRelativeTime(activity.timestamp),
       points: activity.points,
       fan: activity.fanName || activity.fanId
     }));
@@ -254,6 +299,29 @@ const fetchCreatorActivity = async (
     return [];
   }
 };
+
+// Helper function to format timestamps as relative time
+function formatRelativeTime(dateString: string | Date): string {
+  if (!dateString) return 'Unknown';
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffSeconds < 60) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 14) return '1 week ago';
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  if (diffDays < 60) return '1 month ago';
+  return `${Math.floor(diffDays / 30)} months ago`;
+}
 
 // Custom hooks
 export const useCreatorStats = () => {

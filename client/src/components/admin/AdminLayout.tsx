@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuthModal } from "@/hooks/use-auth-modal";
 import { AdminSidebar } from "./AdminSidebar";
 import { Button } from "@/components/ui/button";
 import { Home, LogOut, Shield, Wallet } from "lucide-react";
@@ -16,12 +16,13 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, title, description, actions }: AdminLayoutProps) {
-  const { user, isLoading } = useAuth();
-  const { user: dynamicUser, setShowAuthFlow, handleLogOut } = useDynamicContext();
+  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const [, setLocation] = useLocation();
   
-  const logout = () => {
-    handleLogOut();
+  const handleLogout = () => {
+    logout();
+    setLocation('/');
   };
   
   // Redirect non-admins to home
@@ -43,8 +44,8 @@ export function AdminLayout({ children, title, description, actions }: AdminLayo
     );
   }
 
-  // Not authenticated with Dynamic - show login prompt
-  if (!dynamicUser) {
+  // Not authenticated - show login prompt
+  if (!isAuthenticated || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-brand-dark-bg p-4">
         <Card className="max-w-md w-full bg-white/5 border-white/10">
@@ -54,17 +55,17 @@ export function AdminLayout({ children, title, description, actions }: AdminLayo
             </div>
             <CardTitle className="text-2xl text-white">Admin Access Required</CardTitle>
             <CardDescription className="text-gray-400">
-              Please connect your wallet to access the Fandomly Admin Dashboard
+              Please sign in to access the Fandomly Admin Dashboard
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button 
-              onClick={() => setShowAuthFlow(true)} 
+              onClick={() => openAuthModal()} 
               className="w-full bg-brand-primary hover:bg-brand-primary/90"
               size="lg"
             >
               <Wallet className="h-5 w-5 mr-2" />
-              Connect Wallet
+              Sign In
             </Button>
             <Link href="/">
               <Button variant="outline" className="w-full border-white/20">
@@ -150,7 +151,7 @@ export function AdminLayout({ children, title, description, actions }: AdminLayo
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={logout}
+                onClick={handleLogout}
                 className="border-white/20 text-red-400 hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -170,4 +171,3 @@ export function AdminLayout({ children, title, description, actions }: AdminLayo
     </div>
   );
 }
-

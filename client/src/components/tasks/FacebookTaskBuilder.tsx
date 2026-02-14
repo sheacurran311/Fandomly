@@ -15,12 +15,22 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
 import { SiFacebook } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useFacebookConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Task type to verification tier mapping for Facebook
+// Like tasks are T3 (manual), Comment tasks with required text are T2 (code-based)
+const FACEBOOK_TASK_TIERS: Record<string, VerificationTier> = {
+  facebook_like_page: 'T3',
+  facebook_like_post: 'T3',
+  facebook_comment_post: 'T2',
+  facebook_comment_photo: 'T2',
+};
 
 interface FacebookTaskBuilderProps {
   onSave: (config: any) => void;
@@ -29,11 +39,16 @@ interface FacebookTaskBuilderProps {
   taskType: 'facebook_like_page' | 'facebook_like_post' | 'facebook_comment_post' | 'facebook_comment_photo';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
-export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: FacebookTaskBuilderProps) {
+export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: FacebookTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get verification tier for this task type
+  const tier = FACEBOOK_TASK_TIERS[taskType] || 'T3';
+  const tierGuidance = TIER_GUIDANCE[tier];
   
   // Use unified Facebook connection hook
   const {
@@ -45,7 +60,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
   
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(50);
+  const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [pageUrl, setPageUrl] = useState('');
   const [postUrl, setPostUrl] = useState('');
   const [requiredText, setRequiredText] = useState('');
@@ -97,33 +112,37 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
   }, [facebookConnected, facebookUserInfo?.id, taskType, pageUrl, isEditMode]);
 
   const getDefaultValues = () => {
+    // Get tier-appropriate recommended points
+    const taskTier = FACEBOOK_TASK_TIERS[taskType] || 'T3';
+    const guidance = TIER_GUIDANCE[taskTier];
+    
     switch (taskType) {
       case 'facebook_like_page':
         return {
           name: 'Like Our Facebook Page',
           description: 'Like our Facebook page to stay connected!',
-          points: 50,
+          points: 20, // T3: Lower points for manual verification
         };
       case 'facebook_like_post':
         return {
           name: 'Like Our Facebook Post',
           description: 'Show some love by liking our Facebook post!',
-          points: 25,
+          points: 15, // T3: Lower for simple engagement
         };
       case 'facebook_comment_post':
         return {
           name: 'Comment on Facebook Post',
           description: 'Share your thoughts by commenting on our Facebook post!',
-          points: 30,
+          points: guidance.recommendedPoints, // T2: 40 pts - code verified
         };
       case 'facebook_comment_photo':
         return {
           name: 'Comment on Facebook Photo',
           description: 'Tell us what you think about our Facebook photo!',
-          points: 30,
+          points: guidance.recommendedPoints, // T2: 40 pts - code verified
         };
       default:
-        return { name: '', description: '', points: 50 };
+        return { name: '', description: '', points: guidance.recommendedPoints };
     }
   };
 
@@ -271,6 +290,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       description="Create Facebook-based tasks for your fans"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -346,12 +366,54 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
               />
             </div>
 
+            {/* Verification Tier Guidance */}
+            <div className={`p-4 rounded-lg border ${
+              tier === 'T1' ? 'bg-green-500/10 border-green-500/30' :
+              tier === 'T2' ? 'bg-blue-500/10 border-blue-500/30' :
+              'bg-amber-500/10 border-amber-500/30'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {tier === 'T1' ? <ShieldCheck className="h-4 w-4 text-green-400" /> :
+                 tier === 'T2' ? <Shield className="h-4 w-4 text-blue-400" /> :
+                 <ShieldAlert className="h-4 w-4 text-amber-400" />}
+                <span className={`font-medium ${
+                  tier === 'T1' ? 'text-green-400' :
+                  tier === 'T2' ? 'text-blue-400' :
+                  'text-amber-400'
+                }`}>{tierGuidance.label}</span>
+                <Badge variant="outline" className={`text-xs ${
+                  tier === 'T1' ? 'border-green-500/30 text-green-400' :
+                  tier === 'T2' ? 'border-blue-500/30 text-blue-400' :
+                  'border-amber-500/30 text-amber-400'
+                }`}>
+                  {tierGuidance.trustLevel}
+                </Badge>
+              </div>
+              <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+              <p className={`text-sm font-medium ${
+                tier === 'T1' ? 'text-green-400' :
+                tier === 'T2' ? 'text-blue-400' :
+                'text-amber-400'
+              }`}>{tierGuidance.pointsRange}</p>
+              {tierGuidance.warning && (
+                <p className="text-xs text-amber-400 mt-2">{tierGuidance.warning}</p>
+              )}
+              {tierGuidance.tip && (
+                <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+              )}
+            </div>
+
             {/* Points */}
             <div className="space-y-2">
-              <Label className="text-white">Points Reward</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-white">Points Reward</Label>
+                <span className="text-xs text-gray-400">
+                  Recommended: {tierGuidance.recommendedPoints} pts
+                </span>
+              </div>
               <NumberInput
                 value={points}
-                onChange={(val) => setPoints(val || 1)}
+                onChange={(val) => setPoints(val || tierGuidance.recommendedPoints)}
                 min={1}
                 max={10000}
                 allowEmpty={false}
@@ -361,6 +423,11 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
               <p className="text-xs text-gray-400">
                 How many points fans will earn for completing this task
               </p>
+              {tier === 'T3' && points > 25 && (
+                <p className="text-xs text-amber-400">
+                  ⚠️ High points for a manually verified task. Consider lowering to reduce abuse potential.
+                </p>
+              )}
             </div>
 
             {/* Task-Specific Fields */}

@@ -3,8 +3,10 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import DynamicProvider from "@/components/auth/dynamic-provider";
-import AuthRouter from "@/components/auth/auth-router";
+// New Auth System - JWT-based with Google + Social Logins
+import AuthProvider from "@/components/auth/auth-provider";
+import NewAuthRouter from "@/components/auth/new-auth-router";
+import { AuthModalProvider } from "@/hooks/use-auth-modal";
 import ErrorBoundary from "@/components/error-boundary";
 import { useEffect } from "react";
 import { initTikTokErrorHandler } from "@/lib/tiktok-error-handler";
@@ -17,7 +19,8 @@ import UserTypeSelection from "@/pages/user-type-selection";
 import CreatorTypeSelection from "@/pages/creator-type-selection";
 import BrandTypeSelection from "@/pages/brand-type-selection";
 import BrandOnboarding from "@/pages/brand-onboarding";
-import CreatorOnboarding from "@/pages/creator-onboarding";
+// CreatorOnboarding is deprecated - replaced by program builder with setup checklist
+// Old route redirects to creator-dashboard via auth router
 import CampaignBuilder from "@/pages/campaign-builder";
 import TenantSetup from "@/pages/tenant-setup";
 import BrandingStudio from "@/pages/branding-studio";
@@ -71,6 +74,10 @@ import YouTubeCallback from "@/pages/youtube-callback";
 import SpotifyCallback from "@/pages/spotify-callback";
 import DiscordCallback from "@/pages/discord-callback";
 import TwitchCallback from "@/pages/twitch-callback";
+import KickCallback from "@/pages/kick-callback";
+import PatreonCallback from "@/pages/patreon-callback";
+import Login from "@/pages/login";
+import GoogleCallback from "@/pages/auth/google-callback";
 import CreatorPublic from "@/pages/creator-public";
 import TaskBuilder from "@/pages/creator-dashboard/task-builder";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -95,11 +102,22 @@ function Router() {
       <Route path="/creator-type-selection" component={CreatorTypeSelection} />
       <Route path="/brand-type-selection" component={BrandTypeSelection} />
       <Route path="/brand-onboarding" component={BrandOnboarding} />
-      <Route path="/creator-onboarding" component={CreatorOnboarding} />
+      {/* /creator-onboarding is deprecated - auth router redirects to /creator-dashboard */}
+      <Route path="/creator-onboarding">{() => { window.location.href = '/creator-dashboard'; return null; }}</Route>
       <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />
       <Route path="/branding-studio" component={BrandingStudio} />
-      <Route path="/creator-dashboard" component={CreatorDashboard} />
+      <Route path="/creator-dashboard">
+        {() => {
+          // Instagram OAuth redirects to /creator-dashboard with code + state params
+          // Detect this and render the Instagram callback handler instead of the dashboard
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('code') && params.get('state')?.startsWith('instagram_')) {
+            return <InstagramCallback />;
+          }
+          return <CreatorDashboard />;
+        }}
+      </Route>
       <Route path="/creator-dashboard/program-builder" component={ProgramBuilder} />
       <Route path="/programs/:programId/preview" component={ProgramPublic} />
       <Route path="/creator-dashboard/analytics" component={CreatorAnalytics} />
@@ -145,6 +163,8 @@ function Router() {
       <Route path="/meta-graph-debugger" component={MetaGraphDebugger} />
       {/* Deprecated facebook-login routes removed */}
       
+      <Route path="/login" component={Login} />
+      <Route path="/auth/google/callback" component={GoogleCallback} />
       <Route path="/instagram-callback" component={InstagramCallback} />
       <Route path="/tiktok-callback" component={TikTokCallback} />
       <Route path="/x-callback" component={XCallback} />
@@ -152,6 +172,8 @@ function Router() {
       <Route path="/spotify-callback" component={SpotifyCallback} />
       <Route path="/discord-callback" component={DiscordCallback} />
       <Route path="/twitch-callback" component={TwitchCallback} />
+      <Route path="/kick-callback" component={KickCallback} />
+      <Route path="/patreon-callback" component={PatreonCallback} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />
@@ -213,7 +235,6 @@ function App() {
   const onboardingRoutes = [
     '/user-type-selection',
     '/creator-type-selection',
-    '/creator-onboarding',
     '/fan-onboarding-profile',
     '/fan-choose-creators',
   ];
@@ -224,22 +245,24 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <DynamicProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
           <TooltipProvider>
-            <AuthRouter>
-              <div className="min-h-screen bg-brand-dark-bg">
-                  {!isOnboardingRoute && <Navigation />}
-                  <main>
-                    <Router />
-                  </main>
-                  {isPublicRoute && <Footer />}
-              </div>
-              <Toaster />
-            </AuthRouter>
+            <AuthModalProvider>
+              <NewAuthRouter>
+                <div className="min-h-screen bg-brand-dark-bg">
+                    {!isOnboardingRoute && <Navigation />}
+                    <main>
+                      <Router />
+                    </main>
+                    {isPublicRoute && <Footer />}
+                </div>
+                <Toaster />
+              </NewAuthRouter>
+            </AuthModalProvider>
           </TooltipProvider>
-        </QueryClientProvider>
-      </DynamicProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

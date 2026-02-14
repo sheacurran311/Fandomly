@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,207 +11,76 @@ import {
   CheckCircle 
 } from "lucide-react";
 import { FaSpotify } from "react-icons/fa";
-import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
+import { useSocialConnections } from "@/hooks/use-social-connections";
 
 export default function SimplifiedSocialWidgets() {
-  const { user } = useAuth();
-  const [connectionStatus, setConnectionStatus] = useState<Record<string, boolean>>({
-    facebook: false,
-    twitter: false,
-    tiktok: false,
-    youtube: false,
-    spotify: false,
-    instagram: false,
-    discord: false,
-    twitch: false,
-  });
-
-  useEffect(() => {
-    if (user?.dynamicUserId) {
-      checkAllConnections();
-    }
-  }, [user?.dynamicUserId]);
-
-  const checkAllConnections = async () => {
-    const statuses: Record<string, boolean> = {};
-
-    // Check Facebook
-    try {
-      const { FacebookSDKManager } = await import("@/lib/facebook");
-      await FacebookSDKManager.ensureFBReady('fan');
-      const fbStatus = await FacebookSDKManager.getLoginStatus();
-      statuses.facebook = fbStatus.isLoggedIn;
-    } catch (error) {
-      statuses.facebook = false;
-    }
-
-    // Check Twitter
-    try {
-      const response = await fetch('/api/social-connections/twitter', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        statuses.twitter = data.connected;
-      }
-    } catch (error) {
-      statuses.twitter = false;
-    }
-
-    // Check TikTok
-    try {
-      const response = await fetch('/api/social-connections/tiktok', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        statuses.tiktok = data.connected;
-      }
-    } catch (error) {
-      statuses.tiktok = false;
-    }
-
-    // Check YouTube
-    try {
-      const response = await fetch('/api/social-connections/youtube', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        statuses.youtube = data.connected;
-      }
-    } catch (error) {
-      statuses.youtube = false;
-    }
-
-    // Check Spotify
-    try {
-      const response = await fetch('/api/social-connections/spotify', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        statuses.spotify = data.connected;
-      }
-    } catch (error) {
-      statuses.spotify = false;
-    }
-
-    // Check Discord
-    try {
-      const response = await fetch('/api/social-connections/discord', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        statuses.discord = data.connected;
-      }
-    } catch (error) {
-      statuses.discord = false;
-    }
-
-    // Check Twitch
-    try {
-      const response = await fetch('/api/social-connections/twitch', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        statuses.twitch = data.connected;
-      }
-    } catch (error) {
-      statuses.twitch = false;
-    }
-
-    setConnectionStatus(statuses);
-  };
+  const { isPlatformConnected, isLoading } = useSocialConnections();
 
   const socialAccounts = [
     { 
       platform: "Facebook", 
+      platformKey: "facebook",
       icon: Facebook, 
       color: "text-blue-500", 
       bgColor: "bg-blue-500/20",
-      connected: connectionStatus.facebook,
     },
     { 
       platform: "Twitter", 
+      platformKey: "twitter",
       icon: Twitter, 
       color: "text-blue-400", 
       bgColor: "bg-blue-400/20",
-      connected: connectionStatus.twitter,
     },
     { 
       platform: "TikTok", 
+      platformKey: "tiktok",
       icon: TikTokIcon, 
       color: "text-purple-400", 
       bgColor: "bg-purple-400/20",
-      connected: connectionStatus.tiktok,
     },
     { 
       platform: "YouTube", 
+      platformKey: "youtube",
       icon: Youtube, 
       color: "text-red-500", 
       bgColor: "bg-red-500/20",
-      connected: connectionStatus.youtube,
     },
     { 
       platform: "Spotify", 
+      platformKey: "spotify",
       iconComponent: FaSpotify, 
       color: "text-green-500", 
       bgColor: "bg-green-500/20",
-      connected: connectionStatus.spotify,
     },
     { 
       platform: "Discord", 
+      platformKey: "discord",
       icon: LinkIcon, 
       color: "text-indigo-400", 
       bgColor: "bg-indigo-400/20",
-      connected: connectionStatus.discord,
     },
     { 
       platform: "Twitch", 
+      platformKey: "twitch",
       icon: Youtube, 
       color: "text-violet-400", 
       bgColor: "bg-violet-400/20",
-      connected: connectionStatus.twitch,
     },
     { 
       platform: "Instagram", 
+      platformKey: "instagram",
       icon: Instagram, 
       color: "text-pink-400", 
       bgColor: "bg-pink-400/20",
-      connected: false,
       disabled: true,
     },
   ];
 
-  const connectedCount = Object.values(connectionStatus).filter(Boolean).length;
+  const connectedCount = socialAccounts
+    .filter(a => !a.disabled)
+    .filter(a => isPlatformConnected(a.platformKey))
+    .length;
 
   return (
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
@@ -231,6 +99,7 @@ export default function SimplifiedSocialWidgets() {
         <div className="space-y-2">
           {socialAccounts.map((account) => {
             const Icon = account.icon || account.iconComponent;
+            const connected = account.disabled ? false : isPlatformConnected(account.platformKey);
             return (
               <div 
                 key={account.platform} 
@@ -242,7 +111,7 @@ export default function SimplifiedSocialWidgets() {
                   </div>
                   <span className="text-xs text-gray-300">{account.platform}</span>
                 </div>
-                {account.connected ? (
+                {connected ? (
                   <CheckCircle className="h-3 w-3 text-green-400" />
                 ) : (
                   <div className="w-3 h-3 rounded-full border border-gray-600" />
@@ -264,4 +133,3 @@ export default function SimplifiedSocialWidgets() {
     </Card>
   );
 }
-

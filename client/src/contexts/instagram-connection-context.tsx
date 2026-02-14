@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { useAuth } from '@/hooks/use-auth';
 import InstagramSDKManager, { InstagramUser, InstagramLoginResult } from '@/lib/instagram';
 import { toast } from '@/hooks/use-toast';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
 
 interface InstagramConnectionState {
   isConnected: boolean;
@@ -41,6 +42,11 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     error: null,
   });
 
+  // Stable references for effect dependencies (avoid re-running on every user object change)
+  const userId = user?.id;
+  const userType = user?.userType;
+  const dynamicUserId = (user as any)?.dynamicUserId;
+
   // Initialize and check connection status (similar to Facebook pattern)
   useEffect(() => {
     // Wait for user data to load before checking user type
@@ -49,7 +55,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     }
 
     // Only initialize Instagram for authenticated creator users
-    if (!user || user.userType !== 'creator') {
+    if (!userId || userType !== 'creator') {
       return;
     }
 
@@ -88,7 +94,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
         console.log('[Instagram] Loading saved connection from database...');
         const response = await fetch('/api/social-connections/instagram', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
+            'x-dynamic-user-id': dynamicUserId || userId || '',
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -107,7 +113,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
                 name: connection.platformDisplayName || '',
                 profile_picture_url: connection.profileData?.profilePictureUrl,
                 followers_count: connection.profileData?.followers,
-                media_count: connection.profileData?.following,
+                media_count: connection.profileData?.mediaCount || connection.profileData?.media_count,
               },
               businessAccountId: connection.platformUserId || '',
               accessToken: '', // Don't store token in state for security
@@ -123,7 +129,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     };
 
     loadSavedConnection();
-  }, [user, isLoading]);
+  }, [userId, userType, dynamicUserId, isLoading]);
 
   const saveConnection = useCallback(async (data: {
     userInfo: InstagramUser;
@@ -143,7 +149,8 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
         profileData: {
           profilePictureUrl: data.userInfo.profile_picture_url,
           followers: data.userInfo.followers_count,
-          following: data.userInfo.follows_count,
+          following: 0,
+          mediaCount: data.userInfo.media_count,
         }
       });
       console.log('[Instagram] Connection saved to database');
@@ -255,6 +262,9 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
       // Save to database using the social_connections table
       await saveConnection(connectionData);
       console.log('[Instagram] Connection saved to database');
+      
+      // Invalidate shared social connections cache
+      invalidateSocialConnections();
       
       console.log('[Instagram] loadUserDataFromResult COMPLETE');
       return true;

@@ -1,6 +1,6 @@
 import { Express } from "express";
 import { db } from '../../db';
-import { users, fanPrograms, campaigns, platformTaskCompletions, platformPointsTransactions, pointTransactions, rewardRedemptions, loyaltyPrograms } from "@shared/schema";
+import { users, fanPrograms, campaigns, platformTaskCompletions, platformPointsTransactions, pointTransactions, rewardRedemptions, loyaltyPrograms, taskCompletions } from "@shared/schema";
 import { eq, and, sql, count } from "drizzle-orm";
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
@@ -13,9 +13,35 @@ export function registerFanDashboardRoutes(app: Express) {
   app.get("/api/fan/dashboard/stats", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.id;
+      
+      // Debug: Log user ID and check fan_programs enrollment
+      console.log('[Fan Stats Debug] userId:', userId);
+      
+      const userFanPrograms = await db.select().from(fanPrograms).where(eq(fanPrograms.fanId, userId));
+      console.log('[Fan Stats Debug] fan_programs for user:', userFanPrograms.length, 'records', userFanPrograms.map(fp => ({ id: fp.id, programId: fp.programId })));
+      
+      // Debug: Check all point_transactions in the system
+      const allPointTx = await db.select().from(pointTransactions).limit(20);
+      console.log('[Fan Stats Debug] point_transactions sample:', allPointTx.length, 'records');
+      allPointTx.forEach(tx => {
+        console.log(`  - tx.id: ${tx.id}, fanProgramId: ${tx.fanProgramId}, points: ${tx.points}, type: ${tx.type}, source: ${tx.source}`);
+      });
 
-      // Get platform points balance
-      const platformPoints = await platformPointsService.getBalance(userId);
+      // Get platform points balance from platform_points_transactions table (unified source)
+      // This ensures consistency with charts and leaderboards that also query this table
+      const platformPointsResult = await db.execute(sql`
+        SELECT COALESCE(SUM(points), 0) as total
+        FROM platform_points_transactions
+        WHERE user_id = ${userId}
+      `);
+      const platformPointsFromTable = Number((platformPointsResult.rows[0] as any)?.total || 0);
+      
+      // Also get legacy balance from profile_data for comparison/fallback
+      const platformPointsFromProfile = await platformPointsService.getBalance(userId);
+      
+      // Use the higher value (handles case where legacy data exists but not in table yet)
+      const platformPoints = Math.max(platformPointsFromTable, platformPointsFromProfile);
+      console.log('[Fan Stats Debug] platformPoints - fromTable:', platformPointsFromTable, 'fromProfile:', platformPointsFromProfile, 'using:', platformPoints);
 
       // Get creator points (sum of all creator-specific point balances)
       const creatorPointsResult = await db
@@ -33,6 +59,7 @@ export function registerFanDashboardRoutes(app: Express) {
         );
 
       const creatorPoints = Number(creatorPointsResult[0]?.totalPoints || 0);
+      console.log('[Fan Stats Debug] creatorPoints (earned):', creatorPoints);
 
       // Calculate points spent
       const spentPointsResult = await db
@@ -49,18 +76,28 @@ export function registerFanDashboardRoutes(app: Express) {
           )
         );
 
+      // spentPoints is already negative (e.g., -50) because points column stores negative values for 'spent' type
       const spentPoints = Number(spentPointsResult[0]?.totalSpent || 0);
-      const netCreatorPoints = creatorPoints - spentPoints;
+      const netCreatorPoints = creatorPoints + spentPoints; // Add because spentPoints is already negative
 
-      // Get following count (number of creator programs joined)
-      const followingResult = await db
+      // Get programs enrolled count (number of program enrollments)
+      const programsEnrolledResult = await db
         .select({ count: count() })
         .from(fanPrograms)
         .where(eq(fanPrograms.fanId, userId));
 
-      const followingCount = followingResult[0]?.count || 0;
+      const programsEnrolledCount = programsEnrolledResult[0]?.count || 0;
 
-      // Get active campaigns count
+      // Get distinct creators enrolled count
+      const creatorsEnrolledResult = await db
+        .select({ count: sql<number>`COUNT(DISTINCT ${loyaltyPrograms.creatorId})` })
+        .from(fanPrograms)
+        .innerJoin(loyaltyPrograms, eq(fanPrograms.programId, loyaltyPrograms.id))
+        .where(eq(fanPrograms.fanId, userId));
+
+      const creatorsEnrolledCount = Number(creatorsEnrolledResult[0]?.count || 0);
+
+      // Get active campaigns count (campaigns available from enrolled creators)
       const activeCampaignsResult = await db
         .select({ count: count() })
         .from(campaigns)
@@ -148,7 +185,9 @@ export function registerFanDashboardRoutes(app: Express) {
         creatorPoints: netCreatorPoints,
         totalPoints: platformPoints + netCreatorPoints,
         pointsChange,
-        followingCount,
+        followingCount: creatorsEnrolledCount, // backward compat: now returns distinct creators
+        creatorsEnrolledCount,
+        programsEnrolledCount,
         activeCampaignsCount,
         rewardsEarned,
       });
@@ -215,7 +254,7 @@ export function registerFanDashboardRoutes(app: Express) {
           data: r,
           timestamp: r.redeemedAt,
         })),
-      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      ].sort((a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime());
 
       res.json({
         activities: allActivities.slice(0, limit),
@@ -249,7 +288,7 @@ export function registerFanDashboardRoutes(app: Express) {
           groupByFormat = 'DATE(%s)';
           break;
         case 'weekly':
-          dateFormat = 'YYYY-"W"IW';
+          dateFormat = 'Mon DD';  // e.g., "Feb 09" instead of "2026-W07"
           daysBack = 90;
           groupByFormat = 'DATE_TRUNC(\'week\', %s)';
           break;
@@ -285,10 +324,12 @@ export function registerFanDashboardRoutes(app: Express) {
       `);
 
       // Creator points history
+      // Points are already stored correctly: positive for earned, negative for spent
+      // So we just SUM directly without any CASE transformation
       const creatorPointsHistory = await db.execute(sql`
         SELECT 
           TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'pt.created_at'))}, ${dateFormat}) as period,
-          COALESCE(SUM(CASE WHEN pt.type = 'earned' THEN pt.points ELSE -pt.points END), 0) as points
+          COALESCE(SUM(pt.points), 0) as points
         FROM ${pointTransactions} pt
         WHERE pt.fan_program_id IN (
           SELECT id FROM ${fanPrograms} WHERE fan_id = ${userId}
@@ -329,7 +370,7 @@ export function registerFanDashboardRoutes(app: Express) {
           groupByFormat = 'DATE(%s)';
           break;
         case 'weekly':
-          dateFormat = 'YYYY-"W"IW';
+          dateFormat = 'Mon DD';  // e.g., "Feb 09" instead of "2026-W07"
           daysBack = 90;
           groupByFormat = 'DATE_TRUNC(\'week\', %s)';
           break;
@@ -353,7 +394,7 @@ export function registerFanDashboardRoutes(app: Express) {
       startDate.setDate(startDate.getDate() - daysBack);
 
       // Platform task completions over time
-      const completionStats = await db.execute(sql`
+      const platformCompletionStats = await db.execute(sql`
         SELECT 
           TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'created_at'))}, ${dateFormat}) as period,
           COUNT(*) as completed
@@ -364,9 +405,43 @@ export function registerFanDashboardRoutes(app: Express) {
         ORDER BY period
       `);
 
+      // Creator task completions over time (from task_completions table)
+      const creatorCompletionStats = await db.execute(sql`
+        SELECT 
+          TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'completed_at'))}, ${dateFormat}) as period,
+          COUNT(*) as completed
+        FROM ${taskCompletions}
+        WHERE user_id = ${userId}
+          AND status = 'completed'
+          AND completed_at IS NOT NULL
+          AND completed_at >= ${startDate.toISOString()}
+        GROUP BY ${sql.raw(groupByFormat.replace('%s', 'completed_at'))}
+        ORDER BY period
+      `);
+
+      // Combine platform and creator completions by period
+      const combinedMap = new Map<string, number>();
+      
+      // Add platform completions
+      for (const row of (platformCompletionStats.rows || []) as any[]) {
+        const existing = combinedMap.get(row.period) || 0;
+        combinedMap.set(row.period, existing + Number(row.completed));
+      }
+      
+      // Add creator completions
+      for (const row of (creatorCompletionStats.rows || []) as any[]) {
+        const existing = combinedMap.get(row.period) || 0;
+        combinedMap.set(row.period, existing + Number(row.completed));
+      }
+
+      // Convert map to sorted array
+      const completions = Array.from(combinedMap.entries())
+        .map(([period, completed]) => ({ period, completed }))
+        .sort((a, b) => a.period.localeCompare(b.period));
+
       res.json({
         timeframe,
-        completions: completionStats.rows || [],
+        completions,
       });
     } catch (error) {
       console.error("Error fetching task completion stats:", error);
@@ -445,6 +520,72 @@ export function registerFanDashboardRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching achievement timeline:", error);
       res.status(500).json({ error: "Failed to fetch achievement timeline" });
+    }
+  });
+
+  /**
+   * POST /api/fan/admin/backfill-platform-points
+   * One-time script to backfill platform_points_transactions from profile_data
+   * This ensures all existing platform points appear in charts and leaderboards
+   */
+  app.post("/api/fan/admin/backfill-platform-points", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Get all users with fandomlyPoints in profile_data
+      const usersWithPoints = await db.execute(sql`
+        SELECT id, username, profile_data
+        FROM users
+        WHERE (profile_data->>'fandomlyPoints')::int > 0
+      `);
+
+      let backfilledCount = 0;
+      const results: any[] = [];
+
+      for (const user of (usersWithPoints.rows || []) as any[]) {
+        const userId = user.id;
+        const profilePoints = Number(user.profile_data?.fandomlyPoints || 0);
+        
+        // Check if user already has records in platform_points_transactions
+        const existingTxResult = await db.execute(sql`
+          SELECT COALESCE(SUM(points), 0) as total
+          FROM platform_points_transactions
+          WHERE user_id = ${userId}
+        `);
+        const existingTotal = Number((existingTxResult.rows[0] as any)?.total || 0);
+        
+        // If profile_data has more points than the table, we need to backfill the difference
+        const difference = profilePoints - existingTotal;
+        
+        if (difference > 0) {
+          // Insert a backfill transaction for the difference
+          await db.insert(platformPointsTransactions).values({
+            userId,
+            points: difference,
+            source: 'backfill_from_profile_data',
+            description: `Backfilled ${difference} platform points from legacy profile_data storage`,
+          });
+          
+          backfilledCount++;
+          results.push({
+            userId,
+            username: user.username,
+            profilePoints,
+            existingTotal,
+            backfilledAmount: difference,
+          });
+          
+          console.log(`[Backfill] User ${user.username}: backfilled ${difference} points (profile: ${profilePoints}, table: ${existingTotal})`);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Backfilled platform points for ${backfilledCount} users`,
+        backfilledCount,
+        details: results,
+      });
+    } catch (error) {
+      console.error("Error backfilling platform points:", error);
+      res.status(500).json({ error: "Failed to backfill platform points" });
     }
   });
 }

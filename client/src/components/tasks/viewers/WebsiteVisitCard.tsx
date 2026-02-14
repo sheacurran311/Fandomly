@@ -24,7 +24,7 @@ import type { WebsiteVisitConfig } from "@/components/tasks/config/WebsiteVisitC
 
 interface WebsiteVisitCardProps {
   config: WebsiteVisitConfig;
-  taskId: number;
+  taskId: string | number;
   onComplete: () => void;
   onCancel?: () => void;
 }
@@ -86,7 +86,7 @@ export default function WebsiteVisitCard({
   };
 
   // Generate tracked URL (placeholder - would be backend-generated in production)
-  const generateTrackedUrl = (url: string, taskId: number): string => {
+  const generateTrackedUrl = (url: string, taskId: string | number): string => {
     const trackingParams = new URLSearchParams({
       fandomly_task: taskId.toString(),
       fandomly_tracking: 'website_visit',

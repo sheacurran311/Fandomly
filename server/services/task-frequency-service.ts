@@ -294,8 +294,8 @@ export class TaskFrequencyService {
 
     return {
       totalCompletions: completions.length,
-      lastCompletedAt: completions[0]?.completedAt,
-      firstCompletedAt: completions[completions.length - 1]?.completedAt,
+      lastCompletedAt: completions[0]?.completedAt ?? undefined,
+      firstCompletedAt: completions[completions.length - 1]?.completedAt ?? undefined,
     };
   }
 }

@@ -24,10 +24,13 @@ import type { CompleteProfileSettings } from "@shared/taskRuleSchema";
 import TaskBuilderBase from "@/components/tasks/TaskBuilderBase";
 
 interface CompleteProfileTaskBuilderProps {
-  initialConfig?: Partial<CompleteProfileSettings>;
+  initialConfig?: Partial<CompleteProfileSettings> & { name?: string; description?: string };
   onSave?: (config: any) => void;
   onPublish?: (config: any) => void;
   onBack?: () => void;
+  initialData?: any;
+  isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
 // Field definitions for Fan profiles
@@ -63,7 +66,7 @@ const FAN_PROFILE_FIELDS = [
   { 
     id: "interests" as const, 
     label: "Interests", 
-    description: "What types of creators do you follow?",
+    description: "What types of creators interest you?",
     category: "preferences",
     defaultRequired: true
   },
@@ -129,7 +132,8 @@ export function CompleteProfileTaskBuilder({
   initialConfig,
   onSave,
   onPublish,
-  onBack
+  onBack,
+  programSelector,
 }: CompleteProfileTaskBuilderProps) {
   // Initialize settings with defaults
   const [settings, setSettings] = useState<CompleteProfileSettings>({
@@ -144,7 +148,9 @@ export function CompleteProfileTaskBuilder({
   );
   const defaultPoints = 100;
   
-  const [previewMode, setPreviewMode] = useState<"all" | "per_field">(settings.rewardMode);
+  const [previewMode, setPreviewMode] = useState<"all" | "per_field">(
+    settings.rewardMode === "all_or_nothing" ? "all" : "per_field"
+  );
   
   const toggleField = (fieldId: typeof settings.requiredFields[number]) => {
     const newFields = settings.requiredFields.includes(fieldId)
@@ -163,7 +169,7 @@ export function CompleteProfileTaskBuilder({
       rewardMode: mode,
       pointsPerField: mode === "per_field" ? Math.floor(defaultPoints / settings.requiredFields.length) : undefined
     });
-    setPreviewMode(mode);
+    setPreviewMode(mode === "all_or_nothing" ? "all" : "per_field");
   };
   
   const setPointsPerField = (points: number) => {
@@ -214,12 +220,14 @@ export function CompleteProfileTaskBuilder({
       description="Reward fans for completing their profile"
       icon={<UserCheck className="h-6 w-6 text-brand-primary" />}
       category="User Onboarding"
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSave}
       onPublish={handlePublish}
       isValid={isValid}
       helpText="Encourage fans to complete their profiles by rewarding them with Fandomly Points. Choose between all-or-nothing or per-field rewards."
     >
+    <div className="space-y-6">
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
@@ -483,6 +491,7 @@ export function CompleteProfileTaskBuilder({
         )}
       </CardContent>
     </Card>
+    </div>
     </TaskBuilderBase>
   );
 }

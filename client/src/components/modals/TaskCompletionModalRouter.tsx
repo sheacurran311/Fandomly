@@ -9,11 +9,11 @@ import WebsiteVisitCompletionModal from "./interactive/WebsiteVisitCompletionMod
 import GenericTaskCompletionModal from "./GenericTaskCompletionModal";
 
 interface TaskCompletionModalRouterProps {
-  task: Task;
+  task: Task & { platform?: Task['platform'] };
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  completionId?: number;
+  completionId?: string;
 }
 
 /**
@@ -130,7 +130,7 @@ export default function TaskCompletionModalRouter({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto p-6">
         {renderModal()}
       </DialogContent>
     </Dialog>

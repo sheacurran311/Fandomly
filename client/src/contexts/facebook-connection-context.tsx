@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { FacebookSDK, FacebookUser, FacebookPage } from "@/lib/facebook";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { invalidateSocialConnections } from "@/hooks/use-social-connections";
 
 interface FacebookConnectionState {
   isConnected: boolean;
@@ -136,6 +137,9 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
         console.log('[Creator FB] setting state with connected=true, pages:', userPages?.length);
         setState(prev => ({ ...prev, isConnected: true, userInfo: facebookUser, connectedPages: userPages, selectedPage: selectedPage || null }));
         
+        // Invalidate shared social connections cache
+        invalidateSocialConnections();
+        
         console.log('[Creator FB] loadUserDataFromToken COMPLETE');
         return userPages.length;
       } else {
@@ -235,6 +239,10 @@ export function FacebookConnectionProvider({ children }: { children: ReactNode }
 
   const disconnectFacebook = useCallback(async () => {
     try {
+      // Disconnect from backend first
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('facebook');
+      // Then logout from Facebook SDK
       await FacebookSDK.logout();
       localStorage.removeItem('fandomly_selected_facebook_page');
       setState({ isConnected: false, isConnecting: false, userInfo: null, connectedPages: [], selectedPage: null });

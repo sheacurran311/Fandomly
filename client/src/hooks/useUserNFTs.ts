@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import { useAuth } from '@/hooks/use-auth';
 
 export interface UserNFT {
   id: string;
@@ -28,20 +28,21 @@ export interface UserNFT {
 }
 
 export function useUserNFTs(userId?: string) {
-  const { primaryWallet } = useDynamicContext();
+  const { user, isAuthenticated } = useAuth();
+  const effectiveUserId = userId || user?.id;
   
   return useQuery<UserNFT[]>({
-    queryKey: ['/api/nfts/user', userId, primaryWallet?.address],
+    queryKey: ['/api/nfts/user', effectiveUserId],
     queryFn: async () => {
-      if (!userId && !primaryWallet?.address) {
+      if (!effectiveUserId) {
         return [];
       }
       
       // Fetch NFTs from backend (which aggregates from Crossmint and blockchain)
-      const response = await apiRequest('GET', `/api/nfts/user/${userId || 'me'}`);
+      const response = await apiRequest('GET', `/api/nfts/user/${effectiveUserId}`);
       return response.json();
     },
-    enabled: !!(userId || primaryWallet?.address),
+    enabled: !!effectiveUserId && isAuthenticated,
   });
 }
 
@@ -57,4 +58,3 @@ export function useNFTsByWallet(walletAddress: string, chain: string) {
     enabled: !!walletAddress,
   });
 }
-

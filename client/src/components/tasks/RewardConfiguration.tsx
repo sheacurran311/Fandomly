@@ -7,6 +7,7 @@
  * - Update cadence selector (Immediate, Daily, Weekly, Monthly)
  * - Reward frequency selector (One-time, Daily, Weekly, Monthly)
  * - Smart defaults based on task type
+ * - Verification tier guidance for transparent point recommendations
  * - Validation and help text
  */
 
@@ -15,8 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { NumberInput } from "@/components/ui/number-input";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Info, AlertCircle, Shield, ShieldCheck, ShieldAlert, Lightbulb } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
 
 export type RewardType = 'points' | 'multiplier';
 export type UpdateCadence = 'immediate' | 'daily' | 'weekly' | 'monthly';
@@ -51,6 +54,9 @@ interface RewardConfigurationProps {
   taskType?: string;
   platform?: string;
   
+  // Verification tier for guidance display
+  verificationTier?: VerificationTier;
+  
   // Available currencies
   availableCurrencies?: Array<{ value: string; label: string }>;
   
@@ -80,6 +86,24 @@ const ONE_TIME_ONLY_TASKS = [
   'poll',
 ];
 
+// Get tier icon based on verification tier
+function getTierIcon(tier: VerificationTier) {
+  switch (tier) {
+    case 'T1': return <ShieldCheck className="h-4 w-4" />;
+    case 'T2': return <Shield className="h-4 w-4" />;
+    case 'T3': return <ShieldAlert className="h-4 w-4" />;
+  }
+}
+
+// Get tier badge color
+function getTierBadgeVariant(tier: VerificationTier): "default" | "secondary" | "destructive" | "outline" {
+  switch (tier) {
+    case 'T1': return 'default';
+    case 'T2': return 'secondary';
+    case 'T3': return 'outline';
+  }
+}
+
 export function RewardConfiguration({
   rewardType,
   onRewardTypeChange,
@@ -99,6 +123,7 @@ export function RewardConfiguration({
   onRewardFrequencyChange,
   taskType,
   platform,
+  verificationTier,
   availableCurrencies = [
     { value: 'default', label: 'Default Points' },
     { value: 'premium', label: 'Premium Points' },
@@ -112,8 +137,61 @@ export function RewardConfiguration({
   const isDelayedVerificationTask = taskType && DELAYED_VERIFICATION_TASKS.includes(taskType);
   const isOneTimeOnlyTask = taskType && ONE_TIME_ONLY_TASKS.includes(taskType);
   
+  // Get tier guidance if available
+  const tierGuidance = verificationTier ? TIER_GUIDANCE[verificationTier] : null;
+  
   return (
     <div className="space-y-6">
+      {/* VERIFICATION TIER GUIDANCE */}
+      {tierGuidance && (
+        <Card className={
+          verificationTier === 'T1' ? 'border-green-500/50 bg-green-500/5' :
+          verificationTier === 'T2' ? 'border-blue-500/50 bg-blue-500/5' :
+          'border-yellow-500/50 bg-yellow-500/5'
+        }>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              {getTierIcon(verificationTier!)}
+              <span>Verification: {tierGuidance.label}</span>
+              <Badge variant={getTierBadgeVariant(verificationTier!)} className="ml-auto">
+                {tierGuidance.trustLevel}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {tierGuidance.description}
+            </p>
+            
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <span className={
+                verificationTier === 'T1' ? 'text-green-600 dark:text-green-400' :
+                verificationTier === 'T2' ? 'text-blue-600 dark:text-blue-400' :
+                'text-yellow-600 dark:text-yellow-400'
+              }>
+                {tierGuidance.pointsRange}
+              </span>
+            </div>
+            
+            {tierGuidance.warning && (
+              <Alert variant="destructive" className="bg-yellow-500/10 border-yellow-500/30">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                  {tierGuidance.warning}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {tierGuidance.tip && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground bg-white/5 p-2 rounded">
+                <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{tierGuidance.tip}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* REWARD TYPE SECTION */}
       <Card>
         <CardHeader>
@@ -144,12 +222,19 @@ export function RewardConfiguration({
           {rewardType === 'points' && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="pointsToReward">Points to Reward *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="pointsToReward">Points to Reward *</Label>
+                  {tierGuidance && (
+                    <span className="text-xs text-muted-foreground">
+                      Recommended: {tierGuidance.recommendedPoints} points
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <NumberInput
                     id="pointsToReward"
                     value={pointsToReward}
-                    onChange={onPointsToRewardChange}
+                    onChange={(v) => onPointsToRewardChange?.(v ?? 0)}
                     min={1}
                     max={10000}
                     className="flex-1"
@@ -168,7 +253,12 @@ export function RewardConfiguration({
                   </Select>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Enter the amount and type of points the user will earn upon completing the rule.
+                  Fans will receive exactly <strong>{pointsToReward} points</strong> for completing this task.
+                  {tierGuidance && verificationTier === 'T3' && pointsToReward > 30 && (
+                    <span className="block mt-1 text-yellow-600 dark:text-yellow-400">
+                      ⚠️ This task cannot be verified. Consider using lower points to discourage abuse.
+                    </span>
+                  )}
                 </p>
               </div>
             </>
@@ -182,7 +272,7 @@ export function RewardConfiguration({
                 <NumberInput
                   id="multiplierValue"
                   value={multiplierValue}
-                  onChange={onMultiplierValueChange}
+                  onChange={(v) => onMultiplierValueChange?.(v ?? 1)}
                   min={1.01}
                   max={10.0}
                   step={0.1}

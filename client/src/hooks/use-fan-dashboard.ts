@@ -7,6 +7,8 @@ interface FanStats {
   creatorPoints: number;
   totalPoints: number;
   followingCount: number;
+  creatorsEnrolledCount?: number;
+  programsEnrolledCount?: number;
   activeCampaignsCount: number;
   rewardsEarned: number;
   pointsChange?: {
@@ -82,14 +84,42 @@ const fetchActiveCampaigns = async (fanId: string): Promise<Campaign[]> => {
           
           // Add creator campaigns to the list
           creatorCampaigns.forEach((campaign: any) => {
+            // Calculate real progress based on totalParticipants vs globalBudget
+            const progress = campaign.globalBudget && campaign.totalParticipants 
+              ? Math.min(100, Math.floor((campaign.totalParticipants / campaign.globalBudget) * 100))
+              : 0;
+            
+            // Calculate real time left from endDate
+            let timeLeft = 'Ongoing';
+            if (campaign.endDate) {
+              const endDate = new Date(campaign.endDate);
+              const now = new Date();
+              const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              if (daysLeft < 0) {
+                timeLeft = 'Ended';
+              } else if (daysLeft === 0) {
+                timeLeft = 'Ends today';
+              } else if (daysLeft === 1) {
+                timeLeft = '1 day left';
+              } else if (daysLeft <= 7) {
+                timeLeft = `${daysLeft} days left`;
+              } else if (daysLeft <= 30) {
+                const weeksLeft = Math.ceil(daysLeft / 7);
+                timeLeft = `${weeksLeft} week${weeksLeft > 1 ? 's' : ''} left`;
+              } else {
+                const monthsLeft = Math.ceil(daysLeft / 30);
+                timeLeft = `${monthsLeft} month${monthsLeft > 1 ? 's' : ''} left`;
+              }
+            }
+            
             campaigns.push({
               id: campaign.id,
               creator: campaign.creator?.displayName || 'Unknown Creator',
               campaign: campaign.name || 'Untitled Campaign',
               points: campaign.pointValue || 100,
-              progress: Math.floor(Math.random() * 100), // TODO: Calculate real progress
+              progress,
               category: campaign.category || 'General',
-              timeLeft: '1 week left', // TODO: Calculate from campaign end date
+              timeLeft,
               creatorId: program.creatorId
             });
           });
@@ -118,7 +148,7 @@ const fetchRecommendations = async (): Promise<Recommendation[]> => {
       id: creator.id,
       creator: creator.displayName || 'Unknown Creator',
       description: creator.bio || 'No description available',
-      followers: `${Math.floor(Math.random() * 10000)}`, // TODO: Get real follower count
+      followers: creator.followerCount ? creator.followerCount.toLocaleString() : '0',
       category: creator.category || 'General',
       hasActiveCampaign: creator.hasActiveCampaign || false
     }));

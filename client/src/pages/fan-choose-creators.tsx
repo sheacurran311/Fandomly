@@ -1,23 +1,47 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
-import { type Creator, type User, type LoyaltyProgram } from "@shared/schema";
+import { type Creator } from "@shared/schema";
+import CreatorCard from "@/components/creator/creator-card";
 
-type EnrichedCreator = Creator & { hasActiveCampaign?: boolean };
+type EnrichedCreator = Creator & { 
+  hasActiveCampaign?: boolean;
+  user?: {
+    username: string;
+    profileData?: {
+      avatar?: string;
+      bannerImage?: string;
+    };
+  };
+  tenant?: {
+    slug: string;
+    branding?: any;
+  };
+  program?: {
+    id?: string;
+    name?: string;
+    slug?: string;
+    status?: string;
+    pointsName?: string;
+    pageConfig?: {
+      logo?: string;
+      headerImage?: string;
+      brandColors?: any;
+      socialLinks?: any;
+      location?: string;
+      creatorDetails?: any;
+    };
+  } | null;
+};
 
 export default function FanChooseCreators() {
-  const { user: dynamicUser } = useDynamicContext();
+  const { user, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
-  const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user", dynamicUser?.userId],
-    enabled: !!dynamicUser?.userId,
-  });
   const { data: creators = [] } = useQuery<EnrichedCreator[]>({ queryKey: ["/api/creators"] });
 
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -34,33 +58,26 @@ export default function FanChooseCreators() {
     });
   }, [creators, selectedCategory, search]);
 
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
   const joinSelected = async () => {
-    if (!userData) return;
+    if (!user) return;
     for (const c of creators) {
       if (selected[c.id]) {
-        // Always follow (tenant membership)
-        await apiRequest("POST", `/api/tenants/${c.tenantId}/follow`, { userId: userData.id });
-
-        // If creator has an active campaign, enroll into their first loyalty program (if any)
-        if (c.hasActiveCampaign) {
-          const res = await fetch(`/api/loyalty-programs/creator/${c.id}`, { credentials: 'include' });
-          if (res.ok) {
-            const programs: LoyaltyProgram[] = await res.json();
-            if (programs.length > 0) {
-              const program = programs[0];
-              await apiRequest("POST", "/api/fan-programs", {
-                tenantId: program.tenantId,
-                fanId: userData.id,
-                programId: program.id,
-              });
-            }
+        // Use one-tap join endpoint: creates tenant membership + enrolls in program
+        try {
+          await apiRequest("POST", `/api/fan-programs/join-creator/${c.id}`);
+        } catch (err: any) {
+          // Ignore "already enrolled" or "no program" errors
+          if (!err.message?.includes('already') && !err.message?.includes('no program')) {
+            console.warn('Enroll error:', err.message);
           }
         }
       }
     }
     // Mark onboarding completed
     await apiRequest("POST", "/api/auth/update-onboarding", {
-      userId: userData.id,
+      userId: user.id,
       onboardingState: {
         currentStep: 2,
         totalSteps: 3,
@@ -69,14 +86,27 @@ export default function FanChooseCreators() {
         lastOnboardingRoute: "/fan-onboarding/choose-creators"
       }
     });
+    // Refresh auth context so router sees isCompleted = true
+    await refreshUser();
     // Redirect to fan dashboard
     setLocation("/fan-dashboard");
   };
 
-  const toggle = (id: string) => setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleSelect = (id: string) => {
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
-  if (!dynamicUser) {
-    return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4 bg-white/5 border-white/10">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-white font-bold text-xl mb-4">Authentication Required</h2>
+            <Button onClick={() => setLocation("/")} className="bg-brand-primary">Go Home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -86,52 +116,84 @@ export default function FanChooseCreators() {
       <img src="/fandomly-logo-with-text.png" alt="" className="absolute -bottom-8 -right-8 w-[420px] opacity-[0.06] pointer-events-none select-none" />
 
       <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-5xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6">
           <Card className="bg-white/5 border-white/10">
             <CardHeader>
-              <CardTitle className="text-white">Choose creators to follow or join</CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardTitle className="text-white">Choose creators to enroll with</CardTitle>
+                {selectedCount > 0 && (
+                  <span className="text-sm text-brand-secondary">
+                    {selectedCount} creator{selectedCount !== 1 ? 's' : ''} selected
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-3 mb-4">
-                <Input placeholder="Search creators" value={search} onChange={(e) => setSearch(e.target.value)} className="bg-white/10 border-white/20 text-white" />
-                <div className="flex gap-2">
-                  <Button variant={selectedCategory === "" ? "default" : "outline"} onClick={() => setSelectedCategory("")}>All</Button>
+              <div className="flex flex-col md:flex-row gap-3 mb-6">
+                <Input 
+                  placeholder="Search creators" 
+                  value={search} 
+                  onChange={(e) => setSearch(e.target.value)} 
+                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400" 
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    variant={selectedCategory === "" ? "default" : "outline"} 
+                    onClick={() => setSelectedCategory("")}
+                    className={selectedCategory === "" ? "bg-brand-primary" : "border-white/20 text-gray-300"}
+                  >
+                    All
+                  </Button>
                   {categories.map((cat) => (
-                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} onClick={() => setSelectedCategory(cat)}>
-                      {cat}
+                    <Button 
+                      key={cat} 
+                      variant={selectedCategory === cat ? "default" : "outline"} 
+                      onClick={() => setSelectedCategory(cat)}
+                      className={selectedCategory === cat ? "bg-brand-primary" : "border-white/20 text-gray-300"}
+                    >
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
                     </Button>
                   ))}
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredCreators.map((c) => (
-                  <Card key={c.id} className={`border ${selected[c.id] ? "border-brand-primary" : "border-white/10"} bg-white/5`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="text-white font-semibold">{c.displayName}</div>
-                          <div className="text-xs text-gray-400 capitalize">{c.category}</div>
-                        </div>
-                        {c.hasActiveCampaign ? (
-                          <Badge className="bg-green-500/20 text-green-400">Active</Badge>
-                        ) : (
-                          <Badge className="bg-white/10 text-gray-300">Follow</Badge>
-                        )}
-                      </div>
-                      <div className="mt-3">
-                        <Button variant="neon" className="w-full" onClick={() => toggle(c.id)}>
-                          {selected[c.id] ? "Selected" : c.hasActiveCampaign ? "Join" : "Follow"}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              {filteredCreators.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400">No creators found matching your criteria.</p>
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filteredCreators.map((creator) => (
+                    <CreatorCard
+                      key={creator.id}
+                      creator={creator}
+                      variant="selection"
+                      selected={!!selected[creator.id]}
+                      onSelect={handleSelect}
+                      showBio={true}
+                    />
+                  ))}
+                </div>
+              )}
 
-              <div className="mt-6 flex justify-end">
-                <Button variant="neon" onClick={joinSelected}>
-                  Continue to Dashboard
+              <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-white/10">
+                <p className="text-sm text-gray-400">
+                  {selectedCount === 0 
+                    ? (filteredCreators.length === 0 
+                        ? "No creators available yet - you can skip and find them later"
+                        : "Select creators to follow or join their programs")
+                    : `Ready to join ${selectedCount} creator${selectedCount !== 1 ? 's' : ''}`
+                  }
+                </p>
+                <Button 
+                  variant="neon" 
+                  onClick={joinSelected}
+                  className="w-full sm:w-auto"
+                >
+                  {selectedCount > 0 
+                    ? `Continue with ${selectedCount} Creator${selectedCount !== 1 ? 's' : ''}`
+                    : "Skip for Now"
+                  }
                 </Button>
               </div>
             </CardContent>
@@ -141,5 +203,3 @@ export default function FanChooseCreators() {
     </div>
   );
 }
-
-

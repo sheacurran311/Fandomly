@@ -16,7 +16,7 @@ import { type Achievement, type UserAchievement } from "@shared/schema";
 
 interface AchievementBadgeProps {
   achievement: Achievement;
-  userAchievement?: UserAchievement;
+  userAchievement?: Partial<Pick<UserAchievement, 'progress' | 'completed' | 'claimed'>>;
   size?: "sm" | "md" | "lg";
   showProgress?: boolean;
   onClaim?: () => void;

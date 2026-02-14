@@ -363,11 +363,11 @@ export class PollQuizVerificationService {
 
     return responses.map(r => ({
       id: r.id,
-      submittedAt: r.submittedAt || r.createdAt,
+      submittedAt: (r.submittedAt ?? r.createdAt) ?? new Date(),
       score: r.score ? parseFloat(r.score) : undefined,
       correctAnswers: r.correctAnswers || undefined,
       totalQuestions: r.totalQuestions || 0,
-      isPerfectScore: r.isPerfectScore,
+      isPerfectScore: r.isPerfectScore ?? false,
     }));
   }
 

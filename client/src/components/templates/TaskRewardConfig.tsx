@@ -5,17 +5,29 @@ import { NumberInput } from "@/components/ui/number-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Coins, TrendingUp, Info, Sparkles } from "lucide-react";
+import { Coins, TrendingUp, Info, Sparkles, Shield, ShieldCheck, ShieldAlert, Lightbulb } from "lucide-react";
 import type { RewardType } from "@shared/taskRuleSchema";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
 
 interface TaskRewardConfigProps {
   rewardType: RewardType;
   pointsToReward?: number;
   pointCurrency?: string;
   multiplierValue?: number;
+  verificationTier?: VerificationTier;
   onChange: (field: string, value: any) => void;
   disabled?: boolean;
+}
+
+// Get tier icon based on verification tier
+function getTierIcon(tier: VerificationTier) {
+  switch (tier) {
+    case 'T1': return <ShieldCheck className="h-4 w-4 text-green-500" />;
+    case 'T2': return <Shield className="h-4 w-4 text-blue-500" />;
+    case 'T3': return <ShieldAlert className="h-4 w-4 text-yellow-500" />;
+  }
 }
 
 export function TaskRewardConfig({
@@ -23,16 +35,69 @@ export function TaskRewardConfig({
   pointsToReward = 50,
   pointCurrency = "default",
   multiplierValue = 1.5,
+  verificationTier,
   onChange,
   disabled = false
 }: TaskRewardConfigProps) {
+  // Get tier guidance if available
+  const tierGuidance = verificationTier ? TIER_GUIDANCE[verificationTier] : null;
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Reward Configuration</CardTitle>
-        <CardDescription>Choose how fans are rewarded for completing this task</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Reward Configuration</CardTitle>
+            <CardDescription>Choose how fans are rewarded for completing this task</CardDescription>
+          </div>
+          {tierGuidance && (
+            <Badge 
+              variant={verificationTier === 'T1' ? 'default' : verificationTier === 'T2' ? 'secondary' : 'outline'}
+              className="flex items-center gap-1"
+            >
+              {getTierIcon(verificationTier!)}
+              {tierGuidance.label}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Verification Tier Guidance */}
+        {tierGuidance && (
+          <div className={`p-4 rounded-lg border ${
+            verificationTier === 'T1' ? 'bg-green-500/5 border-green-500/20' :
+            verificationTier === 'T2' ? 'bg-blue-500/5 border-blue-500/20' :
+            'bg-yellow-500/5 border-yellow-500/20'
+          }`}>
+            <div className="flex items-start gap-3">
+              {getTierIcon(verificationTier!)}
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{tierGuidance.trustLevel}</span>
+                  <span className={`text-sm font-medium ${
+                    verificationTier === 'T1' ? 'text-green-600' :
+                    verificationTier === 'T2' ? 'text-blue-600' :
+                    'text-yellow-600'
+                  }`}>
+                    {tierGuidance.pointsRange}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{tierGuidance.description}</p>
+                {tierGuidance.warning && (
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                    ⚠️ {tierGuidance.warning}
+                  </p>
+                )}
+                {tierGuidance.tip && (
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground mt-2">
+                    <Lightbulb className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{tierGuidance.tip}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Reward Type Selection */}
         <div className="space-y-3">
           <Label className="text-base font-semibold">Reward Type</Label>
@@ -87,9 +152,16 @@ export function TaskRewardConfig({
         {/* Points Configuration */}
         {rewardType === "points" && (
           <div className="space-y-4 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Coins className="h-5 w-5 text-yellow-500" />
-              <h4 className="font-semibold">Points Configuration</h4>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-yellow-500" />
+                <h4 className="font-semibold">Points Configuration</h4>
+              </div>
+              {tierGuidance && (
+                <span className="text-xs text-muted-foreground">
+                  Recommended: {tierGuidance.recommendedPoints} pts
+                </span>
+              )}
             </div>
             
             {/* Points Amount */}
@@ -126,8 +198,19 @@ export function TaskRewardConfig({
               />
               
               <p className="text-xs text-gray-400">
-                Fans will earn <strong>{pointsToReward} points</strong> for completing this task
+                Fans will receive exactly <strong>{pointsToReward} points</strong> for completing this task
               </p>
+              
+              {/* Warning for high points on unverifiable tasks */}
+              {verificationTier === 'T3' && pointsToReward && pointsToReward > 30 && (
+                <Alert className="bg-yellow-500/10 border-yellow-500/30">
+                  <ShieldAlert className="h-4 w-4 text-yellow-500" />
+                  <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-sm">
+                    This task cannot be automatically verified. High point values may encourage abuse. 
+                    Consider {tierGuidance?.recommendedPoints || 25} points or less.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
             
             {/* Point Currency (for multi-currency systems) */}

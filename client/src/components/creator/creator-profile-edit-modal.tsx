@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,12 +19,7 @@ import {
   Save, 
   X, 
   User as UserIcon, 
-  Mail, 
   MapPin, 
-  Upload, 
-  Image as ImageIcon,
-  Eye,
-  EyeOff,
   Trophy,
   Music,
   Video
@@ -71,6 +66,16 @@ const contentTypes = [
 export default function CreatorProfileEditModal({ isOpen, onClose, user, creator }: CreatorProfileEditModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch the creator's program (the fan-facing "profile")
+  const { data: programs } = useQuery<any[]>({
+    queryKey: ["/api/programs"],
+    enabled: isOpen && !!creator,
+  });
+
+  // The creator's primary program
+  const program = programs?.[0];
+  const pageConfig = program?.pageConfig as any;
   
   const [formData, setFormData] = useState({
     // Basic Info
@@ -106,35 +111,34 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     topicsOfFocus: "",
     sponsorships: "",
     totalViews: "",
-    
-    // Store Settings (hidden from UI, but kept for backend)
-    storeColors: {
+
+    // Brand Colors (from program.pageConfig)
+    brandColors: {
       primary: "#E10698",
-      secondary: "#14FEEE"
+      secondary: "#14FEEE",
+      accent: "#FFFFFF"
     },
     
-    // Public/Private Toggles
-    publicFields: {
-      location: true,
-      education: true,
-      sport: true,
-      followers: true,
-      bio: true
+    // Visibility Toggles (from program.pageConfig.visibility.profileData)
+    visibility: {
+      showLocation: true,
+      showBio: true,
+      showSocialLinks: true,
+      showVerificationBadge: true
     }
   });
 
   // Load existing data when modal opens
   useEffect(() => {
     if (isOpen && user) {
-      const creatorType = creator?.category || user.profileData?.creatorType;
       const typeSpecificData = creator?.typeSpecificData as any;
       
       setFormData({
-        displayName: creator?.displayName || user.profileData?.name || "",
-        bio: creator?.bio || user.profileData?.bio || "",
-        location: user.profileData?.location || "",
-        bannerImage: user.profileData?.bannerImage || creator?.bannerImage || "",
-        avatar: user.profileData?.avatar || "",
+        displayName: program?.name || creator?.displayName || user.profileData?.name || "",
+        bio: program?.description || creator?.bio || user.profileData?.bio || "",
+        location: pageConfig?.location || user.profileData?.location || "",
+        bannerImage: pageConfig?.headerImage || user.profileData?.bannerImage || "",
+        avatar: pageConfig?.logo || user.profileData?.avatar || "",
         
         // Athlete
         sport: typeSpecificData?.athlete?.sport || user.profileData?.sport || "",
@@ -167,23 +171,23 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
           : (typeSpecificData?.contentCreator?.sponsorships || ""),
         totalViews: typeSpecificData?.contentCreator?.totalViews || "",
         
-        // Store Colors (hidden from UI, preserved for backend)
-        storeColors: creator?.storeColors as any || {
+        // Brand Colors from program pageConfig
+        brandColors: pageConfig?.brandColors || {
           primary: "#E10698",
-          secondary: "#14FEEE"
+          secondary: "#14FEEE",
+          accent: "#FFFFFF"
         },
         
-        // Public/Private (default to public)
-        publicFields: (creator as any)?.publicFields || {
-          location: true,
-          education: true,
-          sport: true,
-          followers: true,
-          bio: true
+        // Visibility from program pageConfig
+        visibility: pageConfig?.visibility?.profileData || {
+          showLocation: true,
+          showBio: true,
+          showSocialLinks: true,
+          showVerificationBadge: true
         }
       });
     }
-  }, [isOpen, user, creator]);
+  }, [isOpen, user, creator, program, pageConfig]);
 
   const updateProfile = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -194,7 +198,6 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
           name: data.displayName,
           bio: data.bio,
           location: data.location,
-          bannerImage: data.bannerImage,
           avatar: data.avatar,
           sport: data.sport,
           position: data.position,
@@ -259,16 +262,34 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
         await apiRequest("PUT", `/api/creators/${creator.id}`, {
           displayName: data.displayName,
           bio: data.bio,
-          imageUrl: data.avatar,  // Save profile photo to creator.imageUrl for verification
-          storeColors: data.storeColors,  // Preserve store colors (managed in program builder)
-          typeSpecificData,
-          publicFields: data.publicFields
+          imageUrl: data.avatar,
+          typeSpecificData
+        });
+      }
+
+      // Update program (the fan-facing profile) with pageConfig data
+      if (program?.id) {
+        await apiRequest("PUT", `/api/programs/${program.id}`, {
+          name: data.displayName,
+          description: data.bio,
+          pageConfig: {
+            ...pageConfig,
+            headerImage: data.bannerImage,
+            logo: data.avatar,
+            location: data.location,
+            brandColors: data.brandColors,
+            visibility: {
+              ...pageConfig?.visibility,
+              profileData: data.visibility
+            }
+          }
         });
       }
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/programs"] });
       
       // Trigger verification check after profile update
       try {
@@ -279,7 +300,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
       }
       
       toast({
-        title: "Profile Updated! ✅",
+        title: "Profile Updated!",
         description: "Your creator profile has been successfully updated.",
         duration: 3000
       });
@@ -298,12 +319,12 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handlePublicFieldToggle = (field: keyof typeof formData.publicFields) => {
+  const handleVisibilityToggle = (field: string) => {
     setFormData(prev => ({
       ...prev,
-      publicFields: {
-        ...prev.publicFields,
-        [field]: !prev.publicFields[field]
+      visibility: {
+        ...prev.visibility,
+        [field]: !(prev.visibility as any)[field]
       }
     }));
   };
@@ -313,7 +334,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     updateProfile.mutate(formData);
   };
 
-  const creatorType = creator?.category || user.profileData?.creatorType;
+  const creatorType = creator?.category || (user.profileData as { creatorType?: string })?.creatorType;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -331,7 +352,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
             <h3 className="text-lg font-semibold text-white flex items-center justify-between">
               Basic Information
               <Badge variant="outline" className="text-xs">
-                {creator?.isVerified ? "✓ Verified" : "Pending Verification"}
+                {creator?.isVerified ? "Verified" : "Pending Verification"}
               </Badge>
             </h3>
 
@@ -354,8 +375,8 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
                     <MapPin className="inline mr-1 h-4 w-4" />Location
                   </Label>
                   <Switch
-                    checked={formData.publicFields.location}
-                    onCheckedChange={() => handlePublicFieldToggle('location')}
+                    checked={formData.visibility.showLocation}
+                    onCheckedChange={() => handleVisibilityToggle('showLocation')}
                     className="scale-75"
                   />
                 </div>
@@ -371,8 +392,8 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
               <Label htmlFor="bio" className="text-gray-300 flex items-center justify-between">
                 <span>Bio</span>
                 <Switch
-                  checked={formData.publicFields.bio}
-                  onCheckedChange={() => handlePublicFieldToggle('bio')}
+                  checked={formData.visibility.showBio}
+                  onCheckedChange={() => handleVisibilityToggle('showBio')}
                   className="scale-75"
                 />
               </Label>
@@ -383,25 +404,6 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
                 className="bg-gray-800 border-gray-700 text-white"
                 placeholder="Tell your fans about yourself..."
                 rows={3}
-              />
-            </div>
-
-            <div className="hidden">
-              <Label htmlFor="followerCount" className="text-gray-300 flex items-center justify-between">
-                <span>Total Follower Count</span>
-                <Switch
-                  checked={formData.publicFields.followers}
-                  onCheckedChange={() => handlePublicFieldToggle('followers')}
-                  className="scale-75"
-                />
-              </Label>
-              <Input
-                id="followerCount"
-                type="number"
-                value={formData.followerCount}
-                onChange={(e) => handleInputChange('followerCount', e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
-                placeholder="Total followers across all platforms"
               />
             </div>
           </div>
@@ -445,13 +447,8 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="sport" className="text-gray-300 flex items-center justify-between">
+                  <Label htmlFor="sport" className="text-gray-300">
                     <span>Sport *</span>
-                    <Switch
-                      checked={formData.publicFields.sport}
-                      onCheckedChange={() => handlePublicFieldToggle('sport')}
-                      className="scale-75"
-                    />
                   </Label>
                   <Select value={formData.sport} onValueChange={(value) => handleInputChange('sport', value)}>
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -477,13 +474,8 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
                 </div>
 
                 <div>
-                  <Label htmlFor="education" className="text-gray-300 flex items-center justify-between">
+                  <Label htmlFor="education" className="text-gray-300">
                     <span>Education Level</span>
-                    <Switch
-                      checked={formData.publicFields.education}
-                      onCheckedChange={() => handlePublicFieldToggle('education')}
-                      className="scale-75"
-                    />
                   </Label>
                   <Select value={formData.education} onValueChange={(value) => handleInputChange('education', value)}>
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -804,4 +796,3 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     </Dialog>
   );
 }
-

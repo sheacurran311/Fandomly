@@ -75,10 +75,9 @@ export default function UserRoleManager() {
       newRole: string; 
       customerTier?: string; 
     }) => {
-      return await apiRequest(`/api/admin/users/${userId}/role`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole, customerTier }),
+      return await apiRequest("PUT", `/api/admin/users/${userId}/role`, {
+        role: newRole,
+        customerTier,
       });
     },
     onSuccess: () => {

@@ -142,49 +142,117 @@ export function registerLeaderboardRoutes(app: Express) {
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      // Query program leaderboard view
-      const leaderboard = await db.execute(sql`
-        SELECT
-          pl.program_id,
-          pl.user_id,
-          pl.username,
-          pl.avatar,
-          pl.current_points,
-          pl.total_points_earned,
-          pl.current_tier,
-          pl.joined_at,
-          pl.rank,
-          pl.current_rank,
-          -- Get rank change from history
-          COALESCE(rh.rank_change, 0) AS rank_change,
-          COALESCE(rh.points_change, 0) AS points_change
-        FROM program_leaderboard pl
-        LEFT JOIN leaderboard_rank_history rh
-          ON rh.leaderboard_type = 'program'
-          AND rh.scope_id = pl.program_id
-          AND rh.user_id = pl.user_id
-          AND rh.snapshot_date = CURRENT_DATE
-        WHERE pl.program_id = ${programId}
-        ORDER BY pl.rank
-        LIMIT ${limit}
-        OFFSET ${offset}
+      // First, check if materialized view exists and has data
+      const viewExists = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_matviews WHERE matviewname = 'program_leaderboard'
+        ) as exists
       `);
 
-      // Get total participant count
-      const totalResult = await db.execute(sql`
-        SELECT COUNT(DISTINCT user_id) as total
-        FROM program_leaderboard
-        WHERE program_id = ${programId}
-      `);
+      let leaderboardRows: any[] = [];
+      let total = 0;
 
-      const total = totalResult.rows[0]?.total || 0;
+      if (viewExists.rows[0]?.exists) {
+        // Query program leaderboard view
+        const leaderboard = await db.execute(sql`
+          SELECT
+            pl.program_id,
+            pl.user_id,
+            pl.username,
+            pl.avatar,
+            pl.current_points,
+            pl.total_points_earned,
+            pl.current_tier,
+            pl.joined_at,
+            pl.rank,
+            pl.current_rank,
+            -- Get rank change from history
+            COALESCE(rh.rank_change, 0) AS rank_change,
+            COALESCE(rh.points_change, 0) AS points_change
+          FROM program_leaderboard pl
+          LEFT JOIN leaderboard_rank_history rh
+            ON rh.leaderboard_type = 'program'
+            AND rh.scope_id = pl.program_id
+            AND rh.user_id = pl.user_id
+            AND rh.snapshot_date = CURRENT_DATE
+          WHERE pl.program_id = ${programId}
+          ORDER BY pl.rank
+          LIMIT ${limit}
+          OFFSET ${offset}
+        `);
+
+        leaderboardRows = leaderboard.rows;
+
+        // Get total participant count
+        const totalResult = await db.execute(sql`
+          SELECT COUNT(DISTINCT user_id) as total
+          FROM program_leaderboard
+          WHERE program_id = ${programId}
+        `);
+
+        total = parseInt(totalResult.rows[0]?.total?.toString() || '0');
+      }
+
+      // Fallback: If materialized view is empty or doesn't exist, query fan_programs directly
+      if (leaderboardRows.length === 0) {
+        console.log(`[Leaderboard] Materialized view empty for program ${programId}, using direct query fallback`);
+        
+        const directQuery = await db.execute(sql`
+          SELECT
+            fp.program_id,
+            fp.fan_id as user_id,
+            u.username,
+            u.profile_data->>'avatarUrl' as avatar,
+            fp.current_points,
+            fp.total_points_earned,
+            fp.current_tier,
+            fp.joined_at,
+            DENSE_RANK() OVER (ORDER BY fp.total_points_earned DESC) as rank,
+            DENSE_RANK() OVER (ORDER BY fp.total_points_earned DESC) as current_rank,
+            0 as rank_change,
+            0 as points_change
+          FROM fan_programs fp
+          INNER JOIN users u ON fp.fan_id = u.id
+          WHERE fp.program_id = ${programId}
+          ORDER BY fp.total_points_earned DESC
+          LIMIT ${limit}
+          OFFSET ${offset}
+        `);
+
+        leaderboardRows = directQuery.rows;
+
+        // Get total from direct query
+        const directTotal = await db.execute(sql`
+          SELECT COUNT(*) as total
+          FROM fan_programs
+          WHERE program_id = ${programId}
+        `);
+
+        total = parseInt(directTotal.rows[0]?.total?.toString() || '0');
+      }
+
+      // Transform to match expected frontend format
+      const formattedLeaderboard = leaderboardRows.map((row: any) => ({
+        programId: row.program_id,
+        userId: row.user_id,
+        username: row.username || 'Anonymous',
+        fullName: row.username || 'Anonymous',
+        avatarUrl: row.avatar,
+        currentPoints: parseInt(row.current_points?.toString() || '0'),
+        totalPoints: parseInt(row.total_points_earned?.toString() || '0'),
+        currentTier: row.current_tier,
+        joinedAt: row.joined_at,
+        rank: parseInt(row.rank?.toString() || '0'),
+        rankChange: parseInt(row.rank_change?.toString() || '0'),
+        pointsChange: parseInt(row.points_change?.toString() || '0')
+      }));
 
       res.json({
-        leaderboard: leaderboard.rows,
+        leaderboard: formattedLeaderboard,
         pagination: {
           limit,
           offset,
-          total: parseInt(total.toString())
+          total
         },
         lastUpdated: new Date().toISOString()
       });
@@ -249,6 +317,27 @@ export function registerLeaderboardRoutes(app: Express) {
         viewName = 'platform_leaderboard_week';
       } else if (period === 'month') {
         viewName = 'platform_leaderboard_month';
+      }
+
+      // Check if materialized view exists first
+      const viewExists = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_matviews WHERE matviewname = ${viewName}
+        ) as exists
+      `);
+
+      if (!viewExists.rows[0]?.exists) {
+        // Return empty leaderboard if view doesn't exist
+        console.warn(`[Leaderboard] Materialized view ${viewName} does not exist. Run migration 0027_add_sprint8_leaderboard_views.sql`);
+        return res.json({
+          leaderboard: [],
+          pagination: {
+            limit,
+            offset,
+            total: 0,
+            hasMore: false
+          }
+        });
       }
 
       // Query the materialized view

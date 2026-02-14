@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,33 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/queryClient";
-import { type User } from "@shared/schema";
 import useUsernameValidation from "@/hooks/use-username-validation";
 import { Check, AlertCircle } from "lucide-react";
 
 export default function FanOnboardingProfile() {
-  const { user: dynamicUser } = useDynamicContext();
+  const { user, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
-  const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user", dynamicUser?.userId],
-    enabled: !!dynamicUser?.userId,
-  });
 
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [age, setAge] = useState<string>("");
 
-  // Onboarding modal steps
-  const [step, setStep] = useState(1); // 1=ToS, 2=Platform placeholder, 3=Profile
-  const totalSteps = 3;
-  const [tosScrolled, setTosScrolled] = useState(false);
-  const [tosAgreed, setTosAgreed] = useState(false);
-  const tosRef = useRef<HTMLDivElement | null>(null);
-  
+  // Onboarding steps: 1=Follow Fandomly (placeholder), 2=Profile
+  const [step, setStep] = useState(1);
+  const totalSteps = 2;
+
   // Username validation
   const { isChecking, isAvailable, error: usernameError, suggestions, hasChecked } = useUsernameValidation(username);
 
-  if (!dynamicUser) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <Card className="max-w-md w-full mx-4 bg-white/5 border-white/10">
@@ -47,36 +38,56 @@ export default function FanOnboardingProfile() {
     );
   }
 
-  useEffect(() => {
-    const el = tosRef.current;
-    if (!el) return;
-    const handler = () => {
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
-      if (atBottom) setTosScrolled(true);
-    };
-    el.addEventListener("scroll", handler);
-    return () => el.removeEventListener("scroll", handler);
-  }, []);
-
   const onContinueProfile = async () => {
-    if (!userData || !username || !isAvailable) return;
+    if (!user) return;
+    // Username is now optional - fans can set it later when needed (leaderboard, comments)
+    if (username && !isAvailable) return;
     
     try {
-      const response = await apiRequest("POST", "/api/auth/profile", {
-        userId: userData.id,
-        username: username,
-        profileData: {
-          name: name || undefined,
-          age: age ? Number(age) : undefined,
-        },
+      // Only update profile if username was provided
+      if (username) {
+        const response = await apiRequest("POST", "/api/auth/profile", {
+          userId: user.id,
+          username: username,
+          profileData: {
+            name: name || undefined,
+            age: age ? Number(age) : undefined,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Profile update failed:', errorData);
+          alert(errorData.error || 'Failed to save profile. Please try again.');
+          return;
+        }
+      } else {
+        // Skip username - just update name/age if provided
+        if (name || age) {
+          await apiRequest("POST", "/api/auth/profile", {
+            userId: user.id,
+            profileData: {
+              name: name || undefined,
+              age: age ? Number(age) : undefined,
+            },
+          });
+        }
+      }
+
+      // Update onboarding progress in the database
+      await apiRequest("POST", "/api/auth/update-onboarding", {
+        userId: user.id,
+        onboardingState: {
+          currentStep: 1,
+          totalSteps: 2,
+          completedSteps: ["profile"],
+          isCompleted: false,
+          lastOnboardingRoute: "/fan-onboarding/choose-creators"
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Profile update failed:', errorData);
-        alert(errorData.error || 'Failed to save profile. Please try again.');
-        return;
-      }
+      // Refresh auth context so router has updated state
+      await refreshUser();
 
       // Successfully saved, move to creators selection
       setLocation("/fan-onboarding/choose-creators");
@@ -89,7 +100,7 @@ export default function FanOnboardingProfile() {
   const StepIndicator = () => (
     <div className="flex justify-center mb-6">
       <div className="flex items-center space-x-3">
-        {[1, 2, 3].map((num) => (
+        {[1, 2].map((num) => (
           <div key={num} className="flex items-center">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
@@ -98,7 +109,7 @@ export default function FanOnboardingProfile() {
             >
               {num}
             </div>
-            {num < 3 && <div className={`w-10 h-1 mx-2 ${step > num ? "bg-brand-primary" : "bg-gray-700"}`} />}
+            {num < 2 && <div className={`w-10 h-1 mx-2 ${step > num ? "bg-brand-primary" : "bg-gray-700"}`} />}
           </div>
         ))}
       </div>
@@ -124,60 +135,9 @@ export default function FanOnboardingProfile() {
 
             {step === 1 && (
               <div className="space-y-4">
-                <h3 className="text-white text-lg font-semibold">Terms of Service</h3>
-                <p className="text-gray-400 text-sm">
-                  Please review and accept our Terms of Service to continue.
-                </p>
-                <div
-                  ref={tosRef}
-                  className="h-48 overflow-y-auto p-4 rounded-lg bg-white/5 border border-white/10 text-gray-300 text-sm space-y-3"
-                >
-                  <p className="text-xs text-gray-400">(Placeholder Terms of Service)</p>
-                  <p>
-                    Welcome to Fandomly. By continuing, you acknowledge that this placeholder TOS will be
-                    replaced with the final document. Please scroll to the bottom and select &quot;I agree&quot; to proceed.
-                  </p>
-                  <p>
-                    Key points: use the platform responsibly, respect community guidelines, and understand that
-                    rewards and participation are subject to program rules and verification.
-                  </p>
-                  <p>
-                    Data: we respect your privacy and will handle data as outlined in the final TOS. Your continued
-                    use signifies consent to those terms.
-                  </p>
-                  <p>
-                    Liability: the platform is provided as-is; certain features may change. We will communicate
-                    material changes to terms.
-                  </p>
-                  <p>Thank you for being part of our community.</p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    className="text-red-300 border-red-500/40 hover:bg-red-500/10"
-                    onClick={() => setLocation("/")}
-                  >
-                    I do not agree
-                  </Button>
-                  <Button
-                    className="bg-brand-primary text-[#101636] hover:bg-brand-primary/80"
-                    disabled={!tosScrolled}
-                    onClick={() => {
-                      setTosAgreed(true);
-                      setStep(2);
-                    }}
-                  >
-                    {tosScrolled ? "I agree" : "Scroll to enable"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="space-y-4">
                 <h3 className="text-white text-lg font-semibold">Follow Fandomly (Placeholder)</h3>
                 <p className="text-gray-400 text-sm">
-                  We’ll add auto platform tasks here (Follow on X, Like on Facebook, Follow on Instagram). For now, this step can be skipped.
+                  We'll add auto platform tasks here (Follow on X, Like on Facebook, Follow on Instagram). For now, this step can be skipped.
                 </p>
                 <div className="grid sm:grid-cols-3 gap-3">
                   {["Follow on X (Twitter)", "Like on Facebook", "Follow on Instagram"].map((item) => (
@@ -191,13 +151,13 @@ export default function FanOnboardingProfile() {
                   <Button
                     variant="outline"
                     className="text-gray-300 border-white/20 hover:bg-white/10"
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(2)}
                   >
                     Skip for now
                   </Button>
                   <Button
                     className="bg-brand-primary text-[#101636] hover:bg-brand-primary/80"
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(2)}
                   >
                     Continue
                   </Button>
@@ -205,9 +165,9 @@ export default function FanOnboardingProfile() {
               </div>
             )}
 
-            {step === 3 && (
+            {step === 2 && (
               <div className="space-y-4">
-                <h3 className="text-white text-lg font-semibold">Create your profile (optional)</h3>
+                <h3 className="text-white text-lg font-semibold">Create your profile</h3>
                 {/* Username Field - Required */}
                 <div>
                   <Label htmlFor="username" className="text-gray-300">Username *</Label>
@@ -241,7 +201,7 @@ export default function FanOnboardingProfile() {
                     <p className="text-red-400 text-sm mt-1">{usernameError}</p>
                   )}
                   {hasChecked && isAvailable && (
-                    <p className="text-green-400 text-sm mt-1">✓ Username is available!</p>
+                    <p className="text-green-400 text-sm mt-1">Username is available!</p>
                   )}
                   {suggestions.length > 0 && (
                     <div className="mt-2">
@@ -281,5 +241,3 @@ export default function FanOnboardingProfile() {
     </div>
   );
 }
-
-

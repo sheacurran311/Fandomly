@@ -291,7 +291,7 @@ export class WebsiteVisitVerificationService {
     const completedVisits = visits.filter(v => v.actionCompleted).length;
     const totalTime = visits.reduce((sum, v) => sum + (v.timeOnSite || 0), 0);
     const averageTimeOnSite = totalClicks > 0 ? totalTime / totalClicks : 0;
-    const lastVisitAt = visits
+    const lastVisitAtRaw = visits
       .filter(v => v.clickedAt)
       .sort((a, b) => (b.clickedAt?.getTime() || 0) - (a.clickedAt?.getTime() || 0))[0]?.clickedAt;
 
@@ -299,7 +299,7 @@ export class WebsiteVisitVerificationService {
       totalClicks,
       completedVisits,
       averageTimeOnSite: Math.round(averageTimeOnSite),
-      lastVisitAt,
+      lastVisitAt: lastVisitAtRaw ?? undefined,
     };
   }
 

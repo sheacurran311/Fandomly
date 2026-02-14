@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, getDynamicUserId } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { transformImageUrl } from "@/lib/image-utils";
 
@@ -105,22 +105,18 @@ export function ImageUpload({
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      // Get Dynamic user ID for authentication
-      const dynamicUserId = getDynamicUserId();
+      // Get auth headers (supports both JWT and legacy Dynamic user ID)
+      const authHeaders = getAuthHeaders();
       
-      if (!dynamicUserId) {
+      if (Object.keys(authHeaders).length === 0) {
         throw new Error('Please log in to upload images');
       }
-      
-      const headers: HeadersInit = {
-        'x-dynamic-user-id': dynamicUserId
-      };
       
       const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
         credentials: 'include',
-        headers
+        headers: authHeaders
       });
 
       clearInterval(progressInterval);

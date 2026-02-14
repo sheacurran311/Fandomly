@@ -13,19 +13,21 @@ async function fetchUserTaskCompletions(tenantId?: string): Promise<{ completion
     ? `/api/task-completions/me?tenantId=${tenantId}`
     : '/api/task-completions/me';
   
-  // Use apiRequest for proper authentication
   const { apiRequest } = await import('@/lib/queryClient');
-  return await apiRequest('GET', url);
+  const res = await apiRequest('GET', url);
+  const data = await res.json();
+  return Array.isArray(data) ? { completions: data } : (data as { completions: TaskCompletion[] });
 }
 
 /**
  * Fetch task completion for a specific task
  */
-async function fetchTaskCompletion(taskId: string): Promise<{ completion: TaskCompletion }> {
+async function fetchTaskCompletion(taskId: string): Promise<{ completion: TaskCompletion | null }> {
   try {
     const { apiRequest } = await import('@/lib/queryClient');
     const response = await apiRequest('GET', `/api/task-completions/${taskId}`);
-    return response.json();
+    const data = await response.json();
+    return data?.completion !== undefined ? data : { completion: data };
   } catch (error: any) {
     // Return null completion for 404 (task not started yet)
     if (error.message?.includes('404') || error.message?.includes('not found')) {
@@ -264,5 +266,43 @@ export function getNextCheckInTime(completion?: TaskCompletion): Date | null {
   nextCheckIn.setHours(0, 0, 0, 0);
   
   return nextCheckIn;
+}
+
+// ==========================================
+// Query Invalidation Helper
+// ==========================================
+
+import type { QueryClient } from '@tanstack/react-query';
+
+/**
+ * Invalidate all queries related to task completion, points, and dashboard stats.
+ * Call this after any successful task verification/completion to ensure all
+ * UI components (fan dashboard, creator dashboard, achievements, etc.) update.
+ */
+export function invalidateTaskCompletionQueries(queryClient: QueryClient): void {
+  // Task completion data - both query key formats used in the app
+  queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
+  queryClient.invalidateQueries({ queryKey: ['task-completions', 'me'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+  queryClient.invalidateQueries({ queryKey: ['tasks', 'published'] });
+
+  // User/points data for fan dashboard
+  queryClient.invalidateQueries({ queryKey: ['user'] });
+  queryClient.invalidateQueries({ queryKey: ['fanStats'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/fan/dashboard/stats'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/fan/dashboard/task-completion-stats'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/fan/dashboard/points-history'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/fan/points/breakdown'] });
+
+  // Platform points
+  queryClient.invalidateQueries({ queryKey: ['platform-points-balance'] });
+  queryClient.invalidateQueries({ queryKey: ['platform-points-transactions'] });
+
+  // Creator metrics
+  queryClient.invalidateQueries({ queryKey: ['creatorStats'] });
+
+  // Achievements
+  queryClient.invalidateQueries({ queryKey: ['/api/achievements/user'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/user-levels'] });
 }
 

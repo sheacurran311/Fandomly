@@ -202,8 +202,8 @@ export default function CreatorPublic() {
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: creator.bannerImage 
-              ? `url(${transformImageUrl(creator.bannerImage)})`
+            backgroundImage: (creator as { bannerImage?: string }).bannerImage ?? creator.user?.profileData?.bannerImage
+              ? `url(${transformImageUrl((creator as { bannerImage?: string }).bannerImage ?? creator.user?.profileData?.bannerImage ?? '')})`
               : `linear-gradient(135deg, ${branding?.primaryColor || '#1a1f3a'}, ${branding?.secondaryColor || '#0f1629'})`,
           }}
         >
@@ -400,7 +400,7 @@ export default function CreatorPublic() {
                             </div>
                             <Badge variant="outline" className="border-brand-accent/30 text-brand-accent">
                               <Star className="h-3 w-3 mr-1" />
-                              {task.points} pts
+                              {(task as { pointsToReward?: number }).pointsToReward ?? 0} pts
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-400 mt-3">
@@ -636,7 +636,7 @@ export default function CreatorPublic() {
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10 text-center">
                   <h4 className="text-white font-bold mb-2">Basic</h4>
                   <div className="text-3xl font-bold text-brand-primary mb-2">Free</div>
-                  <p className="text-sm text-gray-400 mb-4">Follow and earn rewards</p>
+                  <p className="text-sm text-gray-400 mb-4">Enroll and earn rewards</p>
                   <Badge className="bg-green-500/20 text-green-400">Current</Badge>
                 </div>
                 

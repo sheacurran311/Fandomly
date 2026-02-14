@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { verifyAccessToken, verifyRefreshToken, JWTUserPayload } from '../services/auth/jwt-service';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -15,11 +16,15 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     role: 'fandomly_admin' | 'customer_admin' | 'customer_end_user';
+    userType?: string;
     customerTier?: 'basic' | 'premium' | 'vip' | null;
     adminPermissions?: any;
     customerAdminData?: any;
-    dynamicUserId?: string;  // Add dynamicUserId to user object
+    dynamicUserId?: string;  // Legacy: Dynamic user ID (for backward compatibility)
+    authProvider?: string;   // New: which auth provider was used
+    isAdmin?: boolean;
   };
+  jwtPayload?: JWTUserPayload; // Store JWT payload for reference
   dynamicUser?: {
     id: string;
     dynamicUserId: string;
@@ -33,10 +38,94 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-// Middleware to verify user authentication and attach role information
+/**
+ * Middleware to verify user authentication and attach role information
+ * Supports both:
+ * 1. JWT-based auth (new system) via Authorization: Bearer header
+ * 2. Legacy Dynamic auth via x-dynamic-user-id header (for gradual migration)
+ */
 export async function authenticateUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
-    // Extract Dynamic user ID from headers or body (restored original approach)
+    // Try JWT authentication first (new system)
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      
+      try {
+        const payload = verifyAccessToken(token);
+        req.jwtPayload = payload;
+        
+        // Fetch user by ID from JWT
+        const [user] = await db
+          .select({
+            id: users.id,
+            role: users.role,
+            userType: users.userType,
+            customerTier: users.customerTier,
+            adminPermissions: users.adminPermissions,
+            customerAdminData: users.customerAdminData,
+          })
+          .from(users)
+          .where(eq(users.id, payload.sub))
+          .limit(1);
+
+        if (!user) {
+          return res.status(401).json({ error: 'User not found' });
+        }
+
+        req.user = {
+          ...user,
+          customerTier: user.customerTier || undefined,
+          authProvider: payload.provider,
+          isAdmin: user.role === 'fandomly_admin',
+        };
+        
+        console.log('[Auth] JWT auth successful for user:', user.id);
+        return next();
+      } catch (jwtError: any) {
+        // JWT verification failed - check if it's expired
+        if (jwtError.message === 'Token expired') {
+          return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+        }
+        console.log('[Auth] JWT verification failed:', jwtError.message);
+        // Fall through to legacy auth
+      }
+    }
+
+    // Try cookie-based auth (refresh_token cookie)
+    const refreshTokenCookie = req.cookies?.refresh_token;
+    if (refreshTokenCookie) {
+      try {
+        const payload = verifyRefreshToken(refreshTokenCookie);
+        const [user] = await db
+          .select({
+            id: users.id,
+            role: users.role,
+            userType: users.userType,
+            customerTier: users.customerTier,
+            adminPermissions: users.adminPermissions,
+            customerAdminData: users.customerAdminData,
+          })
+          .from(users)
+          .where(eq(users.id, payload.sub))
+          .limit(1);
+
+        if (user) {
+          req.user = {
+            ...user,
+            customerTier: user.customerTier || undefined,
+            isAdmin: user.role === 'fandomly_admin',
+          };
+          console.log('[Auth] Cookie auth successful for user:', user.id);
+          return next();
+        }
+      } catch (cookieError: any) {
+        console.log('[Auth] Cookie auth failed:', cookieError.message);
+        // Fall through to legacy auth
+      }
+    }
+
+    // Legacy: Extract Dynamic user ID from headers or body
     const dynamicUserId = req.headers['x-dynamic-user-id'] as string || req.body?.dynamicUserId;
     
     if (!dynamicUserId) {
@@ -48,6 +137,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
       .select({
         id: users.id,
         role: users.role,
+        userType: users.userType,
         customerTier: users.customerTier,
         adminPermissions: users.adminPermissions,
         customerAdminData: users.customerAdminData,
@@ -55,6 +145,22 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
       .from(users)
       .where(eq(users.dynamicUserId, dynamicUserId))
       .limit(1);
+
+    // Fallback: client may pass internal user id when dynamicUserId is not set
+    if (!user) {
+      [user] = await db
+        .select({
+          id: users.id,
+          role: users.role,
+          userType: users.userType,
+          customerTier: users.customerTier,
+          adminPermissions: users.adminPermissions,
+          customerAdminData: users.customerAdminData,
+        })
+        .from(users)
+        .where(eq(users.id, dynamicUserId))
+        .limit(1);
+    }
 
     // Auto-create user if they don't exist (Dynamic authenticated but not in our DB)
     if (!user) {
@@ -74,6 +180,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
       user = {
         id: newUser.id,
         role: newUser.role as 'fandomly_admin' | 'customer_admin' | 'customer_end_user',
+        userType: newUser.userType ?? 'fan',
         customerTier: newUser.customerTier,
         adminPermissions: newUser.adminPermissions,
         customerAdminData: newUser.customerAdminData,
@@ -85,7 +192,8 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     req.user = {
       ...user,
       customerTier: user.customerTier || undefined,
-      dynamicUserId: dynamicUserId,  // Store the Dynamic user ID
+      dynamicUserId: dynamicUserId,
+      isAdmin: user.role === 'fandomly_admin',
     };
     next();
   } catch (error) {

@@ -1,6 +1,8 @@
 import { db } from '../db';
-import { socialConnections, taskCompletions } from '@shared/schema';
+import { socialConnections, taskCompletions, tasks, loyaltyPrograms } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { creatorPointsService } from './points/points-service';
+import { multiplierService } from './multiplier-service';
 
 /**
  * Social Media Task Verification Service
@@ -981,25 +983,28 @@ export async function verifyFacebookShare(
 // ===== TASK COMPLETION UPDATE =====
 
 /**
- * Update task completion with verification results
+ * Update task completion with verification results and award points
  */
 export async function updateTaskCompletion(
   taskCompletionId: string,
   verificationResult: VerificationResult,
   verificationMethod: 'webhook' | 'api_poll' | 'manual'
-): Promise<void> {
+): Promise<{ pointsAwarded?: number }> {
   try {
     const updates: any = {
       updatedAt: new Date()
     };
     
+    let pointsAwarded = 0;
+    
     if (verificationResult.verified) {
       updates.status = 'completed';
       updates.verifiedAt = new Date();
+      updates.completedAt = new Date();
       updates.verificationMethod = verificationMethod;
       updates.progress = 100;
       
-      // Add verification proof to completion data
+      // Get completion and task details for points calculation
       const [completion] = await db
         .select()
         .from(taskCompletions)
@@ -1007,10 +1012,76 @@ export async function updateTaskCompletion(
       
       if (completion) {
         const completionData = completion.completionData || {};
-        updates.completionData = {
-          ...completionData,
-          verificationProof: verificationResult.proof
-        };
+        
+        // Get the task to calculate points
+        const task = await db.query.tasks.findFirst({
+          where: eq(tasks.id, completion.taskId),
+        });
+        
+        if (task) {
+          const basePoints = task.pointsToReward || 0;
+          
+          // Calculate multiplier
+          const multiplierResult = await multiplierService.calculateMultiplier({
+            userId: completion.userId,
+            taskId: task.id,
+            tenantId: task.tenantId ?? '',
+            taskType: task.taskType,
+            platform: task.platform,
+          });
+          
+          // Apply multiplier to base points
+          pointsAwarded = Math.round(basePoints * multiplierResult.finalMultiplier);
+          
+          console.log(`[Verification Service] Points calculation:`, {
+            basePoints,
+            multiplier: multiplierResult.finalMultiplier,
+            pointsAwarded
+          });
+          
+          updates.pointsEarned = pointsAwarded;
+          updates.completionData = {
+            ...completionData,
+            verificationProof: verificationResult.proof,
+            metadata: {
+              multiplierApplied: multiplierResult.finalMultiplier,
+              multiplierBreakdown: multiplierResult.breakdown,
+              basePoints: basePoints,
+            }
+          };
+          
+          // Award points to user's balance via CreatorPointsService
+          if (pointsAwarded > 0 && task.tenantId) {
+            try {
+              // Get creatorId from the loyalty program
+              const program = await db.query.loyaltyPrograms.findFirst({
+                where: eq(loyaltyPrograms.tenantId, task.tenantId),
+              });
+              
+              if (program?.creatorId) {
+                await creatorPointsService.awardPoints(
+                  completion.userId,
+                  program.creatorId,
+                  task.tenantId,
+                  pointsAwarded,
+                  'task_completion',
+                  `Task completed: ${task.name}`,
+                  { taskId: task.id, taskCompletionId: taskCompletionId }
+                );
+                console.log(`[Verification Service] Awarded ${pointsAwarded} points to user ${completion.userId}`);
+              } else {
+                console.warn(`[Verification Service] No loyalty program found for tenant ${task.tenantId}`);
+              }
+            } catch (pointsError) {
+              console.error('[Verification Service] Failed to award points:', pointsError);
+            }
+          }
+        } else {
+          updates.completionData = {
+            ...completionData,
+            verificationProof: verificationResult.proof
+          };
+        }
       }
     }
     
@@ -1021,8 +1092,11 @@ export async function updateTaskCompletion(
     
     console.log(`[Verification Service] Task completion ${taskCompletionId} updated:`, {
       verified: verificationResult.verified,
-      method: verificationMethod
+      method: verificationMethod,
+      pointsAwarded
     });
+    
+    return { pointsAwarded };
   } catch (error) {
     console.error('[Verification Service] Error updating task completion:', error);
     throw error;

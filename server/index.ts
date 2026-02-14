@@ -1,11 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeCrossmintService } from "./services/nft/crossmint-service";
+import { initializeWalletService } from "./services/wallet/wallet-service";
+import { syncScheduler } from "./services/analytics/sync/sync-scheduler";
+import { groupGoalPoller } from "./services/verification/group-goals/group-goal-poller";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -41,6 +46,9 @@ app.use((req, res, next) => {
   // Initialize Crossmint service
   initializeCrossmintService();
   
+  // Initialize Wallet service for lazy wallet creation
+  initializeWalletService();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -71,5 +79,20 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start background services after server is listening
+    try {
+      syncScheduler.start();
+      log('Analytics sync scheduler started');
+    } catch (err) {
+      console.error('Failed to start sync scheduler:', err);
+    }
+
+    try {
+      groupGoalPoller.start();
+      log('Group goal poller started');
+    } catch (err) {
+      console.error('Failed to start group goal poller:', err);
+    }
   });
 })();

@@ -5,12 +5,16 @@
  * that can be applied instantly or customized further.
  */
 
+export type CreatorTypeForTheme = 'athlete' | 'musician' | 'content_creator';
+
 export interface ThemeTemplate {
   name: string;
   mode: 'light' | 'dark' | 'custom';
   templateId: string;
   description: string;
   preview?: string; // URL to preview image
+  /** Creator types this theme is recommended for */
+  recommendedFor?: CreatorTypeForTheme[];
   colors: {
     primary: string;
     secondary: string;
@@ -154,6 +158,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "default-light",
     description: "Modern, clean light theme with purple accents",
+    recommendedFor: ['athlete', 'musician', 'content_creator'],
     colors: {
       primary: "#6366f1",
       secondary: "#8b5cf6",
@@ -182,6 +187,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "dark",
     templateId: "dark-pro",
     description: "Sleek dark theme with cyan accents",
+    recommendedFor: ['athlete', 'content_creator'],
     colors: {
       primary: "#06b6d4",
       secondary: "#8b5cf6",
@@ -219,6 +225,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "dark",
     templateId: "neon-cyberpunk",
     description: "Bold, high-contrast theme with neon accents",
+    recommendedFor: ['musician', 'content_creator'],
     colors: {
       primary: "#ff00ff",
       secondary: "#00ffff",
@@ -277,6 +284,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "minimalist-white",
     description: "Ultra-clean, minimal design with gray accents",
+    recommendedFor: ['athlete'],
     colors: {
       primary: "#000000",
       secondary: "#333333",
@@ -342,6 +350,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "ocean-blue",
     description: "Calming blue theme inspired by the ocean",
+    recommendedFor: ['athlete', 'content_creator'],
     colors: {
       primary: "#0ea5e9",
       secondary: "#06b6d4",
@@ -400,6 +409,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "sunset-orange",
     description: "Warm, vibrant theme with orange/red gradients",
+    recommendedFor: ['content_creator'],
     colors: {
       primary: "#f97316",
       secondary: "#ef4444",
@@ -428,6 +438,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "forest-green",
     description: "Natural, earthy theme with green tones",
+    recommendedFor: ['athlete'],
     colors: {
       primary: "#16a34a",
       secondary: "#059669",
@@ -456,6 +467,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "dark",
     templateId: "royal-purple",
     description: "Elegant, luxurious purple theme",
+    recommendedFor: ['musician'],
     colors: {
       primary: "#a855f7",
       secondary: "#d946ef",
@@ -493,6 +505,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "monochrome",
     description: "Pure black and white, no colors",
+    recommendedFor: ['athlete'],
     colors: {
       primary: "#000000",
       secondary: "#1a1a1a",
@@ -551,6 +564,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "pastel-dream",
     description: "Soft, muted pastel colors",
+    recommendedFor: ['musician'],
     colors: {
       primary: "#a78bfa",
       secondary: "#fbbf24",
@@ -614,6 +628,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "light",
     templateId: "high-contrast",
     description: "Maximum accessibility, WCAG AAA compliant",
+    recommendedFor: ['athlete'],
     colors: {
       primary: "#0000EE",
       secondary: "#551A8B",
@@ -694,6 +709,7 @@ export const THEME_TEMPLATES: Record<string, ThemeTemplate> = {
     mode: "dark",
     templateId: "gaming-rgb",
     description: "Dynamic, colorful gaming aesthetic",
+    recommendedFor: ['content_creator'],
     colors: {
       primary: "#ff0080",
       secondary: "#00ff80",
@@ -1075,6 +1091,24 @@ export function getThemeTemplate(templateId: string): ThemeTemplate | null {
  */
 export function getAllThemeTemplates(): ThemeTemplate[] {
   return Object.values(THEME_TEMPLATES);
+}
+
+/**
+ * Get theme templates recommended for a specific creator type
+ * Returns recommended themes first, then remaining themes
+ */
+export function getThemeTemplatesForCreator(creatorType: CreatorTypeForTheme): ThemeTemplate[] {
+  const allThemes = getAllThemeTemplates();
+  const recommended = allThemes.filter(t => t.recommendedFor?.includes(creatorType));
+  const others = allThemes.filter(t => !t.recommendedFor?.includes(creatorType));
+  return [...recommended, ...others];
+}
+
+/**
+ * Get only the recommended themes for a creator type
+ */
+export function getRecommendedThemes(creatorType: CreatorTypeForTheme): ThemeTemplate[] {
+  return getAllThemeTemplates().filter(t => t.recommendedFor?.includes(creatorType));
 }
 
 /**

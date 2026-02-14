@@ -62,10 +62,12 @@ export interface FacebookPage {
   followers_count?: number;
   fan_count?: number;
   engagement_data?: any;
+  picture?: { data?: { url?: string } };
 }
 
 export interface FacebookLoginResult {
   success: boolean;
+  accessToken?: string;
   user?: FacebookUser;
   grantedScopes?: string[];
   deniedScopes?: string[];
@@ -73,7 +75,7 @@ export interface FacebookLoginResult {
   errorCode?: string;
 }
 
-export type UserType = 'fan' | 'creator';
+export type UserType = 'fan' | 'creator' | string;  // 'string' allows 'auth' and other neutral values
 
 // App ID configuration
 const FB_APP_CONFIG = {
@@ -100,7 +102,9 @@ class FacebookSDKManager {
    * Ensures FB SDK is loaded and initialized with correct App ID for user type
    */
   static async ensureFBReady(userType: UserType): Promise<void> {
-    const config = FB_APP_CONFIG[userType];
+    // Default to 'fan' config for unknown types — Facebook config requires fan/creator
+    const configKey = (userType === 'creator' ? 'creator' : 'fan') as keyof typeof FB_APP_CONFIG;
+    const config = FB_APP_CONFIG[configKey];
     const requiredAppId = config.appId;
 
     console.log(`[FB Manager] Ensuring FB ready for ${userType} with App ID: ${requiredAppId.substring(0, 6)}...`);
@@ -233,7 +237,8 @@ class FacebookSDKManager {
   static async secureLogin(userType: UserType): Promise<FacebookLoginResult> {
     await this.ensureFBReady(userType);
     
-    const config = FB_APP_CONFIG[userType];
+    const configKey = (userType === 'creator' ? 'creator' : 'fan') as keyof typeof FB_APP_CONFIG;
+    const config = FB_APP_CONFIG[configKey];
     const scope = config.requiredScopes.join(',');
 
     console.log(`[FB Manager] Starting secure login for ${userType}`);
@@ -244,7 +249,7 @@ class FacebookSDKManager {
         console.log(`[FB Manager] Login completed with status: ${response.status}`);
 
         if (response.status === 'connected' && response.authResponse) {
-          this.handleSuccessfulLogin(response, config.requiredScopes, resolve);
+          this.handleSuccessfulLogin(response, response.authResponse.accessToken, config.requiredScopes, resolve);
         } else {
           resolve({
             success: false,
@@ -257,7 +262,8 @@ class FacebookSDKManager {
   }
 
   private static handleSuccessfulLogin(
-    response: any, 
+    response: any,
+    accessToken: string,
     requiredScopes: string[], 
     resolve: (result: FacebookLoginResult) => void
   ): void {
@@ -268,7 +274,7 @@ class FacebookSDKManager {
       if (userResponse && !userResponse.error) {
         // Verify permissions
         window.FB.api('/me/permissions', 'GET', {}, async (permResponse) => {
-          const result = await this.processPermissions(userResponse, permResponse, requiredScopes);
+          const result = await this.processPermissions(userResponse, accessToken, permResponse, requiredScopes);
           resolve(result);
         });
       } else {
@@ -284,6 +290,7 @@ class FacebookSDKManager {
 
   private static async processPermissions(
     userResponse: any,
+    accessToken: string,
     permResponse: any,
     requiredScopes: string[]
   ): Promise<FacebookLoginResult> {
@@ -307,59 +314,46 @@ class FacebookSDKManager {
       console.warn('[FB Manager] Missing required permissions:', missingScopes);
     }
 
-    // Save connection to database
+    // Save connection to database using cookie-based auth
     try {
-      // Import getDynamicUserId for consistent user ID retrieval
-      const { getDynamicUserId } = await import('./queryClient');
-      const dynamicUserId = getDynamicUserId();
+      const { saveSocialConnection } = await import('./auth-redirect');
       console.log('[FB Manager] Saving connection to database...');
       
-      if (dynamicUserId) {
-        // Try to get user's Facebook pages if they have page permissions
-        let pages: any[] = [];
-        try {
-          await new Promise<void>((resolve) => {
-            window.FB.api('/me/accounts', 'GET', { fields: 'id,name,access_token' }, (pagesResponse) => {
-              if (pagesResponse && !pagesResponse.error && pagesResponse.data) {
-                pages = pagesResponse.data;
-                console.log(`[FB Manager] Found ${pages.length} Facebook pages`);
-              }
-              resolve();
-            });
-          });
-        } catch (pageError) {
-          console.log('[FB Manager] Could not fetch pages (user may not have page permissions)');
-        }
-
-        const response = await fetch('/api/social-connections', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-dynamic-user-id': dynamicUserId
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            platform: 'facebook',
-            platformUserId: userResponse.id,
-            platformUsername: userResponse.name,
-            platformDisplayName: userResponse.name,
-            profileData: {
-              id: userResponse.id,
-              name: userResponse.name,
-              email: userResponse.email,
-              picture: userResponse.picture,
-              pages: pages
+      // Try to get user's Facebook pages if they have page permissions
+      let pages: any[] = [];
+      try {
+        await new Promise<void>((resolve) => {
+          window.FB.api('/me/accounts', 'GET', { fields: 'id,name,access_token' }, (pagesResponse) => {
+            if (pagesResponse && !pagesResponse.error && pagesResponse.data) {
+              pages = pagesResponse.data;
+              console.log(`[FB Manager] Found ${pages.length} Facebook pages`);
             }
-          })
+            resolve();
+          });
         });
+      } catch (pageError) {
+        console.log('[FB Manager] Could not fetch pages (user may not have page permissions)');
+      }
 
-        if (response.ok) {
-          console.log('[FB Manager] Connection saved successfully');
-        } else {
-          console.warn('[FB Manager] Failed to save connection:', await response.text());
+      const saveResult = await saveSocialConnection({
+        platform: 'facebook',
+        platformUserId: userResponse.id,
+        platformUsername: userResponse.name,
+        platformDisplayName: userResponse.name,
+        accessToken,
+        profileData: {
+          id: userResponse.id,
+          name: userResponse.name,
+          email: userResponse.email,
+          picture: userResponse.picture,
+          pages: pages
         }
+      });
+
+      if (saveResult.success) {
+        console.log('[FB Manager] Connection saved successfully');
       } else {
-        console.warn('[FB Manager] No dynamicUserId found, skipping connection save');
+        console.warn('[FB Manager] Failed to save connection:', saveResult.error);
       }
     } catch (error) {
       console.error('[FB Manager] Error saving connection:', error);
@@ -367,6 +361,7 @@ class FacebookSDKManager {
 
     return {
       success: true,
+      accessToken,
       user: {
         id: userResponse.id,
         name: userResponse.name,

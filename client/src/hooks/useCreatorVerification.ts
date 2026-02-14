@@ -1,14 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { CreatorVerificationData } from "@shared/creatorVerificationSchema";
+import type { Creator } from "@shared/schema";
 
 interface VerificationStatusResponse {
-  creator: {
-    id: string;
-    displayName: string;
-    category: string;
-    isVerified: boolean;
-  };
+  creator: Pick<Creator, 'id' | 'displayName' | 'category' | 'isVerified'> & Partial<Pick<Creator, 'bio' | 'typeSpecificData'>>;
   verificationData: CreatorVerificationData;
   missingFieldsDisplay: string[];
 }

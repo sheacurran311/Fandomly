@@ -282,7 +282,10 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-2">
             <div className="p-2 bg-brand-primary/20 rounded-lg">
-              {getRewardTypeIcon(reward.rewardType)}
+              {(() => {
+                const Icon = getRewardTypeIcon(reward.rewardType);
+                return <Icon className="h-5 w-5" />;
+              })()}
             </div>
             <div>
               <CardTitle className="text-white text-lg">{reward.name}</CardTitle>
@@ -484,7 +487,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
         {/* Basic Info */}
         <div className="space-y-4">
           <FormField
-            control={form.control}
+            control={form.control as any}
             name="name"
             render={({ field }) => (
               <FormItem>
@@ -503,7 +506,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           />
           
           <FormField
-            control={form.control}
+            control={form.control as any}
             name="description"
             render={({ field }) => (
               <FormItem>
@@ -524,7 +527,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
 
           <div className="grid grid-cols-2 gap-4">
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardType"
               render={({ field }) => (
                 <FormItem>
@@ -549,7 +552,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             />
             
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="pointsCost"
               render={({ field }) => (
                 <FormItem>
@@ -573,7 +576,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           </div>
 
           <FormField
-            control={form.control}
+            control={form.control as any}
             name="maxRedemptions"
             render={({ field }) => (
               <FormItem>
@@ -601,7 +604,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           <div className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg" data-testid="section-raffle-config">
             <h3 className="text-white font-medium">Raffle Configuration</h3>
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.raffleData.prizeDescription"
               render={({ field }) => (
                 <FormItem>
@@ -619,7 +622,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
               )}
             />
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.raffleData.drawDate"
               render={({ field }) => (
                 <FormItem>
@@ -653,7 +656,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             </Alert>
             
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.physicalData.itemName"
               render={({ field }) => (
                 <FormItem>
@@ -672,7 +675,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             />
             
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.physicalData.itemDescription"
               render={({ field }) => (
                 <FormItem>
@@ -693,7 +696,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name="rewardData.physicalData.condition"
                 render={({ field }) => (
                   <FormItem>
@@ -717,7 +720,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
               />
 
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name="rewardData.physicalData.quantity"
                 render={({ field }) => (
                   <FormItem>
@@ -777,7 +780,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             
             <div className="grid grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name="rewardData.videoData.maxVideoDuration"
                 render={({ field }) => (
                   <FormItem>
@@ -801,7 +804,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
               />
               
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name="rewardData.videoData.turnaroundDays"
                 render={({ field }) => (
                   <FormItem>
@@ -826,7 +829,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             </div>
 
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.videoData.deliveryInstructions"
               render={({ field }) => (
                 <FormItem>
@@ -846,7 +849,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             />
 
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.videoData.personalizationInstructions"
               render={({ field }) => (
                 <FormItem>
@@ -890,7 +893,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           <div className="space-y-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg" data-testid="section-custom-config">
             <h3 className="text-white font-medium">Custom Service Configuration</h3>
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.customData.serviceName"
               render={({ field }) => (
                 <FormItem>
@@ -908,7 +911,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
               )}
             />
             <FormField
-              control={form.control}
+              control={form.control as any}
               name="rewardData.customData.deliveryMethod"
               render={({ field }) => (
                 <FormItem>
@@ -960,7 +963,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             ) : (
               <>
                 <FormField
-                  control={form.control}
+                  control={form.control as any}
                   name="rewardData.nftData.collectionId"
                   render={({ field }) => (
                     <FormItem>
@@ -994,7 +997,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
 
                 {selectedCollectionId && (
                   <FormField
-                    control={form.control}
+                    control={form.control as any}
                     name="rewardData.nftData.templateId"
                     render={({ field }) => (
                       <FormItem>

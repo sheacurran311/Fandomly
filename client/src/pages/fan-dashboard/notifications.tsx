@@ -150,7 +150,7 @@ export default function FanNotifications() {
     );
   }
 
-  const unreadCount = notificationList.filter(n => !n.read).length;
+  const unreadCount = notificationList.filter((n: { read?: boolean }) => !n.read).length;
 
   const markAsRead = (id: string) => {
     markAsReadMutation.mutate(id);
@@ -206,7 +206,7 @@ export default function FanNotifications() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {notificationList.map((notification) => {
+                    {notificationList.map((notification: { id: string; read?: boolean; icon: React.ComponentType<{ className?: string }>; color?: string; title?: string; timestamp?: string; message?: string }) => {
                       const Icon = notification.icon;
                       return (
                         <div 
@@ -314,7 +314,7 @@ export default function FanNotifications() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-300 text-sm">This Week</span>
-                      <span className="text-white font-medium">{notificationList.filter(n => !n.read).length}</span>
+                      <span className="text-white font-medium">{notificationList.filter((n: { read?: boolean }) => !n.read).length}</span>
                     </div>
                   </div>
                 </CardContent>

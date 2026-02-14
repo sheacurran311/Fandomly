@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/contexts/auth-context";
+import { useAuthModal } from "@/hooks/use-auth-modal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { fetchApi } from "@/lib/queryClient";
 import { 
   Users, 
   Zap, 
@@ -20,22 +21,32 @@ import {
 
 export default function UserTypeSelection() {
   const [, setLocation] = useLocation();
-  const { user: dynamicUser } = useDynamicContext();
-  const { registerUser, isRegistering } = useAuth();
+  const { user, isAuthenticated, isLoading, refreshUser } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const [selectedType, setSelectedType] = useState<"fan" | "creator" | "brand" | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  console.log("UserTypeSelection - Dynamic user:", !!dynamicUser, "Is registering:", isRegistering);
+  console.log("UserTypeSelection - Authenticated:", isAuthenticated, "Is registering:", isRegistering, "User type:", user?.userType);
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Redirect if not authenticated
-  if (!dynamicUser) {
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
           <CardContent className="text-center p-6">
             <h2 className="text-xl font-bold text-white mb-4">Authentication Required</h2>
-            <p className="text-gray-300 mb-4">Please connect your wallet to continue.</p>
-            <Button onClick={() => setLocation("/")} className="bg-brand-primary hover:bg-brand-primary/80">
-              Go Home
+            <p className="text-gray-300 mb-4">Please sign in to continue.</p>
+            <Button onClick={() => openAuthModal()} className="bg-brand-primary hover:bg-brand-primary/80">
+              Sign In
             </Button>
           </CardContent>
         </Card>
@@ -43,15 +54,29 @@ export default function UserTypeSelection() {
     );
   }
 
+  // Function to set user type via the new endpoint
+  const setUserType = async (userType: "fan" | "creator" | "brand") => {
+    setIsRegistering(true);
+    try {
+      await fetchApi('/api/auth/set-user-type', {
+        method: 'POST',
+        body: JSON.stringify({ userType }),
+      });
+      // Refresh user data after updating type
+      await refreshUser();
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const handleTypeSelection = async (userType: "fan" | "creator" | "brand") => {
     console.log("User selected type:", userType);
     setSelectedType(userType);
     
     try {
-      console.log("Starting registration process...");
-      // For brand users, register as creator type
-      const result = await registerUser(userType === "brand" ? "creator" : userType);
-      console.log("Registration successful:", result);
+      console.log("Setting user type...");
+      await setUserType(userType);
+      console.log("User type set successfully");
       
       // Redirect based on type
       if (userType === "fan") {
@@ -62,8 +87,8 @@ export default function UserTypeSelection() {
         setLocation("/creator-type-selection");
       }
     } catch (error) {
-      console.error("Registration failed:", error);
-      alert(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Failed to set user type:", error);
+      alert(`Failed to set user type: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setSelectedType(null);
     }
   };

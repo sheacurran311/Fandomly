@@ -16,6 +16,7 @@ export function registerPointsRoutes(app: Express) {
   app.get("/api/points/balance", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
       
       const balance = await pointsService.getFullBalance(userId);
       
@@ -32,6 +33,7 @@ export function registerPointsRoutes(app: Express) {
   app.get("/api/points/transactions", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
       const limit = parseInt(req.query.limit as string) || 50;
       
       const transactions = await pointsService.getAllTransactions(userId, limit);
@@ -49,6 +51,7 @@ export function registerPointsRoutes(app: Express) {
   app.get("/api/points/fandomly", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
       
       const balance = await pointsService.fandomly.getBalance(userId);
       
@@ -68,9 +71,8 @@ export function registerPointsRoutes(app: Express) {
       const { creatorId } = req.params;
       const { tenantId } = req.query;
       
-      if (!tenantId) {
-        return res.status(400).json({ error: "Tenant ID required" });
-      }
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
+      if (!tenantId) return res.status(400).json({ error: "Tenant ID required" });
       
       const balance = await pointsService.creator.getBalance(
         userId,

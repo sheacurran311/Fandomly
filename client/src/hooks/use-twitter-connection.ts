@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TwitterSDKManager } from '@/lib/twitter';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
+import { fetchApi } from '@/lib/queryClient';
 
 interface TwitterUserInfo {
   id?: string;
@@ -43,14 +45,22 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
     error: null,
   });
 
+  // Stable references for user fields to avoid re-render loops
+  const userIdRef = useRef(user?.id);
+  const dynamicUserIdRef = useRef((user as any)?.dynamicUserId || user?.id);
+  userIdRef.current = user?.id;
+  dynamicUserIdRef.current = (user as any)?.dynamicUserId || user?.id;
+
   // Check connection status
   const checkStatus = useCallback(async () => {
-    if (!user?.id) return;
+    const uid = userIdRef.current;
+    const dynamicUid = dynamicUserIdRef.current;
+    if (!uid) return;
 
     try {
       const response = await fetch('/api/social-connections/twitter', {
         headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
+          'x-dynamic-user-id': dynamicUid || uid || '',
           'Content-Type': 'application/json'
         },
         credentials: 'include'
@@ -78,14 +88,11 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
             conn.profileData?.user?.public_metrics?.following_count ||
             0;
 
-          // Debug log to see what we're receiving
           console.log('[Twitter Hook] Connection data:', {
             platformUsername: conn.platformUsername,
             hasProfileData: !!conn.profileData,
-            profileDataKeys: conn.profileData ? Object.keys(conn.profileData) : [],
             followersCount,
             followingCount,
-            rawProfileData: conn.profileData
           });
 
           setState(prev => ({
@@ -113,12 +120,14 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
     } catch (error) {
       console.error('[Twitter Hook] Error checking status:', error);
     }
-  }, [user?.id, user]);
+  }, []);  // Stable callback - uses refs for user data
 
-  // Initial status check
+  // Initial status check (runs once on mount + when user ID changes)
   useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
+    if (user?.id) {
+      checkStatus();
+    }
+  }, [user?.id, checkStatus]);
 
   // Listen for PKCE verifier requests from popup
   useEffect(() => {
@@ -152,35 +161,58 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const userType = user.userType === 'creator' ? 'creator' : 'fan';
+      const userType = user.userType || 'auth';
       const result = await TwitterSDKManager.secureLogin(
-        userType,
-        (user as any)?.dynamicUserId || user.id
+        userType
       );
 
       if (result.success && result.user) {
+        // Save connection from parent window (reliable - has JWT/cookie auth)
+        try {
+          await fetchApi('/api/social-connections', {
+            method: 'POST',
+            body: JSON.stringify({
+              platform: 'twitter',
+              platformUserId: result.user.id,
+              platformUsername: result.user.username,
+              platformDisplayName: result.user.name,
+              accessToken: result.accessToken,
+              refreshToken: result.refreshToken,
+              profileData: {
+                profileImageUrl: result.user.profileImageUrl,
+                followersCount: result.user.followersCount,
+                followingCount: result.user.followingCount,
+              },
+            }),
+          });
+          console.log('[Twitter Hook] Connection saved from parent window');
+        } catch (saveErr) {
+          console.warn('[Twitter Hook] Parent save failed (popup may have already saved):', saveErr);
+        }
+
         setState(prev => ({
           ...prev,
           isConnected: true,
           isConnecting: false,
           userInfo: {
-            id: result.user.id,
-            name: result.user.name,
-            username: result.user.username,
-            followersCount: result.user.followersCount || 0,
-            followers_count: result.user.followersCount || 0,
-            followingCount: result.user.followingCount || 0,
-            following_count: result.user.followingCount || 0,
+            id: result.user!.id,
+            name: result.user!.name,
+            username: result.user!.username,
+            followersCount: result.user!.followersCount || 0,
+            followers_count: result.user!.followersCount || 0,
+            followingCount: result.user!.followingCount || 0,
+            following_count: result.user!.followingCount || 0,
           },
           error: null,
         }));
 
         // Refresh from API to get latest data
         await checkStatus();
+        invalidateSocialConnections();
 
         toast({
           title: "X Connected! 🐦",
-          description: `Successfully connected @${result.user.username}`,
+          description: `Successfully connected @${result.user!.username}`,
           duration: 3000,
         });
       } else {
@@ -237,6 +269,8 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
           userInfo: null,
           error: null,
         });
+
+        invalidateSocialConnections();
 
         toast({
           title: "X Disconnected",

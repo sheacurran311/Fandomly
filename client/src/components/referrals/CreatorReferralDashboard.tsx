@@ -67,8 +67,9 @@ export default function CreatorReferralDashboard() {
   }
 
   if (error) {
-    const errorMessage = error?.response?.data?.message || error?.message || "Failed to load referral data";
-    const isCreatorProfileMissing = error?.response?.data?.error === "Creator profile not found";
+    const errorMessage = (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message || (error as Error)?.message || "Failed to load referral data";
+    const err = error as { response?: { data?: { error?: string } } };
+    const isCreatorProfileMissing = err?.response?.data?.error === "Creator profile not found";
     
     return (
       <Alert variant="destructive">

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
+import { fetchApi } from "@/lib/queryClient";
 
 interface DynamicAnalyticsResponse<T = any> {
   success: boolean;
@@ -13,157 +14,135 @@ interface DateRange {
   endDate?: string;
 }
 
-// Helper to create authenticated fetch
-async function authenticatedFetch(url: string, dynamicUserId?: string) {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (dynamicUserId) {
-    headers['x-dynamic-user-id'] = dynamicUserId;
-  }
-  
-  const response = await fetch(url, { headers });
-  return response.json();
-}
-
 /**
- * Hook to fetch wallet analytics from Dynamic
+ * Hook to fetch wallet analytics (stub - Dynamic analytics removed)
  */
 export function useDynamicWalletAnalytics(enabled: boolean = true, dateRange?: DateRange) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/wallets", dateRange, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/wallets", dateRange, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/wallets?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/wallets?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
 
 /**
- * Hook to fetch visit analytics from Dynamic
+ * Hook to fetch visit analytics (stub - Dynamic analytics removed)
  */
 export function useDynamicVisitAnalytics(enabled: boolean = true, dateRange?: DateRange) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/visits", dateRange, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/visits", dateRange, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/visits?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/visits?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
 
 /**
- * Hook to fetch overview analytics from Dynamic
+ * Hook to fetch overview analytics (stub - Dynamic analytics removed)
  */
 export function useDynamicOverviewAnalytics(enabled: boolean = true, dateRange?: DateRange) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/overview", dateRange, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/overview", dateRange, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/overview?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/overview?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
 
 /**
- * Hook to fetch topline analytics from Dynamic
+ * Hook to fetch topline analytics (stub - Dynamic analytics removed)
  */
 export function useDynamicToplineAnalytics(enabled: boolean = true, dateRange?: DateRange) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/topline", dateRange, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/topline", dateRange, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/topline?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/topline?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
 
 /**
- * Hook to fetch engagement analytics from Dynamic
+ * Hook to fetch engagement analytics (stub - Dynamic analytics removed)
  */
 export function useDynamicEngagementAnalytics(enabled: boolean = true, dateRange?: DateRange) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/engagement", dateRange, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/engagement", dateRange, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/engagement?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/engagement?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
 
 /**
- * Hook to fetch wallet breakdown analytics from Dynamic
+ * Hook to fetch wallet breakdown analytics (stub - Dynamic analytics removed)
  */
 export function useDynamicWalletBreakdown(enabled: boolean = true, dateRange?: DateRange) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/wallets/breakdown", dateRange, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/wallets/breakdown", dateRange, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/wallets/breakdown?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/wallets/breakdown?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
 
 /**
- * Hook to fetch users from Dynamic
+ * Hook to fetch users (stub - Dynamic analytics removed)
  */
 export function useDynamicUsers(enabled: boolean = true, limit?: number, offset?: number) {
-  const { user } = useDynamicContext();
-  const dynamicUserId = user?.userId;
+  const { user, isAuthenticated } = useAuth();
   
   return useQuery<DynamicAnalyticsResponse>({
-    queryKey: ["/api/admin/dynamic-analytics/users", limit, offset, dynamicUserId],
+    queryKey: ["/api/admin/dynamic-analytics/users", limit, offset, user?.id],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (limit) params.append('limit', limit.toString());
       if (offset) params.append('offset', offset.toString());
       
-      return authenticatedFetch(`/api/admin/dynamic-analytics/users?${params}`, dynamicUserId);
+      return fetchApi(`/api/admin/dynamic-analytics/users?${params}`);
     },
-    enabled: enabled && !!dynamicUserId,
+    enabled: enabled && isAuthenticated,
   });
 }
-

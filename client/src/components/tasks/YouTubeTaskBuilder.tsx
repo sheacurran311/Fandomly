@@ -15,12 +15,21 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
 import { SiYoutube } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useYouTubeConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Task type to verification tier mapping for YouTube
+// Subscribe has full API support (T1), Like is private (T3), Comment with keyword is T2
+const YOUTUBE_TASK_TIERS: Record<string, VerificationTier> = {
+  youtube_subscribe: 'T1',
+  youtube_like: 'T3',
+  youtube_comment: 'T2',
+};
 
 interface YouTubeTaskBuilderProps {
   onSave: (config: any) => void;
@@ -29,11 +38,16 @@ interface YouTubeTaskBuilderProps {
   taskType: 'youtube_subscribe' | 'youtube_like' | 'youtube_comment';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
-export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: YouTubeTaskBuilderProps) {
+export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: YouTubeTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get verification tier for this task type
+  const tier = YOUTUBE_TASK_TIERS[taskType] || 'T1';
+  const tierGuidance = TIER_GUIDANCE[tier];
   
   // Use unified YouTube connection hook
   const {
@@ -45,7 +59,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
   
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(100);
+  const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [channelUrl, setChannelUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [requiredText, setRequiredText] = useState(''); // For comment tasks
@@ -102,27 +116,31 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
   }, [initialData, isEditMode]);
 
   const getDefaultValues = () => {
+    // Get tier-appropriate recommended points
+    const taskTier = YOUTUBE_TASK_TIERS[taskType] || 'T1';
+    const guidance = TIER_GUIDANCE[taskTier];
+    
     switch (taskType) {
       case 'youtube_subscribe':
         return {
           name: 'Subscribe on YouTube',
           description: 'Subscribe to our YouTube channel for exclusive content!',
-          points: 100,
+          points: 75, // T1: Higher for valuable subscription
         };
       case 'youtube_like':
         return {
           name: 'Like Our YouTube Video',
           description: 'Show some love by liking our YouTube video!',
-          points: 25,
+          points: 15, // T3: Lower for manual verification
         };
       case 'youtube_comment':
         return {
           name: 'Comment on YouTube Video',
           description: 'Leave a comment on our YouTube video!',
-          points: 50,
+          points: guidance.recommendedPoints, // T2: 40 pts - code verified
         };
       default:
-        return { name: '', description: '', points: 100 };
+        return { name: '', description: '', points: guidance.recommendedPoints };
     }
   };
 
@@ -249,6 +267,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
       description="Create YouTube-based tasks for your fans"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -258,7 +277,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
       exampleUse="A creator could offer 100 points for fans to subscribe to their channel, or 25 points for liking a specific video."
     >
       {!youtubeConnected && !checkingConnection && (
-        <Alert className="mb-4 bg-red-500/10 border-red-500/20">
+        <Alert className="bg-red-500/10 border-red-500/20">
           <AlertCircle className="h-4 w-4 text-red-400" />
           <AlertDescription className="text-red-400">
             <div className="flex items-center justify-between">
@@ -277,7 +296,7 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
         </Alert>
       )}
       {youtubeConnected && (
-        <Alert className="mb-4 bg-green-500/10 border-green-500/20">
+        <Alert className="bg-green-500/10 border-green-500/20">
           <CheckCircle2 className="h-4 w-4 text-green-400" />
           <AlertDescription className="text-green-400">
             <strong>YouTube Connected</strong> {youtubeChannel && `- ${youtubeChannel}`}
@@ -317,12 +336,54 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
               />
             </div>
 
+            {/* Verification Tier Guidance */}
+            <div className={`p-4 rounded-lg border ${
+              tier === 'T1' ? 'bg-green-500/10 border-green-500/30' :
+              tier === 'T2' ? 'bg-blue-500/10 border-blue-500/30' :
+              'bg-amber-500/10 border-amber-500/30'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {tier === 'T1' ? <ShieldCheck className="h-4 w-4 text-green-400" /> :
+                 tier === 'T2' ? <Shield className="h-4 w-4 text-blue-400" /> :
+                 <ShieldAlert className="h-4 w-4 text-amber-400" />}
+                <span className={`font-medium ${
+                  tier === 'T1' ? 'text-green-400' :
+                  tier === 'T2' ? 'text-blue-400' :
+                  'text-amber-400'
+                }`}>{tierGuidance.label}</span>
+                <Badge variant="outline" className={`text-xs ${
+                  tier === 'T1' ? 'border-green-500/30 text-green-400' :
+                  tier === 'T2' ? 'border-blue-500/30 text-blue-400' :
+                  'border-amber-500/30 text-amber-400'
+                }`}>
+                  {tierGuidance.trustLevel}
+                </Badge>
+              </div>
+              <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+              <p className={`text-sm font-medium ${
+                tier === 'T1' ? 'text-green-400' :
+                tier === 'T2' ? 'text-blue-400' :
+                'text-amber-400'
+              }`}>{tierGuidance.pointsRange}</p>
+              {tierGuidance.warning && (
+                <p className="text-xs text-amber-400 mt-2">{tierGuidance.warning}</p>
+              )}
+              {tierGuidance.tip && (
+                <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+              )}
+            </div>
+
             {/* Points */}
             <div className="space-y-2">
-              <Label className="text-white">Points Reward</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-white">Points Reward</Label>
+                <span className="text-xs text-gray-400">
+                  Recommended: {tierGuidance.recommendedPoints} pts
+                </span>
+              </div>
               <NumberInput
                 value={points}
-                onChange={(val) => setPoints(val || 1)}
+                onChange={(val) => setPoints(val || tierGuidance.recommendedPoints)}
                 min={1}
                 max={10000}
                 allowEmpty={false}
@@ -331,6 +392,11 @@ export default function YouTubeTaskBuilder({ onSave, onPublish, onBack, taskType
               <p className="text-xs text-gray-400">
                 How many points fans will earn for completing this task
               </p>
+              {tier === 'T3' && points > 25 && (
+                <p className="text-xs text-amber-400">
+                  ⚠️ High points for a manually verified task. Consider lowering to reduce abuse potential.
+                </p>
+              )}
             </div>
 
             {/* Task-Specific Fields */}

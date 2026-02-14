@@ -1,29 +1,73 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
 import {
   BarChart3,
   TrendingUp,
   DollarSign,
   Users,
-  Target,
   ArrowRight,
-  Eye,
-  Heart,
-  Trophy,
   Gift,
   CheckCircle,
-  Calendar
+  Calendar,
+  Settings,
+  AlertTriangle,
 } from "lucide-react";
+
+function ErrorBanner({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-4 py-3 text-yellow-200">
+      <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+      <p className="text-sm flex-1">{message}</p>
+      {onRetry && (
+        <Button variant="outline" size="sm" onClick={onRetry} className="flex-shrink-0">
+          Retry
+        </Button>
+      )}
+    </div>
+  );
+}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link } from "wouter";
+import { NetworkSelector } from "@/components/analytics/NetworkSelector";
+import { AnalyticsOverviewCards } from "@/components/analytics/AnalyticsOverview";
+import { PlatformBreakdown } from "@/components/analytics/PlatformBreakdown";
+import { GrowthChart } from "@/components/analytics/GrowthChart";
+import { ContentPerformance } from "@/components/analytics/ContentPerformance";
+import { PlatformComparison } from "@/components/analytics/PlatformComparison";
+import {
+  useAnalyticsOverview,
+  useGrowthAnalytics,
+  useContentAnalytics,
+  useComparisonAnalytics,
+} from "@/hooks/use-analytics";
+import { AIInsightsPanel } from "@/components/analytics/AIInsightsPanel";
 
 export default function AnalyticsOverview() {
   const { user } = useAuth();
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState("30d");
 
-  // Fetch weekly metrics from database
-  const { data: weeklyMetrics, isLoading: weeklyLoading } = useQuery({
+  const platformsParam = selectedPlatforms || "all";
+
+  // Fetch real analytics data
+  const { data: overview, isLoading: overviewLoading, isError: overviewError } = useAnalyticsOverview(platformsParam, dateRange);
+  const { data: growthData, isLoading: growthLoading, isError: growthError } = useGrowthAnalytics(platformsParam, dateRange);
+  const { data: contentData, isLoading: contentLoading, isError: contentError } = useContentAnalytics(platformsParam, 'views', 5);
+  const { data: comparisonData, isLoading: comparisonLoading, isError: comparisonError } = useComparisonAnalytics(dateRange);
+
+  // Fetch weekly metrics from database (platform metrics)
+  const { data: weeklyMetrics, isLoading: weeklyLoading, isError: weeklyError } = useQuery({
     queryKey: ['/api/creator/weekly-metrics', user?.id],
     queryFn: async () => {
       const response = await fetch(`/api/creator/weekly-metrics/${user?.id}`);
@@ -31,41 +75,55 @@ export default function AnalyticsOverview() {
       return response.json();
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Mock data for other sections - replace with actual API calls
-  const metrics = {
-    totalFans: 2847,
-    totalRevenue: 7420,
-    engagementRate: 24.5,
-    activeCampaigns: 12,
-  };
-
-  const growthMetrics = {
-    newFansThisMonth: 342,
-    growthPercentage: 18.5,
-    topSource: "Instagram",
-  };
-
-  const revenueMetrics = {
-    thisMonth: 7420,
-    lastMonth: 6850,
-    growth: 8.3,
-  };
+  const hasError = overviewError || growthError || contentError || comparisonError || weeklyError;
 
   return (
     <DashboardLayout userType="creator">
       <div className="p-6 space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Analytics Overview</h1>
-          <p className="text-gray-400">
-            Track your performance, growth, and revenue metrics
-          </p>
+        {hasError && (
+          <ErrorBanner
+            message="Some analytics data couldn't be loaded. Please try refreshing."
+            onRetry={() => window.location.reload()}
+          />
+        )}
+        {/* Header with controls */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Analytics Overview</h1>
+            <p className="text-gray-400">
+              Cross-platform performance, growth, and engagement metrics
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Link href="/creator-dashboard/social">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Settings className="h-3.5 w-3.5" /> Sync Settings
+              </Button>
+            </Link>
+          </div>
         </div>
 
-        {/* Weekly Metrics Cards */}
+        {/* Network Selector */}
+        <NetworkSelector
+          connectedPlatforms={overview?.connectedPlatforms || []}
+          selectedPlatforms={selectedPlatforms}
+          onSelectionChange={setSelectedPlatforms}
+        />
+
+        {/* Weekly Metrics Cards (Platform Data) */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="h-5 w-5 text-brand-primary" />
@@ -91,11 +149,11 @@ export default function AnalyticsOverview() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-green-200">Revenue</p>
+                    <p className="text-sm text-green-200">Points Redeemed</p>
                     <p className="text-3xl font-bold text-white mt-1">
                       {weeklyLoading ? '...' : (weeklyMetrics?.revenue || 0).toLocaleString()}
                     </p>
-                    <p className="text-xs text-green-300 mt-1">Points redeemed</p>
+                    <p className="text-xs text-green-300 mt-1">This week</p>
                   </div>
                   <DollarSign className="h-10 w-10 text-green-400" />
                 </div>
@@ -134,170 +192,70 @@ export default function AnalyticsOverview() {
           </div>
         </div>
 
-        {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Total Fans</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {metrics.totalFans.toLocaleString()}
-                  </p>
-                </div>
-                <Users className="h-8 w-8 text-brand-primary" />
+        {/* Cross-Platform Analytics */}
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4 sm:w-auto sm:inline-flex">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="growth">Growth</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="comparison">Comparison</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <AnalyticsOverviewCards
+              data={overview?.overview}
+              isLoading={overviewLoading}
+              dateRangeLabel={dateRange === '7d' ? 'this week' : dateRange === '30d' ? 'this month' : 'this quarter'}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <PlatformBreakdown
+                  platforms={overview?.platforms || []}
+                  isLoading={overviewLoading}
+                />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Monthly Revenue</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    ${metrics.totalRevenue.toLocaleString()}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Engagement Rate</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {metrics.engagementRate}%
-                  </p>
-                </div>
-                <Heart className="h-8 w-8 text-pink-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Active Campaigns</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {metrics.activeCampaigns}
-                  </p>
-                </div>
-                <Target className="h-8 w-8 text-orange-400" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Navigation Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Growth Card */}
-          <Link href="/creator-dashboard/growth">
-            <Card className="bg-white/5 backdrop-blur-lg border border-white/10 hover:border-brand-primary/50 transition-all cursor-pointer group">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-purple-400" />
-                    <span>Growth Analytics</span>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-brand-primary transition-colors" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">New Fans This Month</span>
-                    <span className="text-lg font-bold text-white">
-                      +{growthMetrics.newFansThisMonth}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Growth Rate</span>
-                    <span className="text-lg font-bold text-green-400">
-                      +{growthMetrics.growthPercentage}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Top Source</span>
-                    <span className="text-lg font-bold text-white">
-                      {growthMetrics.topSource}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-white/10">
-                  <p className="text-sm text-gray-400">
-                    View detailed growth trends, acquisition sources, and fan demographics
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* Revenue Card */}
-          <Link href="/creator-dashboard/revenue">
-            <Card className="bg-white/5 backdrop-blur-lg border border-white/10 hover:border-brand-primary/50 transition-all cursor-pointer group">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-yellow-400" />
-                    <span>Revenue Analytics</span>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-brand-primary transition-colors" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">This Month</span>
-                    <span className="text-lg font-bold text-white">
-                      ${revenueMetrics.thisMonth.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Last Month</span>
-                    <span className="text-lg font-bold text-gray-400">
-                      ${revenueMetrics.lastMonth.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Growth</span>
-                    <span className="text-lg font-bold text-green-400">
-                      +{revenueMetrics.growth}%
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-white/10">
-                  <p className="text-sm text-gray-400">
-                    Track revenue streams, conversion rates, and monetization performance
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Charts Placeholder - You can add actual charts later */}
-        <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-brand-primary" />
-              Performance Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <Eye className="h-12 w-12 mx-auto mb-4 text-gray-600" />
-                <p>Performance charts coming soon</p>
-                <p className="text-sm mt-2">View detailed analytics in Growth and Revenue pages</p>
+              <div>
+                <AIInsightsPanel maxInsights={4} />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          <TabsContent value="growth" className="space-y-6">
+            <GrowthChart data={growthData} isLoading={growthLoading} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Link href="/creator-dashboard/growth">
+                <Card className="bg-white/5 backdrop-blur-lg border border-white/10 hover:border-brand-primary/50 transition-all cursor-pointer group">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-purple-400" />
+                        <span>Detailed Growth Analytics</span>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-brand-primary transition-colors" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-400">
+                      View detailed growth trends, fan engagement metrics, and platform-specific insights
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="content">
+            <ContentPerformance
+              content={contentData?.content || []}
+              isLoading={contentLoading}
+              title="Top Performing Content"
+            />
+          </TabsContent>
+
+          <TabsContent value="comparison">
+            <PlatformComparison data={comparisonData} isLoading={comparisonLoading} />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

@@ -7,7 +7,7 @@
  */
 
 import { db } from '../../db';
-import { pointTransactions, users } from "@shared/schema";
+import { pointTransactions, platformPointsTransactions, fanPrograms, loyaltyPrograms } from "@shared/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 
 // ============================================================================
@@ -33,7 +33,7 @@ export interface PointTransaction {
 }
 
 // ============================================================================
-// FANDOMLY POINTS (Platform Currency)
+// FANDOMLY POINTS (Platform Currency) - uses platform_points_transactions
 // ============================================================================
 
 export class FandomlyPointsService {
@@ -47,14 +47,12 @@ export class FandomlyPointsService {
     description?: string,
     metadata?: any
   ): Promise<void> {
-    await db.insert(pointTransactions).values({
+    await db.insert(platformPointsTransactions).values({
       userId,
-      tenantId: null, // null = Fandomly Points
-      amount,
-      type: 'earned',
+      points: amount,
       source,
       description: description || `Earned ${amount} Fandomly Points from ${source}`,
-      metadata
+      metadata: metadata ?? undefined,
     });
 
     console.log(`✅ Awarded ${amount} Fandomly Points to user ${userId} (${source})`);
@@ -76,13 +74,11 @@ export class FandomlyPointsService {
       return false;
     }
 
-    await db.insert(pointTransactions).values({
+    await db.insert(platformPointsTransactions).values({
       userId,
-      tenantId: null,
-      amount: -amount,
-      type: 'spent',
+      points: -amount,
       source,
-      description: description || `Spent ${amount} Fandomly Points on ${source}`
+      description: description || `Spent ${amount} Fandomly Points on ${source}`,
     });
 
     console.log(`✅ Spent ${amount} Fandomly Points for user ${userId} (${source})`);
@@ -93,14 +89,11 @@ export class FandomlyPointsService {
    * Get user's Fandomly Points balance
    */
   async getBalance(userId: string): Promise<number> {
-    const transactions = await db.query.pointTransactions.findMany({
-      where: and(
-        eq(pointTransactions.userId, userId),
-        sql`${pointTransactions.tenantId} IS NULL`
-      )
+    const transactions = await db.query.platformPointsTransactions.findMany({
+      where: eq(platformPointsTransactions.userId, userId),
     });
 
-    const balance = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const balance = transactions.reduce((sum, tx) => sum + (tx.points ?? 0), 0);
     return Math.max(0, balance);
   }
 
@@ -108,14 +101,21 @@ export class FandomlyPointsService {
    * Get transaction history
    */
   async getTransactionHistory(userId: string, limit: number = 50): Promise<PointTransaction[]> {
-    return db.query.pointTransactions.findMany({
-      where: and(
-        eq(pointTransactions.userId, userId),
-        sql`${pointTransactions.tenantId} IS NULL`
-      ),
-      orderBy: [desc(pointTransactions.createdAt)],
-      limit
-    }) as Promise<PointTransaction[]>;
+    const rows = await db.query.platformPointsTransactions.findMany({
+      where: eq(platformPointsTransactions.userId, userId),
+      orderBy: [desc(platformPointsTransactions.createdAt)],
+      limit,
+    });
+    return rows.map(tx => ({
+      id: tx.id,
+      userId: tx.userId,
+      amount: tx.points,
+      type: (tx.points >= 0 ? 'earned' : 'spent') as 'earned' | 'spent' | 'bonus' | 'refund',
+      source: tx.source,
+      description: tx.description ?? undefined,
+      metadata: tx.metadata ?? undefined,
+      createdAt: tx.createdAt ?? new Date(),
+    }));
   }
 }
 
@@ -124,6 +124,19 @@ export class FandomlyPointsService {
 // ============================================================================
 
 export class CreatorPointsService {
+  private async resolveFanProgramId(userId: string, creatorId: string, tenantId: string): Promise<string | null> {
+    const [program] = await db.select().from(loyaltyPrograms).where(and(
+      eq(loyaltyPrograms.creatorId, creatorId),
+      eq(loyaltyPrograms.tenantId, tenantId)
+    )).limit(1);
+    if (!program) return null;
+    const [fp] = await db.select().from(fanPrograms).where(and(
+      eq(fanPrograms.fanId, userId),
+      eq(fanPrograms.programId, program.id)
+    )).limit(1);
+    return fp?.id ?? null;
+  }
+
   /**
    * Award Creator Points to a user
    */
@@ -136,19 +149,32 @@ export class CreatorPointsService {
     description?: string,
     metadata?: any
   ): Promise<void> {
+    const fanProgramId = await this.resolveFanProgramId(userId, creatorId, tenantId);
+    if (!fanProgramId) {
+      console.warn(`[CreatorPoints] No fan program for user ${userId} in creator ${creatorId} tenant ${tenantId}; skipping points award`);
+      return;
+    }
+    
+    // Insert transaction record
     await db.insert(pointTransactions).values({
-      userId,
       tenantId,
-      amount,
+      fanProgramId,
+      points: amount,
       type: 'earned',
       source,
-      description: description || `Earned ${amount} points from ${source}`,
-      metadata: {
-        ...metadata,
-        creatorId
-      }
+      metadata: metadata ? { ...metadata } : undefined,
     });
-
+    
+    // Update fan_programs balance (increment current_points and total_points_earned)
+    await db
+      .update(fanPrograms)
+      .set({
+        currentPoints: sql`${fanPrograms.currentPoints} + ${amount}`,
+        totalPointsEarned: sql`${fanPrograms.totalPointsEarned} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(fanPrograms.id, fanProgramId));
+    
     console.log(`✅ Awarded ${amount} creator points to user ${userId} for creator ${creatorId} (${source})`);
   }
 
@@ -164,22 +190,31 @@ export class CreatorPointsService {
     description?: string
   ): Promise<boolean> {
     const balance = await this.getBalance(userId, creatorId, tenantId);
-    
     if (balance < amount) {
       console.log(`❌ Insufficient creator points for user ${userId}: ${balance} < ${amount}`);
       return false;
     }
-
+    const fanProgramId = await this.resolveFanProgramId(userId, creatorId, tenantId);
+    if (!fanProgramId) return false;
+    
+    // Insert transaction record
     await db.insert(pointTransactions).values({
-      userId,
       tenantId,
-      amount: -amount,
+      fanProgramId,
+      points: -amount,
       type: 'spent',
       source,
-      description: description || `Spent ${amount} points on ${source}`,
-      metadata: { creatorId }
     });
-
+    
+    // Update fan_programs balance (decrement current_points only, NOT total_points_earned)
+    await db
+      .update(fanPrograms)
+      .set({
+        currentPoints: sql`GREATEST(0, ${fanPrograms.currentPoints} - ${amount})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(fanPrograms.id, fanProgramId));
+    
     console.log(`✅ Spent ${amount} creator points for user ${userId} with creator ${creatorId} (${source})`);
     return true;
   }
@@ -188,38 +223,32 @@ export class CreatorPointsService {
    * Get user's Creator Points balance for a specific creator
    */
   async getBalance(userId: string, creatorId: string, tenantId: string): Promise<number> {
+    const fanProgramId = await this.resolveFanProgramId(userId, creatorId, tenantId);
+    if (!fanProgramId) return 0;
     const transactions = await db.query.pointTransactions.findMany({
-      where: and(
-        eq(pointTransactions.userId, userId),
-        eq(pointTransactions.tenantId, tenantId)
-      )
+      where: eq(pointTransactions.fanProgramId, fanProgramId),
     });
-
-    const balance = transactions.reduce((sum, tx) => sum + tx.amount, 0);
-    return Math.max(0, balance);
+    return Math.max(0, transactions.reduce((sum, tx) => sum + (tx.points ?? 0), 0));
   }
 
   /**
    * Get all creator points balances for a user
    */
   async getAllBalances(userId: string): Promise<Record<string, number>> {
-    const transactions = await db.query.pointTransactions.findMany({
-      where: and(
-        eq(pointTransactions.userId, userId),
-        sql`${pointTransactions.tenantId} IS NOT NULL`
-      )
+    const fps = await db.query.fanPrograms.findMany({
+      where: eq(fanPrograms.fanId, userId),
+      with: { program: true },
     });
-
-    // Group by tenant/creator
     const balances: Record<string, number> = {};
-    
-    for (const tx of transactions) {
-      const creatorId = tx.metadata?.creatorId || tx.tenantId;
-      if (creatorId) {
-        balances[creatorId] = (balances[creatorId] || 0) + tx.amount;
-      }
+    for (const fp of fps) {
+      const creatorId = fp.program?.creatorId;
+      if (!creatorId) continue;
+      const txs = await db.query.pointTransactions.findMany({
+        where: eq(pointTransactions.fanProgramId, fp.id),
+      });
+      const balance = txs.reduce((sum, tx) => sum + (tx.points ?? 0), 0);
+      if (balance > 0) balances[creatorId] = balance;
     }
-
     return balances;
   }
 
@@ -231,14 +260,27 @@ export class CreatorPointsService {
     tenantId: string,
     limit: number = 50
   ): Promise<PointTransaction[]> {
-    return db.query.pointTransactions.findMany({
-      where: and(
-        eq(pointTransactions.userId, userId),
-        eq(pointTransactions.tenantId, tenantId)
-      ),
+    const fanProgramsList = await db.query.fanPrograms.findMany({
+      where: and(eq(fanPrograms.fanId, userId), eq(fanPrograms.tenantId, tenantId)),
+      limit: 1,
+    });
+    const fp = fanProgramsList[0];
+    if (!fp) return [];
+    const rows = await db.query.pointTransactions.findMany({
+      where: eq(pointTransactions.fanProgramId, fp.id),
       orderBy: [desc(pointTransactions.createdAt)],
-      limit
-    }) as Promise<PointTransaction[]>;
+      limit,
+    });
+    return rows.map(tx => ({
+      id: tx.id,
+      userId,
+      tenantId: tx.tenantId,
+      amount: tx.points ?? 0,
+      type: (tx.points && tx.points >= 0 ? 'earned' : 'spent') as 'earned' | 'spent' | 'bonus' | 'refund',
+      source: tx.source,
+      metadata: tx.metadata ?? undefined,
+      createdAt: tx.createdAt ?? new Date(),
+    }));
   }
 }
 
@@ -278,21 +320,30 @@ export class PointsService {
     fandomly: PointTransaction[];
     creator: PointTransaction[];
   }> {
-    const allTransactions = await db.query.pointTransactions.findMany({
-      where: eq(pointTransactions.userId, userId),
-      orderBy: [desc(pointTransactions.createdAt)],
-      limit: limit * 2 // Get more to split
-    }) as PointTransaction[];
-
-    const fandomly = allTransactions
-      .filter(tx => !tx.tenantId)
-      .slice(0, limit);
-    
-    const creator = allTransactions
-      .filter(tx => !!tx.tenantId)
-      .slice(0, limit);
-
-    return { fandomly, creator };
+    const fandomly = await this.fandomly.getTransactionHistory(userId, limit);
+    const fps = await db.query.fanPrograms.findMany({
+      where: eq(fanPrograms.fanId, userId),
+    });
+    const creatorTxs: PointTransaction[] = [];
+    for (const fp of fps) {
+      const txs = await db.query.pointTransactions.findMany({
+        where: eq(pointTransactions.fanProgramId, fp.id),
+        orderBy: [desc(pointTransactions.createdAt)],
+        limit,
+      });
+      creatorTxs.push(...txs.map(tx => ({
+        id: tx.id,
+        userId,
+        tenantId: tx.tenantId,
+        amount: tx.points ?? 0,
+        type: (tx.points && tx.points >= 0 ? 'earned' : 'spent') as 'earned' | 'spent' | 'bonus' | 'refund',
+        source: tx.source,
+        metadata: tx.metadata ?? undefined,
+        createdAt: tx.createdAt ?? new Date(),
+      })));
+    }
+    creatorTxs.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    return { fandomly, creator: creatorTxs.slice(0, limit) };
   }
 }
 

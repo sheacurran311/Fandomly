@@ -15,13 +15,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { transformImageUrl } from '@/lib/image-utils';
 import type { Task, TaskCompletion } from '@shared/schema';
 
-interface EnrichedTask extends Task {
+type EnrichedTask = Omit<Task, 'platform'> & {
   creatorName?: string;
   creatorImage?: string;
   programName?: string;
   programSlug?: string;
-  platform?: string;
-}
+  platform?: Task['platform'];
+};
 
 interface CreatorTasksTableProps {
   tasks: EnrichedTask[];
@@ -144,7 +144,7 @@ export function CreatorTasksTable({ tasks, completionMap }: CreatorTasksTablePro
                       <Avatar className="h-8 w-8 border border-white/20">
                         {task.creatorImage && (
                           <AvatarImage 
-                            src={transformImageUrl(task.creatorImage)} 
+                            src={transformImageUrl(task.creatorImage) ?? undefined} 
                             alt={task.creatorName}
                           />
                         )}
@@ -179,9 +179,9 @@ export function CreatorTasksTable({ tasks, completionMap }: CreatorTasksTablePro
                   <TableCell>
                     <Badge 
                       variant="outline" 
-                      className={`text-xs ${getTaskTypeBadgeColor(task.type || '')}`}
+                      className={`text-xs ${getTaskTypeBadgeColor(task.taskType || '')}`}
                     >
-                      {formatTaskType(task.type || '')}
+                      {formatTaskType(task.taskType || '')}
                     </Badge>
                   </TableCell>
 

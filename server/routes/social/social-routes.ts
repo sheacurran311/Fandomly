@@ -209,69 +209,17 @@ async function exchangeTwitterToken(
 }
 
 // YouTube Data API token exchange
+// Now uses dedicated YouTube OAuth client (GOOGLE_YOUTUBE_CLIENT_ID)
 async function exchangeYouTubeToken(code: string, redirectUri: string) {
-  console.log('[YouTube Token Exchange] Request details:', {
-    hasClientId: !!process.env.GOOGLE_CLIENT_ID,
-    hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-    redirectUri,
-    codeLength: code.length
-  });
-
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    throw new Error('YouTube/Google client credentials not configured');
-  }
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri
-    }).toString()
-  });
-  
-  console.log('[YouTube Token Exchange] Response status:', response.status);
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[YouTube Token Exchange] Error:', errorText);
-    throw new Error(`YouTube token exchange failed: ${response.status} ${errorText}`);
-  }
-  
-  return response.json();
+  const { exchangeYouTubeCode } = await import('../../services/auth/youtube-auth');
+  return exchangeYouTubeCode(code, redirectUri);
 }
 
 // YouTube token refresh
+// Now uses dedicated YouTube OAuth client (GOOGLE_YOUTUBE_CLIENT_ID)
 async function refreshYouTubeToken(refreshToken: string) {
-  console.log('[YouTube Token Refresh] Refreshing token...');
-  
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    throw new Error('YouTube/Google client credentials not configured');
-  }
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token'
-    }).toString()
-  });
-  
-  console.log('[YouTube Token Refresh] Response status:', response.status);
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[YouTube Token Refresh] Error:', errorText);
-    throw new Error(`YouTube token refresh failed: ${response.status}`);
-  }
-  
-  return response.json();
+  const { refreshYouTubeTokens } = await import('../../services/auth/youtube-auth');
+  return refreshYouTubeTokens(refreshToken);
 }
 
 // Spotify Web API token exchange
@@ -979,8 +927,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Instagram Business Login token exchange
-  app.post('/api/social/instagram/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Instagram Business Login token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
+  app.post('/api/social/instagram/token', async (req: AuthenticatedRequest, res) => {
     try {
       const { code, redirect_uri, user_type = 'creator' } = req.body;
       
@@ -1107,8 +1055,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // TikTok token exchange
-  app.post('/api/social/tiktok/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // TikTok token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
+  app.post('/api/social/tiktok/token', async (req: AuthenticatedRequest, res) => {
     try {
       const { code, redirect_uri } = req.body || {};
       if (!code) {
@@ -1134,7 +1082,10 @@ export function registerSocialRoutes(app: Express) {
   // TikTok user info
   app.get('/api/social/tiktok/user', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      // Prefer X-Social-Token header (avoids JWT middleware noise), fall back to Authorization
+      const socialTokenHeader = req.headers['x-social-token'] as string | undefined;
+      const authHeader = req.headers.authorization;
+      const accessToken = (socialTokenHeader || authHeader)?.replace('Bearer ', '');
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
@@ -1393,8 +1344,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // YouTube token exchange
-  app.post('/api/social/youtube/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // YouTube token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
+  app.post('/api/social/youtube/token', async (req: AuthenticatedRequest, res) => {
     try {
       const { code, redirect_uri } = req.body;
       if (!code || !redirect_uri) {
@@ -1415,7 +1366,10 @@ export function registerSocialRoutes(app: Express) {
   // YouTube user/channel info
   app.get('/api/social/youtube/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      // Prefer X-Social-Token header (avoids JWT middleware noise), fall back to Authorization
+      const socialTokenHeader = req.headers['x-social-token'] as string | undefined;
+      const authHeader = req.headers.authorization;
+      const accessToken = (socialTokenHeader || authHeader)?.replace('Bearer ', '');
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
@@ -1459,8 +1413,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Spotify token exchange
-  app.post('/api/social/spotify/token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Spotify token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
+  app.post('/api/social/spotify/token', async (req: AuthenticatedRequest, res) => {
     try {
       const { code, redirect_uri } = req.body;
       if (!code || !redirect_uri) {
@@ -1481,7 +1435,10 @@ export function registerSocialRoutes(app: Express) {
   // Spotify user profile
   app.get('/api/social/spotify/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      // Prefer X-Social-Token header (avoids JWT middleware noise), fall back to Authorization
+      const socialTokenHeader = req.headers['x-social-token'] as string | undefined;
+      const authHeader = req.headers.authorization;
+      const accessToken = (socialTokenHeader || authHeader)?.replace('Bearer ', '');
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
@@ -1771,6 +1728,8 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Disconnect social account (generic endpoint for all platforms)
+  // NOTE: Prefer using POST /api/social-connections/disconnect from social-connection-routes (uses authenticateUser)
+  // This route supports x-dynamic-user-id for legacy clients; socialConnections table is source of truth
   app.post('/api/social-connections/disconnect', async (req: AuthenticatedRequest, res) => {
     try {
       const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
@@ -1785,37 +1744,44 @@ export function registerSocialRoutes(app: Express) {
       if (!platform) {
         return res.status(400).json({ error: 'platform required' });
       }
+
+      const platformLower = String(platform).toLowerCase();
       
-      // Remove from BOTH systems for consistency
-      // 1. Remove from old storage system
-      const success = await storage.removeSocialAccount(dynamicUserId, platform);
+      // 1. Resolve user - try dynamicUserId first, then internal id (when client passes user.id)
+      let user = await storage.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        const { users } = await import('@shared/schema');
+        const [byId] = await db.select().from(users).where(eq(users.id, dynamicUserId)).limit(1);
+        user = byId;
+      }
       
-      // 2. Also remove from socialConnections table
+      if (!user) {
+        console.log(`[Social Disconnect] User not found for: ${dynamicUserId}`);
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // 2. Remove from socialConnections table (PRIMARY - source of truth)
+      await db
+        .delete(socialConnections)
+        .where(
+          and(
+            eq(socialConnections.userId, user.id),
+            eq(socialConnections.platform, platformLower)
+          )
+        );
+      console.log(`[Social Disconnect] Removed ${platformLower} from socialConnections table for user ${user.id}`);
+      
+      // 3. Also remove from old storage (profileData.socialConnections) - best effort
       try {
-        const user = await storage.getUserByDynamicId(dynamicUserId);
-        if (user) {
-          await db
-            .delete(socialConnections)
-            .where(
-              and(
-                eq(socialConnections.userId, user.id),
-                eq(socialConnections.platform, platform)
-              )
-            );
-          console.log(`[Social Disconnect] Also removed ${platform} from socialConnections table for user ${user.id}`);
-        }
-      } catch (syncError) {
-        console.error(`[Social Disconnect] Error removing from socialConnections table:`, syncError);
-        // Don't fail the request if the sync fails
+        const dynamicId = (user as any).dynamicUserId || dynamicUserId;
+        await storage.removeSocialAccount(dynamicId, platformLower);
+        console.log(`[Social Disconnect] Also removed ${platformLower} from old storage system`);
+      } catch (storageErr) {
+        console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
       }
       
-      if (success) {
-        console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);
-        res.json({ success: true, message: `${platform} account disconnected successfully` });
-      } else {
-        console.log(`[Social Disconnect] Failed to disconnect ${platform} for user ${dynamicUserId}`);
-        res.status(500).json({ error: `Failed to disconnect ${platform} account` });
-      }
+      console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${dynamicUserId}`);
+      res.json({ success: true, message: `${platformLower} account disconnected successfully` });
     } catch (error) {
       console.error('Social disconnect error:', error);
       res.status(500).json({ error: 'Failed to disconnect social account' });
@@ -1823,47 +1789,52 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Disconnect social account (no custom auth middleware) - legacy endpoint
+  // Used by use-twitter-connection, use-social-connection (DELETE /api/social/twitter, etc.)
   app.delete('/api/social/:platform', async (req: AuthenticatedRequest, res) => {
     try {
       const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
-      const { platform } = req.params;
+      const platform = (req.params.platform || '').toLowerCase();
       
-      console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${dynamicUserId}`);
+      console.log(`[Social Disconnect] DELETE request to disconnect ${platform} for user: ${dynamicUserId}`);
       
       if (!dynamicUserId) {
         return res.status(400).json({ error: 'dynamicUserId required' });
       }
       
-      // Remove from BOTH systems for consistency
-      // 1. Remove from old storage system
-      const success = await storage.removeSocialAccount(dynamicUserId, platform);
+      // 1. Resolve user - try dynamicUserId first, then internal id
+      let user = await storage.getUserByDynamicId(dynamicUserId);
+      if (!user) {
+        const { users } = await import('@shared/schema');
+        const [byId] = await db.select().from(users).where(eq(users.id, dynamicUserId)).limit(1);
+        user = byId;
+      }
       
-      // 2. Also remove from socialConnections table
+      if (!user) {
+        console.log(`[Social Disconnect] User not found for: ${dynamicUserId}`);
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // 2. Remove from socialConnections table (PRIMARY - source of truth)
+      await db
+        .delete(socialConnections)
+        .where(
+          and(
+            eq(socialConnections.userId, user.id),
+            eq(socialConnections.platform, platform)
+          )
+        );
+      console.log(`[Social Disconnect] Removed ${platform} from socialConnections table for user ${user.id}`);
+      
+      // 3. Also remove from old storage - best effort
       try {
-        const user = await storage.getUserByDynamicId(dynamicUserId);
-        if (user) {
-          await db
-            .delete(socialConnections)
-            .where(
-              and(
-                eq(socialConnections.userId, user.id),
-                eq(socialConnections.platform, platform)
-              )
-            );
-          console.log(`[Social Disconnect] Also removed ${platform} from socialConnections table for user ${user.id}`);
-        }
-      } catch (syncError) {
-        console.error(`[Social Disconnect] Error removing from socialConnections table:`, syncError);
-        // Don't fail the request if the sync fails
+        const dynamicId = (user as any).dynamicUserId || dynamicUserId;
+        await storage.removeSocialAccount(dynamicId, platform);
+      } catch (storageErr) {
+        console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
       }
       
-      if (success) {
-        console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);
-        res.json({ success: true, message: `${platform} account disconnected successfully` });
-      } else {
-        console.log(`[Social Disconnect] Failed to disconnect ${platform} for user ${dynamicUserId}`);
-        res.status(500).json({ error: `Failed to disconnect ${platform} account` });
-      }
+      console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);
+      res.json({ success: true, message: `${platform} account disconnected successfully` });
     } catch (error) {
       console.error('Social disconnect error:', error);
       res.status(500).json({ error: 'Failed to disconnect social account' });

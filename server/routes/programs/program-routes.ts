@@ -2,7 +2,7 @@ import { Express } from "express";
 import { z } from "zod";
 import { db } from '../../db';
 import { loyaltyPrograms, campaigns, tasks } from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, or } from "drizzle-orm";
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
 
 // Validation schemas
@@ -57,6 +57,11 @@ const createProgramSchema = z.object({
       discord: z.string().optional(),
       website: z.string().optional(),
     }).optional(),
+    // Creator details - type-specific info (sport, position, genre, etc.)
+    // Replaces the old separate profile data with program-as-source-of-truth
+    creatorDetails: z.record(z.any()).optional(),
+    // Location for the creator
+    location: z.string().optional(),
   }).optional(),
   tiers: z.array(z.object({
     id: z.string(),
@@ -194,14 +199,21 @@ export function registerProgramRoutes(app: Express) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
-      // Create program
+      // Create program - normalize theme.mode for schema compatibility
+      const pageConfig = validatedData.pageConfig ? {
+        ...validatedData.pageConfig,
+        theme: validatedData.pageConfig.theme
+          ? { ...validatedData.pageConfig.theme, mode: (validatedData.pageConfig.theme.mode ?? 'light') as 'light' | 'dark' | 'custom' }
+          : undefined,
+      } : undefined;
+
       const [newProgram] = await db.insert(loyaltyPrograms).values({
         tenantId: creator.tenantId,
         creatorId: creator.id,
         name: validatedData.name,
         description: validatedData.description,
         pointsName: validatedData.pointsName,
-        pageConfig: validatedData.pageConfig,
+        pageConfig,
         tiers: validatedData.tiers,
         status: 'draft',
         slug: slug,
@@ -250,12 +262,24 @@ export function registerProgramRoutes(app: Express) {
       // Debug logging - log validated data
       console.log('✅ [BACKEND] Validated pageConfig:', JSON.stringify(validatedData.pageConfig, null, 2));
 
-      // Update program
+      // Update program - normalize theme.mode for schema compatibility
+      const updatePayload = validatedData.pageConfig
+        ? {
+            ...validatedData,
+            pageConfig: {
+              ...validatedData.pageConfig,
+              theme: validatedData.pageConfig.theme
+                ? { ...validatedData.pageConfig.theme, mode: (validatedData.pageConfig.theme.mode ?? 'light') as 'light' | 'dark' | 'custom' }
+                : undefined,
+            },
+          }
+        : validatedData;
+
       const [updatedProgram] = await db.update(loyaltyPrograms)
         .set({
-          ...validatedData,
+          ...updatePayload,
           updatedAt: new Date(),
-        })
+        } as any)
         .where(and(
           eq(loyaltyPrograms.id, id),
           eq(loyaltyPrograms.creatorId, creator.id)
@@ -306,13 +330,31 @@ export function registerProgramRoutes(app: Express) {
       const body = publishProgramSchema.safeParse(req.body);
       const slug = body.success ? body.data.slug : undefined;
 
-      // Publish program
+      // First, fetch the existing program to check if it's already published
+      const [existingProgram] = await db.select()
+        .from(loyaltyPrograms)
+        .where(and(
+          eq(loyaltyPrograms.id, id),
+          eq(loyaltyPrograms.creatorId, creator.id)
+        ))
+        .limit(1);
+
+      if (!existingProgram) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+
+      // Determine if this is a republish (already has publishedAt)
+      const isRepublish = !!existingProgram.publishedAt;
+      const now = new Date();
+
+      // Publish/republish program - preserve original publishedAt
       const [publishedProgram] = await db.update(loyaltyPrograms)
         .set({
           status: 'published',
           isActive: true,
-          publishedAt: new Date(),
-          updatedAt: new Date(),
+          // Preserve original publishedAt for republishes
+          publishedAt: existingProgram.publishedAt || now,
+          updatedAt: now,
           ...(slug && { slug }),
         })
         .where(and(
@@ -322,8 +364,11 @@ export function registerProgramRoutes(app: Express) {
         .returning();
 
       if (!publishedProgram) {
-        return res.status(404).json({ error: "Program not found" });
+        return res.status(404).json({ error: "Failed to update program" });
       }
+
+      // Log whether this was a new publish or republish
+      console.log(`Program ${id} ${isRepublish ? 'republished' : 'published'} by creator ${creator.id}`);
 
       res.json(publishedProgram);
     } catch (error) {
@@ -481,15 +526,19 @@ export function registerProgramRoutes(app: Express) {
         ))
         .orderBy(desc(tasksTable.createdAt));
 
+      // Program is the single source of truth; fall back to creator for legacy data
+      const previewPageConfig = program.pageConfig as any || {};
       res.json({
         ...program,
         creator: {
           id: creator.id,
-          displayName: creator.displayName || creatorUser?.username || 'Unknown Creator',
-          bio: creator.bio,
-          imageUrl: creator.imageUrl,
-          bannerImage: creatorUser?.profileData?.bannerImage,
-          socialLinks: creator.socialLinks || {},
+          displayName: program.name || creator.displayName || creatorUser?.username || 'Unknown Creator',
+          bio: program.description || creator.bio,
+          imageUrl: previewPageConfig.logo || creator.imageUrl,
+          bannerImage: previewPageConfig.headerImage || creatorUser?.profileData?.bannerImage,
+          socialLinks: previewPageConfig.socialLinks || creator.socialLinks || {},
+          category: creator.category,
+          creatorDetails: previewPageConfig.creatorDetails || {},
         },
         campaigns: programCampaigns,
         tasks: programTasks,
@@ -592,27 +641,39 @@ export function registerProgramRoutes(app: Express) {
             .orderBy(desc(tasks.createdAt))
         : [];
 
-      // Build creator data with granular visibility controls
+      // Build creator data - program is the single source of truth for fan-facing data
+      const pageConfig = program.pageConfig as any || {};
       const creatorData: any = {
         id: creator?.id,
-        displayName: creator?.displayName,
-        imageUrl: creator?.imageUrl,
-        publicPageSettings: creator?.publicPageSettings,
+        // Program is canonical source; fall back to creator table for legacy data
+        displayName: program.name || creator?.displayName,
+        imageUrl: pageConfig.logo || creator?.imageUrl,
+        category: creator?.category,
       };
 
       // Add bio only if showBio is not explicitly false
-      if (profileDataVisibility.showBio !== false && creator?.bio) {
-        creatorData.bio = creator.bio;
+      if (profileDataVisibility.showBio !== false) {
+        creatorData.bio = program.description || creator?.bio;
       }
 
-      // Add social links only if showSocialLinks is not explicitly false
-      if (profileDataVisibility.showSocialLinks !== false && creator?.socialLinks) {
-        creatorData.socialLinks = creator.socialLinks;
+      // Add social links only if showSocialLinks is not explicitly false  
+      if (profileDataVisibility.showSocialLinks !== false) {
+        creatorData.socialLinks = pageConfig.socialLinks || creator?.socialLinks || {};
       }
 
-      // Add banner image only if profile visibility is enabled
-      if (profileDataVisibility.showBio !== false && user?.profileData?.bannerImage) {
-        creatorData.bannerImage = user.profileData.bannerImage;
+      // Add banner image - program is canonical source
+      if (profileDataVisibility.showBio !== false) {
+        creatorData.bannerImage = pageConfig.headerImage || user?.profileData?.bannerImage;
+      }
+
+      // Add location from program pageConfig
+      if (profileDataVisibility.showLocation !== false && pageConfig.location) {
+        creatorData.location = pageConfig.location;
+      }
+
+      // Add creator details (type-specific info) from program
+      if (pageConfig.creatorDetails) {
+        creatorData.creatorDetails = pageConfig.creatorDetails;
       }
 
       res.json({
@@ -658,7 +719,8 @@ export function registerProgramRoutes(app: Express) {
       // Only show tasks that have actually been completed (completedAt is not null)
       const { isNotNull } = await import("drizzle-orm");
       
-      const activity = await db.select({
+      // First try by programId
+      let activity = await db.select({
         completion: taskCompletions,
         user: users,
         task: tasks,
@@ -668,10 +730,34 @@ export function registerProgramRoutes(app: Express) {
         .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
         .where(and(
           eq(tasks.programId, programId),
-          isNotNull(taskCompletions.completedAt) // Only include actually completed tasks
+          or(
+            eq(taskCompletions.status, 'completed'),
+            eq(taskCompletions.status, 'claimed')
+          )
         ))
-        .orderBy(desc(taskCompletions.completedAt)) // Order by completion time, not created time
+        .orderBy(desc(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`)) // Order by completion time, not created time
         .limit(20);
+      
+      // If no results by programId and program has tenantId, try by tenantId
+      if (activity.length === 0 && program.tenantId) {
+        activity = await db.select({
+          completion: taskCompletions,
+          user: users,
+          task: tasks,
+        })
+          .from(taskCompletions)
+          .leftJoin(users, eq(taskCompletions.userId, users.id))
+          .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+          .where(and(
+            eq(tasks.tenantId, program.tenantId),
+            or(
+              eq(taskCompletions.status, 'completed'),
+              eq(taskCompletions.status, 'claimed')
+            )
+          ))
+          .orderBy(desc(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`))
+          .limit(20);
+      }
 
       res.json(activity);
     } catch (error) {

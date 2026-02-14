@@ -1,28 +1,30 @@
 import { useState } from "react";
-import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import type { Task } from "@shared/schema";
 import {
   Instagram,
   ExternalLink,
   CheckCircle2,
-  Loader2,
   Heart,
   UserPlus,
   Upload,
+  ImageIcon,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import TaskCompletionModalLayout, {
+  ModalHint,
+  ProofSection,
+} from "../TaskCompletionModalLayout";
+import { invalidateTaskCompletionQueries } from "@/hooks/useTaskCompletion";
 
 interface InstagramTaskCompletionModalProps {
   task: Task;
   onClose: () => void;
   onSuccess: () => void;
-  completionId?: number;
+  completionId?: string;
 }
 
 export default function InstagramTaskCompletionModal({
@@ -69,8 +71,8 @@ export default function InstagramTaskCompletionModal({
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+      // Invalidate all task completion related queries across the app
+      invalidateTaskCompletionQueries(queryClient);
 
       toast({
         title: "Task Submitted!",
@@ -89,48 +91,47 @@ export default function InstagramTaskCompletionModal({
     },
   });
 
-  // Get task-specific instructions and UI
+  // Get task-specific content
   const getTaskContent = () => {
     const username = settings?.username;
     const contentUrl = settings?.contentUrl || settings?.postUrl;
+    const profileUrl = username
+      ? `https://instagram.com/${username.replace('@', '')}`
+      : null;
 
     switch (taskType) {
       case 'instagram_follow':
-        const profileUrl = username
-          ? `https://instagram.com/${username.replace('@', '')}`
-          : null;
-
         return {
-          icon: <UserPlus className="w-6 h-6 text-pink-500" />,
+          icon: <UserPlus className="h-5 w-5" />,
           title: "Follow on Instagram",
           description: username
             ? `Follow @${username.replace('@', '')} to complete this task`
             : "Follow the required account on Instagram",
           targetUrl: profileUrl,
-          actionText: "Follow Account",
+          actionText: `Follow @${username?.replace('@', '') || 'account'}`,
         };
 
       case 'instagram_like_post':
         return {
-          icon: <Heart className="w-6 h-6 text-pink-500" />,
+          icon: <Heart className="h-5 w-5" />,
           title: "Like Instagram Post",
           description: "Like the specified post to earn points",
           targetUrl: contentUrl,
-          actionText: "Open Post",
+          actionText: "Open Post to Like",
         };
 
       case 'instagram_comment':
         return {
-          icon: <Heart className="w-6 h-6 text-pink-500" />,
+          icon: <Heart className="h-5 w-5" />,
           title: "Comment on Post",
           description: "Leave a comment on the specified post",
           targetUrl: contentUrl,
-          actionText: "Open Post",
+          actionText: "Open Post to Comment",
         };
 
       case 'instagram_story_view':
         return {
-          icon: <Instagram className="w-6 h-6 text-pink-500" />,
+          icon: <Instagram className="h-5 w-5" />,
           title: "View Instagram Story",
           description: "View the story from the specified account",
           targetUrl: profileUrl,
@@ -139,7 +140,7 @@ export default function InstagramTaskCompletionModal({
 
       default:
         return {
-          icon: <Instagram className="w-6 h-6 text-pink-500" />,
+          icon: <Instagram className="h-5 w-5" />,
           title: "Complete Instagram Task",
           description: task.description || "Complete the required Instagram action",
           targetUrl: contentUrl || profileUrl,
@@ -151,103 +152,78 @@ export default function InstagramTaskCompletionModal({
   const content = getTaskContent();
 
   return (
-    <>
-      <DialogHeader>
-        <div className="flex items-center gap-3 mb-2">
-          {content.icon}
-          <DialogTitle>{content.title}</DialogTitle>
-        </div>
-        <DialogDescription>{content.description}</DialogDescription>
-      </DialogHeader>
+    <TaskCompletionModalLayout
+      platform="instagram"
+      icon={content.icon}
+      taskName={content.title}
+      taskDescription={content.description}
+      pointsReward={task.pointsToReward || 0}
+      steps={[
+        { label: "Action" },
+        { label: "Proof" },
+        { label: "Submit" },
+      ]}
+      currentStep={screenshotFile ? 2 : 0}
+      onCancel={onClose}
+      onSubmit={() => submitMutation.mutate()}
+      submitLabel="Submit for Review"
+      isSubmitting={submitMutation.isPending}
+      canSubmit={!!screenshotFile}
+    >
+      {/* Action Button */}
+      {content.targetUrl && (
+        <Button
+          onClick={() => window.open(content.targetUrl!, '_blank')}
+          className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white"
+          size="lg"
+        >
+          <ExternalLink className="w-4 h-4 mr-2" />
+          {content.actionText}
+        </Button>
+      )}
 
-      <div className="space-y-6 py-4">
-        {/* Step 1: Go to Instagram */}
+      {/* Screenshot Upload */}
+      <ProofSection title="Upload Proof">
         <div className="space-y-3">
-          <h4 className="font-semibold text-sm">Step 1: Complete the action</h4>
-          {content.targetUrl && (
-            <Button
-              onClick={() => window.open(content.targetUrl!, '_blank')}
-              className="w-full"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              {content.actionText}
-            </Button>
-          )}
-        </div>
+          <Label className="text-xs text-white/50">Screenshot (required for Instagram)</Label>
+          <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-lg border-2 border-dashed border-white/10 hover:border-pink-500/30 bg-white/[0.02] hover:bg-pink-500/5 cursor-pointer transition-all">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setScreenshotFile(e.target.files?.[0] || null)}
+              className="hidden"
+            />
+            {screenshotFile ? (
+              <div className="flex items-center gap-2 text-green-400">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">{screenshotFile.name}</span>
+              </div>
+            ) : (
+              <>
+                <ImageIcon className="w-8 h-8 text-white/20" />
+                <span className="text-sm text-white/40">Click to upload screenshot</span>
+                <span className="text-xs text-white/20">PNG, JPG up to 10MB</span>
+              </>
+            )}
+          </label>
 
-        {/* Step 2: Upload Proof */}
-        <div className="space-y-3">
-          <h4 className="font-semibold text-sm">Step 2: Provide proof</h4>
-
-          <div className="space-y-2">
-            <Label>Screenshot (required for Instagram):</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setScreenshotFile(e.target.files?.[0] || null)}
-                className="flex-1"
-              />
-              {screenshotFile && (
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Upload a screenshot showing you completed the action
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Link (optional):</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-white/50">Link (optional)</Label>
             <Input
               placeholder="Paste Instagram URL here (if applicable)"
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
             />
           </div>
         </div>
+      </ProofSection>
 
-        {/* Instagram Verification Notice */}
-        <Alert>
-          <AlertDescription>
-            Instagram tasks require manual review. Your submission will be verified by the creator within 24-48 hours.
-          </AlertDescription>
-        </Alert>
-
-        {/* Points Reward Display */}
-        <div className="p-4 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-950/20 dark:to-purple-950/20 rounded-lg border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Reward:</span>
-            <span className="text-lg font-bold text-pink-600 dark:text-pink-400">
-              +{task.pointsToReward || 0} points
-            </span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-4">
-          <Button variant="outline" onClick={onClose} className="flex-1">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => submitMutation.mutate()}
-            disabled={submitMutation.isPending || !screenshotFile}
-            className="flex-1"
-          >
-            {submitMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Submit for Review
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-    </>
+      {/* Manual review notice */}
+      <ModalHint variant="info">
+        <Upload className="h-4 w-4 shrink-0 mt-0.5" />
+        <span>Instagram tasks require manual review. Your submission will be verified within 24-48 hours.</span>
+      </ModalHint>
+    </TaskCompletionModalLayout>
   );
 }

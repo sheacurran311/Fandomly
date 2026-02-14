@@ -123,10 +123,10 @@ export class CheckInService {
 
       return {
         success: false,
-        newStreak: streakRecord.currentStreak,
-        previousStreak: streakRecord.currentStreak,
-        totalCheckIns: streakRecord.totalCheckIns,
-        longestStreak: streakRecord.longestStreak,
+        newStreak: streakRecord.currentStreak ?? 0,
+        previousStreak: streakRecord.currentStreak ?? 0,
+        totalCheckIns: streakRecord.totalCheckIns ?? 0,
+        longestStreak: streakRecord.longestStreak ?? 0,
         isNewRecord: false,
         message: 'You already checked in today! Come back tomorrow. 📅',
         nextCheckInAvailableAt: nextAvailable,
@@ -140,16 +140,17 @@ export class CheckInService {
 
     if (wasYesterday) {
       // Continuing streak
-      newStreak = streakRecord.currentStreak + 1;
+      newStreak = (streakRecord.currentStreak ?? 0) + 1;
     } else {
       // Streak broken - reset to 1
       newStreak = 1;
       streakReset = true;
     }
 
-    const totalCheckIns = streakRecord.totalCheckIns + 1;
-    const longestStreak = Math.max(newStreak, streakRecord.longestStreak);
-    const isNewRecord = longestStreak > streakRecord.longestStreak;
+    const totalCheckIns = (streakRecord.totalCheckIns ?? 0) + 1;
+    const longestStreakVal = streakRecord.longestStreak ?? 0;
+    const longestStreak = Math.max(newStreak, longestStreakVal);
+    const isNewRecord = longestStreak > longestStreakVal;
 
     // Check for milestone achievement
     const milestone = this.checkMilestone(newStreak);
@@ -199,11 +200,11 @@ export class CheckInService {
     return {
       success: true,
       newStreak,
-      previousStreak,
+      previousStreak: streakRecord.currentStreak ?? 0,
       totalCheckIns,
       longestStreak,
       isNewRecord,
-      streakMilestone: milestone,
+      streakMilestone: milestone ?? undefined,
       message,
       nextCheckInAvailableAt: nextAvailable,
     };
@@ -234,7 +235,7 @@ export class CheckInService {
 
     // Check if streak is still valid (not missed today)
     const isStillValid = this.isSameDay(now, lastCheckIn) || this.isYesterday(lastCheckIn, now);
-    const currentStreak = isStillValid ? streakRecord.currentStreak : 0;
+    const currentStreak = isStillValid ? (streakRecord.currentStreak ?? 0) : 0;
 
     // Check eligibility for today
     const isEligibleToday = !this.isSameDay(now, lastCheckIn);
@@ -244,9 +245,9 @@ export class CheckInService {
 
     return {
       currentStreak,
-      longestStreak: streakRecord.longestStreak,
-      totalCheckIns: streakRecord.totalCheckIns,
-      lastCheckIn: streakRecord.lastCheckIn || undefined,
+      longestStreak: streakRecord.longestStreak ?? 0,
+      totalCheckIns: streakRecord.totalCheckIns ?? 0,
+      lastCheckIn: streakRecord.lastCheckIn ?? undefined,
       nextMilestone: nextMilestone
         ? {
             days: nextMilestone.days,
@@ -263,7 +264,7 @@ export class CheckInService {
    */
   async getStreakMultiplier(userId: string, taskId: string): Promise<number> {
     const stats = await this.getStreakStats(userId, taskId);
-    const milestone = this.checkMilestone(stats.currentStreak);
+    const milestone = this.checkMilestone(stats.currentStreak ?? 0);
     return milestone?.bonusMultiplier || 1.0;
   }
 
@@ -345,15 +346,15 @@ export class CheckInService {
 
     // Sort by current streak (descending)
     const sorted = streaks
-      .sort((a, b) => b.currentStreak - a.currentStreak)
+      .sort((a, b) => (b.currentStreak ?? 0) - (a.currentStreak ?? 0))
       .slice(0, limit);
 
     return sorted.map(s => ({
       userId: s.userId,
-      currentStreak: s.currentStreak,
-      longestStreak: s.longestStreak,
-      totalCheckIns: s.totalCheckIns,
-      lastCheckIn: s.lastCheckIn!,
+      currentStreak: s.currentStreak ?? 0,
+      longestStreak: s.longestStreak ?? 0,
+      totalCheckIns: s.totalCheckIns ?? 0,
+      lastCheckIn: s.lastCheckIn ?? new Date(),
     }));
   }
 

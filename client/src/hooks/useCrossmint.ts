@@ -318,8 +318,8 @@ export function useMintStatus(actionId: string | undefined) {
   return useQuery<{ mint: NftMint; crossmint?: any }>({
     queryKey: ['/api/nft/mint', actionId, 'status'],
     enabled: !!actionId,
-    refetchInterval: (data) => {
-      // Stop polling if mint is complete or failed
+    refetchInterval: (query) => {
+      const data = query.state.data;
       if (data?.mint?.status === 'success' || data?.mint?.status === 'failed') {
         return false;
       }

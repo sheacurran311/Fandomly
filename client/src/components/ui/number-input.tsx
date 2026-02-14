@@ -2,7 +2,7 @@ import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-export interface NumberInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'onChange'> {
+export interface NumberInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'onChange' | 'value'> {
   value: number | null | undefined;
   onChange: (value: number | null) => void;
   min?: number;

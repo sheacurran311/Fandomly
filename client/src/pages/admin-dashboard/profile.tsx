@@ -20,6 +20,7 @@ import {
 import { FaSpotify, FaTiktok } from "react-icons/fa";
 import { SocialIntegrationManager } from "@/lib/social-integrations";
 import { FacebookSDKManager } from "@/lib/facebook";
+import { getSocialConnection } from "@/lib/social-connection-api";
 
 const socialManager = new SocialIntegrationManager();
 
@@ -93,7 +94,7 @@ export default function AdminProfile() {
     try {
       setLoadingStates(prev => ({ ...prev, facebook: true }));
       await FacebookSDKManager.ensureFBReady('creator');
-      const result = await FacebookSDKManager.handleCreatorLogin();
+      const result = await FacebookSDKManager.secureLogin('creator');
       
       if (result.success) {
         await checkFacebookStatus();
@@ -117,12 +118,11 @@ export default function AdminProfile() {
 
   const checkTwitterStatus = async () => {
     try {
-      const twitterAPI = socialManager['twitter'];
-      const connection = await twitterAPI.getSocialConnection();
+      const connection = await getSocialConnection('twitter');
       
-      if (connection && connection.connected) {
+      if (connection.connected && connection.connection) {
         setTwitterConnected(true);
-        setTwitterHandle(connection.username || connection.handle || null);
+        setTwitterHandle(connection.connection.platformUsername || connection.connection.platformDisplayName || null);
       } else {
         setTwitterConnected(false);
         setTwitterHandle(null);
@@ -136,7 +136,7 @@ export default function AdminProfile() {
   const connectTwitter = async () => {
     try {
       setLoadingStates(prev => ({ ...prev, twitter: true }));
-      const twitterAPI = socialManager['twitter'];
+      const twitterAPI = socialManager['twitter'] as unknown as { secureLogin: () => Promise<{ success: boolean; error?: string }> };
       const result = await twitterAPI.secureLogin();
       
       if (result.success) {
@@ -161,12 +161,11 @@ export default function AdminProfile() {
 
   const checkInstagramStatus = async () => {
     try {
-      const instagramAPI = socialManager['instagram'];
-      const connection = await instagramAPI.getSocialConnection();
+      const connection = await getSocialConnection('instagram');
       
-      if (connection && connection.connected) {
+      if (connection.connected && connection.connection) {
         setInstagramConnected(true);
-        setInstagramHandle(connection.username || connection.handle || null);
+        setInstagramHandle(connection.connection.platformUsername || connection.connection.platformDisplayName || null);
       } else {
         setInstagramConnected(false);
         setInstagramHandle(null);

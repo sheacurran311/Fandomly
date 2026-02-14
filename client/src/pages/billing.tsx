@@ -58,7 +58,10 @@ function SubscriptionStatus() {
   const { isAuthenticated } = useAuth();
   const { data: subscription, isLoading } = useQuery<SubscriptionStatusResponse>({
     queryKey: ['/api/subscription-status'],
-    queryFn: () => apiRequest('GET', '/api/subscription-status'),
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/subscription-status');
+      return res.json() as Promise<SubscriptionStatusResponse>;
+    },
     enabled: isAuthenticated // Only run query when user is authenticated
   });
 

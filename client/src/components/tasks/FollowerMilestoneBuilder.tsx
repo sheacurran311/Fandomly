@@ -19,7 +19,13 @@ import {
   Instagram,
   Music,
   Youtube,
+  ShieldCheck,
 } from "lucide-react";
+import { TIER_GUIDANCE } from "@shared/taskTemplates";
+
+// Follower milestone tasks are T1 (API-verified via social platform APIs)
+const MILESTONE_TIER = 'T1' as const;
+const tierGuidance = TIER_GUIDANCE[MILESTONE_TIER];
 
 interface FollowerMilestone {
   followers: number;
@@ -46,6 +52,8 @@ interface FollowerMilestoneAPIPayload {
   name: string;
   description: string;
   isDraft: boolean;
+  rewardType: 'points';
+  pointsToReward: number;
   platform: 'twitter' | 'instagram' | 'tiktok' | 'youtube' | 'spotify';
   customSettings: {
     milestoneType: 'single' | 'tiered';
@@ -56,10 +64,12 @@ interface FollowerMilestoneAPIPayload {
 }
 
 interface FollowerMilestoneBuilderProps {
-  initialConfig?: Partial<FollowerMilestoneConfig>;
+  initialData?: any;
+  isEditMode?: boolean;
   onSave?: (config: FollowerMilestoneAPIPayload) => void;
   onPublish?: (config: FollowerMilestoneAPIPayload) => void;
   onBack?: () => void;
+  programSelector?: React.ReactNode;
 }
 
 const PLATFORM_CONFIG = {
@@ -106,17 +116,19 @@ const PLATFORM_CONFIG = {
 };
 
 export default function FollowerMilestoneBuilder({
-  initialConfig,
+  initialData,
+  isEditMode,
   onSave,
   onPublish,
   onBack,
+  programSelector,
 }: FollowerMilestoneBuilderProps) {
   // Handle both local config format and API format (customSettings)
   const getInitialValue = <T,>(key: keyof FollowerMilestoneConfig, defaultValue: T): T => {
-    if (initialConfig && key in initialConfig && initialConfig[key] !== undefined) {
-      return initialConfig[key] as T;
+    if (initialData && key in initialData && initialData[key] !== undefined) {
+      return initialData[key] as T;
     }
-    const customSettings = (initialConfig as any)?.customSettings;
+    const customSettings = (initialData as any)?.customSettings;
     if (customSettings && key in customSettings && customSettings[key] !== undefined) {
       return customSettings[key] as T;
     }
@@ -124,9 +136,9 @@ export default function FollowerMilestoneBuilder({
   };
 
   const [config, setConfig] = useState<FollowerMilestoneConfig>({
-    name: (initialConfig as any)?.name || "Follower Milestone",
-    description: (initialConfig as any)?.description || "Reach follower goals to earn rewards",
-    platform: (initialConfig as any)?.platform || getInitialValue('platform', 'twitter'),
+    name: (initialData as any)?.name || "Follower Milestone",
+    description: (initialData as any)?.description || "Reach follower goals to earn rewards",
+    platform: (initialData as any)?.platform || getInitialValue('platform', 'twitter'),
     milestoneType: getInitialValue('milestoneType', 'tiered'),
     singleFollowerCount: getInitialValue('singleFollowerCount', 1000),
     singlePoints: getInitialValue('singlePoints', 500),
@@ -213,11 +225,18 @@ export default function FollowerMilestoneBuilder({
 
   // Build API payload with proper structure
   const buildAPIPayload = (isDraft: boolean): FollowerMilestoneAPIPayload => {
+    // Derive points from milestone config
+    const derivedPoints = config.milestoneType === 'single'
+      ? config.singlePoints
+      : (config.tiers.length > 0 ? config.tiers[0].points : 100);
+    
     return {
       taskType: 'follower_milestone',
       name: config.name,
       description: config.description,
       isDraft,
+      rewardType: 'points' as const,
+      pointsToReward: derivedPoints,
       platform: config.platform,
       customSettings: {
         milestoneType: config.milestoneType,
@@ -326,6 +345,7 @@ export default function FollowerMilestoneBuilder({
       description="Reward fans for growing your social media presence"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveDraft}
       onPublish={handlePublish}
@@ -335,12 +355,28 @@ export default function FollowerMilestoneBuilder({
       exampleUse="A musician could create tiered rewards: 1K followers (100 pts), 10K followers (1000 pts), 100K followers (10000 pts) to encourage fans to promote their Spotify page."
     >
       <div className="space-y-6">
+        {/* Verification Tier Guidance */}
+        <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="h-4 w-4 text-green-400" />
+            <span className="font-medium text-green-400">{tierGuidance.label}</span>
+            <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+              {tierGuidance.trustLevel}
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+          <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+          {tierGuidance.tip && (
+            <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+          )}
+        </div>
+
         {/* Basic Info */}
         <Card className="bg-white/5 backdrop-blur-lg border-white/10">
           <CardHeader>
             <CardTitle className="text-white">Basic Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div>
               <Label className="text-white">Task Name</Label>
               <Input

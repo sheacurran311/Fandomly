@@ -18,12 +18,21 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Twitter, Info, CheckCircle2, AlertCircle, Lock } from "lucide-react";
+import { Twitter, Info, CheckCircle2, AlertCircle, Lock, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
 import { useExtractTweetId } from "@/hooks/useTwitterVerification";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Task type to verification tier mapping for Twitter
+const TWITTER_TASK_TIERS: Record<string, VerificationTier> = {
+  twitter_follow: 'T1',
+  twitter_like: 'T1',
+  twitter_retweet: 'T1',
+  twitter_quote_tweet: 'T2',
+};
 
 interface TwitterTaskBuilderProps {
   onSave: (config: any) => void;
@@ -32,11 +41,16 @@ interface TwitterTaskBuilderProps {
   taskType: 'twitter_follow' | 'twitter_like' | 'twitter_retweet' | 'twitter_quote_tweet';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
-export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: TwitterTaskBuilderProps) {
+export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: TwitterTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get verification tier for this task type
+  const tier = TWITTER_TASK_TIERS[taskType] || 'T1';
+  const tierGuidance = TIER_GUIDANCE[tier];
   
   // Use the unified Twitter connection hook
   const { 
@@ -60,7 +74,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
   const [isValid, setIsValid] = useState(false);
 
   // Simple points reward (cadence and multipliers now handled in campaigns)
-  const [pointsToReward, setPointsToReward] = useState(50);
+  const [pointsToReward, setPointsToReward] = useState(tierGuidance.recommendedPoints);
 
   const extractTweetId = useExtractTweetId();
 
@@ -125,33 +139,37 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
   }, [initialData, isEditMode]);
 
   const getDefaultValues = () => {
+    // Get tier-appropriate recommended points
+    const taskTier = TWITTER_TASK_TIERS[taskType] || 'T1';
+    const guidance = TIER_GUIDANCE[taskTier];
+    
     switch (taskType) {
       case 'twitter_follow':
         return {
           name: 'Follow on Twitter',
           description: 'Follow our Twitter account to stay updated!',
-          points: 50,
+          points: guidance.recommendedPoints, // T1: 50 pts
         };
       case 'twitter_like':
         return {
           name: 'Like Our Tweet',
           description: 'Show some love by liking our latest tweet!',
-          points: 25,
+          points: 25, // Lower for engagement tasks
         };
       case 'twitter_retweet':
         return {
           name: 'Retweet Our Post',
           description: 'Help us spread the word by retweeting!',
-          points: 75,
+          points: 75, // Higher for shares
         };
       case 'twitter_quote_tweet':
         return {
           name: 'Quote Tweet',
           description: 'Quote tweet our post with your thoughts!',
-          points: 150,
+          points: TIER_GUIDANCE['T2'].recommendedPoints, // T2: 40 pts - code verified
         };
       default:
-        return { name: '', description: '', points: 50 };
+        return { name: '', description: '', points: guidance.recommendedPoints };
     }
   };
 
@@ -296,6 +314,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
       description="Create Twitter-based tasks for your fans"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -437,12 +456,51 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
               </div>
             )}
 
+            {/* Verification Tier Guidance */}
+            <div className={`p-4 rounded-lg border ${
+              tier === 'T1' ? 'bg-green-500/10 border-green-500/30' :
+              tier === 'T2' ? 'bg-blue-500/10 border-blue-500/30' :
+              'bg-amber-500/10 border-amber-500/30'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {tier === 'T1' ? <ShieldCheck className="h-4 w-4 text-green-400" /> :
+                 tier === 'T2' ? <Shield className="h-4 w-4 text-blue-400" /> :
+                 <ShieldAlert className="h-4 w-4 text-amber-400" />}
+                <span className={`font-medium ${
+                  tier === 'T1' ? 'text-green-400' :
+                  tier === 'T2' ? 'text-blue-400' :
+                  'text-amber-400'
+                }`}>{tierGuidance.label}</span>
+                <Badge variant="outline" className={`text-xs ${
+                  tier === 'T1' ? 'border-green-500/30 text-green-400' :
+                  tier === 'T2' ? 'border-blue-500/30 text-blue-400' :
+                  'border-amber-500/30 text-amber-400'
+                }`}>
+                  {tierGuidance.trustLevel}
+                </Badge>
+              </div>
+              <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+              <p className={`text-sm font-medium ${
+                tier === 'T1' ? 'text-green-400' :
+                tier === 'T2' ? 'text-blue-400' :
+                'text-amber-400'
+              }`}>{tierGuidance.pointsRange}</p>
+              {tierGuidance.tip && (
+                <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+              )}
+            </div>
+
             {/* Points Reward */}
             <div className="space-y-2">
-              <Label className="text-white">Points Reward</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-white">Points Reward</Label>
+                <span className="text-xs text-gray-400">
+                  Recommended: {tierGuidance.recommendedPoints} pts
+                </span>
+              </div>
               <NumberInput
                 value={pointsToReward}
-                onChange={(val) => setPointsToReward(val || 50)}
+                onChange={(val) => setPointsToReward(val || tierGuidance.recommendedPoints)}
                 min={1}
                 max={10000}
                 className={`bg-white/5 border-white/10 text-white ${!twitterConnected ? 'opacity-50 cursor-not-allowed' : ''}`}

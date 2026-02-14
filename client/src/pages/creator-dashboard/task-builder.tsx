@@ -40,8 +40,12 @@ export default function TaskBuilder() {
   const isEditMode = !!params.id;
 
   // Fetch programs for the creator
-  const { data: programs = [], isLoading: programsLoading } = useQuery({
+  const { data: programs = [], isLoading: programsLoading } = useQuery<{ id: string; name: string; createdAt?: Date | string | null }[]>({
     queryKey: ["/api/programs"],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/programs');
+      return res.json();
+    },
     enabled: !!user?.id,
   });
 
@@ -57,8 +61,12 @@ export default function TaskBuilder() {
   }, [programs, selectedProgramId, isEditMode]);
 
   // Fetch campaigns for the selected program
-  const { data: campaigns = [] } = useQuery({
+  const { data: campaigns = [] } = useQuery<{ id: string; programId?: string }[]>({
     queryKey: ["/api/campaigns/creator", user?.creator?.id],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/campaigns/creator/${user?.creator?.id}`);
+      return res.json();
+    },
     enabled: !!user?.creator?.id && !!selectedProgramId,
   });
 
@@ -186,7 +194,7 @@ export default function TaskBuilder() {
   if (isEditMode && taskLoading) {
     return (
       <DashboardLayout userType="creator">
-        <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+        <div className="flex items-center justify-center py-24">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
             <p className="text-gray-300">Loading task...</p>
@@ -200,7 +208,7 @@ export default function TaskBuilder() {
   if (!isEditMode && !programsLoading && programs.length === 0) {
     return (
       <DashboardLayout userType="creator">
-        <div className="min-h-screen bg-brand-dark-bg p-6">
+        <div className="p-6">
           <div className="max-w-2xl mx-auto mt-12">
             <Alert className="border-yellow-500/50 bg-yellow-500/10">
               <AlertCircle className="h-5 w-5 text-yellow-500" />
@@ -248,117 +256,116 @@ export default function TaskBuilder() {
     !selectedProgramId || campaign.programId === selectedProgramId
   );
 
-  // Program/Campaign Selector Component
-  const ProgramCampaignSelector = ({ children }: { children: React.ReactNode }) => (
-    <DashboardLayout userType="creator">
-      <div className="max-w-5xl mx-auto p-6">
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 mb-6">
-          <CardHeader>
-            <CardTitle className="text-white">Program & Campaign Association</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="text-white mb-2 block">Select Program <span className="text-red-400">*</span></Label>
-              <Select value={selectedProgramId} onValueChange={(value) => {
-                setSelectedProgramId(value);
-                setSelectedCampaignId(""); // Reset campaign when program changes
-              }}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue placeholder="Select a program (required)" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-white/10">
-                  {programs.map((program: any) => (
-                    <SelectItem key={program.id} value={program.id} className="text-white hover:bg-white/10">
-                      {program.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-400 mt-1">
-                All tasks must be associated with a loyalty program
-              </p>
-            </div>
+  // Program/Campaign selector card rendered inside TaskBuilderBase
+  const programSelectorCard = (
+    <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+      <CardHeader>
+        <CardTitle className="text-white">Program & Campaign Association</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label className="text-white mb-2 block">Select Program <span className="text-red-400">*</span></Label>
+          <Select value={selectedProgramId} onValueChange={(value) => {
+            setSelectedProgramId(value);
+            setSelectedCampaignId(""); // Reset campaign when program changes
+          }}>
+            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectValue placeholder="Select a program (required)" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-white/10">
+              {programs.map((program: any) => (
+                <SelectItem key={program.id} value={program.id} className="text-white hover:bg-white/10">
+                  {program.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-400 mt-1">
+            All tasks must be associated with a loyalty program
+          </p>
+        </div>
 
-            {selectedProgramId && (
-              <div>
-                <Label className="text-white mb-2 block">Select Campaign (Optional)</Label>
-                <Select value={selectedCampaignId} onValueChange={(value) => setSelectedCampaignId(value === "unassigned" ? "" : value)}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Select a campaign (or leave unassigned)" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10">
-                    <SelectItem value="unassigned" className="text-white hover:bg-white/10">No Campaign (Unassigned)</SelectItem>
-                    {filteredCampaigns.map((campaign: any) => (
-                      <SelectItem key={campaign.id} value={campaign.id} className="text-white hover:bg-white/10">
-                        {campaign.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Associate this task with a specific campaign
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        {children}
-      </div>
-    </DashboardLayout>
+        {selectedProgramId && (
+          <div>
+            <Label className="text-white mb-2 block">Select Campaign (Optional)</Label>
+            <Select value={selectedCampaignId} onValueChange={(value) => setSelectedCampaignId(value === "unassigned" ? "" : value)}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Select a campaign (or leave unassigned)" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-900 border-white/10">
+                <SelectItem value="unassigned" className="text-white hover:bg-white/10">No Campaign (Unassigned)</SelectItem>
+                {filteredCampaigns.map((campaign: any) => (
+                  <SelectItem key={campaign.id} value={campaign.id} className="text-white hover:bg-white/10">
+                    {campaign.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-400 mt-1">
+              Associate this task with a specific campaign
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 
   // Show the appropriate builder based on selected template
   switch (selectedTemplate) {
     case 'complete_profile':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <CompleteProfileTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'referral':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <ReferralTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'checkin':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <CheckInTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'follower_milestone':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <FollowerMilestoneBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'twitter_follow':
@@ -366,7 +373,7 @@ export default function TaskBuilder() {
     case 'twitter_retweet':
     case 'twitter_quote_tweet':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <TwitterTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -374,8 +381,9 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'facebook_like_page':
@@ -383,7 +391,7 @@ export default function TaskBuilder() {
     case 'facebook_comment_post':
     case 'facebook_comment_photo':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <FacebookTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -391,8 +399,9 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'instagram_follow':
@@ -401,7 +410,7 @@ export default function TaskBuilder() {
     case 'mention_story':
     case 'keyword_comment':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <InstagramTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -409,15 +418,16 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'youtube_subscribe':
     case 'youtube_like':
     case 'youtube_comment':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <YouTubeTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -425,8 +435,9 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'tiktok_follow':
@@ -434,7 +445,7 @@ export default function TaskBuilder() {
     case 'tiktok_comment':
     case 'tiktok_post':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <TikTokTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -442,14 +453,15 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'poll':
     case 'quiz':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <PollQuizTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -457,27 +469,29 @@ export default function TaskBuilder() {
             taskType={selectedTemplate}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'website_visit':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <WebsiteVisitTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'spotify_follow':
     case 'spotify_playlist':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <SpotifyTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -485,14 +499,15 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'discord_join':
     case 'discord_verify':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <DiscordTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -500,14 +515,15 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'twitch_follow':
     case 'twitch_subscribe':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <TwitchTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
@@ -515,27 +531,29 @@ export default function TaskBuilder() {
             initialData={existingTask}
             isEditMode={isEditMode}
             taskType={selectedTemplate}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     case 'stream_code_verify':
       return (
-        <ProgramCampaignSelector>
+        <DashboardLayout userType="creator">
           <StreamCodeTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
+            programSelector={programSelectorCard}
           />
-        </ProgramCampaignSelector>
+        </DashboardLayout>
       );
 
     default:
       return (
         <DashboardLayout userType="creator">
-          <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+          <div className="flex items-center justify-center py-24">
             <div className="text-center">
               <div className="text-6xl mb-4">🚧</div>
               <h2 className="text-2xl font-bold text-white mb-2">Coming Soon</h2>

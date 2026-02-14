@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { type Task } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { type User, type Creator } from "@shared/schema";
+import { type User, type Creator, type LoyaltyProgram } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -976,8 +975,7 @@ export default function CampaignBuilder() {
   const [showTaskAssignModal, setShowTaskAssignModal] = useState(false);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-  const { user: dynamicUser } = useDynamicContext();
-  const { data: userData } = useQuery<User>({ queryKey: ["/api/auth/user", dynamicUser?.userId], enabled: !!dynamicUser?.userId });
+  const { user: userData } = useAuth();
   const { data: creator } = useQuery<Creator>({ queryKey: ["/api/creators/user", userData?.id], enabled: !!userData?.id });
 
   const [followX, setFollowX] = useState(false);
@@ -990,10 +988,11 @@ export default function CampaignBuilder() {
   const [, setLocation] = useLocation();
 
   // Fetch programs for the creator
-  const { data: programs = [], isLoading: programsLoading } = useQuery({
+  const { data: programsData, isLoading: programsLoading } = useQuery({
     queryKey: ["/api/programs"],
     enabled: !!userData?.id,
   });
+  const programs: LoyaltyProgram[] = Array.isArray(programsData) ? programsData : [];
 
   // Auto-select most recently created program
   useEffect(() => {

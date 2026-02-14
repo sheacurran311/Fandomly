@@ -70,7 +70,8 @@ export default function FanReferralDashboard() {
   }
 
   if (error) {
-    const errorMessage = error?.response?.data?.message || error?.message || "Failed to load referral data";
+    const err = error as { response?: { data?: { message?: string } }; message?: string };
+    const errorMessage = err?.response?.data?.message || err?.message || "Failed to load referral data";
     
     return (
       <Alert variant="destructive">

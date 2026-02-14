@@ -237,18 +237,20 @@ export function registerPlatformTaskRoutes(app: Express) {
         const [updated] = await db
           .update(platformTaskCompletions)
           .set({
-            status: 'verified',
+            status: 'completed',  // Changed from 'verified' for consistency
             verifiedAt: new Date(),
+            completedAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(platformTaskCompletions.id, completionId))
           .returning();
 
         // Award points if not already awarded
-        if (completion.pointsAwarded > 0 && completion.status === 'pending') {
+        const points = completion.pointsAwarded ?? 0;
+        if (points > 0 && completion.status === 'pending') {
           await platformPointsService.awardPoints(
             completion.userId,
-            completion.pointsAwarded,
+            points,
             'platform_task_verification',
             {
               completionId,
@@ -270,8 +272,11 @@ export function registerPlatformTaskRoutes(app: Express) {
             status: 'pending',
             completionData: {
               ...(completion.completionData || {}),
-              rejectionReason: reason,
-            },
+              metadata: {
+                ...(((completion.completionData as Record<string, unknown>)?.metadata as Record<string, unknown>) || {}),
+                rejectionReason: reason,
+              },
+            } as Record<string, unknown>,
             updatedAt: new Date(),
           })
           .where(eq(platformTaskCompletions.id, completionId));

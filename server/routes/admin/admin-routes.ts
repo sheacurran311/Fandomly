@@ -101,7 +101,7 @@ export function registerAdminRoutes(app: Express) {
         const searchLower = (search as string).toLowerCase();
         users = users.filter(u => 
           u.username?.toLowerCase().includes(searchLower) ||
-          u.email.toLowerCase().includes(searchLower)
+          (u.email ?? '').toLowerCase().includes(searchLower)
         );
       }
 
@@ -121,7 +121,7 @@ export function registerAdminRoutes(app: Express) {
         userType: u.userType,
         role: u.role,
         createdAt: u.createdAt,
-        lastActive: u.lastLoginAt || u.createdAt,
+        lastActive: u.lastActiveAt ?? u.createdAt,
         status: 'active', // TODO: Implement real status tracking
       }));
 

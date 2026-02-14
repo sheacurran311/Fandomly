@@ -11,11 +11,11 @@ import NFTCard from "@/components/marketplace/nft-card";
 import BlockchainFilter from "@/components/marketplace/blockchain-filter";
 import { type Creator, type Reward } from "@shared/schema";
 import { sampleNFTRewards } from "@/data/sampleNFTs";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAuth } from "@/hooks/use-auth";
 import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 
 export default function Marketplace() {
-  const { user } = useDynamicContext();
+  const { user, isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedChains, setSelectedChains] = useState<string[]>([]);

@@ -1,7 +1,7 @@
 import { extractContentId, extractUsername } from '../../middleware/upload';
 
 export interface InstagramVerificationRequest {
-  userId?: number;
+  userId?: string | number;
   taskType: string;
   proofUrl?: string;
   screenshotUrl?: string;

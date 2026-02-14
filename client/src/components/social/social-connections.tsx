@@ -1,75 +1,114 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Facebook, Twitter, Instagram, Video, Check, MessageSquare, Radio } from "lucide-react";
+import { Facebook, Twitter, Instagram, Video, Check, MessageSquare, Radio, Youtube, Music } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FacebookSDKManager } from "@/lib/facebook";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
+import InstagramSDKManager from "@/lib/instagram";
 import { socialManager } from "@/lib/social-integrations";
+import { invalidateSocialConnections } from "@/hooks/use-social-connections";
+import { useAuth } from "@/hooks/use-auth";
 
 interface SocialConnectionsProps {
-  userType?: "fan" | "creator";
+  userType?: string;
 }
 
-export default function SocialConnections({ userType = "fan" }: SocialConnectionsProps) {
+export default function SocialConnections({ userType = 'fan' }: SocialConnectionsProps) {
   const [facebookConnected, setFacebookConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [facebookConnecting, setFacebookConnecting] = useState(false);
+  
+  // Twitter connection via unified hook (handles saving connections properly)
+  const {
+    isConnected: twitterConnected,
+    isConnecting: twitterConnecting,
+    connect: handleTwitterConnect,
+  } = useTwitterConnection();
+  
+  const [instagramConnected, setInstagramConnected] = useState(false);
+  const [instagramConnecting, setInstagramConnecting] = useState(false);
   const [tiktokConnected, setTiktokConnected] = useState(false);
   const [tiktokConnecting, setTiktokConnecting] = useState(false);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [youtubeConnecting, setYoutubeConnecting] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [spotifyConnecting, setSpotifyConnecting] = useState(false);
   const [discordConnected, setDiscordConnected] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const [twitchConnected, setTwitchConnected] = useState(false);
   const [twitchConnecting, setTwitchConnecting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Check Facebook and TikTok connection status
+  // Check all connection statuses (Twitter is handled by useTwitterConnection hook)
   useEffect(() => {
-    checkFacebookStatus();
-    checkTiktokStatus();
-    checkDiscordStatus();
-    checkTwitchStatus();
+    const checkStatus = async (platform: string, setter: (v: boolean) => void) => {
+      try {
+        const { getSocialConnection } = await import('@/lib/social-connection-api');
+        const { connected } = await getSocialConnection(platform);
+        setter(connected);
+      } catch (error) {
+        console.error(`[Social] Error checking ${platform} status:`, error);
+        setter(false);
+      }
+    };
+
+    checkStatus('facebook', setFacebookConnected);
+    // Twitter status is managed by useTwitterConnection hook
+    checkStatus('instagram', setInstagramConnected);
+    checkStatus('tiktok', setTiktokConnected);
+    checkStatus('youtube', setYoutubeConnected);
+    checkStatus('spotify', setSpotifyConnected);
+    checkStatus('discord', setDiscordConnected);
+    checkStatus('twitch', setTwitchConnected);
   }, [userType]);
 
-  const checkFacebookStatus = async () => {
+  const refreshStatus = async (platform: string, setter: (v: boolean) => void) => {
     try {
-      await FacebookSDKManager.ensureFBReady(userType);
-      const status = await FacebookSDKManager.getLoginStatus();
-      setFacebookConnected(status.isLoggedIn);
-    } catch (error) {
-      console.error('[Social] Error checking Facebook status:', error);
-      setFacebookConnected(false);
+      const { getSocialConnection } = await import('@/lib/social-connection-api');
+      const { connected } = await getSocialConnection(platform);
+      setter(connected);
+    } catch {}
+  };
+
+  // Twitter connect is handled by useTwitterConnection hook (handleTwitterConnect)
+
+  const handleInstagramConnect = async () => {
+    try {
+      setInstagramConnecting(true);
+      // Instagram only supports creator/business auth -- always use 'creator'
+      const result = await InstagramSDKManager.secureLogin('creator');
+      if (result.success) {
+        setInstagramConnected(true);
+        toast({ title: "Instagram Connected!", description: "Successfully connected to Instagram." });
+        invalidateSocialConnections();
+        refreshStatus('instagram', setInstagramConnected);
+      } else {
+        toast({ title: "Connection Failed", description: result.error || 'Failed to connect Instagram. Please try again.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error('Instagram connection error:', error);
+      toast({ title: "Connection Failed", description: error.message || 'Failed to connect Instagram.', variant: 'destructive' });
+    } finally {
+      setInstagramConnecting(false);
     }
   };
 
-  const checkTiktokStatus = async () => {
+  const handleFacebookConnect = async () => {
     try {
-      const { getSocialConnection } = await import('@/lib/social-connection-api');
-      const { connected } = await getSocialConnection('tiktok');
-      setTiktokConnected(connected);
+      setFacebookConnecting(true);
+      const result = await FacebookSDKManager.secureLogin(userType);
+      if (result.success) {
+        setFacebookConnected(true);
+        invalidateSocialConnections();
+        toast({ title: "Facebook Connected!", description: "Successfully connected to Facebook." });
+      } else {
+        toast({ title: "Connection Failed", description: result.error || "Facebook login failed. Please try again.", variant: "destructive" });
+      }
     } catch (error) {
-      console.error('[Social] Error checking TikTok status:', error);
-      setTiktokConnected(false);
-    }
-  };
-
-  const checkDiscordStatus = async () => {
-    try {
-      const { getSocialConnection } = await import('@/lib/social-connection-api');
-      const { connected } = await getSocialConnection('discord');
-      setDiscordConnected(connected);
-    } catch (error) {
-      console.error('[Social] Error checking Discord status:', error);
-      setDiscordConnected(false);
-    }
-  };
-
-  const checkTwitchStatus = async () => {
-    try {
-      const { getSocialConnection } = await import('@/lib/social-connection-api');
-      const { connected } = await getSocialConnection('twitch');
-      setTwitchConnected(connected);
-    } catch (error) {
-      console.error('[Social] Error checking Twitch status:', error);
-      setTwitchConnected(false);
+      toast({ title: "Connection Error", description: "An error occurred while connecting to Facebook.", variant: "destructive" });
+    } finally {
+      setFacebookConnecting(false);
     }
   };
 
@@ -78,31 +117,61 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
       setTiktokConnecting(true);
       const tiktokAPI = socialManager['tiktok'];
       const result = await tiktokAPI.secureLogin();
-      
       if (result.success) {
         setTiktokConnected(true);
-        toast({
-          title: "TikTok Connected! 🎉",
-          description: "Successfully connected to TikTok.",
-        });
-        // Refresh connection status
-        checkTiktokStatus();
+        toast({ title: "TikTok Connected!", description: "Successfully connected to TikTok." });
+        invalidateSocialConnections();
+        refreshStatus('tiktok', setTiktokConnected);
       } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Failed to connect TikTok. Please try again.',
-          variant: 'destructive',
-        });
+        toast({ title: "Connection Failed", description: result.error || 'Failed to connect TikTok.', variant: 'destructive' });
       }
     } catch (error: any) {
       console.error('TikTok connection error:', error);
-      toast({
-        title: "Connection Failed",
-        description: error.message || 'Failed to connect TikTok. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: "Connection Failed", description: error.message || 'Failed to connect TikTok.', variant: 'destructive' });
     } finally {
       setTiktokConnecting(false);
+    }
+  };
+
+  const handleYoutubeConnect = async () => {
+    try {
+      setYoutubeConnecting(true);
+      const youtubeAPI = socialManager['youtube'];
+      const result = await youtubeAPI.secureLogin();
+      if (result.success) {
+        setYoutubeConnected(true);
+        toast({ title: "YouTube Connected!", description: result.channelName ? `Connected ${result.channelName}` : "Successfully connected to YouTube." });
+        invalidateSocialConnections();
+        refreshStatus('youtube', setYoutubeConnected);
+      } else {
+        toast({ title: "Connection Failed", description: result.error || 'Failed to connect YouTube.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error('YouTube connection error:', error);
+      toast({ title: "Connection Failed", description: error.message || 'Failed to connect YouTube.', variant: 'destructive' });
+    } finally {
+      setYoutubeConnecting(false);
+    }
+  };
+
+  const handleSpotifyConnect = async () => {
+    try {
+      setSpotifyConnecting(true);
+      const spotifyAPI = socialManager['spotify'];
+      const result = await spotifyAPI.secureLogin();
+      if (result.success) {
+        setSpotifyConnected(true);
+        toast({ title: "Spotify Connected!", description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Spotify." });
+        invalidateSocialConnections();
+        refreshStatus('spotify', setSpotifyConnected);
+      } else {
+        toast({ title: "Connection Failed", description: result.error || 'Failed to connect Spotify.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error('Spotify connection error:', error);
+      toast({ title: "Connection Failed", description: error.message || 'Failed to connect Spotify.', variant: 'destructive' });
+    } finally {
+      setSpotifyConnecting(false);
     }
   };
 
@@ -111,28 +180,17 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
       setDiscordConnecting(true);
       const discordAPI = socialManager['discord'];
       const result = await discordAPI.secureLogin();
-      
       if (result.success) {
         setDiscordConnected(true);
-        toast({
-          title: "Discord Connected! 🎉",
-          description: "Successfully connected to Discord.",
-        });
-        checkDiscordStatus();
+        toast({ title: "Discord Connected!", description: "Successfully connected to Discord." });
+        invalidateSocialConnections();
+        refreshStatus('discord', setDiscordConnected);
       } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Failed to connect Discord. Please try again.',
-          variant: 'destructive',
-        });
+        toast({ title: "Connection Failed", description: result.error || 'Failed to connect Discord.', variant: 'destructive' });
       }
     } catch (error: any) {
       console.error('Discord connection error:', error);
-      toast({
-        title: "Connection Failed",
-        description: error.message || 'Failed to connect Discord. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: "Connection Failed", description: error.message || 'Failed to connect Discord.', variant: 'destructive' });
     } finally {
       setDiscordConnecting(false);
     }
@@ -143,60 +201,47 @@ export default function SocialConnections({ userType = "fan" }: SocialConnection
       setTwitchConnecting(true);
       const twitchAPI = socialManager['twitch'];
       const result = await twitchAPI.secureLogin();
-      
       if (result.success) {
         setTwitchConnected(true);
-        toast({
-          title: "Twitch Connected! 🎉",
-          description: result.displayName ? `Connected as ${result.displayName}` : "Successfully connected to Twitch.",
-        });
-        checkTwitchStatus();
+        toast({ title: "Twitch Connected!", description: result.displayName ? `Connected as ${result.displayName}` : "Successfully connected to Twitch." });
+        invalidateSocialConnections();
+        refreshStatus('twitch', setTwitchConnected);
       } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Failed to connect Twitch. Please try again.',
-          variant: 'destructive',
-        });
+        toast({ title: "Connection Failed", description: result.error || 'Failed to connect Twitch.', variant: 'destructive' });
       }
     } catch (error: any) {
       console.error('Twitch connection error:', error);
-      toast({
-        title: "Connection Failed",
-        description: error.message || 'Failed to connect Twitch. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: "Connection Failed", description: error.message || 'Failed to connect Twitch.', variant: 'destructive' });
     } finally {
       setTwitchConnecting(false);
     }
   };
 
-const handleFacebookConnect = async () => {
-    setIsConnecting(true);
-    try {
-      const result = await FacebookSDKManager.secureLogin(userType);
-      if (result.success) {
-        setFacebookConnected(true);
-        toast({
-          title: "Facebook Connected! 🎉",
-          description: "Successfully connected to Facebook.",
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Facebook login failed. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to Facebook.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
+  const renderButton = (
+    label: string,
+    icon: React.ReactNode,
+    connected: boolean,
+    connecting: boolean,
+    handler: () => void,
+    connectedColor: string,
+    testId?: string,
+  ) => (
+    <Button
+      variant="outline"
+      className={`justify-start border-white/20 text-white ${connected ? `${connectedColor}` : ''}`}
+      onClick={handler}
+      disabled={connecting}
+      data-testid={testId}
+    >
+      {icon}
+      {connecting ? 'Connecting...' : connected ? (
+        <>
+          <Check className="h-4 w-4 ml-auto" />
+          {label} Connected
+        </>
+      ) : `Connect ${label}`}
+    </Button>
+  );
 
   return (
     <Card className="bg-white/5 border-white/10">
@@ -204,75 +249,15 @@ const handleFacebookConnect = async () => {
         <CardTitle className="text-white">Connect Socials</CardTitle>
       </CardHeader>
       <CardContent className="grid sm:grid-cols-2 gap-3">
-        <Button variant="outline" className="justify-start border-white/20 text-white">
-          <Twitter className="h-4 w-4 mr-2"/>Connect X (Twitter)
-        </Button>
-        <Button variant="outline" className="justify-start border-white/20 text-white">
-          <Instagram className="h-4 w-4 mr-2"/>Connect Instagram
-        </Button>
-        <Button 
-          variant="outline" 
-          className={`justify-start border-white/20 text-white ${facebookConnected ? 'bg-green-500/20 border-green-500/30' : ''}`}
-          onClick={handleFacebookConnect}
-          disabled={isConnecting}
-          data-testid="button-connect-facebook-creator"
-        >
-          <Facebook className="h-4 w-4 mr-2"/>
-          {isConnecting ? 'Connecting...' : facebookConnected ? (
-            <>
-              <Check className="h-4 w-4 ml-auto" />
-              Facebook Connected
-            </>
-          ) : 'Connect Facebook'}
-        </Button>
-        <Button 
-          variant="outline" 
-          className={`justify-start border-white/20 text-white ${tiktokConnected ? 'bg-purple-500/20 border-purple-500/30' : ''}`}
-          onClick={handleTiktokConnect}
-          disabled={tiktokConnecting}
-          data-testid="button-connect-tiktok-social"
-        >
-          <Video className="h-4 w-4 mr-2"/>
-          {tiktokConnecting ? 'Connecting...' : tiktokConnected ? (
-            <>
-              <Check className="h-4 w-4 ml-auto" />
-              TikTok Connected
-            </>
-          ) : 'Connect TikTok'}
-        </Button>
-        <Button 
-          variant="outline" 
-          className={`justify-start border-white/20 text-white ${discordConnected ? 'bg-indigo-500/20 border-indigo-500/30' : ''}`}
-          onClick={handleDiscordConnect}
-          disabled={discordConnecting}
-          data-testid="button-connect-discord-social"
-        >
-          <MessageSquare className="h-4 w-4 mr-2"/>
-          {discordConnecting ? 'Connecting...' : discordConnected ? (
-            <>
-              <Check className="h-4 w-4 ml-auto" />
-              Discord Connected
-            </>
-          ) : 'Connect Discord'}
-        </Button>
-        <Button 
-          variant="outline" 
-          className={`justify-start border-white/20 text-white ${twitchConnected ? 'bg-purple-500/20 border-purple-500/30' : ''}`}
-          onClick={handleTwitchConnect}
-          disabled={twitchConnecting}
-          data-testid="button-connect-twitch-social"
-        >
-          <Radio className="h-4 w-4 mr-2"/>
-          {twitchConnecting ? 'Connecting...' : twitchConnected ? (
-            <>
-              <Check className="h-4 w-4 ml-auto" />
-              Twitch Connected
-            </>
-          ) : 'Connect Twitch'}
-        </Button>
+        {renderButton('X (Twitter)', <Twitter className="h-4 w-4 mr-2" />, twitterConnected, twitterConnecting, handleTwitterConnect, 'bg-blue-500/20 border-blue-500/30', 'button-connect-twitter-social')}
+        {renderButton('Instagram', <Instagram className="h-4 w-4 mr-2" />, instagramConnected, instagramConnecting, handleInstagramConnect, 'bg-pink-500/20 border-pink-500/30', 'button-connect-instagram-social')}
+        {renderButton('Facebook', <Facebook className="h-4 w-4 mr-2" />, facebookConnected, facebookConnecting, handleFacebookConnect, 'bg-green-500/20 border-green-500/30', 'button-connect-facebook-creator')}
+        {renderButton('TikTok', <Video className="h-4 w-4 mr-2" />, tiktokConnected, tiktokConnecting, handleTiktokConnect, 'bg-purple-500/20 border-purple-500/30', 'button-connect-tiktok-social')}
+        {renderButton('YouTube', <Youtube className="h-4 w-4 mr-2" />, youtubeConnected, youtubeConnecting, handleYoutubeConnect, 'bg-red-500/20 border-red-500/30', 'button-connect-youtube-social')}
+        {renderButton('Spotify', <Music className="h-4 w-4 mr-2" />, spotifyConnected, spotifyConnecting, handleSpotifyConnect, 'bg-green-500/20 border-green-500/30', 'button-connect-spotify-social')}
+        {renderButton('Discord', <MessageSquare className="h-4 w-4 mr-2" />, discordConnected, discordConnecting, handleDiscordConnect, 'bg-indigo-500/20 border-indigo-500/30', 'button-connect-discord-social')}
+        {renderButton('Twitch', <Radio className="h-4 w-4 mr-2" />, twitchConnected, twitchConnecting, handleTwitchConnect, 'bg-purple-500/20 border-purple-500/30', 'button-connect-twitch-social')}
       </CardContent>
     </Card>
   );
 }
-
-

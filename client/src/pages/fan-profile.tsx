@@ -35,7 +35,7 @@ import {
   Phone
 } from "lucide-react";
 import { FaSpotify } from "react-icons/fa";
-import { TwitterSDKManager } from "@/lib/twitter";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { socialManager } from "@/lib/social-integrations";
 import { getCreatorTypeLabel } from "@shared/fanInterestOptions";
@@ -52,11 +52,15 @@ export default function FanProfile() {
   const [isImporting, setIsImporting] = useState(false);
   const [isConnectedToFacebook, setIsConnectedToFacebook] = useState(false);
   
-  // Social media connection states
-  const [twitterConnecting, setTwitterConnecting] = useState(false);
-  const [twitterConnected, setTwitterConnected] = useState(false);
-  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
-  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  // Twitter connection via unified hook (handles saving connections properly)
+  const {
+    isConnected: twitterConnected,
+    isConnecting: twitterConnecting,
+    userInfo: twitterUserInfo,
+    connect: connectTwitter,
+    disconnect: disconnectTwitter,
+  } = useTwitterConnection();
+  const twitterHandle = twitterUserInfo?.username || null;
   
   const [facebookConnected, setFacebookConnected] = useState(false);
   const [facebookConnecting, setFacebookConnecting] = useState(false);
@@ -80,44 +84,17 @@ export default function FanProfile() {
   const [spotifyFollowers, setSpotifyFollowers] = useState<number>(0);
   
   // Check social connections status when user becomes available
+  // Note: Twitter status is managed by useTwitterConnection hook automatically
   useEffect(() => {
     if (user?.dynamicUserId) {
       checkFacebookStatus();
-      checkTwitterStatus();
       checkTiktokStatus();
       checkYoutubeStatus();
       checkSpotifyStatus();
     }
   }, [user?.dynamicUserId]);
 
-  const checkTwitterStatus = async () => {
-    try {
-      setIsCheckingTwitterStatus(true);
-      const response = await fetch('/api/social-connections/twitter', {
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.connected && data.connection) {
-          setTwitterConnected(true);
-          setTwitterHandle(data.connection.platformUsername || data.connection.platformDisplayName);
-        } else {
-          setTwitterConnected(false);
-          setTwitterHandle(null);
-        }
-      }
-    } catch (error) {
-      console.error('[Fan Profile] Error checking Twitter status:', error);
-      setTwitterConnected(false);
-    } finally {
-      setIsCheckingTwitterStatus(false);
-    }
-  };
+  // Twitter status is managed by useTwitterConnection hook automatically
 
   const checkFacebookStatus = async () => {
     try {
@@ -257,30 +234,7 @@ export default function FanProfile() {
     }
   };
 
-  const connectTwitter = async () => {
-    try {
-      setTwitterConnecting(true);
-      const result = await TwitterSDKManager.secureLogin('fan', (user as any)?.dynamicUserId || user?.id);
-      if (result.success && result.user) {
-        setTwitterConnected(true);
-        setTwitterHandle(result.user.username);
-        toast({
-          title: "Twitter Connected! 🐦",
-          description: `Connected @${result.user.username}`,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Twitter login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      toast({ title: 'Connection Error', description: error?.message || 'Failed to connect Twitter', variant: 'destructive' });
-    } finally {
-      setTwitterConnecting(false);
-    }
-  };
+  // Twitter connect/disconnect are handled by useTwitterConnection hook
 
   const connectFacebook = async () => {
     try {
@@ -316,7 +270,7 @@ export default function FanProfile() {
         await checkTiktokStatus();
         toast({
           title: "TikTok Connected! 🎵",
-          description: result.username ? `Connected @${result.username}` : "Successfully connected to TikTok",
+          description: (result as { username?: string }).username ? `Connected @${(result as { username?: string }).username}` : "Successfully connected to TikTok",
         });
       } else {
         toast({
@@ -337,30 +291,20 @@ export default function FanProfile() {
     }
   };
 
-  const disconnectTwitter = async () => {
-    try {
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      const result = await disconnectSocialPlatform('twitter');
-      
-      if (result.success) {
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-        toast({ title: "Twitter Disconnected", description: "Your Twitter account has been disconnected." });
-      } else {
-        throw new Error(result.error || 'Failed to disconnect');
-      }
-    } catch (error) {
-      toast({ title: "Disconnection Failed", description: "Failed to disconnect Twitter. Please try again.", variant: 'destructive' });
-    }
-  };
+  // disconnectTwitter is provided by useTwitterConnection hook
 
   const disconnectFacebook = async () => {
     try {
+      // Disconnect from backend first
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('facebook');
+      // Then logout from Facebook SDK
       await FacebookSDKManager.secureLogout();
       setFacebookConnected(false);
       setFacebookUser(null);
       toast({ title: 'Facebook Disconnected', description: 'Successfully disconnected' });
     } catch (error) {
+      console.error('Facebook disconnect error:', error);
       toast({ title: 'Disconnect Failed', description: 'Please try again', variant: 'destructive' });
     }
   };
@@ -767,7 +711,7 @@ export default function FanProfile() {
                         </div>
                         <div>
                           <div className="text-white text-sm font-medium">
-                            Started following creator
+                            Enrolled in creator program
                           </div>
                           <div className="text-gray-400 text-xs">
                             @musician_name • Yesterday

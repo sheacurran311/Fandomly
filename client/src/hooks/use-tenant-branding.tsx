@@ -78,7 +78,7 @@ export function useTenantBranding(tenantId?: string) {
   const [isCustomThemeActive, setIsCustomThemeActive] = useState(false);
 
   // Fetch tenant branding from API
-  const { data: tenantData, isLoading } = useQuery({
+  const { data: tenantData, isLoading } = useQuery<{ branding?: TenantBranding }>({
     queryKey: ['/api/tenants', tenantId, 'branding'],
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -180,8 +180,9 @@ export function useTenantBranding(tenantId?: string) {
 
   // Initialize branding on load
   useEffect(() => {
-    if (tenantData && 'branding' in tenantData && tenantData.branding) {
-      applyBranding(tenantData.branding);
+    const branding = tenantData?.branding;
+    if (branding && typeof branding === 'object' && !Array.isArray(branding) && 'primaryColor' in branding && 'secondaryColor' in branding && 'accentColor' in branding) {
+      applyBranding(branding as TenantBranding);
     } else if (!isLoading && !tenantId) {
       // No tenant specified, use default
       resetBranding();

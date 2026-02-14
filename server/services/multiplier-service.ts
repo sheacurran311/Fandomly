@@ -186,7 +186,7 @@ export class MultiplierService {
           eq(checkInStreaks.taskId, taskId)
         ),
       });
-      if (!streak || streak.currentStreak < conditions.requiredStreak) return false;
+      if (!streak || (streak.currentStreak ?? 0) < conditions.requiredStreak) return false;
     }
 
     // Tier-based conditions

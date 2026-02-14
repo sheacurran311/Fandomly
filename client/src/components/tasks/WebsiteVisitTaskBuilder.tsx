@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ExternalLink, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { ExternalLink, CheckCircle2, Info, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
 import {
@@ -19,6 +20,11 @@ import {
   type RewardFrequency,
   type WebsiteVisitConfigData,
 } from "./config";
+import { TIER_GUIDANCE } from "@shared/taskTemplates";
+
+// Website visit tasks are T1 (internal platform verification)
+const WEBSITE_VISIT_TIER = 'T1' as const;
+const tierGuidance = TIER_GUIDANCE[WEBSITE_VISIT_TIER];
 
 interface WebsiteVisitTaskBuilderProps {
   onSave: (config: any) => void;
@@ -26,6 +32,7 @@ interface WebsiteVisitTaskBuilderProps {
   onBack: () => void;
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
 export default function WebsiteVisitTaskBuilder({
@@ -34,6 +41,7 @@ export default function WebsiteVisitTaskBuilder({
   onBack,
   initialData,
   isEditMode,
+  programSelector,
 }: WebsiteVisitTaskBuilderProps) {
   const { toast } = useToast();
 
@@ -164,18 +172,7 @@ export default function WebsiteVisitTaskBuilder({
             </a>
           </p>
         )}
-        {websiteConfig.requireMinTimeOnSite && (
-          <p>
-            <span className="text-blue-400">Min Time:</span>{' '}
-            {websiteConfig.minTimeOnSiteSeconds}s
-          </p>
-        )}
-        {websiteConfig.requireActionCompletion && (
-          <p>
-            <span className="text-blue-400">Action:</span>{' '}
-            {websiteConfig.actionType?.replace('_', ' ')}
-          </p>
-        )}
+        
       </div>
     </div>
   );
@@ -187,6 +184,7 @@ export default function WebsiteVisitTaskBuilder({
       description="Create link-clicking tasks with auto-verification"
       category="Interactive"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -195,6 +193,23 @@ export default function WebsiteVisitTaskBuilder({
       helpText="Website visit tasks are auto-verified when fans click the tracked link. Perfect for driving traffic to your website, landing pages, or products."
       exampleUse="Drive traffic to your merch store, Patreon, new YouTube video, music release, or any external link."
     >
+      <div className="space-y-6">
+      {/* Verification Tier Guidance */}
+      <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck className="h-4 w-4 text-green-400" />
+          <span className="font-medium text-green-400">{tierGuidance.label}</span>
+          <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+            {tierGuidance.trustLevel}
+          </Badge>
+        </div>
+        <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+        <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+        {tierGuidance.tip && (
+          <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+        )}
+      </div>
+
       {/* Basic Task Info */}
       <Card className="bg-white/5 border-white/10">
         <CardHeader>
@@ -264,19 +279,7 @@ export default function WebsiteVisitTaskBuilder({
           fans click your link. No manual review needed!
         </AlertDescription>
       </Alert>
-
-      {(websiteConfig.requireMinTimeOnSite || websiteConfig.requireActionCompletion) && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            <p className="font-semibold">Implementation Required</p>
-            <p className="text-sm mt-1">
-              To track time on site or action completion, you'll need to add the Fandomly tracking
-              script to your destination page. Check our integration docs for details.
-            </p>
-          </AlertDescription>
-        </Alert>
-      )}
+      </div>
     </TaskBuilderBase>
   );
 }

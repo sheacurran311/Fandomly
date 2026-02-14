@@ -10,12 +10,19 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info } from "lucide-react";
+import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck } from "lucide-react";
 import { SiSpotify } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useSpotifyConnection } from "@/hooks/use-social-connection";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Spotify has excellent API support - all tasks are T1 (fully automated)
+const SPOTIFY_TASK_TIERS: Record<string, VerificationTier> = {
+  spotify_follow: 'T1',
+  spotify_playlist: 'T1',
+};
 
 interface SpotifyTaskBuilderProps {
   onSave: (config: any) => void;
@@ -24,11 +31,16 @@ interface SpotifyTaskBuilderProps {
   taskType: 'spotify_follow' | 'spotify_playlist';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
-export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode }: SpotifyTaskBuilderProps) {
+export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: SpotifyTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get verification tier for this task type (all Spotify tasks are T1)
+  const tier = SPOTIFY_TASK_TIERS[taskType] || 'T1';
+  const tierGuidance = TIER_GUIDANCE[tier];
   
   // Use unified Spotify connection hook
   const {
@@ -40,7 +52,7 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
   
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(50);
+  const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [artistUrl, setArtistUrl] = useState('');
   const [playlistUrl, setPlaylistUrl] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
@@ -49,9 +61,10 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
 
   useEffect(() => {
     if (!isEditMode && !taskName) {
+      // All Spotify tasks are T1 with API verification
       const defaults = taskType === 'spotify_follow' 
-        ? { name: 'Follow on Spotify', description: 'Follow us on Spotify!', points: 50 }
-        : { name: 'Follow Our Spotify Playlist', description: 'Follow our Spotify playlist!', points: 75 };
+        ? { name: 'Follow on Spotify', description: 'Follow us on Spotify!', points: tierGuidance.recommendedPoints }
+        : { name: 'Follow Our Spotify Playlist', description: 'Follow our Spotify playlist!', points: 75 }; // Higher for playlist
       setTaskName(defaults.name);
       setDescription(defaults.description);
       setPoints(defaults.points);
@@ -165,6 +178,7 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
       description="Create Spotify-based tasks for your fans"
       category="Social Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -173,8 +187,9 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
       helpText="Spotify tasks help grow your music presence."
       exampleUse="Offer 50 points for following you on Spotify or 75 points for following a playlist."
     >
+      <div className="space-y-6">
       {!spotifyConnected && !checkingConnection && (
-        <Alert className="mb-4 bg-red-500/10 border-red-500/20">
+        <Alert className="bg-red-500/10 border-red-500/20">
           <AlertCircle className="h-4 w-4 text-red-400" />
           <AlertDescription className="text-red-400">
             <div className="flex items-center justify-between">
@@ -193,7 +208,7 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
         </Alert>
       )}
       {spotifyConnected && (
-        <Alert className="mb-4 bg-green-500/10 border-green-500/20">
+        <Alert className="bg-green-500/10 border-green-500/20">
           <CheckCircle2 className="h-4 w-4 text-green-400" />
           <AlertDescription className="text-green-400">
             <strong>Spotify Connected</strong> - Your Spotify account is linked and ready to use.
@@ -215,9 +230,30 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
             <Label className="text-white">Description</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} className="bg-white/5 border-white/10 text-white" />
           </div>
+          {/* Verification Tier Guidance */}
+          <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="h-4 w-4 text-green-400" />
+              <span className="font-medium text-green-400">{tierGuidance.label}</span>
+              <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+                {tierGuidance.trustLevel}
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+            <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+            {tierGuidance.tip && (
+              <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-white">Points Reward</Label>
-            <NumberInput value={points} onChange={(val) => setPoints(val || 1)} min={1} max={10000} allowEmpty={false} className="bg-white/5 border-white/10 text-white" />
+            <div className="flex items-center justify-between">
+              <Label className="text-white">Points Reward</Label>
+              <span className="text-xs text-gray-400">
+                Recommended: {tierGuidance.recommendedPoints} pts
+              </span>
+            </div>
+            <NumberInput value={points} onChange={(val) => setPoints(val || tierGuidance.recommendedPoints)} min={1} max={10000} allowEmpty={false} className="bg-white/5 border-white/10 text-white" />
           </div>
           {taskType === 'spotify_follow' ? (
             <div className="space-y-2">
@@ -273,6 +309,7 @@ export default function SpotifyTaskBuilder({ onSave, onPublish, onBack, taskType
           </div>
         </CardContent>
       </Card>
+      </div>
     </TaskBuilderBase>
   );
 }

@@ -17,12 +17,13 @@ import {
   Calendar,
   Target
 } from "lucide-react";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Link } from "wouter";
 import { useRBAC, RoleGuard } from "@/hooks/use-rbac";
+import { useAuth } from "@/hooks/use-auth";
+import { useAnalyticsOverview } from "@/hooks/use-analytics";
 
 export default function NILDashboard() {
-  const { user } = useDynamicContext();
+  const { user, isAuthenticated } = useAuth();
   const { hasFeatureAccess, isCustomerAdmin, isNILAthlete, userRole } = useRBAC();
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -54,38 +55,29 @@ export default function NILDashboard() {
     );
   }
 
-  // Mock NIL data - in real app this would come from user's profile
+  // Fetch real analytics data
+  const { data: analytics, isLoading: analyticsLoading } = useAnalyticsOverview('all', '30d');
+
+  // NIL stats - use real data where available, show "Coming Soon" for deal tracking
   const nilStats = {
-    monthlyEarnings: 2450,
-    totalDeals: 8,
-    complianceScore: 95,
-    activePrograms: 3,
-    totalFans: 15600,
-    engagementRate: 4.2
+    // Deal tracking not implemented - show as coming soon
+    monthlyEarnings: null as number | null, // null = coming soon
+    totalDeals: null as number | null, // null = coming soon
+    complianceScore: null as number | null, // null = coming soon (needs compliance system)
+    // Real data from analytics
+    activePrograms: analytics?.overview?.totalTaskCompletions || 0,
+    totalFans: analytics?.overview?.totalFollowers || 0,
+    engagementRate: analytics?.overview?.followerGrowth || 0
   };
 
-  const recentActivity = [
-    {
-      type: "earning",
-      description: "Nike social media campaign completed",
-      amount: 500,
-      timestamp: "2 hours ago",
-      status: "completed"
-    },
-    {
-      type: "compliance",
-      description: "Quarterly compliance review due",
-      timestamp: "1 day ago",
-      status: "pending"
-    },
-    {
-      type: "deal",
-      description: "New partnership proposal from local dealership",
-      amount: 1200,
-      timestamp: "3 days ago",
-      status: "review"
-    }
-  ];
+  // No activity yet - feature coming soon
+  const recentActivity: Array<{
+    type: string;
+    description: string;
+    amount?: number;
+    timestamp: string;
+    status: string;
+  }> = [];
 
   return (
     <div className="min-h-screen bg-brand-dark-bg">
@@ -145,10 +137,10 @@ export default function NILDashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <DollarSign className="h-5 w-5 text-brand-secondary" />
-                    <TrendingUp className="h-4 w-4 text-green-400" />
+                    <Badge className="text-[10px] bg-yellow-500/20 text-yellow-400">Soon</Badge>
                   </div>
-                  <div className="text-2xl font-bold text-brand-secondary">
-                    ${nilStats.monthlyEarnings.toLocaleString()}
+                  <div className="text-2xl font-bold text-gray-500">
+                    --
                   </div>
                   <p className="text-xs text-gray-400">Monthly Earnings</p>
                 </CardContent>
@@ -158,9 +150,10 @@ export default function NILDashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <Award className="h-5 w-5 text-brand-primary" />
+                    <Badge className="text-[10px] bg-yellow-500/20 text-yellow-400">Soon</Badge>
                   </div>
-                  <div className="text-2xl font-bold text-white">
-                    {nilStats.totalDeals}
+                  <div className="text-2xl font-bold text-gray-500">
+                    --
                   </div>
                   <p className="text-xs text-gray-400">Total Deals</p>
                 </CardContent>
@@ -170,9 +163,10 @@ export default function NILDashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <Shield className="h-5 w-5 text-green-400" />
+                    <Badge className="text-[10px] bg-yellow-500/20 text-yellow-400">Soon</Badge>
                   </div>
-                  <div className="text-2xl font-bold text-green-400">
-                    {nilStats.complianceScore}%
+                  <div className="text-2xl font-bold text-gray-500">
+                    --
                   </div>
                   <p className="text-xs text-gray-400">Compliance Score</p>
                 </CardContent>
@@ -184,9 +178,9 @@ export default function NILDashboard() {
                     <Target className="h-5 w-5 text-brand-accent" />
                   </div>
                   <div className="text-2xl font-bold text-white">
-                    {nilStats.activePrograms}
+                    {analyticsLoading ? '--' : nilStats.activePrograms}
                   </div>
-                  <p className="text-xs text-gray-400">Active Programs</p>
+                  <p className="text-xs text-gray-400">Tasks Completed</p>
                 </CardContent>
               </Card>
 
@@ -196,21 +190,21 @@ export default function NILDashboard() {
                     <Users className="h-5 w-5 text-purple-400" />
                   </div>
                   <div className="text-2xl font-bold text-white">
-                    {nilStats.totalFans.toLocaleString()}
+                    {analyticsLoading ? '--' : nilStats.totalFans.toLocaleString()}
                   </div>
-                  <p className="text-xs text-gray-400">Total Fans</p>
+                  <p className="text-xs text-gray-400">Total Followers</p>
                 </CardContent>
               </Card>
 
               <Card className="bg-white/5 backdrop-blur-lg border-white/10">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <TrendingUp className="h-5 w-5 text-red-400" />
+                    <TrendingUp className="h-5 w-5 text-green-400" />
                   </div>
                   <div className="text-2xl font-bold text-white">
-                    {nilStats.engagementRate}%
+                    {analyticsLoading ? '--' : `${nilStats.engagementRate}%`}
                   </div>
-                  <p className="text-xs text-gray-400">Engagement Rate</p>
+                  <p className="text-xs text-gray-400">Growth Rate</p>
                 </CardContent>
               </Card>
             </div>
@@ -221,37 +215,47 @@ export default function NILDashboard() {
                 <CardTitle className="text-white">Recent Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        {activity.type === "earning" && <DollarSign className="h-5 w-5 text-brand-secondary" />}
-                        {activity.type === "compliance" && <Shield className="h-5 w-5 text-yellow-400" />}
-                        {activity.type === "deal" && <Award className="h-5 w-5 text-brand-primary" />}
-                        <div>
-                          <p className="text-white font-medium">{activity.description}</p>
-                          <p className="text-gray-400 text-sm">{activity.timestamp}</p>
+                {recentActivity.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentActivity.map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          {activity.type === "earning" && <DollarSign className="h-5 w-5 text-brand-secondary" />}
+                          {activity.type === "compliance" && <Shield className="h-5 w-5 text-yellow-400" />}
+                          {activity.type === "deal" && <Award className="h-5 w-5 text-brand-primary" />}
+                          <div>
+                            <p className="text-white font-medium">{activity.description}</p>
+                            <p className="text-gray-400 text-sm">{activity.timestamp}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          {activity.amount && (
+                            <span className="text-brand-secondary font-semibold">
+                              +${activity.amount}
+                            </span>
+                          )}
+                          <Badge 
+                            className={
+                              activity.status === "completed" ? "bg-green-500/20 text-green-400" :
+                              activity.status === "pending" ? "bg-yellow-500/20 text-yellow-400" :
+                              "bg-blue-500/20 text-blue-400"
+                            }
+                          >
+                            {activity.status}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        {activity.amount && (
-                          <span className="text-brand-secondary font-semibold">
-                            +${activity.amount}
-                          </span>
-                        )}
-                        <Badge 
-                          className={
-                            activity.status === "completed" ? "bg-green-500/20 text-green-400" :
-                            activity.status === "pending" ? "bg-yellow-500/20 text-yellow-400" :
-                            "bg-blue-500/20 text-blue-400"
-                          }
-                        >
-                          {activity.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <h3 className="text-white font-medium mb-2">No Activity Yet</h3>
+                    <p className="text-gray-400 text-sm max-w-md mx-auto">
+                      Your NIL deal activity and compliance updates will appear here once you start tracking deals.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

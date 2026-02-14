@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Instagram, Loader2 } from 'lucide-react';
+import InstagramSDKManager from '@/lib/instagram';
 
 interface InstagramLoginButtonProps {
   onSuccess?: (result: any) => void;
@@ -10,6 +11,7 @@ interface InstagramLoginButtonProps {
   text?: string;
   disabled?: boolean;
   loading?: boolean;
+  userType?: 'creator' | 'fan';
 }
 
 export function InstagramLoginButton({
@@ -19,20 +21,30 @@ export function InstagramLoginButton({
   size = 'medium',
   text = 'Connect with Instagram',
   disabled = false,
-  loading = false
+  loading: externalLoading = false,
+  userType = 'creator'
 }: InstagramLoginButtonProps) {
-  const handleClick = () => {
+  const [isConnecting, setIsConnecting] = useState(false);
+  const loading = externalLoading || isConnecting;
+
+  const handleClick = async () => {
     if (disabled || loading) return;
 
     try {
-      // Use the exact URL from your Instagram App Dashboard
-      const instagramAuthUrl = 'https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=1157911489578561&redirect_uri=https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/creator-dashboard&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights';
+      setIsConnecting(true);
+      // Instagram only supports creator/business auth -- always use 'creator'
+      const result = await InstagramSDKManager.secureLogin('creator');
       
-      // Redirect to Instagram OAuth
-      window.location.href = instagramAuthUrl;
+      if (result.success) {
+        onSuccess?.(result);
+      } else {
+        onError?.(result.error || 'Failed to connect Instagram');
+      }
     } catch (error) {
       console.error('[Instagram Login Button] Error:', error);
       onError?.(error instanceof Error ? error.message : 'Failed to initiate Instagram login');
+    } finally {
+      setIsConnecting(false);
     }
   };
 

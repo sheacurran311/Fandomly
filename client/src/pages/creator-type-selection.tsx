@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useAuth as useAuthContext } from "@/contexts/auth-context";
+import { useMutation } from "@tanstack/react-query";
+import { fetchApi } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Trophy,
   Music,
   User,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
 
 const creatorTypes = [
@@ -66,7 +71,37 @@ const creatorTypes = [
 export default function CreatorTypeSelection() {
   const [, setLocation] = useLocation();
   const { user, dynamicUser, isLoading } = useAuth();
+  const { refreshUser } = useAuthContext();
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Mutation to call the new set-creator-type endpoint
+  // This atomically creates tenant + creator + draft program
+  const setCreatorTypeMutation = useMutation({
+    mutationFn: async (creatorType: string) => {
+      return fetchApi('/api/auth/set-creator-type', {
+        method: 'POST',
+        body: JSON.stringify({ creatorType }),
+      });
+    },
+    onSuccess: async () => {
+      // Refresh the auth-context user data BEFORE navigating.
+      // This is critical: the auth-router checks onboardingState.isCompleted
+      // to decide if the creator should be on the dashboard. Without refreshing,
+      // the stale state would redirect back to this page in a loop.
+      await refreshUser();
+      // Navigate to dashboard — onboarding is already complete
+      setLocation('/creator-dashboard');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to set up your creator account. Please try again.",
+        variant: "destructive",
+      });
+      setSelectedType(null);
+    },
+  });
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -82,15 +117,14 @@ export default function CreatorTypeSelection() {
     );
   }
 
-  // Check for Dynamic user (wallet connected) rather than backend user data
-  // This allows newly registered users to proceed before the query refetches
-  if (!dynamicUser) {
+  // Check for authenticated user
+  if (!dynamicUser && !user) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
           <CardContent className="text-center p-6">
             <h2 className="text-xl font-bold text-white mb-4">Authentication Required</h2>
-            <p className="text-gray-300 mb-4">Please connect your wallet to continue.</p>
+            <p className="text-gray-300 mb-4">Please sign in to continue.</p>
             <Button onClick={() => setLocation("/")} className="bg-brand-primary hover:bg-brand-primary/80">
               Go Home
             </Button>
@@ -101,9 +135,10 @@ export default function CreatorTypeSelection() {
   }
 
   const handleTypeSelection = (creatorType: string) => {
+    if (setCreatorTypeMutation.isPending) return;
     setSelectedType(creatorType);
-    // Navigate to specific onboarding flow based on creator type
-    setLocation(`/creator-onboarding?type=${creatorType}`);
+    // Call the new endpoint that atomically scaffolds everything
+    setCreatorTypeMutation.mutate(creatorType);
   };
 
   return (
@@ -182,13 +217,23 @@ export default function CreatorTypeSelection() {
                     <Button 
                       variant="neon"
                       className="w-full mt-4"
+                      disabled={setCreatorTypeMutation.isPending}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleTypeSelection(type.id);
                       }}
                     >
-                      Choose {type.title}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      {setCreatorTypeMutation.isPending && selectedType === type.id ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Setting up...
+                        </>
+                      ) : (
+                        <>
+                          Choose {type.title}
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>

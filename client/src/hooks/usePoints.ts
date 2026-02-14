@@ -1,4 +1,15 @@
 /**
+ * @deprecated This file is deprecated. Use hooks from './use-points.ts' instead.
+ * 
+ * The hooks in this file are not used anywhere in the codebase.
+ * The canonical points hooks are in use-points.ts which provides:
+ * - usePlatformPointsBalance() - Platform points balance
+ * - usePlatformPointsTransactions() - Platform points history
+ * - usePointTransactionHistory() - Creator points history
+ * - usePointsSummary() - Combined points summary
+ * - useAvailableRewards() - Available rewards
+ * - useRewardRedemptions() - Redemption history
+ * 
  * React Query hooks for Points System
  * 
  * Hooks for fetching and managing:

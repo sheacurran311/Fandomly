@@ -3,7 +3,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { getAccessToken } from "@/lib/queryClient";
 
 interface VerificationResult {
   verified: boolean;
@@ -37,21 +37,21 @@ interface TwitterTweet {
  * Authenticated fetch helper
  */
 async function authenticatedFetch(url: string, options: RequestInit = {}) {
-  const dynamicUserId = localStorage.getItem('twitter_dynamic_user_id') || 
-                       (window as any).__dynamicUserId;
+  const accessToken = getAccessToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  if (dynamicUserId) {
-    headers['x-dynamic-user-id'] = dynamicUserId;
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {

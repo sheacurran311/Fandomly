@@ -25,6 +25,11 @@ interface UseInstagramConnectionReturn extends InstagramConnectionState {
 export function useInstagramConnection(): UseInstagramConnectionReturn {
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Stable primitive refs to avoid re-creating callbacks on every user object change
+  const userId = user?.id;
+  const userType = user?.userType;
+  const dynamicUserId = (user as any)?.dynamicUserId;
   
   const [state, setState] = useState<InstagramConnectionState>({
     isConnected: false,
@@ -37,13 +42,13 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
 
   // Check connection status - uses direct fetch for hot reload persistence
   const checkStatus = useCallback(async () => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     try {
       console.log('[Instagram Hook] Checking connection status...');
       const response = await fetch('/api/social-connections/instagram', {
         headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
+          'x-dynamic-user-id': dynamicUserId || userId || '',
           'Content-Type': 'application/json'
         },
         credentials: 'include'
@@ -62,7 +67,7 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
               name: connection.platformDisplayName || '',
               profile_picture_url: connection.profileData?.profilePictureUrl,
               followers_count: connection.profileData?.followers || 0,
-              media_count: connection.profileData?.following || 0,
+              media_count: connection.profileData?.mediaCount || connection.profileData?.media_count || 0,
             },
             businessAccountId: connection.platformUserId || '',
             error: null,
@@ -81,7 +86,7 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
     } catch (error) {
       console.error('[Instagram Hook] Error checking status:', error);
     }
-  }, [user?.id]);
+  }, [userId, dynamicUserId]);
 
   // Initial status check
   useEffect(() => {
@@ -107,7 +112,8 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
               profileData: {
                 profilePictureUrl: result.user.profile_picture_url,
                 followers: result.user.followers_count || 0,
-                following: result.user.media_count || 0,
+                following: 0,
+                mediaCount: result.user.media_count || 0,
               }
             });
             console.log('[Instagram Hook] Connection saved successfully');
@@ -168,10 +174,10 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
 
   // Connect to Instagram
   const connect = useCallback(async () => {
-    if (!user?.id || state.isConnecting) return;
+    if (!userId || state.isConnecting) return;
 
     // Only creators can connect Instagram
-    if (user.userType !== 'creator') {
+    if (userType !== 'creator') {
       toast({
         title: "Not Available",
         description: "Instagram connection is only available for creators",
@@ -199,7 +205,8 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
             profileData: {
               profilePictureUrl: result.user.profile_picture_url,
               followers: result.user.followers_count || 0,
-              following: result.user.media_count || 0,
+              following: 0,
+              mediaCount: result.user.media_count || 0,
             }
           });
           console.log('[Instagram Hook] Connection saved successfully');
@@ -211,8 +218,8 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
           ...prev,
           isConnected: true,
           isConnecting: false,
-          userInfo: result.user,
-          businessAccountId: result.user.id,
+          userInfo: result.user ?? null,
+          businessAccountId: result.user?.id ?? '',
           error: null,
         }));
 
@@ -221,7 +228,7 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
 
         toast({
           title: "Instagram Connected! 📸",
-          description: `Successfully connected @${result.user.username}`,
+          description: `Successfully connected @${result.user?.username ?? 'Instagram'}`,
           duration: 3000,
         });
       } else {
@@ -252,11 +259,11 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
         variant: 'destructive',
       });
     }
-  }, [user, state.isConnecting, checkStatus, toast]);
+  }, [userId, userType, state.isConnecting, checkStatus, toast]);
 
   // Disconnect from Instagram
   const disconnect = useCallback(async () => {
-    if (!user?.id || state.isDisconnecting) return;
+    if (!userId || state.isDisconnecting) return;
 
     setState(prev => ({ ...prev, isDisconnecting: true }));
 
@@ -290,7 +297,7 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
         variant: 'destructive',
       });
     }
-  }, [user, state.isDisconnecting, toast]);
+  }, [userId, state.isDisconnecting, toast]);
 
   return {
     ...state,

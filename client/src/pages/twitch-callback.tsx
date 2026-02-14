@@ -2,21 +2,29 @@
  * Twitch OAuth Callback Page
  *
  * Handles the OAuth callback from Twitch
- * Exchanges authorization code for access token
- * Sends data back to parent window for saving (popup shares data, parent saves)
+ * Supports both authentication (login/signup) and social account linking
  */
 
-import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getPostAuthRedirect,
+  getSocialLinkingRedirect,
+  checkAuthState,
+  authenticateWithSocial,
+  saveSocialConnection,
+} from "@/lib/auth-redirect";
+import { invalidateSocialConnections } from "@/hooks/use-social-connections";
 
 // Global flag to prevent duplicate execution across multiple renders/remounts
 let twitchCallbackProcessed = false;
 
 export default function TwitchCallback() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const ranRef = useRef(false);
+  const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'link_required'>('processing');
+  const [error, setError] = useState<string | null>(null);
+  const [linkInfo, setLinkInfo] = useState<{ existingProviders: string[]; message: string } | null>(null);
 
   useEffect(() => {
     // Prevent duplicate execution
@@ -32,19 +40,19 @@ export default function TwitchCallback() {
         const params = new URLSearchParams(window.location.search);
         const code = params.get("code");
         const state = params.get("state");
-        const error = params.get("error");
+        const errorParam = params.get("error");
         const errorDescription = params.get("error_description");
 
         console.log("[Twitch Callback] Processing OAuth callback", {
           hasCode: !!code,
           hasState: !!state,
-          hasError: !!error,
+          hasError: !!errorParam,
         });
 
         // Handle OAuth error
-        if (error) {
-          console.error("[Twitch Callback] OAuth error:", error, errorDescription);
-          const errorMsg = errorDescription || error || "Twitch authorization failed";
+        if (errorParam) {
+          console.error("[Twitch Callback] OAuth error:", errorParam, errorDescription);
+          const errorMsg = errorDescription || errorParam || "Twitch authorization failed";
 
           // If opened in popup, send error to parent
           if (window.opener && !window.opener.closed) {
@@ -59,25 +67,52 @@ export default function TwitchCallback() {
             return;
           }
 
-          // Otherwise show toast and redirect
-          toast({
-            title: "Twitch Connection Failed",
-            description: errorMsg,
-            variant: "destructive",
-          });
-          setLocation("/creator-dashboard/social");
+          setStatus('error');
+          setError(errorMsg);
           return;
         }
 
         // Validate required parameters
         if (!code || !state) {
-          throw new Error("Missing code or state parameter");
+          const errorMsg = "Missing code or state parameter";
+          
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage(
+              {
+                type: "twitch-oauth-result",
+                result: { success: false, error: errorMsg },
+              },
+              window.location.origin
+            );
+            window.close();
+            return;
+          }
+
+          setStatus('error');
+          setError(errorMsg);
+          return;
         }
 
         // Validate CSRF state
         const savedState = localStorage.getItem("twitch_oauth_state");
         if (!savedState || savedState !== state) {
-          throw new Error("Invalid state parameter - possible CSRF attack");
+          const errorMsg = "Invalid state parameter - possible CSRF attack";
+          
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage(
+              {
+                type: "twitch-oauth-result",
+                result: { success: false, error: errorMsg },
+              },
+              window.location.origin
+            );
+            window.close();
+            return;
+          }
+
+          setStatus('error');
+          setError(errorMsg);
+          return;
         }
 
         // Clear the state from localStorage
@@ -130,63 +165,131 @@ export default function TwitchCallback() {
 
         const displayName = userData.display_name || userData.login;
 
-        // Prepare connection data to send to parent
-        const connectionData = {
-          platform: "twitch",
-          platformUserId: userData.id,
-          platformUsername: userData.login,
-          platformDisplayName: displayName,
-          accessToken: accessToken,
-          refreshToken: tokenData.refresh_token || null,
-          profileData: {
-            profile_image_url: userData.profile_image_url,
-            broadcaster_type: userData.broadcaster_type,
-            description: userData.description,
-          },
-        };
-
-        // If opened in popup, send data to parent for saving
+        // POPUP FLOW: If opened in popup, send data to parent for handling
         if (window.opener && !window.opener.closed) {
+          const connectionData = {
+            platform: "twitch",
+            platformUserId: userData.id,
+            platformUsername: userData.login,
+            platformDisplayName: displayName,
+            accessToken: accessToken,
+            refreshToken: tokenData.refresh_token || null,
+            profileData: {
+              profile_image_url: userData.profile_image_url,
+              broadcaster_type: userData.broadcaster_type,
+              description: userData.description,
+            },
+          };
+
           window.opener.postMessage(
             {
               type: "twitch-oauth-result",
               result: {
                 success: true,
                 displayName,
-                connectionData, // Parent will save this
+                connectionData,
+                userId: userData.id,
+                username: userData.login,
+                accessToken,
               },
             },
             window.location.origin
           );
-          window.close();
+          // Small delay to ensure postMessage is received before popup closes
+          setTimeout(() => window.close(), 150);
           return;
         }
 
-        // If not in popup (direct navigation), try to save here
-        const saveResponse = await fetch("/api/social-connections", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(connectionData),
-          credentials: "include",
-        });
+        // DIRECT NAVIGATION FLOW: Handle authentication or social linking
+        console.log('[Twitch Callback] Direct navigation detected, handling auth/linking flow...');
 
-        if (!saveResponse.ok) {
-          const errorText = await saveResponse.text();
-          throw new Error(`Failed to save connection: ${errorText}`);
+        // Check if user is already authenticated
+        const authCheck = await checkAuthState();
+        console.log('[Twitch Callback] Auth check result:', authCheck);
+
+        if (!authCheck.isAuthenticated) {
+          // AUTHENTICATION FLOW: User is not logged in, authenticate with social
+          console.log('[Twitch Callback] User not authenticated, initiating social auth...');
+          
+          const authResult = await authenticateWithSocial('twitch', {
+            access_token: accessToken,
+            platform_user_id: userData.id,
+            email: userData.email, // Twitch may provide email
+            username: userData.login,
+            display_name: displayName,
+            profile_data: {
+              profile_image_url: userData.profile_image_url,
+              broadcaster_type: userData.broadcaster_type,
+              description: userData.description,
+            },
+          });
+
+          console.log('[Twitch Callback] Social auth result:', authResult);
+
+          if (authResult.linkRequired) {
+            setStatus('link_required');
+            setLinkInfo({
+              existingProviders: authResult.existingProviders || [],
+              message: authResult.message || 'An account with this email already exists.',
+            });
+            return;
+          }
+
+          if (!authResult.success) {
+            setStatus('error');
+            setError(authResult.error || 'Authentication failed');
+            return;
+          }
+
+          // Success - redirect based on user state
+          toast({
+            title: "Welcome to Fandomly!",
+            description: `Successfully signed in as ${displayName}`,
+          });
+
+          const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
+          console.log('[Twitch Callback] Auth successful, redirecting to:', redirectUrl);
+          window.location.replace(redirectUrl);
+          return;
         }
 
-        console.log("[Twitch Callback] Connection saved successfully");
+        // SOCIAL LINKING FLOW: User is already authenticated, save the connection
+        console.log('[Twitch Callback] User already authenticated, saving social connection...');
+
+        const saveResult = await saveSocialConnection({
+          platform: 'twitch',
+          platformUserId: userData.id,
+          platformUsername: userData.login,
+          platformDisplayName: displayName,
+          accessToken: accessToken,
+          refreshToken: tokenData.refresh_token,
+          profileData: {
+            profile_image_url: userData.profile_image_url,
+            broadcaster_type: userData.broadcaster_type,
+            description: userData.description,
+          },
+        });
+
+        if (!saveResult.success) {
+          console.error('[Twitch Callback] Failed to save connection:', saveResult.error);
+        }
+
+        // Invalidate social connections cache so all components get fresh data
+        invalidateSocialConnections();
 
         toast({
-          title: "Twitch Connected! 🎉",
+          title: "Twitch Connected!",
           description: `Successfully connected ${displayName}`,
         });
-        setLocation("/creator-dashboard/social");
-      } catch (error) {
-        console.error("[Twitch Callback] Error:", error);
-        const errorMsg = error instanceof Error ? error.message : "Failed to connect Twitch";
+
+        // Redirect to appropriate dashboard based on user type
+        const redirectUrl = getSocialLinkingRedirect(authCheck.user?.userType);
+        console.log('[Twitch Callback] Connection saved, redirecting to:', redirectUrl);
+        window.location.replace(redirectUrl);
+
+      } catch (err) {
+        console.error("[Twitch Callback] Error:", err);
+        const errorMsg = err instanceof Error ? err.message : "Failed to connect Twitch";
 
         // If opened in popup, send error to parent
         if (window.opener && !window.opener.closed) {
@@ -201,24 +304,63 @@ export default function TwitchCallback() {
           return;
         }
 
-        // Otherwise show toast and redirect
-        toast({
-          title: "Twitch Connection Failed",
-          description: errorMsg,
-          variant: "destructive",
-        });
-        setLocation("/creator-dashboard/social");
+        setStatus('error');
+        setError(errorMsg);
       }
     };
 
     run();
-  }, [setLocation, toast]);
+  }, [toast]);
 
+  // Error state
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
+        <div className="bg-brand-card rounded-lg p-8 max-w-md w-full text-center">
+          <div className="text-red-500 text-5xl mb-4">!</div>
+          <h2 className="text-2xl font-bold text-white mb-4">Connection Failed</h2>
+          <p className="text-gray-300 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.replace('/')}
+            className="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+          >
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Account linking required
+  if (status === 'link_required' && linkInfo) {
+    return (
+      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
+        <div className="bg-brand-card rounded-lg p-8 max-w-md w-full">
+          <h2 className="text-2xl font-bold text-white mb-4">Account Found</h2>
+          <p className="text-gray-300 mb-6">{linkInfo.message}</p>
+          <p className="text-gray-400 text-sm mb-6">
+            Existing login method: {linkInfo.existingProviders.join(', ')}
+          </p>
+          <p className="text-gray-400 text-sm mb-6">
+            Please sign in with your existing account to link Twitch.
+          </p>
+          <button
+            onClick={() => window.location.replace('/')}
+            className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+          >
+            Go to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Processing state
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="flex items-center justify-center min-h-screen bg-brand-dark-bg">
       <div className="text-center space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-        <p className="text-muted-foreground">Connecting your Twitch account...</p>
+        <p className="text-gray-400">Connecting your Twitch account...</p>
       </div>
     </div>
   );

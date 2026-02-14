@@ -15,9 +15,14 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, Video, Hash } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Info, Video, Hash, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
+import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+
+// Stream code tasks are T2 (code-based verification)
+const STREAM_CODE_TIER: VerificationTier = 'T2';
 
 interface StreamCodeTaskBuilderProps {
   onSave: (config: any) => void;
@@ -25,6 +30,7 @@ interface StreamCodeTaskBuilderProps {
   onBack: () => void;
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
 export default function StreamCodeTaskBuilder({
@@ -33,13 +39,18 @@ export default function StreamCodeTaskBuilder({
   onBack,
   initialData,
   isEditMode,
+  programSelector,
 }: StreamCodeTaskBuilderProps) {
   const { toast } = useToast();
+
+  // Get verification tier guidance (T2 for code-based)
+  const tier = STREAM_CODE_TIER;
+  const tierGuidance = TIER_GUIDANCE[tier];
 
   // Task settings
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [points, setPoints] = useState(100);
+  const [points, setPoints] = useState(tierGuidance.recommendedPoints);
 
   // Stream code settings
   const [secretCode, setSecretCode] = useState('');
@@ -155,6 +166,7 @@ export default function StreamCodeTaskBuilder({
       description="Create a code-based task for live streams and spaces"
       category="Live Engagement"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -163,7 +175,8 @@ export default function StreamCodeTaskBuilder({
       helpText="Perfect for rewarding fans who attend your live streams, spaces, or virtual events."
       exampleUse="Set up this task before going live. During the stream, announce the secret code. Fans who were watching can enter the code to prove they attended and earn points!"
     >
-      <Alert className="mb-4 bg-blue-500/10 border-blue-500/20">
+      <div className="space-y-6">
+      <Alert className="bg-blue-500/10 border-blue-500/20">
         <Info className="h-4 w-4 text-blue-400" />
         <AlertDescription className="text-blue-400">
           <strong>How it works:</strong> Create this task before your stream. During the stream, mention the secret code out loud. Fans watching can then enter the code to complete the task and earn points.
@@ -195,11 +208,32 @@ export default function StreamCodeTaskBuilder({
             />
           </div>
 
+          {/* Verification Tier Guidance */}
+          <div className="p-4 rounded-lg border bg-blue-500/10 border-blue-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="h-4 w-4 text-blue-400" />
+              <span className="font-medium text-blue-400">{tierGuidance.label}</span>
+              <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-400">
+                {tierGuidance.trustLevel}
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+            <p className="text-sm font-medium text-blue-400">{tierGuidance.pointsRange}</p>
+            {tierGuidance.tip && (
+              <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-white">Points Reward</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-white">Points Reward</Label>
+              <span className="text-xs text-gray-400">
+                Recommended: {tierGuidance.recommendedPoints} pts
+              </span>
+            </div>
             <NumberInput
               value={points}
-              onChange={(val) => setPoints(val || 1)}
+              onChange={(val) => setPoints(val || tierGuidance.recommendedPoints)}
               min={1}
               max={10000}
               allowEmpty={false}
@@ -277,6 +311,7 @@ export default function StreamCodeTaskBuilder({
           </Alert>
         </CardContent>
       </Card>
+      </div>
     </TaskBuilderBase>
   );
 }

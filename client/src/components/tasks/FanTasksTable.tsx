@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { transformImageUrl } from '@/lib/image-utils';
-import { useStartTask } from '@/hooks/useTaskCompletion';
+import { useStartTask, invalidateTaskCompletionQueries } from '@/hooks/useTaskCompletion';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
@@ -21,14 +21,14 @@ import type { Task, TaskCompletion } from '@shared/schema';
 import TaskCompletionModalRouter from '@/components/modals/TaskCompletionModalRouter';
 import { useSocialConnectionStatus } from '@/hooks/useSocialConnectionStatus';
 
-interface EnrichedTask extends Task {
+type EnrichedTask = Omit<Task, 'platform'> & {
   creatorName?: string;
   creatorImage?: string;
   programName?: string;
   programSlug?: string;
   programImage?: string;
-  platform?: string;
-}
+  platform?: Task['platform'];
+};
 
 interface FanTasksTableProps {
   tasks: EnrichedTask[];
@@ -120,7 +120,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
     // For non-social tasks, start directly
     setProcessingTasks(prev => new Set(prev).add(task.id));
     try {
-      await startTask.mutateAsync({ taskId: task.id, tenantId: task.tenantId });
+      await startTask.mutateAsync({ taskId: task.id, tenantId: task.tenantId ?? '' });
       toast({
         title: 'Task Started!',
         description: `You've started "${task.name}"`,
@@ -142,8 +142,8 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
 
   // Handle modal success
   const handleModalSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+    // Invalidate all task completion related queries across the app
+    invalidateTaskCompletionQueries(queryClient);
     setIsModalOpen(false);
     setSelectedTask(null);
   };
@@ -154,14 +154,14 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
       const response = await apiRequest('POST', `/api/task-completions/${completion.id}/verify`, {
         platform: task.platform,
         taskType: task.taskType,
-        targetData: task.targetData || {},
+        targetData: (task.customSettings as Record<string, unknown>) || {},
       });
 
       const result = await response.json();
 
       if (result.verified) {
-        queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-        queryClient.invalidateQueries({ queryKey: ['task-completions', 'me'] });
+        // Invalidate all task completion related queries across the app
+        invalidateTaskCompletionQueries(queryClient);
 
         toast({
           title: '✅ Task Verified!',
@@ -278,8 +278,8 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
                       <Avatar className="h-8 w-8 border border-white/20">
                         {task.programImage && (
                           <AvatarImage
-                            src={transformImageUrl(task.programImage)}
-                            alt={task.programName}
+                            src={transformImageUrl(task.programImage) ?? undefined}
+                            alt={task.programName ?? ''}
                           />
                         )}
                         <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-xs">
@@ -429,7 +429,7 @@ export function FanTasksTable({ tasks, completionMap }: FanTasksTableProps) {
       {/* Task Completion Modal */}
       {selectedTask && (
         <TaskCompletionModalRouter
-          task={selectedTask}
+          task={{ ...selectedTask, platform: selectedTask.platform ?? 'system' }}
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false);

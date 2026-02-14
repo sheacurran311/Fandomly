@@ -10,20 +10,21 @@ import { Label } from "@/components/ui/label";
 import { Search, Users, Trophy, TrendingUp, Sparkles, Zap, CheckCircle } from "lucide-react";
 import CreatorCard from "@/components/creator/creator-card";
 import { type Creator } from "@shared/schema";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
+import { useAuthModal } from "@/hooks/use-auth-modal";
 
 export default function FindCreators() {
-  const { user, setShowAuthFlow } = useDynamicContext();
-  const { user: userData } = useAuth();
+  const { user: userData, isAuthenticated } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [sortBy, setSortBy] = useState<"all" | "active" | "verified">("all");
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
 
-  const { data: creators = [], isLoading, error, isError } = useQuery<Creator[]>({
+  type CreatorWithExtras = Creator & { user?: { username?: string; profileData?: { avatar?: string; bannerImage?: string } }; tenant?: { slug?: string; branding?: { bannerUrl?: string; logoUrl?: string } }; program?: { id?: string; name?: string }; isLive?: boolean; isVerified?: boolean; hasPublishedProgram?: boolean };
+  const { data: creators = [], isLoading, error, isError } = useQuery<CreatorWithExtras[]>({
     queryKey: ["/api/creators"],
     retry: 1,
     staleTime: 30000, // 30 seconds
@@ -32,7 +33,7 @@ export default function FindCreators() {
   // Debug logging
   console.log('Find Creators - Query Status:', { isLoading, isError, error });
   console.log('Find Creators - Total creators from API:', creators.length);
-  console.log('Find Creators - User data:', { user: !!user, userData: !!userData, userType: userData?.userType });
+  console.log('Find Creators - User data:', { userData: !!userData, userType: userData?.userType });
   console.log('Find Creators - Filters active:', { 
     showActiveOnly, 
     showVerifiedOnly, 
@@ -42,7 +43,7 @@ export default function FindCreators() {
   
   // Debug: Log banner image data for first few creators
   if (creators.length > 0) {
-    console.log('Find Creators - Image data sample:', creators.slice(0, 3).map(c => ({
+    console.log('Find Creators - Image data sample:', creators.slice(0, 3).map((c: CreatorWithExtras) => ({
       displayName: c.displayName,
       imageUrl: c.imageUrl,
       userProfileAvatar: c.user?.profileData?.avatar,
@@ -53,8 +54,8 @@ export default function FindCreators() {
   }
 
   const handleUnauthenticatedClick = () => {
-    // Trigger Dynamic auth modal for unauthenticated users
-    setShowAuthFlow(true);
+    // Trigger auth modal for unauthenticated users
+    openAuthModal();
   };
 
   const filteredCreators = creators.filter((creator: any) => {
@@ -64,10 +65,10 @@ export default function FindCreators() {
     const matchesCategory = !selectedCategory || creator.category === selectedCategory;
 
     // Filter by active status - only apply if toggle is ON
-    const matchesActive = !showActiveOnly || creator.isLive;
+    const matchesActive = !showActiveOnly || (creator as CreatorWithExtras).isLive;
 
     // Filter by verified status - only apply if toggle is ON
-    const matchesVerified = !showVerifiedOnly || creator.isVerified;
+    const matchesVerified = !showVerifiedOnly || (creator as CreatorWithExtras).isVerified;
 
     // IMPORTANT: Only show creators who have at least one published program
     // This prevents showing creators who haven't set up their program yet
@@ -80,22 +81,20 @@ export default function FindCreators() {
 
   // Sort creators - default is newest first
   const sortedCreators = [...filteredCreators].sort((a, b) => {
+    const aDate = (a as Creator).createdAt ? new Date((a as Creator).createdAt!).getTime() : 0;
+    const bDate = (b as Creator).createdAt ? new Date((b as Creator).createdAt!).getTime() : 0;
     if (sortBy === "active") {
-      // Sort by active status (live first), then by newest
-      if (a.isLive !== b.isLive) {
-        return b.isLive ? 1 : -1;
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const aLive = (a as CreatorWithExtras).isLive;
+      const bLive = (b as CreatorWithExtras).isLive;
+      if (aLive !== bLive) return bLive ? 1 : -1;
+      return bDate - aDate;
     } else if (sortBy === "verified") {
-      // Sort by verified status first, then by newest
-      if (a.isVerified !== b.isVerified) {
-        return b.isVerified ? 1 : -1;
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    } else {
-      // Default: Sort by creation date (newest first)
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const aVerified = (a as CreatorWithExtras).isVerified;
+      const bVerified = (b as CreatorWithExtras).isVerified;
+      if (aVerified !== bVerified) return bVerified ? 1 : -1;
+      return bDate - aDate;
     }
+    return bDate - aDate;
   });
 
   const categories = ["athlete", "musician", "creator", "brand"];
@@ -110,7 +109,8 @@ export default function FindCreators() {
       </div>
     );
     
-    return user && userData ? (
+    // Only wrap in DashboardLayout if user has a valid userType (not null/pending)
+    return userData && userData.userType ? (
       <DashboardLayout userType={userData.userType as "fan" | "creator"}>
         {loadingContent}
       </DashboardLayout>
@@ -127,7 +127,7 @@ export default function FindCreators() {
               Find Creators
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Discover and follow your favorite athletes, musicians, and content creators. Join their communities and participate in exclusive campaigns.
+              Discover your favorite athletes, musicians, and content creators. Enroll in their programs and participate in exclusive campaigns.
             </p>
           </div>
 
@@ -283,8 +283,8 @@ export default function FindCreators() {
                     {sortedCreators.map((creator) => (
                       <CreatorCard 
                         key={creator.id} 
-                        creator={creator}
-                        onUnauthenticatedClick={!user ? handleUnauthenticatedClick : undefined}
+                        creator={creator as Creator}
+                        onUnauthenticatedClick={!userData ? handleUnauthenticatedClick : undefined}
                       />
                     ))}
                   </div>
@@ -319,8 +319,8 @@ export default function FindCreators() {
                     {sortedCreators.map((creator) => (
                       <CreatorCard 
                         key={creator.id} 
-                        creator={creator}
-                        onUnauthenticatedClick={!user ? handleUnauthenticatedClick : undefined}
+                        creator={creator as Creator}
+                        onUnauthenticatedClick={!userData ? handleUnauthenticatedClick : undefined}
                       />
                     ))}
                   </div>
@@ -355,8 +355,8 @@ export default function FindCreators() {
                     {sortedCreators.map((creator) => (
                       <CreatorCard 
                         key={creator.id} 
-                        creator={creator}
-                        onUnauthenticatedClick={!user ? handleUnauthenticatedClick : undefined}
+                        creator={creator as Creator}
+                        onUnauthenticatedClick={!userData ? handleUnauthenticatedClick : undefined}
                       />
                     ))}
                   </div>
@@ -369,7 +369,8 @@ export default function FindCreators() {
     </div>
   );
 
-  return user && userData ? (
+  // Only wrap in DashboardLayout if user has a valid userType (not null/pending)
+  return userData && userData.userType ? (
     <DashboardLayout userType={userData.userType as "fan" | "creator"}>
       {content}
     </DashboardLayout>

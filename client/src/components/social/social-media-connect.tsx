@@ -14,6 +14,9 @@ import { FaTiktok, FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
 import { socialManager, type SocialMediaAccount } from "@/lib/social-integrations";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateSocialConnections } from "@/hooks/use-social-connections";
+import { fetchApi } from "@/lib/queryClient";
+import { disconnectSocialPlatform } from "@/lib/social-connection-api";
 
 interface SocialPlatform {
   id: string;
@@ -225,8 +228,8 @@ export default function SocialMediaConnect({
     try {
       if (platformId === 'twitter') {
         // Use popup PKCE flow via TwitterSDKManager
-        const userType = (window as any).__userType || 'fan';
-        const result = await TwitterSDKManager.secureLogin(userType, (user as any)?.dynamicUserId || user?.id);
+        const userType = (window as any).__userType || 'auth';
+        const result = await TwitterSDKManager.secureLogin(userType);
         if (result.success && result.accessToken) {
           // Fetch profile directly using the token
           const userInfo = await TwitterSDKManager.fetchUserInfo(result.accessToken);
@@ -247,15 +250,27 @@ export default function SocialMediaConnect({
             onAccountsChange?.(updated);
             return updated;
           });
-          // Persist in case background save failed
+          // Save connection via authenticated endpoint (supports cookie & JWT auth)
           try {
-            await fetch('/api/social/connect', {
+            await fetchApi('/api/social-connections', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ platform: 'twitter', accountData: { user: userInfo, connectedAt: new Date().toISOString() } })
+              body: JSON.stringify({
+                platform: 'twitter',
+                platformUserId: userInfo.id,
+                platformUsername: userInfo.username,
+                platformDisplayName: userInfo.name,
+                accessToken: result.accessToken,
+                profileData: {
+                  profileImageUrl: userInfo.profileImageUrl,
+                  followersCount: userInfo.followersCount,
+                  followingCount: userInfo.followingCount,
+                },
+              }),
             });
-          } catch {}
+            console.log('[SocialMediaConnect] Twitter connection saved');
+          } catch (saveErr) {
+            console.warn('[SocialMediaConnect] Save failed (popup may have saved):', saveErr);
+          }
           toast({
             title: "X Connected! 🎉",
             description: "Successfully connected to X (Twitter).",
@@ -411,6 +426,8 @@ export default function SocialMediaConnect({
         const authUrl = socialManager.getAuthUrl(platformId);
         window.location.href = authUrl;
       }
+      // Invalidate social connections cache so all components get fresh data
+      invalidateSocialConnections();
     } catch (error) {
       console.error('Connect platform error:', error);
       toast({
@@ -425,15 +442,19 @@ export default function SocialMediaConnect({
 
   const disconnectPlatform = async (platformId: string) => {
     try {
-      await fetch(`/api/social/${platformId}`, {
-        method: 'DELETE'
-      });
+      const result = await disconnectSocialPlatform(platformId);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
       setConnectedAccounts(prev => {
         const updated = prev.filter(acc => acc.platform !== platformId);
         onAccountsChange?.(updated);
         return updated;
       });
+
+      // Invalidate social connections cache so all components get fresh data
+      invalidateSocialConnections();
 
       toast({
         title: "Account Disconnected",

@@ -4,7 +4,11 @@ import { createServer, type Server } from "http";
 import { storage } from '../core/storage';
 import { db } from '../db';
 import { registerSocialRoutes } from "./social/social-routes";
+import { registerKickOAuthRoutes } from "./social/kick-oauth-routes";
+import { registerPatreonOAuthRoutes } from "./social/patreon-oauth-routes";
 import { registerTenantRoutes } from "./user/tenant-routes";
+import { registerGoogleAuthRoutes } from "./auth/google-routes";
+import { registerAuthRoutes } from "./auth/auth-routes";
 import { registerAdminRoutes } from "./admin/admin-routes";
 import { registerDynamicAnalyticsRoutes } from "./media/dynamic-analytics-routes";
 import { registerTwitterVerificationRoutes } from "./social/twitter-verification-routes";
@@ -28,6 +32,10 @@ import { registerSpotifyTaskRoutes } from "./tasks/spotify-task-routes";
 import { registerTikTokTaskRoutes } from "./tasks/tiktok-task-routes";
 import { registerLeaderboardRoutes } from "./programs/leaderboard-routes";
 import { registerBetaSignupRoutes } from "./beta-signup-routes";
+import { registerVerificationAnalyticsRoutes } from "./analytics/verification-analytics-routes";
+import { registerSyncPreferencesRoutes } from "./analytics/sync-preferences-routes";
+import { registerCreatorAnalyticsRoutes } from "./analytics/creator-analytics-routes";
+import { registerHealthRoutes } from "./health/health-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -40,6 +48,7 @@ import {
   youtubeTaskSchema, tiktokTaskSchema, spotifyTaskSchema
 } from "@shared/taskTemplates";
 import { authenticateUser, requireRole, requireCustomerTier, requireAdminPermission, requireFandomlyAdmin, AuthenticatedRequest } from "../middleware/rbac";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 import multer from 'multer';
 import path from 'path';
@@ -91,6 +100,7 @@ import videoUploadRoutes from "./media/video-upload-routes";
 import socialConnectionRoutes from "./social/social-connection-routes";
 import creatorVerificationRoutes from "./social/creator-verification-routes";
 import { createAuditRoutes } from "./admin/audit-routes";
+import { getJWKS } from "../services/auth/jwt-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -180,6 +190,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // JWKS endpoint for Crossmint JWT validation
+  app.get('/.well-known/jwks.json', (req, res) => {
+    try {
+      const jwks = getJWKS();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.json(jwks);
+    } catch (error) {
+      console.error('Error serving JWKS:', error);
+      res.status(500).json({ error: 'Failed to generate JWKS' });
+    }
+  });
+
   // Register image upload routes
   app.use('/api/upload', uploadRoutes);
   
@@ -430,7 +453,349 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Complete onboarding endpoint with Stripe integration
+  // Set user type endpoint - called after OAuth when user selects their type
+  app.post("/api/auth/set-user-type", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { userType } = req.body;
+      
+      // Validate userType
+      if (!userType || !['fan', 'creator', 'brand'].includes(userType)) {
+        return res.status(400).json({ error: "Invalid userType. Must be 'fan', 'creator', or 'brand'" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Determine the actual type and role
+      // For 'brand' users, we store them as 'creator' type but with brandType metadata
+      const actualUserType = userType === 'brand' ? 'creator' : userType;
+      const role = actualUserType === 'creator' ? 'customer_admin' : 'customer_end_user';
+
+      // Update user type and role
+      await storage.updateUser(userId, {
+        userType: actualUserType,
+        role: role as "customer_admin" | "customer_end_user",
+        ...(userType === 'brand' ? { profileData: { ...(user.profileData as object || {}), isBrand: true } } : {})
+      } as any);
+
+      // If user is a creator, auto-create their tenant
+      if (actualUserType === 'creator' && !user.currentTenantId) {
+        try {
+          const username = user.username || "creator";
+          const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${userId.slice(-6)}`;
+          
+          const tenant = await storage.createTenant({
+            slug: tenantSlug,
+            name: `${username}'s Store`,
+            ownerId: userId,
+            status: 'trial',
+            subscriptionTier: 'starter',
+            branding: {
+              primaryColor: '#8B5CF6',
+              secondaryColor: '#06B6D4', 
+              accentColor: '#10B981'
+            },
+            businessInfo: {
+              businessType: 'individual' as const
+            },
+            limits: {
+              maxMembers: 100,
+              maxCampaigns: 3,
+              maxRewards: 10,
+              maxApiCalls: 1000,
+              storageLimit: 100,
+              customDomain: false,
+              advancedAnalytics: false,
+              whiteLabel: false
+            },
+            settings: {
+              timezone: 'UTC',
+              currency: 'USD',
+              language: 'en',
+              nilCompliance: false,
+              publicProfile: true,
+              allowRegistration: true,
+              requireEmailVerification: false,
+              enableSocialLogin: true
+            }
+          });
+
+          // Create initial tenant membership for the creator
+          await storage.createTenantMembership({
+            tenantId: tenant.id,
+            userId: userId,
+            role: 'owner'
+          });
+
+          // Update user's current tenant
+          await storage.updateUser(userId, { currentTenantId: tenant.id });
+
+          console.log("Created tenant for new creator:", tenant.id);
+        } catch (tenantError) {
+          console.error("Failed to create tenant for creator:", tenantError);
+          // Continue even if tenant creation fails
+        }
+      }
+
+      // Get updated user
+      const updatedUser = await storage.getUser(userId);
+      
+      console.log("User type set successfully:", { userId, userType: actualUserType, role });
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Set user type error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to set user type" });
+    }
+  });
+
+  // ================================================================
+  // NEW: Unified creator type selection + auto-scaffold endpoint
+  // Replaces the multi-step onboarding with a single atomic operation:
+  //   1. Sets userType to 'creator'
+  //   2. Creates tenant
+  //   3. Creates creator record
+  //   4. Creates draft program with smart defaults
+  //   5. Marks onboarding as complete
+  // ================================================================
+  app.post("/api/auth/set-creator-type", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { creatorType } = req.body;
+
+      // Validate creatorType
+      if (!creatorType || !['athlete', 'musician', 'content_creator'].includes(creatorType)) {
+        return res.status(400).json({ 
+          error: "Invalid creatorType. Must be 'athlete', 'musician', or 'content_creator'" 
+        });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Import theme templates for smart defaults
+      const { getThemeTemplate } = await import("@shared/theme-templates");
+
+      // Creator type -> default theme mapping
+      const themeMap: Record<string, string> = {
+        athlete: 'dark-pro',
+        musician: 'royal-purple',
+        content_creator: 'gaming-rgb',
+      };
+
+      // Creator type -> points name suggestion
+      const pointsNameMap: Record<string, string> = {
+        athlete: 'Fan Points',
+        musician: 'Fan Credits',
+        content_creator: 'Community Points',
+      };
+
+      // Step 1: Set userType to 'creator' and role to 'customer_admin'
+      await storage.updateUser(userId, {
+        userType: 'creator',
+        role: 'customer_admin' as "customer_admin",
+        onboardingState: {
+          currentStep: 1,
+          totalSteps: 1,
+          completedSteps: ["1"],
+          isCompleted: true,
+        },
+      });
+
+      // Step 2: Create tenant (if not already created)
+      let tenantId = user.currentTenantId;
+      if (!tenantId) {
+        try {
+          const username = user.username || "creator";
+          const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${userId.slice(-6)}`;
+          
+          const tenant = await storage.createTenant({
+            slug: tenantSlug,
+            name: `${username}'s Store`,
+            ownerId: userId,
+            status: 'trial',
+            subscriptionTier: 'starter',
+            branding: {
+              primaryColor: '#8B5CF6',
+              secondaryColor: '#06B6D4',
+              accentColor: '#10B981',
+            },
+            businessInfo: {
+              businessType: 'individual' as const,
+            },
+            limits: {
+              maxMembers: 100,
+              maxCampaigns: 3,
+              maxRewards: 10,
+              maxApiCalls: 1000,
+              storageLimit: 100,
+              customDomain: false,
+              advancedAnalytics: false,
+              whiteLabel: false,
+            },
+            settings: {
+              timezone: 'UTC',
+              currency: 'USD',
+              language: 'en',
+              nilCompliance: false,
+              publicProfile: true,
+              allowRegistration: true,
+              requireEmailVerification: false,
+              enableSocialLogin: true,
+            },
+          });
+
+          tenantId = tenant.id;
+
+          // Create initial tenant membership
+          await storage.createTenantMembership({
+            tenantId: tenant.id,
+            userId: userId,
+            role: 'owner',
+          });
+
+          // Update user's current tenant
+          await storage.updateUser(userId, { currentTenantId: tenant.id });
+
+          console.log("Created tenant for new creator:", tenant.id);
+        } catch (tenantError) {
+          console.error("Failed to create tenant for creator:", tenantError);
+          return res.status(500).json({ error: "Failed to create creator account" });
+        }
+      }
+
+      // Step 3: Create creator record (if not already created)
+      let creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        const displayName = (user.profileData as any)?.name || user.username || 'Creator';
+
+        creator = await storage.createCreator({
+          userId: userId,
+          tenantId: tenantId,
+          displayName: displayName,
+          bio: '',
+          category: creatorType,
+          followerCount: 0,
+          typeSpecificData: {},
+          brandColors: {
+            primary: '#8B5CF6',
+            secondary: '#06B6D4',
+            accent: '#10B981',
+          },
+          socialLinks: {},
+        });
+
+        console.log("Created creator record:", creator.id);
+      } else {
+        // Update creator category if it changed
+        creator = await storage.updateCreator(creator.id, {
+          category: creatorType,
+        });
+      }
+
+      // Step 4: Create draft program with smart defaults (if none exists)
+      const existingPrograms = await storage.getLoyaltyProgramsByCreator(creator.id);
+      let program = existingPrograms[0];
+
+      if (!program) {
+        const displayName = creator.displayName || user.username || 'Creator';
+        const defaultThemeId = themeMap[creatorType] || 'dark-pro';
+        const defaultTheme = getThemeTemplate(defaultThemeId);
+        const pointsName = pointsNameMap[creatorType] || 'Points';
+        const programSlug = `${(user.username || 'creator').toLowerCase().replace(/[^a-z0-9]/g, '-')}-program`;
+
+        program = await storage.createLoyaltyProgram({
+          tenantId: tenantId,
+          creatorId: creator.id,
+          name: `${displayName}'s Program`,
+          description: '',
+          pointsName: pointsName,
+          status: 'draft',
+          isActive: false,
+          slug: programSlug,
+          pageConfig: {
+            headerImage: undefined,
+            logo: undefined,
+            brandColors: defaultTheme ? {
+              primary: defaultTheme.colors.primary,
+              secondary: defaultTheme.colors.secondary,
+              accent: defaultTheme.colors.accent,
+            } : {
+              primary: '#8B5CF6',
+              secondary: '#06B6D4',
+              accent: '#10B981',
+            },
+            theme: defaultTheme ? {
+              ...defaultTheme,
+              mode: defaultTheme.mode ?? 'dark',
+            } as { mode: 'light' | 'dark' | 'custom'; backgroundColor?: string; textColor?: string; templateId?: string } : {
+              mode: 'dark' as const,
+            },
+            socialLinks: {},
+            visibility: {
+              showProfile: true,
+              showCampaigns: true,
+              showTasks: true,
+              showRewards: true,
+              showLeaderboard: true,
+              showActivityFeed: true,
+              showFanWidget: true,
+              profileData: {
+                showBio: true,
+                showSocialLinks: true,
+                showTiers: true,
+                showVerificationBadge: true,
+                showLocation: true,
+                showWebsite: true,
+                showJoinDate: true,
+                showFollowerCount: true,
+              },
+            },
+            creatorDetails: {},
+          },
+          tiers: [],
+        });
+
+        console.log("Created draft program:", program.id);
+      }
+
+      // Get the fully updated user
+      const updatedUser = await storage.getUser(userId);
+
+      console.log("Creator type set and scaffolded successfully:", {
+        userId,
+        creatorType,
+        tenantId,
+        creatorId: creator.id,
+        programId: program.id,
+      });
+
+      res.json({
+        ...updatedUser,
+        creator,
+        program,
+      });
+    } catch (error) {
+      console.error("Set creator type error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to set creator type" 
+      });
+    }
+  });
+
+  // Complete onboarding endpoint with Stripe integration (LEGACY - kept for backward compatibility)
   app.post("/api/auth/complete-onboarding", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       // Get user data from authenticated user
@@ -1071,33 +1436,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn(`Failed to fetch tenant for creator ${c.id}:`, tenantError);
           }
 
-          // Check if creator has at least one published program
+          // Get creator's program (single source of truth for fan-facing data)
           let hasPublishedProgram = false;
+          let program = null;
           try {
             const { loyaltyPrograms } = await import("@shared/schema");
-            const { eq, and } = await import("drizzle-orm");
+            const { eq, and, desc } = await import("drizzle-orm");
             const db = (await import("../db")).db;
 
-            const publishedPrograms = await db.select()
+            // Get the most recent program for this creator
+            const programs = await db.select()
               .from(loyaltyPrograms)
-              .where(and(
-                eq(loyaltyPrograms.creatorId, c.id),
-                eq(loyaltyPrograms.status, 'published')
-              ))
+              .where(eq(loyaltyPrograms.creatorId, c.id))
+              .orderBy(desc(loyaltyPrograms.createdAt))
               .limit(1);
 
-            hasPublishedProgram = publishedPrograms.length > 0;
+            if (programs.length > 0) {
+              program = programs[0];
+              hasPublishedProgram = program.status === 'published';
+            }
           } catch (programError) {
-            console.warn(`Failed to check published programs for creator ${c.id}:`, programError);
+            console.warn(`Failed to check programs for creator ${c.id}:`, programError);
           }
 
+          // Build response using program as canonical source, falling back to creator/user data
+          const pageConfig = (program?.pageConfig as any) || {};
           return {
             ...c,
+            // Program is the single source of truth for fan-facing data
+            displayName: program?.name || c.displayName,
+            bio: program?.description || c.bio,
+            imageUrl: pageConfig.logo || c.imageUrl,
+            brandColors: pageConfig.brandColors || c.brandColors,
+            socialLinks: pageConfig.socialLinks || c.socialLinks,
             hasActiveCampaign: activeCampaigns.length > 0,
             activeCampaignsCount: activeCampaigns.length,
             publishedTasksCount: publishedTasks.length,
             isLive: activeCampaigns.length > 0 || publishedTasks.length > 0,
             hasPublishedProgram,
+            program: program ? {
+              id: program.id,
+              name: program.name,
+              slug: program.slug,
+              status: program.status,
+              pointsName: program.pointsName,
+              pageConfig: program.pageConfig,
+            } : null,
             user: user ? { username: user.username, profileData: user.profileData } : null,
             tenant: tenant ? { slug: tenant.slug, branding: tenant.branding } : null,
           };
@@ -2756,6 +3140,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ================================================================
+  // One-tap join: Follow tenant + Enroll in program in a single call
+  // Simplifies fan onboarding and creator card join buttons
+  // ================================================================
+  app.post("/api/fan-programs/join-creator/:creatorId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
+
+      const { creatorId } = req.params;
+      const { loyaltyPrograms } = await import("@shared/schema");
+      const { eq, and, desc } = await import("drizzle-orm");
+
+      // Get creator's most recent published (or any) program
+      const [program] = await db.select()
+        .from(loyaltyPrograms)
+        .where(eq(loyaltyPrograms.creatorId, creatorId))
+        .orderBy(desc(loyaltyPrograms.createdAt))
+        .limit(1);
+
+      if (!program) {
+        return res.status(404).json({ error: "Creator has no program yet" });
+      }
+
+      // Step 1: Follow tenant (create membership if not exists)
+      try {
+        await storage.createTenantMembership({
+          tenantId: program.tenantId,
+          userId: userId,
+          role: 'member',
+        });
+      } catch (err: any) {
+        // Ignore duplicate membership errors
+        if (!err.message?.includes('duplicate') && !err.message?.includes('already')) {
+          console.warn('Follow error:', err.message);
+        }
+      }
+
+      // Step 2: Enroll in program (if not already enrolled)
+      const existing = await storage.getFanProgram(userId, program.id);
+      if (existing) {
+        return res.json({ 
+          ...existing, 
+          message: "Already joined this program",
+          program: { id: program.id, name: program.name, slug: program.slug },
+        });
+      }
+
+      const fanProgram = await storage.createFanProgram({
+        fanId: userId,
+        tenantId: program.tenantId,
+        programId: program.id,
+      });
+
+      res.json({ 
+        ...fanProgram,
+        program: { id: program.id, name: program.name, slug: program.slug },
+      });
+    } catch (error) {
+      console.error("One-tap join error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to join creator" });
+    }
+  });
+
   // Fan program routes
   app.post("/api/fan-programs", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
@@ -2815,6 +3263,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all fans enrolled in a specific program (for creator dashboard)
+  app.get("/api/fan-programs/program/:programId", async (req, res) => {
+    try {
+      const { db } = await import("../db");
+      const { eq } = await import("drizzle-orm");
+      const { fanPrograms: fanProgramsTable, users } = await import("@shared/schema");
+      
+      // Fetch all fans enrolled in this program with user details
+      const fansInProgram = await db
+        .select({
+          fanProgram: fanProgramsTable,
+          user: users,
+        })
+        .from(fanProgramsTable)
+        .leftJoin(users, eq(fanProgramsTable.fanId, users.id))
+        .where(eq(fanProgramsTable.programId, req.params.programId));
+      
+      // Transform to return fan data with enrollment info
+      const enrichedFans = fansInProgram.map(({ fanProgram, user }) => ({
+        id: fanProgram.id,
+        fanId: fanProgram.fanId,
+        programId: fanProgram.programId,
+        joinedAt: fanProgram.joinedAt,
+        currentPoints: fanProgram.currentPoints || 0,
+        totalPointsEarned: fanProgram.totalPointsEarned || 0,
+        currentTier: fanProgram.currentTier,
+        username: user?.username,
+        email: user?.email,
+        fullName: user?.fullName,
+        avatarUrl: user?.avatarUrl,
+      }));
+      
+      console.log(`[API] Returning ${enrichedFans.length} fans for program ${req.params.programId}`);
+      res.json(enrichedFans);
+    } catch (error) {
+      console.error("Failed to fetch fans for program:", error);
+      res.status(500).json({ error: "Failed to fetch fans for program" });
+    }
+  });
+
   // Point transaction routes
   app.get("/api/point-transactions/fan-program/:fanProgramId", async (req, res) => {
     try {
@@ -2847,23 +3335,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Creator Activity Feed
   app.get("/api/creator/activity/:creatorId", async (req, res) => {
     try {
-      const { creatorId } = req.params;
+      const { creatorId } = req.params; // This is actually the userId passed from frontend
       const { search = '', type = 'all', dateFilter = 'all', limit = '100' } = req.query;
 
       // Get creator's programs
-      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, pointTransactions, users, tasks } = await import("@shared/schema");
+      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, pointTransactions, users, tasks, creators } = await import("@shared/schema");
       const { eq, and, desc, or, like, gte, sql } = await import("drizzle-orm");
       const db = (await import("../db")).db;
+      
+      // First, look up the actual creator.id from the user.id
+      const [creator] = await db.select()
+        .from(creators)
+        .where(eq(creators.userId, creatorId))
+        .limit(1);
+      
+      // Try both the userId as creatorId directly and the looked-up creator.id
+      const creatorIds = creator ? [creatorId, creator.id] : [creatorId];
 
       const programs = await db.select()
         .from(loyaltyPrograms)
-        .where(eq(loyaltyPrograms.creatorId, creatorId));
+        .where(or(...creatorIds.map(cid => eq(loyaltyPrograms.creatorId, cid))));
 
       if (programs.length === 0) {
         return res.json([]);
       }
 
       const programIds = programs.map(p => p.id);
+      const tenantIds = [...new Set(programs.map(p => p.tenantId).filter(Boolean))];
       const activities: any[] = [];
 
       // Calculate date filter
@@ -2913,13 +3411,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2. Fetch task completions
       if (type === 'all' || type === 'task' || type === 'earn') {
+        const processedCompletionIds = new Set<string>();
+        
+        // First try by programId
         for (const programId of programIds) {
+          // Query completions including both 'completed' and 'claimed' status
           const completions = await db.select({
             id: taskCompletions.id,
             userId: taskCompletions.userId,
             taskId: taskCompletions.taskId,
             completedAt: taskCompletions.completedAt,
-            pointsAwarded: taskCompletions.pointsAwarded,
+            updatedAt: taskCompletions.updatedAt,
+            pointsEarned: taskCompletions.pointsEarned,
+            status: taskCompletions.status,
             fanUsername: users.username,
             taskName: tasks.name
           })
@@ -2928,20 +3432,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .leftJoin(users, eq(taskCompletions.userId, users.id))
           .where(and(
             eq(tasks.programId, programId),
-            eq(taskCompletions.status, 'completed'),
-            dateThreshold && taskCompletions.completedAt ? gte(taskCompletions.completedAt, dateThreshold) : sql`true`
+            or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
+            dateThreshold ? gte(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`, dateThreshold) : sql`true`
           ))
-          .orderBy(desc(taskCompletions.completedAt))
+          .orderBy(desc(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`))
           .limit(parseInt(limit as string));
 
           completions.forEach(completion => {
-            if (completion.completedAt) {
+            // Use completedAt or fall back to updatedAt
+            const timestamp = completion.completedAt || completion.updatedAt;
+            if (timestamp && !processedCompletionIds.has(completion.id)) {
+              processedCompletionIds.add(completion.id);
               activities.push({
                 id: completion.id,
                 type: 'task',
                 description: `completed task: ${completion.taskName}`,
-                timestamp: completion.completedAt,
-                points: completion.pointsAwarded,
+                timestamp: timestamp,
+                points: completion.pointsEarned,
+                fanName: completion.fanUsername || 'Anonymous Fan',
+                fanId: completion.userId
+              });
+            }
+          });
+        }
+        
+        // Fallback: Also try by tenantId for tasks that might not have programId set
+        for (const tenantId of tenantIds) {
+          const tenantCompletions = await db.select({
+            id: taskCompletions.id,
+            userId: taskCompletions.userId,
+            taskId: taskCompletions.taskId,
+            completedAt: taskCompletions.completedAt,
+            updatedAt: taskCompletions.updatedAt,
+            pointsEarned: taskCompletions.pointsEarned,
+            status: taskCompletions.status,
+            fanUsername: users.username,
+            taskName: tasks.name
+          })
+          .from(taskCompletions)
+          .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+          .leftJoin(users, eq(taskCompletions.userId, users.id))
+          .where(and(
+            eq(tasks.tenantId, tenantId),
+            or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
+            dateThreshold ? gte(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`, dateThreshold) : sql`true`
+          ))
+          .orderBy(desc(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`))
+          .limit(parseInt(limit as string));
+
+          tenantCompletions.forEach(completion => {
+            // Use completedAt or fall back to updatedAt, avoid duplicates
+            const timestamp = completion.completedAt || completion.updatedAt;
+            if (timestamp && !processedCompletionIds.has(completion.id)) {
+              processedCompletionIds.add(completion.id);
+              activities.push({
+                id: completion.id,
+                type: 'task',
+                description: `completed task: ${completion.taskName}`,
+                timestamp: timestamp,
+                points: completion.pointsEarned,
                 fanName: completion.fanUsername || 'Anonymous Fan',
                 fanId: completion.userId
               });
@@ -2964,7 +3513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(rewardRedemptions)
           .leftJoin(users, eq(rewardRedemptions.fanId, users.id))
           .where(and(
-            eq(rewardRedemptions.programId, programId),
+            sql`${rewardRedemptions.rewardId} IN (SELECT id FROM rewards WHERE program_id = ${programId})`,
             dateThreshold ? gte(rewardRedemptions.redeemedAt, dateThreshold) : sql`true`
           ))
           .orderBy(desc(rewardRedemptions.redeemedAt))
@@ -3007,13 +3556,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Creator Weekly Metrics
+  // Creator Engagement Metrics (supports week, month, all periods with comparison)
   app.get("/api/creator/weekly-metrics/:creatorId", async (req, res) => {
     try {
       const { creatorId } = req.params;
+      const period = (req.query.period as string) || 'week';
 
-      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks } = await import("@shared/schema");
-      const { eq, and, gte, sql } = await import("drizzle-orm");
+      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks, pointTransactions } = await import("@shared/schema");
+      const { eq, and, gte, lt, sql, inArray, or } = await import("drizzle-orm");
       const db = (await import("../db")).db;
 
       // Get creator's programs
@@ -3024,79 +3574,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (programs.length === 0) {
         return res.json({
           newFans: 0,
-          revenue: 0,
           tasksCompleted: 0,
-          rewardsRedeemed: 0
+          rewardsRedeemed: 0,
+          pointsDistributed: 0
         });
       }
 
       const programIds = programs.map(p => p.id);
 
-      // Calculate start of current week (Sunday)
+      // Calculate date ranges based on period
       const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
+      let currentStart: Date;
+      let previousStart: Date;
+      let previousEnd: Date;
 
-      // 1. Count new fans this week
-      let newFans = 0;
-      for (const programId of programIds) {
-        const fans = await db.select({ count: sql<number>`count(*)` })
+      if (period === 'week') {
+        // Current week (Sunday to now)
+        currentStart = new Date(now);
+        currentStart.setDate(now.getDate() - now.getDay());
+        currentStart.setHours(0, 0, 0, 0);
+        // Previous week
+        previousEnd = new Date(currentStart);
+        previousStart = new Date(currentStart);
+        previousStart.setDate(previousStart.getDate() - 7);
+      } else if (period === 'month') {
+        // Current month (1st to now)
+        currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Previous month
+        previousEnd = new Date(currentStart);
+        previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      } else {
+        // All time - no comparison
+        currentStart = new Date(0);
+        previousStart = new Date(0);
+        previousEnd = new Date(0);
+      }
+
+      // Helper function to get metrics for a date range
+      const getMetricsForRange = async (startDate: Date, endDate?: Date) => {
+        let newFans = 0;
+        let tasksCompleted = 0;
+        let rewardsRedeemed = 0;
+        let pointsDistributed = 0;
+
+        for (const programId of programIds) {
+          // Count new fans
+          const fansQuery = endDate
+            ? and(eq(fanPrograms.programId, programId), gte(fanPrograms.joinedAt, startDate), lt(fanPrograms.joinedAt, endDate))
+            : and(eq(fanPrograms.programId, programId), gte(fanPrograms.joinedAt, startDate));
+          
+          const fans = await db.select({ count: sql<number>`count(*)` })
+            .from(fanPrograms)
+            .where(fansQuery);
+          newFans += Number(fans[0]?.count || 0);
+
+          // Count tasks completed (including 'claimed' status)
+          const completionsQuery = endDate
+            ? and(
+                eq(tasks.programId, programId),
+                or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
+                gte(taskCompletions.completedAt, startDate),
+                lt(taskCompletions.completedAt, endDate)
+              )
+            : and(
+                eq(tasks.programId, programId),
+                or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
+                gte(taskCompletions.completedAt, startDate)
+              );
+          
+          const completions = await db.select({ count: sql<number>`count(*)` })
+            .from(taskCompletions)
+            .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+            .where(completionsQuery);
+          tasksCompleted += Number(completions[0]?.count || 0);
+
+          // Count rewards redeemed
+          const { rewards } = await import("@shared/schema");
+          const redemptionsQuery = endDate
+            ? and(eq(rewards.programId, programId), gte(rewardRedemptions.redeemedAt, startDate), lt(rewardRedemptions.redeemedAt, endDate))
+            : and(eq(rewards.programId, programId), gte(rewardRedemptions.redeemedAt, startDate));
+          
+          const redemptions = await db.select({ count: sql<number>`count(*)` })
+            .from(rewardRedemptions)
+            .innerJoin(rewards, eq(rewardRedemptions.rewardId, rewards.id))
+            .where(redemptionsQuery);
+          rewardsRedeemed += Number(redemptions[0]?.count || 0);
+        }
+
+        // Get points distributed from fan_programs for this creator's programs
+        // Sum totalPointsEarned from all fans in these programs
+        const fanProgramsData = await db.select({ 
+          totalEarned: sql<number>`COALESCE(SUM(${fanPrograms.totalPointsEarned}), 0)` 
+        })
           .from(fanPrograms)
-          .where(and(
-            eq(fanPrograms.programId, programId),
-            gte(fanPrograms.joinedAt, startOfWeek)
-          ));
-        newFans += Number(fans[0]?.count || 0);
-      }
+          .where(inArray(fanPrograms.programId, programIds));
+        
+        pointsDistributed = Number(fanProgramsData[0]?.totalEarned || 0);
 
-      // 2. Calculate revenue this week (from reward redemptions)
-      let revenue = 0;
-      for (const programId of programIds) {
-        const redemptions = await db.select({ total: sql<number>`sum(${rewardRedemptions.pointsSpent})` })
-          .from(rewardRedemptions)
-          .where(and(
-            eq(rewardRedemptions.programId, programId),
-            gte(rewardRedemptions.redeemedAt, startOfWeek)
-          ));
-        revenue += Number(redemptions[0]?.total || 0);
-      }
+        return { newFans, tasksCompleted, rewardsRedeemed, pointsDistributed };
+      };
 
-      // 3. Count tasks completed this week
-      let tasksCompleted = 0;
-      for (const programId of programIds) {
-        const completions = await db.select({ count: sql<number>`count(*)` })
-          .from(taskCompletions)
-          .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-          .where(and(
-            eq(tasks.programId, programId),
-            eq(taskCompletions.status, 'completed'),
-            gte(taskCompletions.completedAt, startOfWeek)
-          ));
-        tasksCompleted += Number(completions[0]?.count || 0);
-      }
+      // Get current period metrics
+      const currentMetrics = await getMetricsForRange(currentStart);
 
-      // 4. Count rewards redeemed this week
-      let rewardsRedeemed = 0;
-      for (const programId of programIds) {
-        const redemptions = await db.select({ count: sql<number>`count(*)` })
-          .from(rewardRedemptions)
-          .where(and(
-            eq(rewardRedemptions.programId, programId),
-            gte(rewardRedemptions.redeemedAt, startOfWeek)
-          ));
-        rewardsRedeemed += Number(redemptions[0]?.count || 0);
+      // Get previous period metrics for comparison (only if not "all" period)
+      let previousMetrics = null;
+      if (period !== 'all') {
+        previousMetrics = await getMetricsForRange(previousStart, previousEnd);
       }
 
       res.json({
-        newFans,
-        revenue,
-        tasksCompleted,
-        rewardsRedeemed
+        newFans: currentMetrics.newFans,
+        tasksCompleted: currentMetrics.tasksCompleted,
+        rewardsRedeemed: currentMetrics.rewardsRedeemed,
+        pointsDistributed: currentMetrics.pointsDistributed,
+        ...(previousMetrics && {
+          previousNewFans: previousMetrics.newFans,
+          previousTasksCompleted: previousMetrics.tasksCompleted,
+          previousRewardsRedeemed: previousMetrics.rewardsRedeemed,
+          previousPointsDistributed: previousMetrics.pointsDistributed
+        })
       });
     } catch (error) {
-      console.error('Error fetching weekly metrics:', error);
-      res.status(500).json({ error: "Failed to fetch weekly metrics" });
+      console.error('Error fetching engagement metrics:', error);
+      res.status(500).json({ error: "Failed to fetch engagement metrics" });
     }
   });
 
@@ -3333,8 +3934,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register authentication routes (Google OAuth and general auth)
+  registerGoogleAuthRoutes(app);
+  registerAuthRoutes(app);
+
   // Register social media routes (includes Instagram webhooks)
   registerSocialRoutes(app);
+  
+  // Register new platform OAuth routes
+  registerKickOAuthRoutes(app);
+  registerPatreonOAuthRoutes(app);
 
   // Register Facebook webhooks (Pages and Users)
   registerFacebookWebhooks(app);
@@ -3401,6 +4010,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register beta signup routes (public - no auth required)
   registerBetaSignupRoutes(app);
+
+  // Register verification analytics routes
+  registerVerificationAnalyticsRoutes(app);
+
+  // Register sync preferences routes
+  registerSyncPreferencesRoutes(app);
+
+  // Register creator analytics routes
+  registerCreatorAnalyticsRoutes(app);
+
+  // Register health check routes
+  registerHealthRoutes(app);
 
   // Register task routes
   const { registerTaskRoutes } = await import("./tasks/task-routes");
@@ -3907,7 +4528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is admin
       const user = await storage.getUser(req.user?.id || '');
-      if (!user || user.role !== 'admin') {
+      if (!user || user.role !== 'fandomly_admin') {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -3985,7 +4606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is admin or creator
       const user = await storage.getUser(req.user?.id || '');
-      if (!user || (user.role !== 'admin' && user.userType !== 'creator')) {
+      if (!user || (user.role !== 'fandomly_admin' && user.userType !== 'creator')) {
         return res.status(403).json({ error: "Access denied" });
       }
 

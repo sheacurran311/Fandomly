@@ -115,13 +115,13 @@ export async function handleInstagramMentionEvent(event: InstagramMentionEvent):
     return;
   }
 
-  // 3. Find active mention tasks for this creator
+  // 3. Find active mention tasks for this creator (isDraft=false = active)
   const activeTasks = await db.query.tasks.findMany({
     where: and(
       eq(tasks.creatorId, creatorConnection.userId),
       eq(tasks.platform, 'instagram'),
       eq(tasks.taskType, 'mention_story'),
-      eq(tasks.status, 'active')
+      eq(tasks.isDraft, false)
     )
   });
 
@@ -159,7 +159,8 @@ export async function handleInstagramMentionEvent(event: InstagramMentionEvent):
     if (!started) continue;
 
     // Optional: Check hashtag requirement
-    const requireHashtag = task.requirements?.requireHashtag;
+    const settings = (task.customSettings || {}) as { requireHashtag?: string };
+    const requireHashtag = settings.requireHashtag;
     if (requireHashtag && caption) {
       if (!caption.includes(requireHashtag)) {
         console.log('[Instagram Verification] Hashtag requirement not met:', requireHashtag);
@@ -171,10 +172,11 @@ export async function handleInstagramMentionEvent(event: InstagramMentionEvent):
     await awardTaskCompletion({
       taskId: task.id,
       userId: fanConnection.userId,
+      tenantId: task.tenantId ?? '',
       sourceEventId: mention_id,
       matchedUsername: from.username,
       verificationMethod: 'instagram_mention',
-      points: task.pointsReward
+      points: task.pointsToReward ?? 0
     });
 
     console.log('[Instagram Verification] ✅ Mention task verified:', {
@@ -200,19 +202,20 @@ async function verifyCommentNonce(event: InstagramCommentEvent): Promise<boolean
 
   console.log('[Instagram Verification] Nonce found in comment:', nonce);
 
-  // Find active nonce tasks for this media
+  // Find active nonce tasks for this media (isDraft=false = active)
   const activeTasks = await db.query.tasks.findMany({
     where: and(
       eq(tasks.platform, 'instagram'),
       eq(tasks.taskType, 'comment_code'),
-      eq(tasks.status, 'active')
+      eq(tasks.isDraft, false)
     )
   });
 
-  // Filter tasks by media_id from requirements
-  const mediaTasks = activeTasks.filter(task => 
-    task.requirements?.mediaId === media_id
-  );
+  // Filter tasks by media_id from customSettings
+  const mediaTasks = activeTasks.filter(task => {
+    const s = (task.customSettings || {}) as { mediaId?: string };
+    return s.mediaId === media_id;
+  });
 
   if (!mediaTasks.length) {
     console.log('[Instagram Verification] No active comment_code tasks for media:', media_id);
@@ -245,11 +248,12 @@ async function verifyCommentNonce(event: InstagramCommentEvent): Promise<boolean
     await awardTaskCompletion({
       taskId: task.id,
       userId,
+      tenantId: task.tenantId ?? '',
       sourceEventId: comment_id,
       sourceMediaId: media_id,
       matchedUsername: from.username,
       verificationMethod: 'instagram_nonce',
-      points: task.pointsReward
+      points: task.pointsToReward ?? 0
     });
 
     // Clean up nonce
@@ -267,19 +271,20 @@ async function verifyCommentNonce(event: InstagramCommentEvent): Promise<boolean
 async function verifyCommentKeyword(event: InstagramCommentEvent): Promise<boolean> {
   const { comment_id, media_id, text, from } = event;
 
-  // Find active keyword tasks for this media
+  // Find active keyword tasks for this media (isDraft=false = active)
   const activeTasks = await db.query.tasks.findMany({
     where: and(
       eq(tasks.platform, 'instagram'),
       eq(tasks.taskType, 'keyword_comment'),
-      eq(tasks.status, 'active')
+      eq(tasks.isDraft, false)
     )
   });
 
-  // Filter tasks by media_id
-  const mediaTasks = activeTasks.filter(task => 
-    task.requirements?.mediaId === media_id
-  );
+  // Filter tasks by media_id from customSettings
+  const mediaTasks = activeTasks.filter(task => {
+    const s = (task.customSettings || {}) as { mediaId?: string };
+    return s.mediaId === media_id;
+  });
 
   if (!mediaTasks.length) return false;
 
@@ -295,7 +300,8 @@ async function verifyCommentKeyword(event: InstagramCommentEvent): Promise<boole
 
   // Find task with matching keyword
   for (const task of mediaTasks) {
-    const keyword = task.requirements?.keyword;
+    const settings = (task.customSettings || {}) as { keyword?: string };
+    const keyword = settings.keyword;
     if (!keyword) continue;
 
     // Check if keyword is in comment (case-insensitive)
@@ -309,11 +315,12 @@ async function verifyCommentKeyword(event: InstagramCommentEvent): Promise<boole
     await awardTaskCompletion({
       taskId: task.id,
       userId: fanConnection.userId,
+      tenantId: task.tenantId ?? '',
       sourceEventId: comment_id,
       sourceMediaId: media_id,
       matchedUsername: from.username,
       verificationMethod: 'instagram_keyword',
-      points: task.pointsReward
+      points: task.pointsToReward ?? 0
     });
 
     return true;
@@ -328,6 +335,7 @@ async function verifyCommentKeyword(event: InstagramCommentEvent): Promise<boole
 interface AwardTaskCompletionParams {
   taskId: string;
   userId: string;
+  tenantId: string;
   sourceEventId: string;
   sourceMediaId?: string;
   matchedUsername: string;
@@ -336,7 +344,7 @@ interface AwardTaskCompletionParams {
 }
 
 async function awardTaskCompletion(params: AwardTaskCompletionParams): Promise<void> {
-  const { taskId, userId, sourceEventId, sourceMediaId, matchedUsername, verificationMethod, points } = params;
+  const { taskId, userId, tenantId, sourceEventId, sourceMediaId, matchedUsername, verificationMethod, points } = params;
 
   // Check if already completed (idempotency)
   const existing = await db.query.taskCompletions.findFirst({
@@ -355,6 +363,7 @@ async function awardTaskCompletion(params: AwardTaskCompletionParams): Promise<v
   await db.insert(taskCompletions).values({
     taskId,
     userId,
+    tenantId,
     status: 'completed',
     verifiedAt: new Date(),
     verificationMethod,
@@ -364,7 +373,7 @@ async function awardTaskCompletion(params: AwardTaskCompletionParams): Promise<v
       matchedUsername,
       platform: 'instagram',
       verifiedViaWebhook: true
-    }
+    } as Record<string, unknown>
   });
 
   // Update user points (assuming you have a user points system)

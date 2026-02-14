@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -9,16 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Plus, Settings, Target, Trash2, Edit, Eye, EyeOff,
   CheckCircle, Clock, BarChart3, Search, Filter, X,
-  CheckSquare, Square, TrendingUp
+  CheckSquare, Square, TrendingUp, LayoutGrid, Layers, Globe,
+  ShieldCheck, Shield, ShieldAlert, Info, ChevronDown, HelpCircle
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
+import { VerificationTierBadge } from "@/components/tasks/VerificationBadge";
+import { TASK_TYPE_VERIFICATION, TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
 
 interface Task {
   id: string;
@@ -38,6 +42,25 @@ interface Task {
   };
 }
 
+// Helper to get verification tier from task type
+function getTaskVerificationTier(taskType: string, platform?: string): VerificationTier {
+  // Try exact match first
+  if (TASK_TYPE_VERIFICATION[taskType]) {
+    return TASK_TYPE_VERIFICATION[taskType].tier;
+  }
+  // Try with platform prefix
+  if (platform) {
+    const prefixedType = `${platform}_${taskType}`;
+    if (TASK_TYPE_VERIFICATION[prefixedType]) {
+      return TASK_TYPE_VERIFICATION[prefixedType].tier;
+    }
+  }
+  // Default to T3 if unknown
+  return 'T3';
+}
+
+type ViewMode = 'grid' | 'by-verification' | 'by-platform';
+
 export default function CreatorTasksIndex() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -49,6 +72,9 @@ export default function CreatorTasksIndex() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [filterFrequency, setFilterFrequency] = useState<string>('all');
+  const [filterVerification, setFilterVerification] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [showTierInfo, setShowTierInfo] = useState(false);
 
   // Sprint 4B: Bulk operations
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
@@ -205,8 +231,31 @@ export default function CreatorTasksIndex() {
       return false;
     }
 
+    // Verification tier filter
+    if (filterVerification !== 'all') {
+      const taskTier = getTaskVerificationTier(task.taskType, task.platform);
+      if (taskTier !== filterVerification) {
+        return false;
+      }
+    }
+
     return true;
   });
+
+  // Group tasks by verification tier
+  const tasksByTier = {
+    T1: filteredTasks.filter(t => getTaskVerificationTier(t.taskType, t.platform) === 'T1'),
+    T2: filteredTasks.filter(t => getTaskVerificationTier(t.taskType, t.platform) === 'T2'),
+    T3: filteredTasks.filter(t => getTaskVerificationTier(t.taskType, t.platform) === 'T3'),
+  };
+
+  // Group tasks by platform
+  const tasksByPlatform = filteredTasks.reduce((acc, task) => {
+    const platform = task.platform || 'other';
+    if (!acc[platform]) acc[platform] = [];
+    acc[platform].push(task);
+    return acc;
+  }, {} as Record<string, Task[]>);
 
   // Stats
   const stats = {
@@ -236,6 +285,36 @@ export default function CreatorTasksIndex() {
               </div>
               
               <div className="flex gap-2">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-white/5 rounded-lg p-1 border border-white/10">
+                  <Button
+                    onClick={() => setViewMode('grid')}
+                    variant="ghost"
+                    size="sm"
+                    className={`px-3 ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('by-verification')}
+                    variant="ghost"
+                    size="sm"
+                    className={`px-3 ${viewMode === 'by-verification' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
+                    title="Group by Verification Tier"
+                  >
+                    <Layers className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('by-platform')}
+                    variant="ghost"
+                    size="sm"
+                    className={`px-3 ${viewMode === 'by-platform' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
+                    title="Group by Platform"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 <Button
                   onClick={() => setBulkMode(!bulkMode)}
                   variant="outline"
@@ -283,6 +362,91 @@ export default function CreatorTasksIndex() {
             />
           </div>
 
+          {/* Verification Tier Info Panel */}
+          <Collapsible open={showTierInfo} onOpenChange={setShowTierInfo} className="mb-6">
+            <Card className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-green-500/10 border-white/10">
+              <CardHeader className="pb-2">
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="h-5 w-5 text-blue-400" />
+                      <CardTitle className="text-white text-lg">Understanding Verification Tiers</CardTitle>
+                    </div>
+                    <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showTierInfo ? 'rotate-180' : ''}`} />
+                  </div>
+                </CollapsibleTrigger>
+                <CardDescription className="text-gray-400">
+                  Click to learn about T1, T2, and T3 verification and recommended point values
+                </CardDescription>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* T1 */}
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShieldCheck className="h-5 w-5 text-green-400" />
+                        <span className="font-semibold text-green-400">T1 - API Verified</span>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-2">{TIER_GUIDANCE.T1.description}</p>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Trust Level:</span>{' '}
+                        <span className="text-green-400 font-medium">{TIER_GUIDANCE.T1.trustLevel}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Recommended:</span>{' '}
+                        <span className="text-white font-medium">{TIER_GUIDANCE.T1.pointsRange}</span>
+                      </div>
+                      {TIER_GUIDANCE.T1.tip && (
+                        <p className="text-xs text-green-400/80 mt-2 italic">{TIER_GUIDANCE.T1.tip}</p>
+                      )}
+                    </div>
+                    
+                    {/* T2 */}
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="h-5 w-5 text-blue-400" />
+                        <span className="font-semibold text-blue-400">T2 - Code Verified</span>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-2">{TIER_GUIDANCE.T2.description}</p>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Trust Level:</span>{' '}
+                        <span className="text-blue-400 font-medium">{TIER_GUIDANCE.T2.trustLevel}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Recommended:</span>{' '}
+                        <span className="text-white font-medium">{TIER_GUIDANCE.T2.pointsRange}</span>
+                      </div>
+                      {TIER_GUIDANCE.T2.tip && (
+                        <p className="text-xs text-blue-400/80 mt-2 italic">{TIER_GUIDANCE.T2.tip}</p>
+                      )}
+                    </div>
+                    
+                    {/* T3 */}
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShieldAlert className="h-5 w-5 text-amber-400" />
+                        <span className="font-semibold text-amber-400">T3 - Honor System</span>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-2">{TIER_GUIDANCE.T3.description}</p>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Trust Level:</span>{' '}
+                        <span className="text-amber-400 font-medium">{TIER_GUIDANCE.T3.trustLevel}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Recommended:</span>{' '}
+                        <span className="text-white font-medium">{TIER_GUIDANCE.T3.pointsRange}</span>
+                      </div>
+                      {TIER_GUIDANCE.T3.warning && (
+                        <p className="text-xs text-amber-400/80 mt-2 italic">{TIER_GUIDANCE.T3.warning}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
           {/* Filters & Search */}
           <Card className="bg-white/5 border-white/10 mb-6">
             <CardContent className="p-4">
@@ -299,6 +463,35 @@ export default function CreatorTasksIndex() {
                     />
                   </div>
                 </div>
+
+                {/* Verification Tier Filter */}
+                <Select value={filterVerification} onValueChange={setFilterVerification}>
+                  <SelectTrigger className="w-full md:w-[180px] bg-white/10 border-white/20 text-white">
+                    <Shield className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Verification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tiers</SelectItem>
+                    <SelectItem value="T1">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-green-500" />
+                        T1 - API Verified
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="T2">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-blue-500" />
+                        T2 - Code Verified
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="T3">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 text-amber-500" />
+                        T3 - Honor System
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
 
                 {/* Type Filter */}
                 <Select value={filterType} onValueChange={setFilterType}>
@@ -475,12 +668,14 @@ export default function CreatorTasksIndex() {
                     )}
                   </CardContent>
                 </Card>
-              ) : (
+              ) : viewMode === 'grid' ? (
+                // Grid View
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredTasks.map((task) => (
                     <TaskCard
                       key={task.id}
                       task={task}
+                      verificationTier={getTaskVerificationTier(task.taskType, task.platform)}
                       onDelete={() => deleteTaskMutation.mutate(task.id)}
                       onTogglePublish={() => togglePublishMutation.mutate({
                         taskId: task.id,
@@ -491,6 +686,152 @@ export default function CreatorTasksIndex() {
                       isSelected={selectedTasks.has(task.id)}
                       onToggleSelection={() => toggleTaskSelection(task.id)}
                     />
+                  ))}
+                </div>
+              ) : viewMode === 'by-verification' ? (
+                // Group by Verification Tier
+                <div className="space-y-8">
+                  {/* T1 Group */}
+                  {tasksByTier.T1.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-2 border-b border-green-500/20">
+                        <ShieldCheck className="h-5 w-5 text-green-400" />
+                        <h3 className="text-lg font-semibold text-green-400">
+                          T1 - API Verified ({TIER_GUIDANCE.T1.trustLevel} Trust)
+                        </h3>
+                        <span className="text-sm text-gray-400">
+                          {tasksByTier.T1.length} task{tasksByTier.T1.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-xs text-green-400/70 ml-auto">
+                          Recommended: {TIER_GUIDANCE.T1.pointsRange}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {tasksByTier.T1.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            verificationTier="T1"
+                            onDelete={() => deleteTaskMutation.mutate(task.id)}
+                            onTogglePublish={() => togglePublishMutation.mutate({
+                              taskId: task.id,
+                              isDraft: task.isDraft
+                            })}
+                            onEdit={() => setLocation(`/creator-dashboard/tasks/edit/${task.id}`)}
+                            bulkMode={bulkMode}
+                            isSelected={selectedTasks.has(task.id)}
+                            onToggleSelection={() => toggleTaskSelection(task.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* T2 Group */}
+                  {tasksByTier.T2.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-2 border-b border-blue-500/20">
+                        <Shield className="h-5 w-5 text-blue-400" />
+                        <h3 className="text-lg font-semibold text-blue-400">
+                          T2 - Code Verified ({TIER_GUIDANCE.T2.trustLevel} Trust)
+                        </h3>
+                        <span className="text-sm text-gray-400">
+                          {tasksByTier.T2.length} task{tasksByTier.T2.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-xs text-blue-400/70 ml-auto">
+                          Recommended: {TIER_GUIDANCE.T2.pointsRange}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {tasksByTier.T2.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            verificationTier="T2"
+                            onDelete={() => deleteTaskMutation.mutate(task.id)}
+                            onTogglePublish={() => togglePublishMutation.mutate({
+                              taskId: task.id,
+                              isDraft: task.isDraft
+                            })}
+                            onEdit={() => setLocation(`/creator-dashboard/tasks/edit/${task.id}`)}
+                            bulkMode={bulkMode}
+                            isSelected={selectedTasks.has(task.id)}
+                            onToggleSelection={() => toggleTaskSelection(task.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* T3 Group */}
+                  {tasksByTier.T3.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-2 border-b border-amber-500/20">
+                        <ShieldAlert className="h-5 w-5 text-amber-400" />
+                        <h3 className="text-lg font-semibold text-amber-400">
+                          T3 - Honor System ({TIER_GUIDANCE.T3.trustLevel} Trust)
+                        </h3>
+                        <span className="text-sm text-gray-400">
+                          {tasksByTier.T3.length} task{tasksByTier.T3.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-xs text-amber-400/70 ml-auto">
+                          Recommended: {TIER_GUIDANCE.T3.pointsRange}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {tasksByTier.T3.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            verificationTier="T3"
+                            onDelete={() => deleteTaskMutation.mutate(task.id)}
+                            onTogglePublish={() => togglePublishMutation.mutate({
+                              taskId: task.id,
+                              isDraft: task.isDraft
+                            })}
+                            onEdit={() => setLocation(`/creator-dashboard/tasks/edit/${task.id}`)}
+                            bulkMode={bulkMode}
+                            isSelected={selectedTasks.has(task.id)}
+                            onToggleSelection={() => toggleTaskSelection(task.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Group by Platform
+                <div className="space-y-8">
+                  {Object.entries(tasksByPlatform).sort(([a], [b]) => a.localeCompare(b)).map(([platform, platformTasks]) => (
+                    <div key={platform}>
+                      <div className="flex items-center gap-3 mb-4 pb-2 border-b border-white/10">
+                        <Globe className="h-5 w-5 text-indigo-400" />
+                        <h3 className="text-lg font-semibold text-white capitalize">
+                          {platform === 'other' ? 'Other / General' : platform}
+                        </h3>
+                        <span className="text-sm text-gray-400">
+                          {platformTasks.length} task{platformTasks.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {platformTasks.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            verificationTier={getTaskVerificationTier(task.taskType, task.platform)}
+                            onDelete={() => deleteTaskMutation.mutate(task.id)}
+                            onTogglePublish={() => togglePublishMutation.mutate({
+                              taskId: task.id,
+                              isDraft: task.isDraft
+                            })}
+                            onEdit={() => setLocation(`/creator-dashboard/tasks/edit/${task.id}`)}
+                            bulkMode={bulkMode}
+                            isSelected={selectedTasks.has(task.id)}
+                            onToggleSelection={() => toggleTaskSelection(task.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -504,6 +845,7 @@ export default function CreatorTasksIndex() {
 // Task Card Component
 function TaskCard({
   task,
+  verificationTier,
   onDelete,
   onTogglePublish,
   onEdit,
@@ -512,6 +854,7 @@ function TaskCard({
   onToggleSelection,
 }: {
   task: Task;
+  verificationTier?: VerificationTier;
   onDelete: () => void;
   onTogglePublish: () => void;
   onEdit: () => void;
@@ -539,6 +882,9 @@ function TaskCard({
     return 'One-time';
   };
 
+  // Get tier for display if not provided
+  const tier = verificationTier || getTaskVerificationTier(task.taskType, task.platform);
+
   return (
     <Card className={`bg-white/5 border-white/10 hover:border-brand-primary/30 transition-all ${task.isDraft ? 'opacity-75' : ''} ${isSelected ? 'ring-2 ring-brand-primary' : ''}`}>
       <CardHeader className="pb-3">
@@ -555,7 +901,10 @@ function TaskCard({
           )}
 
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {/* Verification Tier Badge */}
+              <VerificationTierBadge tier={tier} size="sm" />
+              
               {task.isDraft ? (
                 <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
                   <Clock className="h-3 w-3 mr-1" />

@@ -1,11 +1,11 @@
 import { TwitterApi } from 'twitter-api-v2';
 import { db } from '@db';
-import { users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { socialConnections } from '@shared/schema';
+import { and, eq } from 'drizzle-orm';
 import { extractContentId } from '../../middleware/upload';
 
 export interface TwitterVerificationRequest {
-  userId: number;
+  userId: string | number;
   taskType: string;
   proofUrl?: string;
   taskSettings: {
@@ -59,23 +59,42 @@ export class TwitterVerificationService {
   }
 
   /**
-   * Get Twitter client for user-level access (requires OAuth)
+   * Get Twitter connection from social_connections (OAuth 2.0 tokens)
    */
-  private async getUserClient(userId: number): Promise<TwitterApi | null> {
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
+  private async getTwitterConnection(userId: string | number): Promise<{ accessToken: string; refreshToken: string; platformUserId: string } | null> {
+    const uid = String(userId);
+    const [conn] = await db.select().from(socialConnections).where(
+      and(eq(socialConnections.userId, uid), eq(socialConnections.platform, 'twitter'))
+    );
+    
+    // Log connection lookup for debugging
+    console.log(`[TwitterVerification] Looking up connection for userId: ${uid}`, {
+      found: !!conn,
+      hasAccessToken: !!conn?.accessToken,
+      hasRefreshToken: !!conn?.refreshToken,
+      hasPlatformUserId: !!conn?.platformUserId,
+      platformUsername: conn?.platformUsername,
     });
-
-    if (!user?.twitter_oauth_token || !user?.twitter_oauth_secret) {
+    
+    if (!conn?.accessToken || !conn?.platformUserId) {
       return null;
     }
+    return {
+      accessToken: conn.accessToken,
+      refreshToken: conn.refreshToken || '',
+      platformUserId: conn.platformUserId,
+    };
+  }
 
-    return new TwitterApi({
-      appKey: this.apiKey,
-      appSecret: this.apiSecret,
-      accessToken: user.twitter_oauth_token,
-      accessSecret: user.twitter_oauth_secret,
-    });
+  /**
+   * Get Twitter client for user-level access (OAuth 2.0 Bearer token)
+   */
+  private async getUserClient(userId: string | number): Promise<TwitterApi | null> {
+    const conn = await this.getTwitterConnection(userId);
+    if (!conn) return null;
+
+    // OAuth 2.0 PKCE uses Bearer token authentication
+    return new TwitterApi(conn.accessToken);
   }
 
   /**
@@ -149,12 +168,8 @@ export class TwitterVerificationService {
     }
 
     try {
-      // Get user's Twitter ID
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user?.twitter_user_id) {
+      const conn = await this.getTwitterConnection(userId);
+      if (!conn) {
         return {
           verified: false,
           requiresManualReview: false,
@@ -174,7 +189,7 @@ export class TwitterVerificationService {
       }
 
       // Check if user follows target
-      const following = await userClient.v2.following(user.twitter_user_id, {
+      const following = await userClient.v2.following(conn.platformUserId, {
         max_results: 1000,
       });
 
@@ -201,6 +216,17 @@ export class TwitterVerificationService {
       };
     } catch (error: any) {
       console.error('Twitter follow verification error:', error);
+      
+      // Check for 403 Forbidden - indicates missing OAuth scopes
+      if (error.code === 403 || error.data?.status === 403) {
+        return {
+          verified: false,
+          requiresManualReview: false,
+          reason: 'Permission denied. Please disconnect and reconnect your X/Twitter account to grant updated permissions.',
+          metadata: { errorCode: 403, requiresReconnect: true },
+        };
+      }
+      
       return {
         verified: false,
         requiresManualReview: false,
@@ -245,11 +271,8 @@ export class TwitterVerificationService {
     }
 
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user?.twitter_user_id) {
+      const conn = await this.getTwitterConnection(userId);
+      if (!conn) {
         return {
           verified: false,
           requiresManualReview: false,
@@ -258,11 +281,12 @@ export class TwitterVerificationService {
       }
 
       // Get user's liked tweets
-      const likedTweets = await userClient.v2.userLikedTweets(user.twitter_user_id, {
+      const likedTweets = await userClient.v2.userLikedTweets(conn.platformUserId, {
         max_results: 100,
       });
 
-      const hasLiked = likedTweets.data?.some(tweet => tweet.id === tweetId);
+      const tweetList = likedTweets.data as unknown as { id: string }[] | undefined;
+      const hasLiked = tweetList?.some((tweet) => tweet.id === tweetId);
 
       if (hasLiked) {
         return {
@@ -280,6 +304,17 @@ export class TwitterVerificationService {
       };
     } catch (error: any) {
       console.error('Twitter like verification error:', error);
+      
+      // Check for 403 Forbidden - indicates missing OAuth scopes
+      if (error.code === 403 || error.data?.status === 403) {
+        return {
+          verified: false,
+          requiresManualReview: false,
+          reason: 'Permission denied. Please disconnect and reconnect your X/Twitter account to grant updated permissions.',
+          metadata: { errorCode: 403, requiresReconnect: true },
+        };
+      }
+      
       return {
         verified: false,
         requiresManualReview: false,
@@ -316,11 +351,8 @@ export class TwitterVerificationService {
     const appClient = this.getAppClient();
 
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user?.twitter_user_id) {
+      const conn = await this.getTwitterConnection(userId);
+      if (!conn) {
         return {
           verified: false,
           requiresManualReview: false,
@@ -333,7 +365,8 @@ export class TwitterVerificationService {
         max_results: 100,
       });
 
-      const hasRetweeted = retweeters.data?.some(retweeter => retweeter.id === user.twitter_user_id);
+      const retweeterIds = (retweeters.data as { id: string }[] | undefined) ?? [];
+      const hasRetweeted = retweeterIds.some((r: { id: string }) => r.id === conn.platformUserId);
 
       if (hasRetweeted) {
         return {
@@ -490,11 +523,8 @@ export class TwitterVerificationService {
     }
 
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user?.twitter_user_id) {
+      const conn = await this.getTwitterConnection(userId);
+      if (!conn) {
         return {
           verified: false,
           requiresManualReview: false,
@@ -503,7 +533,7 @@ export class TwitterVerificationService {
       }
 
       // Get user profile
-      const profile = await userClient.v2.user(user.twitter_user_id, {
+      const profile = await userClient.v2.user(conn.platformUserId, {
         'user.fields': ['description'],
       });
 

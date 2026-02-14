@@ -472,7 +472,7 @@ export default function FanPoints() {
                   <div className="text-center py-12">
                     <Trophy className="mx-auto h-12 w-12 text-gray-600 mb-4" />
                     <p className="text-gray-400">No rewards available yet</p>
-                    <p className="text-sm text-gray-500 mt-1">Follow more creators to unlock rewards</p>
+                    <p className="text-sm text-gray-500 mt-1">Enroll with more creators to unlock rewards</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

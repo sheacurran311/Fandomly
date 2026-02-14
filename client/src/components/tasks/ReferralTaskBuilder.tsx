@@ -19,7 +19,13 @@ import {
   Gift,
   Target,
   Trophy,
+  ShieldCheck,
 } from "lucide-react";
+import { TIER_GUIDANCE } from "@shared/taskTemplates";
+
+// Referral tasks are T1 (internal platform verification)
+const REFERRAL_TIER = 'T1' as const;
+const tierGuidance = TIER_GUIDANCE[REFERRAL_TIER];
 
 interface QualifyingCondition {
   type: 'quest_completion' | 'point_threshold' | 'account_age' | 'revenue_threshold';
@@ -52,6 +58,8 @@ interface ReferralTaskAPIPayload {
   name: string;
   description: string;
   isDraft: boolean;
+  rewardType: 'points';
+  pointsToReward: number;
   customSettings: {
     referralTier: 'platform_creator_to_creator' | 'platform_fan_to_fan' | 'campaign_fan_to_fan';
     rewardStructure: 'fixed' | 'percentage' | 'revenue_share';
@@ -65,24 +73,28 @@ interface ReferralTaskAPIPayload {
 }
 
 interface ReferralTaskBuilderProps {
-  initialConfig?: Partial<ReferralTaskConfig>;
+  initialData?: any;
+  isEditMode?: boolean;
   onSave?: (config: ReferralTaskAPIPayload) => void;
   onPublish?: (config: ReferralTaskAPIPayload) => void;
   onBack?: () => void;
+  programSelector?: React.ReactNode;
 }
 
 export default function ReferralTaskBuilder({
-  initialConfig,
+  initialData,
+  isEditMode,
   onSave,
   onPublish,
   onBack,
+  programSelector,
 }: ReferralTaskBuilderProps) {
   // Handle both local config format and API format (customSettings)
   const getInitialValue = <T,>(key: keyof ReferralTaskConfig, defaultValue: T): T => {
-    if (initialConfig && key in initialConfig && initialConfig[key] !== undefined) {
-      return initialConfig[key] as T;
+    if (initialData && key in initialData && initialData[key] !== undefined) {
+      return initialData[key] as T;
     }
-    const customSettings = (initialConfig as any)?.customSettings;
+    const customSettings = (initialData as any)?.customSettings;
     if (customSettings && key in customSettings && customSettings[key] !== undefined) {
       return customSettings[key] as T;
     }
@@ -90,8 +102,8 @@ export default function ReferralTaskBuilder({
   };
 
   const [config, setConfig] = useState<ReferralTaskConfig>({
-    name: (initialConfig as any)?.name || "Refer a Friend",
-    description: (initialConfig as any)?.description || "Invite friends to join and earn rewards",
+    name: (initialData as any)?.name || "Refer a Friend",
+    description: (initialData as any)?.description || "Invite friends to join and earn rewards",
     rewardStructure: getInitialValue('rewardStructure', 'fixed'),
     referrerPoints: getInitialValue('referrerPoints', 100),
     referredPoints: getInitialValue('referredPoints', 50),
@@ -156,11 +168,16 @@ export default function ReferralTaskBuilder({
 
   // Build API payload with proper structure
   const buildAPIPayload = (isDraft: boolean): ReferralTaskAPIPayload => {
+    // Derive pointsToReward from referrer points (the primary reward for the person doing the referral)
+    const derivedPoints = config.rewardStructure === 'fixed' ? config.referrerPoints : 50;
+    
     return {
       taskType: 'referral',
       name: config.name,
       description: config.description,
       isDraft,
+      rewardType: 'points' as const,
+      pointsToReward: derivedPoints,
       customSettings: {
         referralTier: 'campaign_fan_to_fan', // Default to campaign fan-to-fan referrals
         rewardStructure: config.rewardStructure,
@@ -255,6 +272,7 @@ export default function ReferralTaskBuilder({
       description="Reward fans for inviting their friends"
       category="Onboarding"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveDraft}
       onPublish={handlePublish}
@@ -269,7 +287,7 @@ export default function ReferralTaskBuilder({
           <CardHeader>
             <CardTitle className="text-white">Basic Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div>
               <Label className="text-white">Task Name</Label>
               <Input
@@ -291,6 +309,22 @@ export default function ReferralTaskBuilder({
             </div>
           </CardContent>
         </Card>
+
+        {/* Verification Tier Guidance */}
+        <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="h-4 w-4 text-green-400" />
+            <span className="font-medium text-green-400">{tierGuidance.label}</span>
+            <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+              {tierGuidance.trustLevel}
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+          <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+          {tierGuidance.tip && (
+            <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+          )}
+        </div>
 
         {/* Reward Structure */}
         <Card className="bg-white/5 backdrop-blur-lg border-white/10">

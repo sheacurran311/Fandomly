@@ -40,17 +40,31 @@ import {
   Loader2,
   Check,
   Globe,
-  Gift
+  Gift,
+  Type,
+  LayoutGrid,
+  MapPin,
+  User,
+  Info
 } from "lucide-react";
 import { FaDiscord, FaTwitch, FaSpotify, FaTiktok } from "react-icons/fa";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { socialManager } from "@/lib/social-integrations";
 import { TwitterSDKManager } from "@/lib/twitter";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateSocialConnections } from "@/hooks/use-social-connections";
 import { ImageUpload } from "@/components/ui/image-upload";
 import type { Program, Campaign, Task } from "@shared/schema";
-import { THEME_TEMPLATES, getAllThemeTemplates, type ThemeTemplate } from "@shared/theme-templates";
+import { THEME_TEMPLATES, getAllThemeTemplates, getThemeTemplate, type ThemeTemplate, type CreatorTypeForTheme } from "@shared/theme-templates";
 import { TypographyToolbar } from "@/components/program/typography-toolbar";
+// New simplified builder components
+import { ProgramBuilderModeToggle, getSavedBuilderMode, type BuilderMode } from "@/components/program/program-builder-mode-toggle";
+import { CollapsibleSection } from "@/components/program/collapsible-section";
+import { QuickThemePicker } from "@/components/program/quick-theme-picker";
+import { EssentialInfoSection } from "@/components/program/essential-info-section";
+import { PlatformConnectionPriority } from "@/components/program/platform-connection-priority";
+import { getCreatorTemplate, type CreatorType } from "@/components/program/creator-program-templates";
+import { QuickSetupWizard, type QuickSetupData } from "@/components/program/quick-setup-wizard";
 
 interface ProgramWithDetails extends Program {
   campaigns?: Campaign[];
@@ -66,12 +80,14 @@ export default function ProgramBuilderNew() {
   const { data: programs = [], isLoading } = useQuery<Program[]>({
     queryKey: ["/api/programs"],
     enabled: !!user,
+    refetchOnMount: 'always',
   });
 
   // Fetch selected program details
   const { data: programDetails, refetch: refetchProgram } = useQuery<ProgramWithDetails>({
     queryKey: [`/api/programs/${selectedProgram?.id}`],
     enabled: !!selectedProgram?.id,
+    refetchOnMount: 'always',
   });
 
   // Fetch campaigns for the selected program
@@ -136,6 +152,9 @@ export default function ProgramBuilderNew() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs"] });
+      if (selectedProgram?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/programs/${selectedProgram.id}`] });
+      }
       refetchProgram();
     },
   });
@@ -237,11 +256,28 @@ function ProgramCustomizer({
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Builder mode state (simple/advanced)
+  const [builderMode, setBuilderMode] = useState<BuilderMode>(() => getSavedBuilderMode());
+  
+  // Get creator type from user context
+  const creatorType: CreatorType = (user?.creator?.category as CreatorType) || 'content_creator';
+  const creatorTemplate = getCreatorTemplate(creatorType);
+  
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
-  const [recentlyConnected, setRecentlyConnected] = useState<Set<string>>(new Set());
+  const [recentlyConnected, setRecentlyConnected] = useState<Set<string>>(new Set<string>());
   const [showPreview, setShowPreview] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [publishSlug, setPublishSlug] = useState(program.slug || "");
+  
+  // Quick Setup Wizard - show on first visit if program has no theme configured
+  const [showQuickSetup, setShowQuickSetup] = useState(() => {
+    // Check if this is a new/unconfigured program
+    const hasTheme = program.pageConfig?.theme?.templateId;
+    const hasSeenWizard = localStorage.getItem(`quickSetup_${program.id}`);
+    return !hasTheme && !hasSeenWizard && builderMode === 'simple';
+  });
   const [customizeData, setCustomizeData] = useState({
     displayName: program.name,
     pointsName: program.pointsName || 'Points',
@@ -286,10 +322,61 @@ function ProgramCustomizer({
       showJoinDate: true,
       showFollowerCount: true,
     },
+    // Creator details (type-specific info - sport, position, genre, etc.)
+    creatorDetails: (program.pageConfig?.creatorDetails || {}) as Record<string, Record<string, unknown>>,
+    // Location
+    location: program.pageConfig?.location || '',
   });
 
+  // Sync customizeData when the program prop changes (e.g., after re-navigation or refetch)
+  useEffect(() => {
+    setCustomizeData({
+      displayName: program.name,
+      pointsName: program.pointsName || 'Points',
+      bio: program.description || '',
+      headerImage: program.pageConfig?.headerImage || '',
+      logo: program.pageConfig?.logo || '',
+      brandColors: program.pageConfig?.brandColors || {
+        primary: '#8B5CF6',
+        secondary: '#EC4899',
+        accent: '#F59E0B'
+      },
+      socialLinks: program.pageConfig?.socialLinks || {
+        twitter: '',
+        instagram: '',
+        discord: '',
+        website: '',
+      },
+      theme: program.pageConfig?.theme || {
+        mode: 'light' as 'light' | 'dark' | 'custom',
+        backgroundColor: '#ffffff',
+        textColor: '#111827',
+      },
+      showProfile: program.pageConfig?.visibility?.showProfile ?? true,
+      showCampaigns: program.pageConfig?.visibility?.showCampaigns ?? true,
+      showTasks: program.pageConfig?.visibility?.showTasks ?? true,
+      showRewards: program.pageConfig?.visibility?.showRewards ?? true,
+      showLeaderboard: program.pageConfig?.visibility?.showLeaderboard ?? true,
+      showActivityFeed: program.pageConfig?.visibility?.showActivityFeed ?? true,
+      showFanWidget: program.pageConfig?.visibility?.showFanWidget ?? true,
+      profileData: program.pageConfig?.visibility?.profileData || {
+        showBio: true,
+        showSocialLinks: true,
+        showTiers: true,
+        showVerificationBadge: true,
+        showLocation: true,
+        showWebsite: true,
+        showJoinDate: true,
+        showFollowerCount: true,
+      },
+      creatorDetails: (program.pageConfig?.creatorDetails || {}) as Record<string, Record<string, unknown>>,
+      location: program.pageConfig?.location || '',
+    });
+    setPublishSlug(program.slug || "");
+  }, [program.id, program.updatedAt]);
+
   // Fetch social connections
-  const { data: socialConnectionsData, refetch: refetchConnections } = useQuery({
+  const { data: socialConnectionsData } = useQuery({
     queryKey: ['/api/social-connections'],
     queryFn: async () => {
       const response = await fetchApi('/api/social-connections');
@@ -297,8 +384,8 @@ function ProgramCustomizer({
     },
   });
 
-  const connectedPlatforms = new Set(
-    socialConnectionsData?.connections?.map((c: any) => c.platform) || []
+  const connectedPlatforms = new Set<string>(
+    (socialConnectionsData?.connections?.map((c: { platform?: string }) => c.platform).filter((p: unknown): p is string => typeof p === 'string') || [])
   );
 
   // Social platform connection handlers
@@ -306,13 +393,44 @@ function ProgramCustomizer({
     setConnectingPlatform('twitter');
     try {
       const result = await TwitterSDKManager.secureLogin('creator');
-      if (result.success) {
+      if (result.success && result.user) {
+        // Save connection from parent window (reliable - has JWT/cookie auth)
+        try {
+          await fetchApi('/api/social-connections', {
+            method: 'POST',
+            body: JSON.stringify({
+              platform: 'twitter',
+              platformUserId: result.user.id,
+              platformUsername: result.user.username,
+              platformDisplayName: result.user.name,
+              accessToken: result.accessToken,
+              refreshToken: result.refreshToken,
+              profileData: {
+                profileImageUrl: result.user.profileImageUrl,
+                followersCount: result.user.followersCount,
+                followingCount: result.user.followingCount,
+              },
+            }),
+          });
+          console.log('[ProgramBuilder] Twitter connection saved from parent window');
+        } catch (saveErr) {
+          console.warn('[ProgramBuilder] Parent save failed (popup may have already saved):', saveErr);
+        }
+
         setRecentlyConnected(prev => new Set(prev).add('twitter'));
         toast({
           title: "Twitter Connected! +500 Points",
           description: `Successfully connected your Twitter account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
+      } else if (result.success) {
+        // OAuth succeeded but no user info - still mark as connected
+        setRecentlyConnected(prev => new Set(prev).add('twitter'));
+        toast({
+          title: "Twitter Connected! +500 Points",
+          description: `Successfully connected your Twitter account`,
+        });
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -342,7 +460,7 @@ function ProgramCustomizer({
           title: "Instagram Connected! +500 Points",
           description: `Successfully connected your Instagram account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -372,7 +490,7 @@ function ProgramCustomizer({
           title: "Discord Connected! +500 Points",
           description: `Successfully connected your Discord account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -394,14 +512,14 @@ function ProgramCustomizer({
   const handleConnectFacebook = async () => {
     setConnectingPlatform('facebook');
     try {
-      const result = await FacebookSDKManager.login();
-      if (result.authResponse) {
+      const result = await FacebookSDKManager.login('pages_show_list,pages_read_engagement,business_management');
+      if (result.success && result.accessToken) {
         setRecentlyConnected(prev => new Set(prev).add('facebook'));
         toast({
           title: "Facebook Connected! +500 Points",
           description: `Successfully connected your Facebook account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -431,7 +549,7 @@ function ProgramCustomizer({
           title: "TikTok Connected! +500 Points",
           description: `Successfully connected your TikTok account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -461,7 +579,7 @@ function ProgramCustomizer({
           title: "YouTube Connected! +500 Points",
           description: `Successfully connected your YouTube account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -491,7 +609,7 @@ function ProgramCustomizer({
           title: "Spotify Connected! +500 Points",
           description: `Successfully connected your Spotify account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -521,7 +639,7 @@ function ProgramCustomizer({
           title: "Twitch Connected! +500 Points",
           description: `Successfully connected your Twitch account`,
         });
-        refetchConnections();
+        invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
@@ -540,6 +658,101 @@ function ProgramCustomizer({
     }
   };
 
+  // Unified connect handler for PlatformConnectionPriority component
+  const handleConnectPlatform = (platformId: string) => {
+    switch (platformId) {
+      case 'twitter':
+        handleConnectTwitter();
+        break;
+      case 'instagram':
+        handleConnectInstagram();
+        break;
+      case 'discord':
+        handleConnectDiscord();
+        break;
+      case 'facebook':
+        handleConnectFacebook();
+        break;
+      case 'tiktok':
+        handleConnectTikTok();
+        break;
+      case 'youtube':
+        handleConnectYouTube();
+        break;
+      case 'spotify':
+        handleConnectSpotify();
+        break;
+      case 'twitch':
+        handleConnectTwitch();
+        break;
+      default:
+        console.warn('Unknown platform:', platformId);
+    }
+  };
+
+  // Handler for QuickThemePicker theme selection
+  const handleSelectTheme = (template: ThemeTemplate) => {
+    setCustomizeData(prev => ({
+      ...prev,
+      theme: template as any,
+      brandColors: {
+        primary: template.colors.primary,
+        secondary: template.colors.secondary,
+        accent: template.colors.accent
+      }
+    }));
+    toast({
+      title: "Theme Applied",
+      description: `${template.name} theme has been applied to your program.`,
+    });
+  };
+
+  // Handler for EssentialInfoSection updates
+  const handleEssentialInfoChange = (updates: Partial<{
+    displayName: string;
+    bio: string;
+    pointsName: string;
+    logo: string;
+    headerImage: string;
+  }>) => {
+    setCustomizeData(prev => ({ ...prev, ...updates }));
+    // Auto-save when images are uploaded or removed (don't wait for manual Save click)
+    if ('logo' in updates || 'headerImage' in updates) {
+      const saveData = buildSaveData(updates);
+      updateProgramMutation.mutate(saveData);
+    }
+  };
+
+  // Handler for QuickSetupWizard completion
+  const handleQuickSetupComplete = (data: QuickSetupData) => {
+    // Apply the wizard data
+    const updates: any = {
+      displayName: data.displayName || customizeData.displayName,
+      bio: data.bio || customizeData.bio,
+      pointsName: data.pointsName || customizeData.pointsName,
+    };
+    
+    // Apply selected theme if any
+    if (data.selectedTheme) {
+      updates.theme = data.selectedTheme;
+      updates.brandColors = {
+        primary: data.selectedTheme.colors.primary,
+        secondary: data.selectedTheme.colors.secondary,
+        accent: data.selectedTheme.colors.accent,
+      };
+    }
+    
+    setCustomizeData(prev => ({ ...prev, ...updates }));
+    
+    // Mark wizard as seen for this program
+    localStorage.setItem(`quickSetup_${program.id}`, 'true');
+    
+    toast({
+      title: "Setup Complete!",
+      description: "Your program has been configured. Don't forget to save your changes.",
+    });
+  };
+
   const updateProgramMutation = useMutation({
     mutationFn: async (data: any) => {
       return fetchApi(`/api/programs/${program.id}`, {
@@ -550,33 +763,69 @@ function ProgramCustomizer({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/programs/${program.id}`] });
       onUpdate();
+      toast({
+        title: "Changes Saved",
+        description: "Your program has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Error saving program:", error);
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save program changes. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
-  const handleSave = () => {
-    const saveData = {
-      name: customizeData.displayName,
-      pointsName: customizeData.pointsName,
-      description: customizeData.bio,
+  // Build the full save payload from current customizeData (or with overrides)
+  const buildSaveData = (overrides: Partial<typeof customizeData> = {}) => {
+    const merged = { ...customizeData, ...overrides };
+    return {
+      name: merged.displayName,
+      pointsName: merged.pointsName,
+      description: merged.bio,
       pageConfig: {
         ...program.pageConfig,
-        headerImage: customizeData.headerImage,
-        logo: customizeData.logo,
-        brandColors: customizeData.brandColors,
-        socialLinks: customizeData.socialLinks,
-        theme: customizeData.theme,
+        headerImage: merged.headerImage,
+        logo: merged.logo,
+        brandColors: merged.brandColors,
+        socialLinks: merged.socialLinks,
+        theme: merged.theme,
+        creatorDetails: merged.creatorDetails,
+        location: merged.location,
         visibility: {
-          showProfile: customizeData.showProfile,
-          showCampaigns: customizeData.showCampaigns,
-          showTasks: customizeData.showTasks,
-          showRewards: customizeData.showRewards,
-          showLeaderboard: customizeData.showLeaderboard,
-          showActivityFeed: customizeData.showActivityFeed,
-          showFanWidget: customizeData.showFanWidget,
-          profileData: customizeData.profileData,
+          showProfile: merged.showProfile,
+          showCampaigns: merged.showCampaigns,
+          showTasks: merged.showTasks,
+          showRewards: merged.showRewards,
+          showLeaderboard: merged.showLeaderboard,
+          showActivityFeed: merged.showActivityFeed,
+          showFanWidget: merged.showFanWidget,
+          profileData: merged.profileData,
         }
       }
     };
+  };
+
+  // Auto-save a specific image field immediately after upload
+  const handleImageUpload = (field: 'headerImage' | 'logo', url: string) => {
+    // Update local state
+    setCustomizeData(prev => ({ ...prev, [field]: url }));
+    // Auto-save to backend so the image persists immediately
+    const saveData = buildSaveData({ [field]: url });
+    updateProgramMutation.mutate(saveData);
+  };
+
+  // Remove an image field and auto-save
+  const handleImageRemove = (field: 'headerImage' | 'logo') => {
+    setCustomizeData(prev => ({ ...prev, [field]: '' }));
+    const saveData = buildSaveData({ [field]: '' });
+    updateProgramMutation.mutate(saveData);
+  };
+
+  const handleSave = () => {
+    const saveData = buildSaveData();
 
     console.log('🔍 SAVING PROGRAM DATA:', JSON.stringify(saveData, null, 2));
     console.log('🎨 Brand Colors:', customizeData.brandColors);
@@ -620,140 +869,668 @@ function ProgramCustomizer({
                 </a>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setShowPreview(true)}
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
-              <Button
-                onClick={handleSave}
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-                disabled={updateProgramMutation.isPending}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {updateProgramMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
-              {program.status !== 'published' && (
+            <div className="flex items-center gap-4">
+              {/* Builder Mode Toggle */}
+              <ProgramBuilderModeToggle 
+                mode={builderMode} 
+                onModeChange={setBuilderMode} 
+              />
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowPreview(true)}
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  disabled={updateProgramMutation.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {updateProgramMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
                 <Button
                   onClick={() => setShowPublishDialog(true)}
                   className="bg-brand-primary hover:bg-brand-primary/80"
                 >
                   <Rocket className="h-4 w-4 mr-2" />
-                  Publish Program
+                  {program.status === 'published' ? 'Update Published URL' : 'Publish Program'}
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
-              onClick={() => setLocation('/creator-dashboard/campaigns')}
-              variant="outline"
-              className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
-            >
-              <Megaphone className="h-8 w-8 mb-3 text-orange-400" />
-              <span className="font-semibold text-lg">Create Campaign</span>
-              <span className="text-xs text-gray-400 mt-1">Time-based task collection</span>
-            </Button>
+      {/* Quick Actions - Only shown after program is published */}
+      {program.status === 'published' ? (
+        <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Button
+                onClick={() => setLocation('/creator-dashboard/campaigns')}
+                variant="outline"
+                className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
+              >
+                <Megaphone className="h-8 w-8 mb-3 text-orange-400" />
+                <span className="font-semibold text-lg">Create Campaign</span>
+                <span className="text-xs text-gray-400 mt-1">Time-based task collection</span>
+              </Button>
 
-            <Button
-              onClick={() => setLocation('/creator-dashboard/tasks/create')}
-              variant="outline"
-              className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
-            >
-              <CheckSquare className="h-8 w-8 mb-3 text-indigo-400" />
-              <span className="font-semibold text-lg">Create Task</span>
-              <span className="text-xs text-gray-400 mt-1">Single action for fans</span>
-            </Button>
+              <Button
+                onClick={() => setLocation('/creator-dashboard/tasks/create')}
+                variant="outline"
+                className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
+              >
+                <CheckSquare className="h-8 w-8 mb-3 text-indigo-400" />
+                <span className="font-semibold text-lg">Create Task</span>
+                <span className="text-xs text-gray-400 mt-1">Single action for fans</span>
+              </Button>
 
-            <Button
-              onClick={() => setLocation('/creator-dashboard/rewards')}
-              variant="outline"
-              className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
-            >
-              <Settings className="h-8 w-8 mb-3 text-purple-400" />
-              <span className="font-semibold text-lg">Manage Rewards</span>
-              <span className="text-xs text-gray-400 mt-1">Set up reward store</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Profile Information */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white">Program Information</CardTitle>
-          <p className="text-sm text-gray-400">Customize how your program appears to fans</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-white">Program Name</Label>
-            <Input
-              value={customizeData.displayName}
-              onChange={(e) => setCustomizeData({ ...customizeData, displayName: e.target.value })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="My Loyalty Program"
-            />
-          </div>
-          <div>
-            <Label className="text-white">Points Name</Label>
-            <Input
-              value={customizeData.pointsName}
-              onChange={(e) => setCustomizeData({ ...customizeData, pointsName: e.target.value })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="Points, Stars, Coins, etc."
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              What you'll call the rewards fans earn (e.g., "Thunder Points", "Luna Coins")
+              <Button
+                onClick={() => setLocation('/creator-dashboard/rewards')}
+                variant="outline"
+                className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
+              >
+                <Settings className="h-8 w-8 mb-3 text-purple-400" />
+                <span className="font-semibold text-lg">Manage Rewards</span>
+                <span className="text-xs text-gray-400 mt-1">Set up reward store</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="bg-white/5 backdrop-blur-lg border-white/10 border-dashed">
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-400 text-sm">
+              Publish your program first to create tasks, campaigns, and manage rewards.
             </p>
-          </div>
-          <div>
-            <Label className="text-white">Description</Label>
-            <Textarea
-              value={customizeData.bio}
-              onChange={(e) => setCustomizeData({ ...customizeData, bio: e.target.value })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              rows={3}
-              placeholder="Tell your fans what this program is about..."
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Program Images */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <ImageIcon className="h-5 w-5" />
-            Program Images
-          </CardTitle>
-          <p className="text-sm text-gray-400">Customize your program's banner and logo (separate from your personal profile)</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <Label className="text-white mb-3 block">Banner Image</Label>
-            <p className="text-sm text-gray-400 mb-3">
-              This banner will appear at the top of your program page. If not set, your creator profile banner will be used.
-            </p>
-            <ImageUpload
-              type="banner"
-              currentImageUrl={customizeData.headerImage}
-              onUploadSuccess={(url) => setCustomizeData({ ...customizeData, headerImage: url })}
-              onRemove={() => setCustomizeData({ ...customizeData, headerImage: '' })}
+      {/* ========== SIMPLE MODE COMPONENTS ========== */}
+      {builderMode === 'simple' && (
+        <>
+          {/* Quick Theme Picker - Always visible in Simple Mode */}
+          <QuickThemePicker
+            creatorType={creatorType as CreatorTypeForTheme}
+            selectedThemeId={customizeData.theme?.templateId || null}
+            onSelectTheme={handleSelectTheme}
+          />
+
+          {/* Essential Info Section - Always visible in Simple Mode */}
+          <EssentialInfoSection
+            data={{
+              displayName: customizeData.displayName,
+              bio: customizeData.bio,
+              pointsName: customizeData.pointsName,
+              logo: customizeData.logo,
+              headerImage: customizeData.headerImage,
+            }}
+            creatorType={creatorType}
+            onChange={handleEssentialInfoChange}
+          />
+
+          {/* Collapsible: Connect Platforms */}
+          <CollapsibleSection
+            title="Connect Social Platforms"
+            icon={Gift}
+            description="Connect your social accounts to build network-specific tasks"
+            badge={`${connectedPlatforms.size} connected`}
+            defaultOpen={false}
+          >
+            <PlatformConnectionPriority
+              creatorType={creatorType}
+              connectedPlatforms={connectedPlatforms}
+              socialConnections={socialConnectionsData?.connections || []}
+              recentlyConnected={recentlyConnected}
+              connectingPlatform={connectingPlatform}
+              onConnect={handleConnectPlatform}
+              asCard={false}
             />
+          </CollapsibleSection>
+
+          {/* Collapsible: Creator Details - type-specific fields */}
+          <CollapsibleSection
+            title="Creator Details"
+            icon={Info}
+            description="Add details about you that fans will see"
+            defaultOpen={false}
+          >
+            <div className="space-y-4">
+              {/* Location */}
+              <div className="space-y-2">
+                <Label className="text-white flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-brand-primary" />
+                  Location
+                </Label>
+                <Input
+                  value={customizeData.location}
+                  onChange={(e) => setCustomizeData({ ...customizeData, location: e.target.value })}
+                  placeholder="e.g., Los Angeles, CA"
+                  className="bg-white/10 border-white/20 text-white"
+                />
+              </div>
+
+              {/* Athlete-specific fields */}
+              {creatorType === 'athlete' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white">Sport</Label>
+                      <Input
+                        value={String((customizeData.creatorDetails?.athlete as { sport?: string })?.sport ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            athlete: { ...(customizeData.creatorDetails?.athlete ?? {}), sport: e.target.value }
+                          }
+                        })}
+                        placeholder="e.g., Basketball, Football"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white">Position</Label>
+                      <Input
+                        value={String((customizeData.creatorDetails?.athlete as { position?: string })?.position ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            athlete: { ...(customizeData.creatorDetails?.athlete ?? {}), position: e.target.value }
+                          }
+                        })}
+                        placeholder="e.g., Point Guard, Quarterback"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white">School</Label>
+                      <Input
+                        value={String((customizeData.creatorDetails?.athlete as { school?: string })?.school ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            athlete: { ...(customizeData.creatorDetails?.athlete ?? {}), school: e.target.value }
+                          }
+                        })}
+                        placeholder="e.g., Ohio State University"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white">Education Level</Label>
+                      <select
+                        value={String((customizeData.creatorDetails?.athlete as { education?: { level?: string } })?.education?.level ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            athlete: {
+                              ...(customizeData.creatorDetails?.athlete ?? {}),
+                              education: { ...(customizeData.creatorDetails?.athlete?.education ?? {}), level: e.target.value }
+                            }
+                          }
+                        })}
+                        className="w-full h-10 rounded-md bg-white/10 border border-white/20 text-white px-3"
+                      >
+                        <option value="">Select level</option>
+                        <option value="high_school">High School</option>
+                        <option value="college_d1">College D1</option>
+                        <option value="college_d2">College D2</option>
+                        <option value="college_d3">College D3</option>
+                        <option value="professional">Professional</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white">Current Sponsors</Label>
+                    <Input
+                      value={String((customizeData.creatorDetails?.athlete as { currentSponsors?: string })?.currentSponsors ?? '')}
+                      onChange={(e) => setCustomizeData({
+                        ...customizeData,
+                        creatorDetails: {
+                          ...(customizeData.creatorDetails ?? {}),
+                          athlete: { ...(customizeData.creatorDetails?.athlete ?? {}), currentSponsors: e.target.value }
+                        }
+                      })}
+                      placeholder="e.g., Nike, Gatorade (comma separated)"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Musician-specific fields */}
+              {creatorType === 'musician' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white">Band / Artist Name</Label>
+                      <Input
+                        value={String((customizeData.creatorDetails?.musician as { bandArtistName?: string })?.bandArtistName ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            musician: { ...(customizeData.creatorDetails?.musician ?? {}), bandArtistName: e.target.value }
+                          }
+                        })}
+                        placeholder="Your stage name or band name"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white">Artist Type</Label>
+                      <select
+                        value={String((customizeData.creatorDetails?.musician as { artistType?: string })?.artistType ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            musician: { ...(customizeData.creatorDetails?.musician ?? {}), artistType: e.target.value }
+                          }
+                        })}
+                        className="w-full h-10 rounded-md bg-white/10 border border-white/20 text-white px-3"
+                      >
+                        <option value="">Select type</option>
+                        <option value="independent">Independent</option>
+                        <option value="signed">Signed</option>
+                        <option value="hobby">Hobby</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white">Music Genre</Label>
+                      <Input
+                        value={String((customizeData.creatorDetails?.musician as { musicGenre?: string })?.musicGenre ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            musician: { ...(customizeData.creatorDetails?.musician ?? {}), musicGenre: e.target.value }
+                          }
+                        })}
+                        placeholder="e.g., Hip Hop, Pop, Rock"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white">Music Catalog URL</Label>
+                      <Input
+                        value={String((customizeData.creatorDetails?.musician as { musicCatalogUrl?: string })?.musicCatalogUrl ?? '')}
+                        onChange={(e) => setCustomizeData({
+                          ...customizeData,
+                          creatorDetails: {
+                            ...(customizeData.creatorDetails ?? {}),
+                            musician: { ...(customizeData.creatorDetails?.musician ?? {}), musicCatalogUrl: e.target.value }
+                          }
+                        })}
+                        placeholder="Spotify, Apple Music, or SoundCloud link"
+                        className="bg-white/10 border-white/20 text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Content Creator-specific fields */}
+              {creatorType === 'content_creator' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-white">Topics of Focus</Label>
+                    <Input
+                      value={Array.isArray((customizeData.creatorDetails?.contentCreator as { topicsOfFocus?: string[] })?.topicsOfFocus) 
+                        ? (customizeData.creatorDetails?.contentCreator as { topicsOfFocus: string[] }).topicsOfFocus.join(', ') 
+                        : String((customizeData.creatorDetails?.contentCreator as { topicsOfFocus?: string })?.topicsOfFocus ?? '')}
+                      onChange={(e) => setCustomizeData({
+                        ...customizeData,
+                        creatorDetails: {
+                          ...(customizeData.creatorDetails ?? {}),
+                            contentCreator: {
+                            ...(customizeData.creatorDetails?.contentCreator ?? {}),
+                            topicsOfFocus: e.target.value.split(',').map((s: string) => s.trim())
+                          }
+                        }
+                      })}
+                      onBlur={(e) => setCustomizeData({
+                        ...customizeData,
+                        creatorDetails: {
+                          ...(customizeData.creatorDetails ?? {}),
+                            contentCreator: {
+                            ...(customizeData.creatorDetails?.contentCreator ?? {}),
+                            topicsOfFocus: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean)
+                          }
+                        }
+                      })}
+                      placeholder="e.g., Gaming, Tech Reviews, Fitness (comma separated)"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                    <p className="text-xs text-gray-400">Separate topics with commas</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white">Platforms</Label>
+                    <Input
+                      value={Array.isArray((customizeData.creatorDetails?.contentCreator as { platforms?: string[] })?.platforms)
+                        ? (customizeData.creatorDetails?.contentCreator as { platforms: string[] }).platforms.join(', ')
+                        : String((customizeData.creatorDetails?.contentCreator as { platforms?: string })?.platforms ?? '')}
+                      onChange={(e) => setCustomizeData({
+                        ...customizeData,
+                        creatorDetails: {
+                          ...(customizeData.creatorDetails ?? {}),
+                            contentCreator: {
+                            ...(customizeData.creatorDetails?.contentCreator ?? {}),
+                            platforms: e.target.value.split(',').map((s: string) => s.trim())
+                          }
+                        }
+                      })}
+                      onBlur={(e) => setCustomizeData({
+                        ...customizeData,
+                        creatorDetails: {
+                          ...(customizeData.creatorDetails ?? {}),
+                            contentCreator: {
+                            ...(customizeData.creatorDetails?.contentCreator ?? {}),
+                            platforms: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean)
+                          }
+                        }
+                      })}
+                      placeholder="e.g., YouTube, TikTok, Twitch (comma separated)"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white">Sponsorships</Label>
+                    <Input
+                      value={String((customizeData.creatorDetails?.contentCreator as { sponsorships?: string })?.sponsorships ?? '')}
+                      onChange={(e) => setCustomizeData({
+                        ...customizeData,
+                        creatorDetails: {
+                          ...(customizeData.creatorDetails ?? {}),
+                            contentCreator: {
+                            ...(customizeData.creatorDetails?.contentCreator ?? {}),
+                            sponsorships: e.target.value
+                          }
+                        }
+                      })}
+                      placeholder="Current brand partnerships"
+                      className="bg-white/10 border-white/20 text-white"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
+          {/* Collapsible: Brand Colors */}
+          <CollapsibleSection
+            title="Customize Colors"
+            icon={Palette}
+            description="Override theme colors with your brand"
+            defaultOpen={false}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Primary Color */}
+              <div className="space-y-2">
+                <Label className="text-white">Primary Color</Label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={customizeData.brandColors.primary}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      brandColors: { ...customizeData.brandColors, primary: e.target.value }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.brandColors.primary}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      brandColors: { ...customizeData.brandColors, primary: e.target.value }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#8B5CF6"
+                  />
+                </div>
+              </div>
+
+              {/* Secondary Color */}
+              <div className="space-y-2">
+                <Label className="text-white">Secondary Color</Label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={customizeData.brandColors.secondary}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      brandColors: { ...customizeData.brandColors, secondary: e.target.value }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.brandColors.secondary}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      brandColors: { ...customizeData.brandColors, secondary: e.target.value }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#EC4899"
+                  />
+                </div>
+              </div>
+
+              {/* Accent Color */}
+              <div className="space-y-2">
+                <Label className="text-white">Accent Color</Label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={customizeData.brandColors.accent}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      brandColors: { ...customizeData.brandColors, accent: e.target.value }
+                    })}
+                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
+                  />
+                  <Input
+                    value={customizeData.brandColors.accent}
+                    onChange={(e) => setCustomizeData({
+                      ...customizeData,
+                      brandColors: { ...customizeData.brandColors, accent: e.target.value }
+                    })}
+                    className="flex-1 bg-white/5 border-white/10 text-white"
+                    placeholder="#F59E0B"
+                  />
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Collapsible: Page Sections Visibility */}
+          <CollapsibleSection
+            title="Page Sections"
+            icon={LayoutGrid}
+            description="Control what appears on your public page"
+            badge={`${[customizeData.showProfile, customizeData.showCampaigns, customizeData.showTasks, customizeData.showRewards, customizeData.showLeaderboard].filter(Boolean).length} visible`}
+            defaultOpen={false}
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                <div>
+                  <p className="text-white font-medium">Show Profile Tab</p>
+                  <p className="text-sm text-gray-400">Display your profile information</p>
+                </div>
+                <Switch
+                  checked={customizeData.showProfile}
+                  onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showProfile: checked })}
+                />
+              </div>
+              {program.status === 'published' ? (
+                <>
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div>
+                      <p className="text-white font-medium">Show Campaigns</p>
+                      <p className="text-sm text-gray-400">Display active campaigns</p>
+                    </div>
+                    <Switch
+                      checked={customizeData.showCampaigns}
+                      onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showCampaigns: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div>
+                      <p className="text-white font-medium">Show Tasks</p>
+                      <p className="text-sm text-gray-400">Display available tasks</p>
+                    </div>
+                    <Switch
+                      checked={customizeData.showTasks}
+                      onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showTasks: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div>
+                      <p className="text-white font-medium">Show Rewards</p>
+                      <p className="text-sm text-gray-400">Display reward store</p>
+                    </div>
+                    <Switch
+                      checked={customizeData.showRewards}
+                      onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showRewards: checked })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="p-3 bg-white/5 rounded-lg border border-dashed border-white/10">
+                  <p className="text-gray-400 text-sm text-center">
+                    Publish your program to configure Campaigns, Tasks, and Rewards visibility.
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                <div>
+                  <p className="text-white font-medium">Show Leaderboard</p>
+                  <p className="text-sm text-gray-400">Display fan rankings</p>
+                </div>
+                <Switch
+                  checked={customizeData.showLeaderboard}
+                  onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showLeaderboard: checked })}
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Collapsible: Typography & Layout (Pro) */}
+          <CollapsibleSection
+            title="Typography & Layout"
+            icon={Type}
+            description="Advanced font and spacing customization"
+            enterpriseBadge={true}
+            defaultOpen={false}
+          >
+            <TypographyToolbar
+              value={{
+                typography: customizeData.theme?.typography,
+                layout: customizeData.theme?.layout
+              } as any}
+              onChange={(updates) => {
+                setCustomizeData({
+                  ...customizeData,
+                  theme: {
+                    ...customizeData.theme,
+                    typography: updates.typography 
+                      ? { ...customizeData.theme?.typography, ...updates.typography }
+                      : customizeData.theme?.typography,
+                    layout: updates.layout
+                      ? { ...customizeData.theme?.layout, ...updates.layout }
+                      : customizeData.theme?.layout
+                  }
+                });
+              }}
+            />
+          </CollapsibleSection>
+        </>
+      )}
+
+      {/* ========== ADVANCED MODE COMPONENTS ========== */}
+      {builderMode === 'advanced' && (
+        <>
+          {/* Profile Information */}
+          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Program Information</CardTitle>
+              <p className="text-sm text-gray-400">Customize how your program appears to fans</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-white">Program Name</Label>
+                <Input
+                  value={customizeData.displayName}
+                  onChange={(e) => setCustomizeData({ ...customizeData, displayName: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                  placeholder="My Loyalty Program"
+                />
+              </div>
+              <div>
+                <Label className="text-white">Points Name</Label>
+                <Input
+                  value={customizeData.pointsName}
+                  onChange={(e) => setCustomizeData({ ...customizeData, pointsName: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                  placeholder="Points, Stars, Coins, etc."
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  What you'll call the rewards fans earn (e.g., "Thunder Points", "Luna Coins")
+                </p>
+              </div>
+              <div>
+                <Label className="text-white">Description</Label>
+                <Textarea
+                  value={customizeData.bio}
+                  onChange={(e) => setCustomizeData({ ...customizeData, bio: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                  rows={3}
+                  placeholder="Tell your fans what this program is about..."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Program Images */}
+          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                Program Images
+              </CardTitle>
+              <p className="text-sm text-gray-400">Customize your program's banner and logo (separate from your personal profile)</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label className="text-white mb-3 block">Banner Image</Label>
+                <p className="text-sm text-gray-400 mb-3">
+                  This banner will appear at the top of your program page. If not set, your creator profile banner will be used.
+                </p>
+                <ImageUpload
+                  type="banner"
+                  currentImageUrl={customizeData.headerImage}
+                  onUploadSuccess={(url) => handleImageUpload('headerImage', url)}
+                  onRemove={() => handleImageRemove('headerImage')}
+                />
           </div>
 
           <Separator className="bg-white/10" />
@@ -766,8 +1543,8 @@ function ProgramCustomizer({
             <ImageUpload
               type="avatar"
               currentImageUrl={customizeData.logo}
-              onUploadSuccess={(url) => setCustomizeData({ ...customizeData, logo: url })}
-              onRemove={() => setCustomizeData({ ...customizeData, logo: '' })}
+              onUploadSuccess={(url) => handleImageUpload('logo', url)}
+              onRemove={() => handleImageRemove('logo')}
             />
           </div>
 
@@ -1147,9 +1924,9 @@ function ProgramCustomizer({
           <div>
             <div className="flex items-center justify-between mb-3">
               <Label className="text-white">Select a Theme</Label>
-              {customizeData.theme?.name && (
+              {(customizeData.theme as { name?: string })?.name && (
                 <span className="text-xs text-gray-400">
-                  Current: <span className="text-brand-primary font-medium">{customizeData.theme.name}</span>
+                  Current: <span className="text-brand-primary font-medium">{(customizeData.theme as { name?: string }).name}</span>
                 </span>
               )}
             </div>
@@ -1245,7 +2022,7 @@ function ProgramCustomizer({
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="text-white font-medium mb-1">Applied Theme</p>
-                  <p className="text-gray-400 text-sm mb-2">{customizeData.theme.name} - {customizeData.theme.description}</p>
+                  <p className="text-gray-400 text-sm mb-2">{(customizeData.theme as { name?: string }).name} - {(customizeData.theme as { description?: string }).description}</p>
                   <div className="flex flex-wrap gap-2">
                     <Badge className="bg-white/10 text-white border-white/20 text-xs">
                       {customizeData.theme.mode === 'light' ? '☀️ Light' : '🌙 Dark'} Mode
@@ -1267,8 +2044,8 @@ function ProgramCustomizer({
                     setCustomizeData({
                       ...customizeData,
                       theme: {
-                        name: 'Default Light',
-                        mode: 'light',
+                        ...customizeData.theme,
+                        mode: 'light' as const,
                         templateId: 'default-light',
                         backgroundColor: '#ffffff',
                         textColor: '#111827'
@@ -1575,7 +2352,7 @@ function ProgramCustomizer({
                 Primary Button
               </Button>
               <p className="text-xs opacity-60">
-                <strong>Applied to:</strong> Program name badge, Active Campaign badges, Task badges, Follow button, Share button, Tab highlights
+                <strong>Applied to:</strong> Program name badge, Active Campaign badges, Task badges, Enroll button, Share button, Tab highlights
               </p>
             </div>
           </div>
@@ -1842,7 +2619,7 @@ function ProgramCustomizer({
         value={{
           typography: customizeData.theme?.typography,
           layout: customizeData.theme?.layout
-        }}
+        } as any}
         onChange={(updates) => {
           setCustomizeData({
             ...customizeData,
@@ -1975,36 +2752,46 @@ function ProgramCustomizer({
             )}
           </div>
           
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <div>
-              <p className="text-white font-medium">Show Campaigns Tab</p>
-              <p className="text-sm text-gray-400">Display active and upcoming campaigns</p>
+          {program.status === 'published' ? (
+            <>
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                <div>
+                  <p className="text-white font-medium">Show Campaigns Tab</p>
+                  <p className="text-sm text-gray-400">Display active and upcoming campaigns</p>
+                </div>
+                <Switch
+                  checked={customizeData.showCampaigns}
+                  onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showCampaigns: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                <div>
+                  <p className="text-white font-medium">Show Tasks Tab</p>
+                  <p className="text-sm text-gray-400">Display available tasks for fans</p>
+                </div>
+                <Switch
+                  checked={customizeData.showTasks}
+                  onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showTasks: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                <div>
+                  <p className="text-white font-medium">Show Rewards Tab</p>
+                  <p className="text-sm text-gray-400">Display reward store and available rewards</p>
+                </div>
+                <Switch
+                  checked={customizeData.showRewards}
+                  onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showRewards: checked })}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="p-3 bg-white/5 rounded-lg border border-dashed border-white/10">
+              <p className="text-gray-400 text-sm text-center">
+                Publish your program to configure Campaigns, Tasks, and Rewards visibility.
+              </p>
             </div>
-            <Switch
-              checked={customizeData.showCampaigns}
-              onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showCampaigns: checked })}
-            />
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <div>
-              <p className="text-white font-medium">Show Tasks Tab</p>
-              <p className="text-sm text-gray-400">Display available tasks for fans</p>
-            </div>
-            <Switch
-              checked={customizeData.showTasks}
-              onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showTasks: checked })}
-            />
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <div>
-              <p className="text-white font-medium">Show Rewards Tab</p>
-              <p className="text-sm text-gray-400">Display reward store and available rewards</p>
-            </div>
-            <Switch
-              checked={customizeData.showRewards}
-              onCheckedChange={(checked) => setCustomizeData({ ...customizeData, showRewards: checked })}
-            />
-          </div>
+          )}
           <Separator className="bg-white/10" />
           <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
             <div>
@@ -2038,127 +2825,133 @@ function ProgramCustomizer({
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
 
-      {/* Program Content (Campaigns & Tasks) */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      {/* ========== SHARED COMPONENTS (Both Modes) ========== */}
+
+      {/* Program Content (Campaigns & Tasks) - Only shown after program is published */}
+      {program.status === 'published' && (
+        <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Layers className="h-5 w-5" />
+                  Program Content
+                </CardTitle>
+                <p className="text-sm text-gray-400 mt-1">Campaigns and tasks associated with this program</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Campaigns Section */}
             <div>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                Program Content
-              </CardTitle>
-              <p className="text-sm text-gray-400 mt-1">Campaigns and tasks associated with this program</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Campaigns Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <Megaphone className="h-4 w-4 text-orange-400" />
-                Campaigns ({campaigns.length})
-              </h3>
-              <Button
-                onClick={() => window.location.href = '/creator-dashboard/campaigns'}
-                size="sm"
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add Campaign
-              </Button>
-            </div>
-            {campaigns.length === 0 ? (
-              <div className="text-center py-8 bg-white/5 rounded-lg border border-white/10">
-                <Megaphone className="h-10 w-10 mx-auto mb-3 text-gray-500" />
-                <p className="text-gray-400 text-sm">No campaigns associated with this program yet</p>
-                <p className="text-gray-500 text-xs mt-1">Create a campaign and assign it to this program</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  <Megaphone className="h-4 w-4 text-orange-400" />
+                  Campaigns ({campaigns.length})
+                </h3>
+                <Button
+                  onClick={() => window.location.href = '/creator-dashboard/campaigns'}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Campaign
+                </Button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {campaigns.map((campaign: any) => (
-                  <Card key={campaign.id} className="bg-white/5 border-white/10">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <h4 className="text-white font-semibold text-sm">{campaign.name}</h4>
-                          <p className="text-gray-400 text-xs mt-1 line-clamp-2">{campaign.description}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge 
-                              className={`text-xs ${
-                                campaign.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                campaign.status === 'draft' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
-                                'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                              }`}
-                            >
-                              {campaign.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* Tasks Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-indigo-400" />
-                Tasks ({tasks.length})
-              </h3>
-              <Button
-                onClick={() => window.location.href = '/creator-dashboard/tasks/create'}
-                size="sm"
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add Task
-              </Button>
-            </div>
-            {tasks.length === 0 ? (
-              <div className="text-center py-8 bg-white/5 rounded-lg border border-white/10">
-                <CheckSquare className="h-10 w-10 mx-auto mb-3 text-gray-500" />
-                <p className="text-gray-400 text-sm">No tasks associated with this program yet</p>
-                <p className="text-gray-500 text-xs mt-1">Create a task and assign it to this program</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {tasks.map((task: any) => (
-                  <Card key={task.id} className="bg-white/5 border-white/10">
-                    <CardContent className="p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-white font-medium text-sm truncate">{task.name}</h4>
-                          <p className="text-gray-400 text-xs mt-1 line-clamp-1">{task.description}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/30 text-xs">
-                              +{task.pointsToReward} pts
-                            </Badge>
-                            {task.isActive && (
-                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
-                                Active
+              {campaigns.length === 0 ? (
+                <div className="text-center py-8 bg-white/5 rounded-lg border border-white/10">
+                  <Megaphone className="h-10 w-10 mx-auto mb-3 text-gray-500" />
+                  <p className="text-gray-400 text-sm">No campaigns associated with this program yet</p>
+                  <p className="text-gray-500 text-xs mt-1">Create a campaign and assign it to this program</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {campaigns.map((campaign: any) => (
+                    <Card key={campaign.id} className="bg-white/5 border-white/10">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <h4 className="text-white font-semibold text-sm">{campaign.name}</h4>
+                            <p className="text-gray-400 text-xs mt-1 line-clamp-2">{campaign.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge 
+                                className={`text-xs ${
+                                  campaign.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                  campaign.status === 'draft' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
+                                  'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                                }`}
+                              >
+                                {campaign.status}
                               </Badge>
-                            )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Separator className="bg-white/10" />
+
+            {/* Tasks Section */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4 text-indigo-400" />
+                  Tasks ({tasks.length})
+                </h3>
+                <Button
+                  onClick={() => window.location.href = '/creator-dashboard/tasks/create'}
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Task
+                </Button>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {tasks.length === 0 ? (
+                <div className="text-center py-8 bg-white/5 rounded-lg border border-white/10">
+                  <CheckSquare className="h-10 w-10 mx-auto mb-3 text-gray-500" />
+                  <p className="text-gray-400 text-sm">No tasks associated with this program yet</p>
+                  <p className="text-gray-500 text-xs mt-1">Create a task and assign it to this program</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {tasks.map((task: any) => (
+                    <Card key={task.id} className="bg-white/5 border-white/10">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-white font-medium text-sm truncate">{task.name}</h4>
+                            <p className="text-gray-400 text-xs mt-1 line-clamp-1">{task.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/30 text-xs">
+                                +{task.pointsToReward} pts
+                              </Badge>
+                              {task.isActive && (
+                                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                                  Active
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Announcements Section */}
       <AnnouncementsManager programId={program.id} />
@@ -2173,13 +2966,40 @@ function ProgramCustomizer({
         />
       )}
 
+      {/* Quick Setup Wizard */}
+      <QuickSetupWizard
+        isOpen={showQuickSetup}
+        onClose={() => {
+          setShowQuickSetup(false);
+          localStorage.setItem(`quickSetup_${program.id}`, 'true');
+        }}
+        creatorType={creatorType}
+        creatorName={user?.creator?.displayName || (user as { displayName?: string })?.displayName || (user as { name?: string })?.name || ''}
+        onComplete={handleQuickSetupComplete}
+        connectedPlatforms={connectedPlatforms}
+        socialConnections={socialConnectionsData?.connections || []}
+        recentlyConnected={recentlyConnected}
+        connectingPlatform={connectingPlatform}
+        onConnect={handleConnectPlatform}
+      />
+
       {/* Publish Dialog */}
       <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
         <DialogContent className="bg-slate-900 border-white/10">
           <DialogHeader>
-            <DialogTitle className="text-white">Publish Program</DialogTitle>
+            <DialogTitle className="text-white">
+              {program.status === 'published' ? 'Update Published Program' : 'Publish Program'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
+            {program.status === 'published' && (
+              <Alert className="bg-green-500/10 border-green-500/30">
+                <Check className="h-4 w-4 text-green-400" />
+                <AlertDescription className="text-green-400">
+                  This program is already published at <strong>/programs/{program.slug}</strong>
+                </AlertDescription>
+              </Alert>
+            )}
             <div>
               <Label className="text-white">Public URL Slug</Label>
               <div className="flex items-center gap-2 mt-2">
@@ -2192,7 +3012,9 @@ function ProgramCustomizer({
                 />
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                This will be your program's public URL
+                {program.status === 'published' 
+                  ? 'Update the URL slug for your published program'
+                  : 'This will be your program\'s public URL'}
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-4">
@@ -2212,7 +3034,7 @@ function ProgramCustomizer({
                 disabled={!publishSlug}
               >
                 <Rocket className="h-4 w-4 mr-2" />
-                Publish Now
+                {program.status === 'published' ? 'Update URL' : 'Publish Now'}
               </Button>
             </div>
           </div>
@@ -2233,11 +3055,13 @@ function PreviewModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  // For published programs, use the public slug URL (no auth needed)
-  // For draft programs, we'll need to implement a proper preview mechanism
-  const previewUrl = program.status === 'published' && program.slug
-    ? `/programs/${program.slug}`
-    : null;
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  
+  // Get theme colors
+  const theme = customizeData.theme || {};
+  const brandColors = customizeData.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
+  const backgroundColor = theme.backgroundColor || (theme.mode === 'dark' ? '#0f172a' : '#ffffff');
+  const textColor = theme.textColor || (theme.mode === 'dark' ? '#ffffff' : '#111827');
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -2245,28 +3069,219 @@ function PreviewModal({
         <DialogHeader className="p-4 border-b border-white/10 flex-shrink-0">
           <DialogTitle className="text-white flex items-center justify-between">
             <span>Preview: {customizeData.displayName}</span>
-            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-              {program.status === 'published' ? 'Live Preview' : 'Draft Preview'}
-            </Badge>
+            <div className="flex items-center gap-3">
+              {/* Device Toggle */}
+              <div className="flex items-center gap-1 bg-white/10 rounded-lg p-1">
+                <button
+                  onClick={() => setPreviewMode('desktop')}
+                  className={`px-3 py-1 rounded text-sm transition-colors ${
+                    previewMode === 'desktop' ? 'bg-brand-primary text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Desktop
+                </button>
+                <button
+                  onClick={() => setPreviewMode('mobile')}
+                  className={`px-3 py-1 rounded text-sm transition-colors ${
+                    previewMode === 'mobile' ? 'bg-brand-primary text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Mobile
+                </button>
+              </div>
+              <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                {program.status === 'published' ? 'Live Preview' : 'Draft Preview'}
+              </Badge>
+            </div>
           </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden">
-          {previewUrl ? (
-            <iframe
-              key={previewUrl}
-              src={previewUrl}
-              className="w-full h-full bg-white"
-              title="Program Preview"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full bg-brand-dark-bg">
-              <div className="text-center text-gray-400">
-                <AlertCircle className="h-12 w-12 mx-auto mb-4" />
-                <p className="text-lg mb-2">Preview Unavailable</p>
-                <p className="text-sm">Please publish your program to see the preview</p>
+        <div className="flex-1 overflow-auto flex justify-center p-4 bg-slate-800">
+          {/* Preview Container */}
+          <div 
+            className={`transition-all duration-300 rounded-lg shadow-2xl overflow-auto ${
+              previewMode === 'mobile' ? 'w-[375px]' : 'w-full max-w-5xl'
+            }`}
+            style={{ 
+              backgroundColor,
+              color: textColor,
+              minHeight: '100%'
+            }}
+          >
+            {/* Header Banner */}
+            <div 
+              className="h-48 relative"
+              style={{
+                background: customizeData.headerImage 
+                  ? `url(${customizeData.headerImage}) center/cover`
+                  : `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`
+              }}
+            >
+              {/* Logo */}
+              {customizeData.logo && (
+                <div className="absolute bottom-0 left-6 transform translate-y-1/2">
+                  <img 
+                    src={customizeData.logo} 
+                    alt="Logo" 
+                    className="w-24 h-24 rounded-full border-4 object-cover"
+                    style={{ borderColor: backgroundColor }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className={`p-6 ${customizeData.logo ? 'pt-16' : 'pt-6'}`}>
+              {/* Program Name */}
+              <h1 
+                className="text-3xl font-bold mb-2"
+                style={{ 
+                  color: textColor,
+                  fontFamily: theme.typography?.fontFamily?.heading || 'inherit'
+                }}
+              >
+                {customizeData.displayName || 'Your Program Name'}
+              </h1>
+
+              {/* Points Badge */}
+              <div className="flex items-center gap-2 mb-4">
+                <span 
+                  className="px-3 py-1 rounded-full text-sm font-medium"
+                  style={{ 
+                    backgroundColor: brandColors.primary + '20',
+                    color: brandColors.primary
+                  }}
+                >
+                  Earn {customizeData.pointsName || 'Points'}
+                </span>
+              </div>
+
+              {/* Bio */}
+              {customizeData.bio && (
+                <p 
+                  className="text-base mb-6 opacity-80"
+                  style={{ 
+                    color: textColor,
+                    fontFamily: theme.typography?.fontFamily?.body || 'inherit'
+                  }}
+                >
+                  {customizeData.bio}
+                </p>
+              )}
+
+              {/* Section Previews */}
+              <div className="space-y-4">
+                {customizeData.showCampaigns && (
+                  <div 
+                    className="p-4 rounded-lg"
+                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+                  >
+                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Active Campaigns</h3>
+                    <div className="flex gap-2">
+                      <div 
+                        className="px-4 py-2 rounded text-sm"
+                        style={{ backgroundColor: brandColors.primary, color: '#fff' }}
+                      >
+                        Sample Campaign
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {customizeData.showTasks && (
+                  <div 
+                    className="p-4 rounded-lg"
+                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+                  >
+                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Available Tasks</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+                        <span>Follow on Twitter</span>
+                        <span style={{ color: brandColors.primary }}>+100 {customizeData.pointsName || 'pts'}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+                        <span>Like a Post</span>
+                        <span style={{ color: brandColors.primary }}>+50 {customizeData.pointsName || 'pts'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {customizeData.showRewards && (
+                  <div 
+                    className="p-4 rounded-lg"
+                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+                  >
+                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Rewards Store</h3>
+                    <div className="flex gap-3">
+                      <div 
+                        className="p-3 rounded-lg text-center flex-1"
+                        style={{ 
+                          backgroundColor: brandColors.secondary + '15',
+                          borderColor: brandColors.secondary + '30',
+                          borderWidth: 1
+                        }}
+                      >
+                        <div className="text-2xl mb-1">🎁</div>
+                        <p className="text-sm font-medium">Exclusive Merch</p>
+                        <p className="text-xs opacity-70">500 {customizeData.pointsName || 'pts'}</p>
+                      </div>
+                      <div 
+                        className="p-3 rounded-lg text-center flex-1"
+                        style={{ 
+                          backgroundColor: brandColors.accent + '15',
+                          borderColor: brandColors.accent + '30',
+                          borderWidth: 1
+                        }}
+                      >
+                        <div className="text-2xl mb-1">🏆</div>
+                        <p className="text-sm font-medium">VIP Access</p>
+                        <p className="text-xs opacity-70">1000 {customizeData.pointsName || 'pts'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {customizeData.showLeaderboard && (
+                  <div 
+                    className="p-4 rounded-lg"
+                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+                  >
+                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Top Fans</h3>
+                    <div className="space-y-2">
+                      {['1st', '2nd', '3rd'].map((place, i) => (
+                        <div key={place} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
+                          <span>{place} - Fan{i + 1}</span>
+                          <span style={{ color: brandColors.primary }}>{(1000 - i * 200)} {customizeData.pointsName || 'pts'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Color Palette Preview */}
+              <div className="mt-8 pt-6 border-t" style={{ borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                <p className="text-xs opacity-50 mb-2">Color Palette</p>
+                <div className="flex gap-2">
+                  <div 
+                    className="w-8 h-8 rounded-full" 
+                    style={{ backgroundColor: brandColors.primary }}
+                    title="Primary"
+                  />
+                  <div 
+                    className="w-8 h-8 rounded-full" 
+                    style={{ backgroundColor: brandColors.secondary }}
+                    title="Secondary"
+                  />
+                  <div 
+                    className="w-8 h-8 rounded-full" 
+                    style={{ backgroundColor: brandColors.accent }}
+                    title="Accent"
+                  />
+                </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

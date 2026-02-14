@@ -4,20 +4,25 @@
  * Creates interactive polls and quizzes for fan engagement
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { HelpCircle, AlertCircle, Lock, Info } from "lucide-react";
+import { HelpCircle, AlertCircle, Lock, Info, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TaskBuilderBase from "./TaskBuilderBase";
 import {
   PollQuizBuilder,
   type PollQuizConfig,
 } from "./config";
+import { TIER_GUIDANCE } from "@shared/taskTemplates";
+
+// Poll/Quiz tasks are T1 (internal platform verification)
+const POLL_QUIZ_TIER = 'T1' as const;
+const tierGuidance = TIER_GUIDANCE[POLL_QUIZ_TIER];
 
 interface PollQuizTaskBuilderProps {
   onSave: (config: any) => void;
@@ -26,6 +31,7 @@ interface PollQuizTaskBuilderProps {
   taskType: 'poll' | 'quiz';
   initialData?: any;
   isEditMode?: boolean;
+  programSelector?: React.ReactNode;
 }
 
 export default function PollQuizTaskBuilder({
@@ -35,8 +41,13 @@ export default function PollQuizTaskBuilder({
   taskType,
   initialData,
   isEditMode,
+  programSelector,
 }: PollQuizTaskBuilderProps) {
   const { toast } = useToast();
+  
+  // Guard to prevent re-initialization from parent re-renders
+  const hasInitialized = useRef(false);
+  const hasLoadedEditData = useRef(false);
 
   // Basic task info
   const [taskName, setTaskName] = useState('');
@@ -53,9 +64,10 @@ export default function PollQuizTaskBuilder({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
 
-  // Set default values
+  // Set default values (only once)
   useEffect(() => {
-    if (!isEditMode && !taskName) {
+    if (!isEditMode && !hasInitialized.current) {
+      hasInitialized.current = true;
       const defaults =
         taskType === 'poll'
           ? {
@@ -72,11 +84,12 @@ export default function PollQuizTaskBuilder({
       setDescription(defaults.description);
       setPoints(defaults.points);
     }
-  }, [taskType, isEditMode, taskName]);
+  }, [taskType, isEditMode]);
 
-  // Load initial data if editing
+  // Load initial data if editing (only once)
   useEffect(() => {
-    if (isEditMode && initialData) {
+    if (isEditMode && initialData && !hasLoadedEditData.current) {
+      hasLoadedEditData.current = true;
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
       setPoints(initialData.points || 50);
@@ -198,6 +211,7 @@ export default function PollQuizTaskBuilder({
       }
       category="Interactive"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveClick}
       onPublish={handlePublishClick}
@@ -214,6 +228,23 @@ export default function PollQuizTaskBuilder({
           : 'Test fan knowledge about your content, trivia about your journey, fun facts, etc.'
       }
     >
+      <div className="space-y-6">
+      {/* Verification Tier Guidance */}
+      <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck className="h-4 w-4 text-green-400" />
+          <span className="font-medium text-green-400">{tierGuidance.label}</span>
+          <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+            {tierGuidance.trustLevel}
+          </Badge>
+        </div>
+        <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+        <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+        {tierGuidance.tip && (
+          <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+        )}
+      </div>
+
       {/* Basic Task Info */}
       <Card className="bg-white/5 border-white/10">
         <CardHeader>
@@ -302,6 +333,7 @@ export default function PollQuizTaskBuilder({
           instantly verified when fans submit their responses. No manual review needed!
         </AlertDescription>
       </Alert>
+      </div>
     </TaskBuilderBase>
   );
 }

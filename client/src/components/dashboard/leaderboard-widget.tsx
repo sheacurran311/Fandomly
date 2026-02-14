@@ -11,6 +11,7 @@ interface LeaderboardEntry {
   fullName: string;
   avatarUrl: string | null;
   totalPoints: number;
+  currentPoints?: number;
   rank: number;
 }
 

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,24 +6,29 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { socialManager } from "@/lib/social-integrations";
 import type { Task } from "@shared/schema";
 import {
   Youtube,
   ExternalLink,
   CheckCircle2,
-  Loader2,
   Heart,
   UserPlus,
   Share2,
   MessageSquare,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import TaskCompletionModalLayout, {
+  ConnectionStatusBanner,
+  ModalHint,
+  ProofSection,
+} from "../TaskCompletionModalLayout";
+import { invalidateTaskCompletionQueries } from "@/hooks/useTaskCompletion";
 
 interface YouTubeTaskCompletionModalProps {
   task: Task;
   onClose: () => void;
   onSuccess: () => void;
-  completionId?: number;
+  completionId?: string;
 }
 
 export default function YouTubeTaskCompletionModal({
@@ -38,17 +42,22 @@ export default function YouTubeTaskCompletionModal({
   const [proofUrl, setProofUrl] = useState("");
   const [commentText, setCommentText] = useState("");
   const [needsOAuth, setNeedsOAuth] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const settings = task.customSettings as any;
   const taskType = task.taskType as string;
 
-  // Check if user has connected YouTube OAuth
+  // Check if user has connected YouTube
+  useEffect(() => {
+    checkYouTubeConnection();
+  }, []);
+
   const checkYouTubeConnection = async () => {
     try {
-      const response = await apiRequest('GET', '/api/auth/youtube/status');
-      const data = await response.json();
-      setNeedsOAuth(!data.connected);
-      return data.connected;
+      const { getSocialConnection } = await import('@/lib/social-connection-api');
+      const { connected } = await getSocialConnection('youtube');
+      setNeedsOAuth(!connected);
+      return connected;
     } catch {
       setNeedsOAuth(true);
       return false;
@@ -75,8 +84,8 @@ export default function YouTubeTaskCompletionModal({
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/task-completions/me'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks/published'] });
+      // Invalidate all task completion related queries across the app
+      invalidateTaskCompletionQueries(queryClient);
 
       toast({
         title: "Task Verified!",
@@ -98,22 +107,40 @@ export default function YouTubeTaskCompletionModal({
   });
 
   // Handle YouTube OAuth connection
-  const handleConnectYouTube = () => {
-    window.open('/api/auth/youtube/connect', '_blank');
-    // Poll for connection status
-    const pollInterval = setInterval(async () => {
-      const connected = await checkYouTubeConnection();
-      if (connected) {
-        clearInterval(pollInterval);
+  const handleConnectYouTube = async () => {
+    try {
+      setIsConnecting(true);
+      const youtubeAPI = socialManager['youtube'];
+      const result = await youtubeAPI.secureLogin();
+
+      if (result.success) {
+        setNeedsOAuth(false);
         toast({
           title: "YouTube Connected!",
-          description: "You can now verify YouTube tasks automatically",
+          description: result.channelName
+            ? `Connected ${result.channelName}. You can now verify YouTube tasks automatically.`
+            : "You can now verify YouTube tasks automatically",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect YouTube. Please try again.",
+          variant: "destructive",
         });
       }
-    }, 2000);
+    } catch (error: any) {
+      console.error('YouTube connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: error.message || "An error occurred while connecting YouTube.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
-  // Get task-specific instructions and UI
+  // Get task-specific content
   const getTaskContent = () => {
     const videoUrl = settings?.videoUrl || settings?.contentUrl;
     const channelUrl = settings?.channelUrl;
@@ -123,7 +150,7 @@ export default function YouTubeTaskCompletionModal({
     switch (taskType) {
       case 'youtube_subscribe':
         return {
-          icon: <UserPlus className="w-6 h-6 text-red-500" />,
+          icon: <UserPlus className="h-5 w-5" />,
           title: "Subscribe to Channel",
           description: channelName
             ? `Subscribe to ${channelName} to complete this task`
@@ -135,21 +162,21 @@ export default function YouTubeTaskCompletionModal({
 
       case 'youtube_like':
         return {
-          icon: <Heart className="w-6 h-6 text-red-500" />,
+          icon: <Heart className="h-5 w-5" />,
           title: "Like Video",
           description: "Like the specified video to earn points",
           targetUrl: videoUrl,
-          actionText: "Open Video",
+          actionText: "Open Video to Like",
           supportsOAuth: true,
         };
 
       case 'youtube_comment':
         return {
-          icon: <MessageSquare className="w-6 h-6 text-red-500" />,
+          icon: <MessageSquare className="h-5 w-5" />,
           title: "Comment on Video",
           description: "Leave a comment on the specified video",
           targetUrl: videoUrl,
-          actionText: "Open Video",
+          actionText: "Open Video to Comment",
           supportsOAuth: true,
           requiresComment: true,
           requiredText,
@@ -157,17 +184,17 @@ export default function YouTubeTaskCompletionModal({
 
       case 'youtube_share':
         return {
-          icon: <Share2 className="w-6 h-6 text-red-500" />,
+          icon: <Share2 className="h-5 w-5" />,
           title: "Share Video",
           description: "Share the specified video",
           targetUrl: videoUrl,
-          actionText: "Open Video",
+          actionText: "Open Video to Share",
           supportsOAuth: false,
         };
 
       default:
         return {
-          icon: <Youtube className="w-6 h-6 text-red-500" />,
+          icon: <Youtube className="h-5 w-5" />,
           title: "Complete YouTube Task",
           description: task.description || "Complete the required YouTube action",
           targetUrl: videoUrl || channelUrl,
@@ -178,126 +205,94 @@ export default function YouTubeTaskCompletionModal({
   };
 
   const content = getTaskContent();
+  const isYTConnected = !needsOAuth;
+
+  const steps = content.supportsOAuth
+    ? [{ label: "Connect" }, { label: "Action" }, { label: "Verify" }]
+    : [{ label: "Action" }, { label: "Proof" }, { label: "Submit" }];
+
+  const currentStep = content.supportsOAuth
+    ? (isYTConnected ? 1 : 0)
+    : 0;
 
   return (
-    <>
-      <DialogHeader>
-        <div className="flex items-center gap-3 mb-2">
-          {content.icon}
-          <DialogTitle>{content.title}</DialogTitle>
-        </div>
-        <DialogDescription>{content.description}</DialogDescription>
-      </DialogHeader>
+    <TaskCompletionModalLayout
+      platform="youtube"
+      icon={content.icon}
+      taskName={content.title}
+      taskDescription={content.description}
+      pointsReward={task.pointsToReward || 0}
+      steps={steps}
+      currentStep={currentStep}
+      onCancel={onClose}
+      onSubmit={() => submitMutation.mutate()}
+      submitLabel="Verify Task"
+      isSubmitting={submitMutation.isPending}
+      canSubmit={true}
+    >
+      {/* OAuth Connection (if supported) */}
+      {content.supportsOAuth && (
+        <ConnectionStatusBanner
+          isConnected={isYTConnected}
+          isConnecting={isConnecting}
+          onConnect={handleConnectYouTube}
+          platformName="YouTube"
+        />
+      )}
 
-      <div className="space-y-6 py-4">
-        {/* OAuth Connection (if needed) */}
-        {content.supportsOAuth && (
-          <div className="space-y-3">
-            <Alert>
-              <AlertDescription>
-                Connect your YouTube account for instant verification
-              </AlertDescription>
-            </Alert>
-            <Button
-              onClick={handleConnectYouTube}
-              variant="outline"
-              className="w-full"
-            >
-              <Youtube className="w-4 h-4 mr-2" />
-              Connect YouTube Account
-            </Button>
+      {/* Action Button */}
+      {content.targetUrl && (
+        <Button
+          onClick={() => window.open(content.targetUrl!, '_blank')}
+          className="w-full bg-red-500 hover:bg-red-600 text-white"
+          size="lg"
+        >
+          <ExternalLink className="w-4 h-4 mr-2" />
+          {content.actionText}
+        </Button>
+      )}
+
+      {/* Comment Template (for comment tasks) */}
+      {content.requiresComment && content.requiredText && (
+        <ProofSection title="Suggested Comment">
+          <Textarea
+            value={content.requiredText}
+            readOnly
+            rows={2}
+            className="bg-white/5 border-white/10 text-white/80 resize-none text-sm"
+          />
+          <p className="text-xs text-white/30">
+            You can customize this or use your own comment
+          </p>
+        </ProofSection>
+      )}
+
+      {/* Proof URL (for non-OAuth tasks) */}
+      {!content.supportsOAuth && (
+        <ProofSection title="Your Proof">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-white/50">Proof URL (optional)</Label>
+            <Input
+              placeholder="Paste your share link or screenshot URL"
+              value={proofUrl}
+              onChange={(e) => setProofUrl(e.target.value)}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
+            />
           </div>
-        )}
+        </ProofSection>
+      )}
 
-        {/* Step 1: Go to YouTube */}
-        <div className="space-y-3">
-          <h4 className="font-semibold text-sm">Step 1: Complete the action</h4>
-          {content.targetUrl && (
-            <Button
-              onClick={() => window.open(content.targetUrl!, '_blank')}
-              className="w-full"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              {content.actionText}
-            </Button>
-          )}
-
-          {content.requiresComment && content.requiredText && (
-            <div className="space-y-2">
-              <Label>Suggested Comment:</Label>
-              <Textarea
-                value={content.requiredText}
-                readOnly
-                rows={2}
-                className="text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                You can customize this or use your own comment
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Step 2: Verify */}
-        {content.supportsOAuth ? (
-          <div className="space-y-3">
-            <h4 className="font-semibold text-sm">Step 2: Verify</h4>
-            <Alert>
-              <AlertDescription>
-                {needsOAuth
-                  ? "Connect YouTube account above for automatic verification"
-                  : "Click 'Verify Task' below after completing the action"}
-              </AlertDescription>
-            </Alert>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <h4 className="font-semibold text-sm">Step 2: Provide proof</h4>
-            <div className="space-y-2">
-              <Label>Proof URL (optional):</Label>
-              <Input
-                placeholder="Paste your share link or screenshot URL"
-                value={proofUrl}
-                onChange={(e) => setProofUrl(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Points Reward Display */}
-        <div className="p-4 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-950/20 dark:to-pink-950/20 rounded-lg border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Reward:</span>
-            <span className="text-lg font-bold text-red-600 dark:text-red-400">
-              +{task.pointsToReward || 0} points
-            </span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-4">
-          <Button variant="outline" onClick={onClose} className="flex-1">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => submitMutation.mutate()}
-            disabled={submitMutation.isPending}
-            className="flex-1"
-          >
-            {submitMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Verifying...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Verify Task
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-    </>
+      {/* Verification hint */}
+      {content.supportsOAuth && (
+        <ModalHint>
+          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            {needsOAuth
+              ? "Connect YouTube above for automatic verification, or complete the action and verify manually"
+              : "Click \"Verify Task\" below after completing the action"}
+          </span>
+        </ModalHint>
+      )}
+    </TaskCompletionModalLayout>
   );
 }

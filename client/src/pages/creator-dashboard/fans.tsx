@@ -46,67 +46,92 @@ export default function CreatorFans() {
     enabled: !!user?.id
   });
 
-  // Fetch real fan data from tenant memberships
+  // Fetch real fan data from fan_programs (which has correct points data)
   const { data: fans = [], isLoading: fansLoading, error: fansError } = useQuery<Fan[]>({
-    queryKey: ['/api/tenant-memberships', creator?.tenantId, creator?.id],
+    queryKey: ['/api/creator-fans', creator?.id, user?.id],
     queryFn: async (): Promise<Fan[]> => {
-      if (!creator?.tenantId || !creator?.id) return [];
+      if (!creator?.id) return [];
       
-      const response = await apiRequest('GET', `/api/tenant-memberships/${creator.tenantId}`);
-      const memberships = await response.json();
-      
-      // Get campaign participation data for all fans
+      // Get creator's loyalty programs
       const programsResponse = await apiRequest('GET', `/api/loyalty-programs/creator/${creator.id}`);
       const programs = await programsResponse.json();
       
-      // Build a map of fan campaign participation counts
-      const fanCampaignCounts: { [fanId: string]: number } = {};
+      if (programs.length === 0) return [];
+      
+      // Fetch fans from each program's fan_programs
+      const allFans: Map<string, Fan> = new Map();
       
       for (const program of programs) {
         try {
-          const transactionsResponse = await apiRequest('GET', `/api/point-transactions/program/${program.id}`);
-          const transactions = await transactionsResponse.json();
+          const fansResponse = await apiRequest('GET', `/api/fan-programs/program/${program.id}`);
+          const fanPrograms = await fansResponse.json();
           
-          // Count unique campaigns per fan
-          const fanCampaignsMap: { [fanId: string]: Set<string> } = {};
-          transactions.forEach((tx: any) => {
-            if (tx.fanId && tx.campaignName) {
-              if (!fanCampaignsMap[tx.fanId]) {
-                fanCampaignsMap[tx.fanId] = new Set();
-              }
-              fanCampaignsMap[tx.fanId].add(tx.campaignName);
+          for (const fanProgram of fanPrograms) {
+            // Skip the creator's own account
+            if (fanProgram.fanId === user?.id || fanProgram.fanId === creator.userId) {
+              continue;
             }
-          });
-          
-          // Add to total counts
-          Object.entries(fanCampaignsMap).forEach(([fanId, campaigns]) => {
-            fanCampaignCounts[fanId] = (fanCampaignCounts[fanId] || 0) + campaigns.size;
-          });
+            
+            const existingFan = allFans.get(fanProgram.fanId);
+            if (existingFan) {
+              // Accumulate points across programs
+              existingFan.totalPoints += fanProgram.totalPointsEarned || 0;
+            } else {
+              // Calculate tier based on total points
+              const points = fanProgram.totalPointsEarned || 0;
+              let tier = 'Bronze';
+              if (points >= 10000) tier = 'Platinum';
+              else if (points >= 5000) tier = 'Gold';
+              else if (points >= 1000) tier = 'Silver';
+              
+              allFans.set(fanProgram.fanId, {
+                id: fanProgram.fanId,
+                name: fanProgram.fullName || fanProgram.username || fanProgram.email || 'Fan',
+                email: fanProgram.email || 'No email',
+                joinDate: new Date(fanProgram.joinedAt).toLocaleDateString(),
+                totalPoints: points,
+                tier: fanProgram.currentTier || tier,
+                lastActive: fanProgram.joinedAt ? 
+                  getRelativeTime(new Date(fanProgram.joinedAt)) : 'Unknown',
+                campaigns: 0, // Will be calculated below
+                username: fanProgram.username
+              });
+            }
+          }
         } catch (error) {
-          console.warn(`Failed to get campaign data for program ${program.id}:`, error);
+          console.warn(`Failed to fetch fans for program ${program.id}:`, error);
         }
       }
       
-      // Transform membership data into fan format with real campaign counts
-      return memberships.map((membership: any) => {
-        const memberData = membership.memberData || {};
-        const user = membership.user || {};
-        
-        return {
-          id: membership.id,
-          name: memberData.displayName || user.username || user.email || 'Fan',
-          email: user.email || 'No email',
-          joinDate: new Date(membership.joinedAt).toLocaleDateString(),
-          totalPoints: memberData.points || 0,
-          tier: memberData.tier || 'Bronze',
-          lastActive: membership.lastActiveAt ? 
-            getRelativeTime(new Date(membership.lastActiveAt)) : 'Unknown',
-          campaigns: fanCampaignCounts[membership.userId] || 0,
-          username: user.username
-        };
-      });
+      // Get task completion counts as a proxy for campaign participation
+      for (const program of programs) {
+        try {
+          const completionsResponse = await apiRequest('GET', `/api/task-completions/program/${program.id}`);
+          const completions = await completionsResponse.json();
+          
+          // Count completions per fan
+          const fanCompletionCounts: { [fanId: string]: number } = {};
+          completions.forEach((c: any) => {
+            if (c.userId && (c.status === 'completed' || c.status === 'claimed')) {
+              fanCompletionCounts[c.userId] = (fanCompletionCounts[c.userId] || 0) + 1;
+            }
+          });
+          
+          // Update fan campaign counts (using completion count as proxy)
+          Object.entries(fanCompletionCounts).forEach(([fanId, count]) => {
+            const fan = allFans.get(fanId);
+            if (fan) {
+              fan.campaigns += count;
+            }
+          });
+        } catch (error) {
+          console.warn(`Failed to get completions for program ${program.id}:`, error);
+        }
+      }
+      
+      return Array.from(allFans.values());
     },
-    enabled: !!creator?.tenantId && !!creator?.id,
+    enabled: !!creator?.id && !!user?.id,
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 

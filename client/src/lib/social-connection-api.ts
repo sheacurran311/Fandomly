@@ -1,4 +1,4 @@
-import { apiRequest, getDynamicUserId } from '@/lib/queryClient';
+import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 
 export interface SocialConnection {
   id: string;
@@ -25,15 +25,9 @@ export interface SocialConnection {
  */
 export async function getSocialConnections(): Promise<SocialConnection[]> {
   try {
-    const dynamicUserId = getDynamicUserId();
-    if (!dynamicUserId) {
-      console.warn('No user logged in');
-      return [];
-    }
-
     const response = await fetch('/api/social-connections', {
       headers: {
-        'x-dynamic-user-id': dynamicUserId
+        ...getAuthHeaders()
       },
       credentials: 'include'
     });
@@ -55,14 +49,9 @@ export async function getSocialConnections(): Promise<SocialConnection[]> {
  */
 export async function getSocialConnection(platform: string): Promise<{ connected: boolean; connection?: SocialConnection }> {
   try {
-    const dynamicUserId = getDynamicUserId();
-    if (!dynamicUserId) {
-      return { connected: false };
-    }
-
     const response = await fetch(`/api/social-connections/${platform}`, {
       headers: {
-        'x-dynamic-user-id': dynamicUserId
+        ...getAuthHeaders()
       },
       credentials: 'include'
     });
@@ -73,17 +62,19 @@ export async function getSocialConnection(platform: string): Promise<{ connected
 
     const data = await response.json();
     // Map server response structure to expected format
-    if (data.connected && data.connectionData) {
+    if (data.connected && data.connection) {
       return {
         connected: true,
         connection: {
-          id: data.connectionData.accountId,
-          platform: data.connectionData.platform,
-          platformUserId: data.connectionData.accountId,
-          platformUsername: data.connectionData.username,
-          platformDisplayName: data.connectionData.displayName,
-          profileData: data.connectionData.profile,
-          connectedAt: data.connectionData.connectedAt
+          id: data.connection.id,
+          platform: data.connection.platform,
+          platformUserId: data.connection.platformUserId,
+          platformUsername: data.connection.platformUsername,
+          platformDisplayName: data.connection.platformDisplayName,
+          profileData: data.connection.profileData,
+          connectedAt: data.connection.connectedAt,
+          lastSyncedAt: data.connection.lastSyncedAt,
+          isActive: data.connection.isActive,
         }
       };
     }
@@ -108,16 +99,11 @@ export async function saveSocialConnection(connectionData: {
   profileData?: any;
 }): Promise<{ success: boolean; connection?: SocialConnection; error?: string }> {
   try {
-    const dynamicUserId = getDynamicUserId();
-    if (!dynamicUserId) {
-      return { success: false, error: 'User not authenticated' };
-    }
-
     const response = await fetch('/api/social-connections', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-dynamic-user-id': dynamicUserId
+        ...getAuthHeaders()
       },
       credentials: 'include',
       body: JSON.stringify(connectionData)
@@ -138,24 +124,27 @@ export async function saveSocialConnection(connectionData: {
 
 /**
  * Disconnect a social platform from the database
+ * Uses POST /disconnect (unified endpoint) - supports both JWT and x-dynamic-user-id auth
  */
 export async function disconnectSocialPlatform(platform: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const dynamicUserId = getDynamicUserId();
-    if (!dynamicUserId) {
-      return { success: false, error: 'User not authenticated' };
-    }
-
-    const response = await fetch(`/api/social-connections/${platform}`, {
-      method: 'DELETE',
+    const response = await fetch('/api/social-connections/disconnect', {
+      method: 'POST',
       headers: {
-        'x-dynamic-user-id': dynamicUserId
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
       },
-      credentials: 'include'
+      credentials: 'include',
+      body: JSON.stringify({ platform: platform.toLowerCase() })
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData: { error?: string } = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { error: 'Failed to disconnect' };
+      }
       return { success: false, error: errorData.error || 'Failed to disconnect' };
     }
 
@@ -194,32 +183,8 @@ export async function migrateLocalStorageToDatabase(): Promise<void> {
       }
     }
 
-    // Check for Instagram connection in localStorage (user-specific)
-    const dynamicUserId = getDynamicUserId();
-    if (dynamicUserId) {
-      const instagramData = localStorage.getItem(`instagram_connection_${dynamicUserId}`);
-      if (instagramData) {
-        try {
-          const instagram = JSON.parse(instagramData);
-          await saveSocialConnection({
-            platform: 'instagram',
-            platformUserId: instagram.userInfo?.id,
-            platformUsername: instagram.userInfo?.username,
-            platformDisplayName: instagram.userInfo?.name,
-            accessToken: instagram.accessToken,
-            profileData: {
-              profilePictureUrl: instagram.userInfo?.profile_picture_url,
-              followers: instagram.userInfo?.followers_count,
-              following: instagram.userInfo?.follows_count,
-            }
-          });
-          localStorage.removeItem(`instagram_connection_${dynamicUserId}`);
-          console.log('✅ Migrated Instagram connection from localStorage to database');
-        } catch (e) {
-          console.error('Failed to migrate Instagram connection:', e);
-        }
-      }
-    }
+    // Legacy Instagram localStorage migration is no longer supported
+    // Instagram connections are now saved directly via OAuth callback flow
   } catch (error) {
     console.error('Error during localStorage migration:', error);
   }

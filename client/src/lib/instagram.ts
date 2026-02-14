@@ -1,5 +1,7 @@
 // Instagram Graph API SDK for Creator Instagram Business Account integration
 // Handles OAuth flow and messaging capabilities for creators
+import { saveSocialConnection } from './auth-redirect';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
 
 export interface InstagramUser {
   id: string;
@@ -40,25 +42,25 @@ export interface InstagramMessage {
 export type UserType = 'creator' | 'fan';
 
 // Instagram App Configuration
-const INSTAGRAM_CONFIG = {
-  creator: {
-    clientId: import.meta.env.VITE_INSTAGRAM_CREATOR_APP_ID || '1157911489578561', // Use env var or fallback
-    redirectUri: 'https://81905ce2-383a-4f34-a786-de23b33f10cb-00-3bmrhe6m2al7v.janeway.replit.dev/creator-dashboard', // Must match Instagram App Dashboard exactly
-    requiredScopes: [
-      'instagram_business_basic',
-      'instagram_business_manage_messages',
-      'instagram_business_manage_comments',
-      'instagram_business_content_publish',
-      'instagram_business_manage_insights'
-    ]
-  },
-  fan: {
-    clientId: import.meta.env.VITE_INSTAGRAM_FAN_CLIENT_ID || '',
-    redirectUri: `${window.location.origin}/auth/instagram/callback`,
-    requiredScopes: [
-      'instagram_business_basic'
-    ]
-  }
+// Only creator/business auth is supported -- no fan-level Instagram auth
+const INSTAGRAM_CLIENT_ID = import.meta.env.VITE_INSTAGRAM_CREATOR_APP_ID || '1157911489578561';
+
+const CREATOR_CONFIG = {
+  clientId: INSTAGRAM_CLIENT_ID,
+  redirectUri: `${window.location.origin}/creator-dashboard`, // Must match Instagram App Dashboard exactly
+  requiredScopes: [
+    'instagram_business_basic',
+    'instagram_business_manage_messages',
+    'instagram_business_manage_comments',
+    'instagram_business_content_publish',
+    'instagram_business_manage_insights'
+  ]
+};
+
+// All user types resolve to the same creator config -- Instagram only supports business auth
+const INSTAGRAM_CONFIG: Record<string, typeof CREATOR_CONFIG> = {
+  creator: CREATOR_CONFIG,
+  fan: CREATOR_CONFIG,
 };
 
 const INSTAGRAM_API_VERSION = 'v21.0';
@@ -124,35 +126,25 @@ class InstagramSDKManager {
       code_length: code.length
     });
     
-    // Propagate auth to backend: Authorization + x-dynamic-user-id
+    // Propagate auth to backend using JWT token
     let authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     try {
-      // Dynamic auth token (optional)
-      const maybeGetAuthToken = (await import('@dynamic-labs/sdk-react-core')).getAuthToken;
-      const token = maybeGetAuthToken?.();
+      // Get JWT access token from queryClient module
+      const { getAccessToken } = await import('@/lib/queryClient');
+      const token = getAccessToken();
       if (token) {
         authHeaders['Authorization'] = `Bearer ${token}`;
       }
     } catch {}
 
-    // Dynamic user ID from parent (popup) or current window
-    const openerDynId = typeof window !== 'undefined' && (window as any).opener ? (window as any).opener.__dynamicUserId : null;
-    const currentDynId = (window as any).__dynamicUserId || null;
-    const dynamicUserId = openerDynId || currentDynId || null;
-    if (dynamicUserId) {
-      authHeaders['x-dynamic-user-id'] = dynamicUserId;
-    } else {
-      console.warn('[Instagram Manager] No dynamicUserId available for token exchange');
-    }
-
     const response = await fetch('/api/social/instagram/token', {
       method: 'POST',
       headers: authHeaders,
+      credentials: 'include',
       body: JSON.stringify({ 
         code, 
         redirect_uri: config.redirectUri,
-        user_type: userType,
-        dynamicUserId
+        user_type: userType
       })
     });
     
@@ -362,8 +354,28 @@ class InstagramSDKManager {
           return;
         }
 
+        // Helper to save connection data if present (matches Discord/Twitch pattern)
+        const saveConnectionIfNeeded = async (result: any): Promise<InstagramLoginResult> => {
+          if (result?.success && result?.connectionData) {
+            try {
+              console.log('[Instagram secureLogin] Saving connection from parent window...');
+              const saveResult = await saveSocialConnection(result.connectionData);
+              if (!saveResult.success) {
+                console.error('[Instagram secureLogin] Failed to save connection:', saveResult.error);
+                return { success: false, error: saveResult.error || 'Failed to save connection' };
+              }
+              console.log('[Instagram secureLogin] Connection saved successfully');
+              invalidateSocialConnections();
+            } catch (error) {
+              console.error('[Instagram secureLogin] Error saving connection:', error);
+              return { success: false, error: 'Failed to save connection' };
+            }
+          }
+          return result;
+        };
+
         // Poll for popup completion
-        const pollTimer = setInterval(() => {
+        const pollTimer = setInterval(async () => {
           try {
             if (popup.closed) {
               clearInterval(pollTimer);
@@ -371,7 +383,8 @@ class InstagramSDKManager {
               const callbackData = (window as any).instagramCallbackData;
               if (callbackData) {
                 delete (window as any).instagramCallbackData;
-                resolve(callbackData);
+                const finalResult = await saveConnectionIfNeeded(callbackData);
+                resolve(finalResult);
               } else {
                 resolve({
                   success: false,
@@ -385,14 +398,15 @@ class InstagramSDKManager {
         }, 1000);
 
         // Set up message listener for popup communication
-        const messageListener = (event: MessageEvent) => {
+        const messageListener = async (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           
           if (event.data.type === 'instagram-oauth-result') {
             clearInterval(pollTimer);
             window.removeEventListener('message', messageListener);
             popup.close();
-            resolve(event.data.result);
+            const finalResult = await saveConnectionIfNeeded(event.data.result);
+            resolve(finalResult);
           }
         };
 

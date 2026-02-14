@@ -1,5 +1,5 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { ReactNode } from "react";
+import { useAuthModal } from "@/hooks/use-auth-modal";
 
 interface ConnectWalletButtonProps {
   children?: ReactNode;
@@ -7,13 +7,17 @@ interface ConnectWalletButtonProps {
   text?: string;
 }
 
+/**
+ * Sign In button that opens the auth modal
+ * No userType parameter — all users come through the same door
+ * and choose their type after authenticating.
+ */
 export default function ConnectWalletButton({ children, className, text }: ConnectWalletButtonProps) {
-  const { setShowAuthFlow } = useDynamicContext();
-  const buttonText = text || (typeof children === 'string' ? children : 'Start Now');
+  const { openAuthModal } = useAuthModal();
+  const buttonText = text || (typeof children === 'string' ? children : 'Sign In');
   
   const handleClick = () => {
-    // Programmatically trigger wallet connection - bypasses any admin dashboard email settings
-    setShowAuthFlow(true);
+    openAuthModal();
   };
   
   return (

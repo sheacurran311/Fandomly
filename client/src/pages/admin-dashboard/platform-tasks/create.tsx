@@ -382,14 +382,14 @@ export default function AdminPlatformTaskCreate() {
   const [useCompleteProfileBuilder, setUseCompleteProfileBuilder] = useState(false);
 
   // Track connected admin social accounts using React Query for persistence
-  const { data: connectedSocials = {
+  const { data: connectedSocials = ({
     facebook: { connected: false },
     twitter: { connected: false },
     instagram: { connected: false },
     tiktok: { connected: false },
     youtube: { connected: false },
     spotify: { connected: false },
-  }} = useQuery({
+  }) as Record<string, { connected: boolean; handle?: string }>} = useQuery<Record<string, { connected: boolean; handle?: string }>>({
     queryKey: ['admin-social-connections', user?.dynamicUserId],
     queryFn: async () => {
       if (!user?.dynamicUserId) return {};
@@ -447,7 +447,7 @@ export default function AdminPlatformTaskCreate() {
     },
     enabled: !!user?.dynamicUserId,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (was cacheTime in react-query v4)
   });
 
   // Fetch task if editing

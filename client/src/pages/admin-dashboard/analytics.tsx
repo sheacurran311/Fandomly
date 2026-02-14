@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { VerificationAnalyticsDashboard } from "@/components/analytics/VerificationAnalyticsDashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Users, Wallet, Activity, ExternalLink, AlertCircle, CheckCircle2, BarChart3, Globe, Eye } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
   Legend,
 } from 'recharts';
 
@@ -126,6 +128,7 @@ export default function AdminAnalytics() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="wallets">Wallets</TabsTrigger>
           <TabsTrigger value="engagement">Engagement</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="traffic">Traffic</TabsTrigger>
         </TabsList>
 
@@ -183,11 +186,11 @@ export default function AdminAnalytics() {
                   <>
                     <div className="text-2xl font-bold text-white">
                       {formatNumber(
-                        walletData?.reduce((sum, w) => sum + w.count, 0) || 0
+                        walletData?.reduce((sum: number, w: { walletName: string; count: number }) => sum + w.count, 0) || 0
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {walletData?.map(wallet => (
+                      {walletData?.map((wallet: { walletName: string; count: number }) => (
                         <span
                           key={wallet.walletName}
                           className={`text-xs px-2 py-1 rounded-full ${
@@ -325,15 +328,17 @@ export default function AdminAnalytics() {
                           color: '#fff',
                         }}
                       />
-                      <Bar
-                        dataKey="count"
-                        name="Connected Wallets"
-                        fill={(entry) => {
-                          if (entry.walletName.includes('phantom')) return '#9333ea';
-                          if (entry.walletName.includes('metamask')) return '#f97316';
-                          return '#3b82f6';
-                        }}
-                      />
+                      <Bar dataKey="count" name="Connected Wallets" fill="#3b82f6">
+                        {walletData.map((entry: { walletName: string; count: number }, index: number) => (
+                          <Cell
+                            key={index}
+                            fill={
+                              entry.walletName.includes('phantom') ? '#9333ea' :
+                              entry.walletName.includes('metamask') ? '#f97316' : '#3b82f6'
+                            }
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -643,6 +648,11 @@ export default function AdminAnalytics() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Verification Tab */}
+        <TabsContent value="verification" className="space-y-6">
+          <VerificationAnalyticsDashboard />
         </TabsContent>
 
         {/* Traffic Tab */}

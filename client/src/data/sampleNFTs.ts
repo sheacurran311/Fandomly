@@ -4,6 +4,7 @@ import { type Reward } from "@shared/schema";
 export const sampleNFTRewards: Reward[] = [
   {
     id: "reward_1",
+    tenantId: "sample_tenant",
     programId: "prog_1", 
     name: "Legendary Dragon NFT",
     description: "An exclusive legendary dragon NFT from the Mystic Beasts collection",
@@ -34,6 +35,7 @@ export const sampleNFTRewards: Reward[] = [
   },
   {
     id: "reward_2",
+    tenantId: "sample_tenant",
     programId: "prog_1",
     name: "Epic Warrior NFT", 
     description: "A fierce warrior ready for battle from the Champions collection",
@@ -64,6 +66,7 @@ export const sampleNFTRewards: Reward[] = [
   },
   {
     id: "reward_3",
+    tenantId: "sample_tenant",
     programId: "prog_1",
     name: "Rare Space Explorer",
     description: "Discover the cosmos with this rare space explorer NFT",
@@ -92,6 +95,7 @@ export const sampleNFTRewards: Reward[] = [
   },
   {
     id: "reward_4",
+    tenantId: "sample_tenant",
     programId: "prog_1",
     name: "Uncommon Pixel Art",
     description: "Retro pixel art NFT from the 8-bit collection",
@@ -120,6 +124,7 @@ export const sampleNFTRewards: Reward[] = [
   },
   {
     id: "reward_5",
+    tenantId: "sample_tenant",
     programId: "prog_1",
     name: "Common Crystal Gem",
     description: "Beautiful crystal gem from the Mineral collection",
@@ -148,6 +153,7 @@ export const sampleNFTRewards: Reward[] = [
   },
   {
     id: "reward_6",
+    tenantId: "sample_tenant",
     programId: "prog_1",
     name: "Epic Cyberpunk Avatar",
     description: "Futuristic cyberpunk character from Neo City",

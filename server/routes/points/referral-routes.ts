@@ -15,7 +15,7 @@ import {
 } from '../../services/rewards/referral-service';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
 import { db } from '../../db';
-import { creators, users } from "@shared/schema";
+import { creators, users, creatorReferrals, fanReferrals, creatorTaskReferrals } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export function registerReferralRoutes(app: Express) {
@@ -226,6 +226,7 @@ export function registerReferralRoutes(app: Express) {
       const userId = req.user?.id;
       const { taskId, creatorId } = req.body;
       
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
       if (!taskId || !creatorId) {
         return res.status(400).json({ error: "Task ID and creator ID required" });
       }
@@ -251,6 +252,7 @@ export function registerReferralRoutes(app: Express) {
       const userId = req.user?.id;
       const { campaignId, creatorId } = req.body;
       
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
       if (!campaignId || !creatorId) {
         return res.status(400).json({ error: "Campaign ID and creator ID required" });
       }
@@ -314,6 +316,7 @@ export function registerReferralRoutes(app: Express) {
   app.get("/api/referrals/task/stats", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
       const creatorId = req.query.creatorId as string | undefined;
       
       const stats = await creatorTaskReferralService.getFanTaskReferralStats(
@@ -361,7 +364,7 @@ export function registerReferralRoutes(app: Express) {
       
       // Check which type of referral this is
       const creatorRef = await db.query.creatorReferrals.findFirst({
-        where: eq(db.schema.creatorReferrals.referralCode, code)
+        where: eq(creatorReferrals.referralCode, code)
       });
       
       if (creatorRef) {
@@ -373,7 +376,7 @@ export function registerReferralRoutes(app: Express) {
       }
       
       const fanRef = await db.query.fanReferrals.findFirst({
-        where: eq(db.schema.fanReferrals.referralCode, code)
+        where: eq(fanReferrals.referralCode, code)
       });
       
       if (fanRef) {
@@ -385,7 +388,7 @@ export function registerReferralRoutes(app: Express) {
       }
       
       const taskRef = await db.query.creatorTaskReferrals.findFirst({
-        where: eq(db.schema.creatorTaskReferrals.referralCode, code)
+        where: eq(creatorTaskReferrals.referralCode, code)
       });
       
       if (taskRef) {

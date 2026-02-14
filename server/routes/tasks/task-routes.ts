@@ -23,8 +23,9 @@ import {
   taskCompletions,
   manualReviewQueue,
   creators,
+  socialConnections,
 } from "@shared/schema";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, sql } from "drizzle-orm";
 import { uploadScreenshot, getFileUrl } from "../../middleware/upload";
 import { unifiedVerification } from "../../services/verification/unified-verification";
 import { taskFrequencyService } from "../../services/task-frequency-service";
@@ -285,7 +286,11 @@ const createTaskSchema = z.discriminatedUnion('taskType', [
 ]).refine((data) => {
   // If reward type is 'points', pointsToReward is required (unless legacy 'points' field exists)
   if (data.rewardType === 'points' && !data.pointsToReward && !('points' in data)) {
-    return false;
+    // Allow task types that manage their own points via customSettings
+    const selfManagedTypes = ['referral', 'checkin', 'follower_milestone', 'complete_profile'];
+    if (!selfManagedTypes.includes(data.taskType)) {
+      return false;
+    }
   }
   // If reward type is 'multiplier', multiplierValue is required
   if (data.rewardType === 'multiplier' && !data.multiplierValue) {
@@ -401,12 +406,12 @@ export function registerTaskRoutes(app: Express) {
         return {
           ...task,
           creatorName: task.creator?.displayName || task.tenant?.name || 'Unknown Creator',
-          creatorImage: task.creator?.profileImage || task.tenant?.logo || null,
+          creatorImage: (task.creator as { avatar?: string })?.avatar || (task.tenant as { branding?: { logo?: string } })?.branding?.logo || null,
           programName: task.program?.name || null,
           programSlug: task.program?.slug || null,
-          programImage: task.program?.imageUrl || task.program?.image || null,
+          programImage: (task.program?.pageConfig as { headerImage?: string; logo?: string })?.headerImage || (task.program?.pageConfig as { headerImage?: string; logo?: string })?.logo || null,
           platform: task.platform || 'other', // Use the platform field directly
-          type: task.taskType || task.type || 'other', // Use taskType field for consistency
+          type: task.taskType || 'other',
           targetData, // Add the transformed targetData for Fan verification
         };
       });
@@ -573,8 +578,16 @@ export function registerTaskRoutes(app: Express) {
         pointsToReward: validatedData.pointsToReward || 
           ('points' in validatedData 
             ? validatedData.points 
-            : ('customSettings' in validatedData && 'pointsPerCheckIn' in validatedData.customSettings 
-              ? validatedData.customSettings.pointsPerCheckIn 
+            : ('customSettings' in validatedData 
+              ? ('pointsPerCheckIn' in validatedData.customSettings 
+                ? validatedData.customSettings.pointsPerCheckIn
+                : 'referrerPoints' in validatedData.customSettings && validatedData.customSettings.referrerPoints
+                  ? validatedData.customSettings.referrerPoints
+                  : 'singlePoints' in validatedData.customSettings && validatedData.customSettings.singlePoints
+                    ? validatedData.customSettings.singlePoints
+                    : 'tiers' in validatedData.customSettings && Array.isArray(validatedData.customSettings.tiers) && validatedData.customSettings.tiers.length > 0
+                      ? validatedData.customSettings.tiers[0].points
+                      : 50)
               : 50)),
         pointCurrency: validatedData.pointCurrency || 'default',
         
@@ -601,7 +614,7 @@ export function registerTaskRoutes(app: Express) {
       };
 
       // Create task in database
-      const task = await storage.createTask(taskData);
+      const task = await storage.createTask(taskData as any);
 
       res.status(201).json({
         success: true,
@@ -953,7 +966,7 @@ export function registerTaskRoutes(app: Express) {
         const frequencyCheck = await taskFrequencyService.checkEligibility({
           userId,
           taskId,
-          tenantId: task.tenantId,
+          tenantId: task.tenantId ?? '',
         });
 
         if (!frequencyCheck.isEligible) {
@@ -961,7 +974,7 @@ export function registerTaskRoutes(app: Express) {
           const timeUntil = await taskFrequencyService.getTimeUntilAvailable({
             userId,
             taskId,
-            tenantId: task.tenantId,
+            tenantId: task.tenantId ?? '',
           });
 
           let availabilityMessage = frequencyCheck.reason || 'Task not available';
@@ -988,8 +1001,8 @@ export function registerTaskRoutes(app: Express) {
         const result = await unifiedVerification.verify({
           userId,
           taskId: taskId,
-          tenantId: task.tenantId,
-          creatorId: task.creatorId,
+          tenantId: task.tenantId ?? '',
+          creatorId: task.creatorId ?? '',
           platform: platform || task.platform || 'unknown',
           taskType: taskType || task.taskType,
           taskName: task.name,
@@ -1059,7 +1072,7 @@ export function registerTaskRoutes(app: Express) {
         }
 
         // Verify user owns this completion
-        if (completion.user_id !== userId) {
+        if (completion.userId !== userId) {
           return res.status(403).json({ error: "Unauthorized" });
         }
 
@@ -1070,8 +1083,8 @@ export function registerTaskRoutes(app: Express) {
           userId,
           taskCompletionId: completionId,
           taskId: task.id,
-          tenantId: task.tenantId,
-          creatorId: task.creatorId,
+          tenantId: task.tenantId ?? '',
+          creatorId: task.creatorId ?? '',
           platform: platform || task.platform || 'unknown',
           taskType: taskType || task.taskType,
           taskName: task.name,
@@ -1148,25 +1161,25 @@ export function registerTaskRoutes(app: Express) {
 
         // Get creator record
         const creator = await db.query.creators.findFirst({
-          where: eq(creators.user_id, userId),
+          where: eq(creators.userId, userId),
         });
 
         if (!creator) {
           return res.status(403).json({ error: "Only creators can access review queue" });
         }
 
-        // Get pending reviews for this creator
+        // Get pending reviews for this creator (creatorId is integer in legacy schema; cast for comparison)
         const reviews = await db
           .select()
           .from(manualReviewQueue)
           .where(
             and(
-              eq(manualReviewQueue.creator_id, creator.id),
+              sql`${manualReviewQueue.creatorId}::text = ${creator.id}`,
               eq(manualReviewQueue.status, status as string),
-              isNull(manualReviewQueue.deleted_at)
+              isNull(manualReviewQueue.deletedAt)
             )
           )
-          .orderBy(desc(manualReviewQueue.priority), desc(manualReviewQueue.submitted_at))
+          .orderBy(desc(manualReviewQueue.priority), desc(manualReviewQueue.submittedAt))
           .limit(Number(limit));
 
         res.json(reviews);
@@ -1196,22 +1209,22 @@ export function registerTaskRoutes(app: Express) {
         // Verify user is creator who owns this review
         const review = await db.query.manualReviewQueue.findFirst({
           where: eq(manualReviewQueue.id, Number(reviewId)),
-          with: {
-            creator: true,
-          },
         });
 
         if (!review) {
           return res.status(404).json({ error: "Review not found" });
         }
 
-        if (review.creator.user_id !== userId) {
+        const creatorForApprove = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId),
+        });
+        if (!creatorForApprove || String(creatorForApprove.id) !== String(review.creatorId)) {
           return res.status(403).json({ error: "Unauthorized" });
         }
 
         await unifiedVerification.approveManualReview(
           Number(reviewId),
-          userId,
+          userId as unknown as number,
           reviewNotes
         );
 
@@ -1246,22 +1259,22 @@ export function registerTaskRoutes(app: Express) {
         // Verify user is creator who owns this review
         const review = await db.query.manualReviewQueue.findFirst({
           where: eq(manualReviewQueue.id, Number(reviewId)),
-          with: {
-            creator: true,
-          },
         });
 
         if (!review) {
           return res.status(404).json({ error: "Review not found" });
         }
 
-        if (review.creator.user_id !== userId) {
+        const creatorForReject = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId),
+        });
+        if (!creatorForReject || String(creatorForReject.id) !== String(review.creatorId)) {
           return res.status(403).json({ error: "Unauthorized" });
         }
 
         await unifiedVerification.rejectManualReview(
           Number(reviewId),
-          userId,
+          userId as unknown as number,
           reviewNotes
         );
 
@@ -1270,6 +1283,171 @@ export function registerTaskRoutes(app: Express) {
         console.error('Error rejecting review:', error);
         res.status(500).json({
           error: "Failed to reject review",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  // ============================================================================
+  // CODE VERIFICATION ENDPOINTS (T2)
+  // ============================================================================
+
+  /**
+   * Get or generate verification code for a task
+   * GET /api/tasks/:taskId/verification-code
+   * 
+   * Returns the fan's unique code for code-based (T2) verification
+   */
+  app.get(
+    "/api/tasks/:taskId/verification-code",
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user!.id;
+
+        // Import code service
+        const { codeService } = await import("../../services/verification/code-service");
+
+        // Get the task to get tenant info
+        const task = await storage.getTask(taskId);
+        if (!task) {
+          return res.status(404).json({ error: "Task not found" });
+        }
+
+        // Get or create code
+        const result = await codeService.getOrCreateCode({
+          taskId,
+          fanId: userId,
+          tenantId: task.tenantId ?? '',
+          codeType: 'comment',
+        });
+
+        if (!result.success || !result.code) {
+          return res.status(500).json({ error: result.error || 'Failed to generate code' });
+        }
+
+        const codeRecord = await codeService.getCodeForFan(taskId, userId);
+        res.json({
+          code: result.code,
+          expiresAt: codeRecord?.expiresAt ?? null,
+          isUsed: codeRecord?.isUsed ?? false,
+        });
+      } catch (error: any) {
+        console.error('Error getting verification code:', error);
+        res.status(500).json({
+          error: "Failed to get verification code",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Check if a verification code has been found
+   * POST /api/tasks/:taskId/verify-code
+   * 
+   * Called when fan clicks "I posted my code" - triggers immediate check
+   */
+  app.post(
+    "/api/tasks/:taskId/verify-code",
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user!.id;
+
+        // Get task details
+        const task = await storage.getTask(taskId);
+        if (!task) {
+          return res.status(404).json({ error: "Task not found" });
+        }
+
+        // Import services
+        const { codeService } = await import("../../services/verification/code-service");
+        const { commentFetcher } = await import("../../services/verification/comment-fetcher");
+
+        // Get the fan's code
+        const codeRecord = await codeService.getCodeForFan(taskId, userId);
+        if (!codeRecord) {
+          return res.status(400).json({ error: "No verification code found" });
+        }
+
+        if (codeRecord.isUsed) {
+          return res.json({
+            verified: true,
+            message: "Code already verified!",
+          });
+        }
+
+        // Get task settings (customSettings in schema)
+        const settings = (task.customSettings || task) as Record<string, unknown>;
+        const rawContentId = settings?.contentId || settings?.postId || settings?.videoId;
+        const contentId = typeof rawContentId === "string" ? rawContentId : String(rawContentId ?? "");
+
+        if (!contentId) {
+          return res.status(400).json({
+            error: "Task not properly configured for code verification",
+          });
+        }
+
+        // Get creator's access token for the platform
+        const creatorConnection = await db.query.socialConnections.findFirst({
+          where: and(
+            eq(socialConnections.userId, task.creatorId!),
+            eq(socialConnections.platform, task.platform),
+            eq(socialConnections.isActive, true),
+          ),
+        });
+
+        if (!creatorConnection?.accessToken) {
+          return res.json({
+            verified: false,
+            message: "Creator has not connected their account. Code verification may take longer.",
+            pendingCheck: true,
+          });
+        }
+
+        // Try to verify code in comments
+        const result = await commentFetcher.verifyCodeInComments({
+          platform: task.platform,
+          contentId,
+          taskId,
+          fanId: userId,
+          creatorAccessToken: creatorConnection.accessToken,
+        });
+
+        if (result.verified) {
+          // Complete the task
+          const verificationResult = await unifiedVerification.verify({
+            userId,
+            taskId,
+            tenantId: task.tenantId ?? '',
+            creatorId: task.creatorId!,
+            platform: task.platform,
+            taskType: task.taskType,
+            taskName: task.name,
+            taskSettings: settings,
+          });
+
+          return res.json({
+            verified: true,
+            message: "Code found! Task verified.",
+            pointsAwarded: verificationResult.pointsAwarded,
+          });
+        }
+
+        // Code not found yet
+        res.json({
+          verified: false,
+          message: result.reason || "Code not found yet. Please make sure you included your code in your comment.",
+          code: codeRecord.code,
+        });
+      } catch (error: any) {
+        console.error('Error verifying code:', error);
+        res.status(500).json({
+          error: "Failed to verify code",
           message: error.message,
         });
       }

@@ -24,11 +24,11 @@ export default function MetaGraphDebugger() {
       const url = qs ? `${endpoint}?${qs}` : endpoint;
       const res = await fetch(url, {
         method: "GET",
-        headers: {
+        headers: new Headers({
           "Content-Type": "application/json",
-          "x-dynamic-user-id": user.dynamicUserId,
-          Authorization: accessToken ? `Bearer ${accessToken}` : "",
-        },
+          ...(user.dynamicUserId ? { "x-dynamic-user-id": user.dynamicUserId } : {}),
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        }),
         credentials: "include",
       });
       const json = await res.json();
@@ -51,10 +51,10 @@ export default function MetaGraphDebugger() {
       try { parsed = params ? JSON.parse(params) : {}; } catch (e) { parsed = {}; }
       const res = await fetch('/api/facebook/graph', {
         method: 'POST',
-        headers: {
+        headers: new Headers({
           'Content-Type': 'application/json',
-          'x-dynamic-user-id': user.dynamicUserId,
-        },
+          ...(user.dynamicUserId ? { 'x-dynamic-user-id': user.dynamicUserId } : {}),
+        }),
         body: JSON.stringify({ path, method, params: parsed, accessToken })
       });
       const json = await res.json();

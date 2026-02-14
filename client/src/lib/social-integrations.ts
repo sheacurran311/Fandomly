@@ -1,6 +1,7 @@
 // Social Media Integration APIs
 import FacebookSDK, { type FacebookUser, type FacebookPage } from './facebook';
-import { getDynamicUserId } from './queryClient';
+import { saveSocialConnection } from './auth-redirect';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
 
 export interface SocialMediaAccount {
   platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify' | 'discord' | 'twitch';
@@ -85,26 +86,28 @@ export class FacebookAPI {
   }
 }
 
-// Instagram Basic Display API
+// Instagram API -- delegates to InstagramSDKManager for all auth
+// Only creator/business auth is supported
 export class InstagramAPI {
   private clientId: string;
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_INSTAGRAM_CLIENT_ID || '';
-    this.redirectUri = `${window.location.origin}/auth/instagram/callback`;
+    // Use the same creator app ID as InstagramSDKManager
+    this.clientId = import.meta.env.VITE_INSTAGRAM_CREATOR_APP_ID || '1157911489578561';
+    this.redirectUri = `${window.location.origin}/instagram-callback`;
   }
 
   getAuthUrl(): string {
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
-      scope: 'user_profile,user_media',
+      scope: 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights',
       response_type: 'code',
-      state: 'instagram_auth'
+      state: `instagram_creator_${Date.now()}`
     });
     
-    return `https://api.instagram.com/oauth/authorize?${params}`;
+    return `https://www.instagram.com/oauth/authorize?${params}`;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
@@ -133,6 +136,56 @@ export class InstagramAPI {
       accessToken,
       connectedAt: new Date()
     };
+  }
+
+  async secureLogin(): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      try {
+        const authUrl = this.getAuthUrl();
+        const popup = window.open(authUrl, 'instagram-oauth', 'width=600,height=700,scrollbars=yes,resizable=yes');
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+        let settled = false;
+        const cleanup = () => {
+          try { window.removeEventListener('message', onMsg); } catch {}
+          try { popup?.close(); } catch {}
+        };
+        const onMsg = async (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'instagram-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          const result = event.data.result;
+          if (result?.success && result?.connectionData) {
+            try {
+              const saveResult = await saveSocialConnection(result.connectionData);
+              invalidateSocialConnections();
+              resolve(saveResult.success ? { success: true } : { success: false, error: saveResult.error });
+            } catch (e) {
+              resolve({ success: false, error: 'Failed to save connection' });
+            }
+          } else {
+            resolve(result?.success ? { success: true } : { success: false, error: result?.error || 'Connection failed' });
+          }
+        };
+        window.addEventListener('message', onMsg);
+        const checkClosed = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(checkClosed);
+            if (!settled) {
+              settled = true;
+              cleanup();
+              resolve({ success: false, error: 'Popup closed without completing' });
+            }
+          }
+        }, 300);
+      } catch (e) {
+        resolve({ success: false, error: 'Failed to start Instagram connection' });
+      }
+    });
   }
 }
 
@@ -174,7 +227,7 @@ export class TikTokAPI {
     return authUrl;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string }> {
+  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
     return new Promise((resolve) => {
       try {
         // Generate CSRF state token
@@ -200,13 +253,33 @@ export class TikTokAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = (event: MessageEvent) => {
+        const onMsg = async (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'tiktok-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(event.data.result);
+          
+          // If the popup sent connection data, save it from parent window (which has session cookies)
+          if (event.data.result?.success && event.data.result?.connectionData) {
+            try {
+              console.log('[TikTok secureLogin] Saving connection from parent window...');
+              const saveResult = await saveSocialConnection(event.data.result.connectionData);
+              if (!saveResult.success) {
+                console.error('[TikTok secureLogin] Failed to save connection:', saveResult.error);
+                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
+                return;
+              }
+              console.log('[TikTok secureLogin] Connection saved successfully');
+              invalidateSocialConnections();
+              resolve({ success: true, displayName: event.data.result.displayName });
+            } catch (error) {
+              console.error('[TikTok secureLogin] Error saving connection:', error);
+              resolve({ success: false, error: 'Failed to save connection' });
+            }
+          } else {
+            resolve(event.data.result);
+          }
         };
         
         window.addEventListener('message', onMsg);
@@ -284,7 +357,7 @@ export class TwitterAPI {
   constructor() {
     this.clientId = import.meta.env.VITE_TWITTER_CLIENT_ID || '';
     this.redirectUri = (import.meta.env.VITE_TWITTER_REDIRECT_URI as string) || `${window.location.origin}/x-callback`;
-    this.scopes = (import.meta.env.VITE_TWITTER_SCOPES as string) || 'tweet.read tweet.write users.read follows.read offline.access';
+    this.scopes = (import.meta.env.VITE_TWITTER_SCOPES as string) || 'users.read tweet.read tweet.write follows.read like.read offline.access';
   }
 
   getAuthUrl(): string {
@@ -340,12 +413,13 @@ export class YouTubeAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    // Use dedicated YouTube OAuth client ID (not basic Google auth client)
+    this.clientId = import.meta.env.VITE_GOOGLE_YOUTUBE_CLIENT_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_YOUTUBE_REDIRECT_URI || `${origin}/youtube-callback`;
     
     if (!this.clientId) {
-      console.warn('YouTube: VITE_GOOGLE_CLIENT_ID not configured');
+      console.warn('YouTube: VITE_GOOGLE_YOUTUBE_CLIENT_ID not configured');
     }
   }
 
@@ -360,7 +434,9 @@ export class YouTubeAPI {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.channel-memberships.creator',
+      // Scopes: youtube.readonly for API access + identity scopes
+      // Removed unused youtube.channel-memberships.creator scope
+      scope: 'https://www.googleapis.com/auth/youtube.readonly openid email profile',
       access_type: 'offline',
       prompt: 'consent',
       state: csrfState
@@ -395,18 +471,38 @@ export class YouTubeAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = (event: MessageEvent) => {
+        const onMsg = async (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'youtube-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(event.data.result);
+          
+          // If the popup sent connection data, save it from parent window (which has session cookies)
+          if (event.data.result?.success && event.data.result?.connectionData) {
+            try {
+              console.log('[YouTube secureLogin] Saving connection from parent window...');
+              const saveResult = await saveSocialConnection(event.data.result.connectionData);
+              if (!saveResult.success) {
+                console.error('[YouTube secureLogin] Failed to save connection:', saveResult.error);
+                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
+                return;
+              }
+              console.log('[YouTube secureLogin] Connection saved successfully');
+              invalidateSocialConnections();
+              resolve({ success: true, channelName: event.data.result.channelName });
+            } catch (error) {
+              console.error('[YouTube secureLogin] Error saving connection:', error);
+              resolve({ success: false, error: 'Failed to save connection' });
+            }
+          } else {
+            resolve(event.data.result);
+          }
         };
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback)
+        // Poll for popup closure (fallback - also handles COOP blocking popup.closed)
         const pollTimer = setInterval(() => {
           try {
             if (popup.closed) {
@@ -414,11 +510,18 @@ export class YouTubeAPI {
               if (!settled) {
                 settled = true;
                 cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+                // Check for fallback data set by callback page (handles COOP race condition)
+                const fallback = (window as any).youtubeCallbackData;
+                if (fallback) {
+                  delete (window as any).youtubeCallbackData;
+                  resolve(fallback);
+                } else {
+                  resolve({ success: false, error: 'Authorization cancelled' });
+                }
               }
             }
           } catch (error) {
-            // Cross-origin error means popup is still open
+            // Cross-origin error means popup is still open on provider page
           }
         }, 1000);
 
@@ -529,18 +632,38 @@ export class SpotifyAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = (event: MessageEvent) => {
+        const onMsg = async (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'spotify-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(event.data.result);
+          
+          // If the popup sent connection data, save it from parent window (which has session cookies)
+          if (event.data.result?.success && event.data.result?.connectionData) {
+            try {
+              console.log('[Spotify secureLogin] Saving connection from parent window...');
+              const saveResult = await saveSocialConnection(event.data.result.connectionData);
+              if (!saveResult.success) {
+                console.error('[Spotify secureLogin] Failed to save connection:', saveResult.error);
+                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
+                return;
+              }
+              console.log('[Spotify secureLogin] Connection saved successfully');
+              invalidateSocialConnections();
+              resolve({ success: true, displayName: event.data.result.displayName });
+            } catch (error) {
+              console.error('[Spotify secureLogin] Error saving connection:', error);
+              resolve({ success: false, error: 'Failed to save connection' });
+            }
+          } else {
+            resolve(event.data.result);
+          }
         };
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback)
+        // Poll for popup closure (fallback - also handles COOP blocking popup.closed)
         const pollTimer = setInterval(() => {
           try {
             if (popup.closed) {
@@ -548,11 +671,18 @@ export class SpotifyAPI {
               if (!settled) {
                 settled = true;
                 cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+                // Check for fallback data set by callback page (handles COOP race condition)
+                const fallback = (window as any).spotifyCallbackData;
+                if (fallback) {
+                  delete (window as any).spotifyCallbackData;
+                  resolve(fallback);
+                } else {
+                  resolve({ success: false, error: 'Authorization cancelled' });
+                }
               }
             }
           } catch (error) {
-            // Cross-origin error means popup is still open
+            // Cross-origin error means popup is still open on provider page
           }
         }, 1000);
 
@@ -670,31 +800,14 @@ export class DiscordAPI {
           settled = true;
           cleanup();
           
-          // If the popup sent connection data, save it from parent window (which has session)
+          // If the popup sent connection data, save it from parent window (which has session cookies)
           if (event.data.result?.success && event.data.result?.connectionData) {
             try {
               console.log('[Discord secureLogin] Saving connection from parent window...');
-              const dynamicUserId = getDynamicUserId();
-              if (!dynamicUserId) {
-                console.error('[Discord secureLogin] No Dynamic user ID available');
-                resolve({ success: false, error: 'User not authenticated' });
-                return;
-              }
-              
-              const saveResponse = await fetch('/api/social-connections', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-dynamic-user-id': dynamicUserId,
-                },
-                body: JSON.stringify(event.data.result.connectionData),
-                credentials: 'include',
-              });
-              
-              if (!saveResponse.ok) {
-                const errorText = await saveResponse.text();
-                console.error('[Discord secureLogin] Failed to save connection:', errorText);
-                resolve({ success: false, error: `Failed to save connection: ${errorText}` });
+              const saveResult = await saveSocialConnection(event.data.result.connectionData);
+              if (!saveResult.success) {
+                console.error('[Discord secureLogin] Failed to save connection:', saveResult.error);
+                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
                 return;
               }
               
@@ -839,31 +952,14 @@ export class TwitchAPI {
           settled = true;
           cleanup();
           
-          // If the popup sent connection data, save it from parent window (which has session)
+          // If the popup sent connection data, save it from parent window (which has session cookies)
           if (event.data.result?.success && event.data.result?.connectionData) {
             try {
               console.log('[Twitch secureLogin] Saving connection from parent window...');
-              const dynamicUserId = getDynamicUserId();
-              if (!dynamicUserId) {
-                console.error('[Twitch secureLogin] No Dynamic user ID available');
-                resolve({ success: false, error: 'User not authenticated' });
-                return;
-              }
-              
-              const saveResponse = await fetch('/api/social-connections', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-dynamic-user-id': dynamicUserId,
-                },
-                body: JSON.stringify(event.data.result.connectionData),
-                credentials: 'include',
-              });
-              
-              if (!saveResponse.ok) {
-                const errorText = await saveResponse.text();
-                console.error('[Twitch secureLogin] Failed to save connection:', errorText);
-                resolve({ success: false, error: `Failed to save connection: ${errorText}` });
+              const saveResult = await saveSocialConnection(event.data.result.connectionData);
+              if (!saveResult.success) {
+                console.error('[Twitch secureLogin] Failed to save connection:', saveResult.error);
+                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
                 return;
               }
               
@@ -970,6 +1066,17 @@ export class SocialIntegrationManager {
     this.spotify = new SpotifyAPI();
     this.discord = new DiscordAPI();
     this.twitch = new TwitchAPI();
+  }
+
+  getAPI(platform: string): TikTokAPI | YouTubeAPI | SpotifyAPI | DiscordAPI | TwitchAPI {
+    switch (platform) {
+      case 'tiktok': return this.tiktok;
+      case 'youtube': return this.youtube;
+      case 'spotify': return this.spotify;
+      case 'discord': return this.discord;
+      case 'twitch': return this.twitch;
+      default: throw new Error(`Unsupported platform for getAPI: ${platform}`);
+    }
   }
 
   getAuthUrl(platform: string): string {

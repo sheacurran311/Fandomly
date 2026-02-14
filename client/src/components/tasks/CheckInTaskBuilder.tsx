@@ -19,7 +19,13 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Zap,
+  ShieldCheck,
 } from "lucide-react";
+import { TIER_GUIDANCE } from "@shared/taskTemplates";
+
+// Check-in tasks are T1 (internal platform verification)
+const CHECKIN_TIER = 'T1' as const;
+const tierGuidance = TIER_GUIDANCE[CHECKIN_TIER];
 
 interface StreakMilestone {
   consecutiveDays: number;
@@ -51,6 +57,8 @@ interface CheckInTaskAPIPayload {
   name: string;
   description: string;
   isDraft: boolean;
+  rewardType: 'points';
+  pointsToReward: number;
   customSettings: {
     pointsPerCheckIn: number;
     frequency: 'daily' | 'weekly' | 'monthly';
@@ -64,26 +72,30 @@ interface CheckInTaskAPIPayload {
 }
 
 interface CheckInTaskBuilderProps {
-  initialConfig?: Partial<CheckInTaskConfig>;
+  initialData?: any;
+  isEditMode?: boolean;
   onSave?: (config: CheckInTaskAPIPayload) => void;
   onPublish?: (config: CheckInTaskAPIPayload) => void;
   onBack?: () => void;
+  programSelector?: React.ReactNode;
 }
 
 export default function CheckInTaskBuilder({
-  initialConfig,
+  initialData,
+  isEditMode,
   onSave,
   onPublish,
   onBack,
+  programSelector,
 }: CheckInTaskBuilderProps) {
   // Handle both local config format and API format (customSettings)
   const getInitialValue = <T,>(key: keyof CheckInTaskConfig, defaultValue: T): T => {
-    // First check if value exists directly on initialConfig
-    if (initialConfig && key in initialConfig && initialConfig[key] !== undefined) {
-      return initialConfig[key] as T;
+    // First check if value exists directly on initialData
+    if (initialData && key in initialData && initialData[key] !== undefined) {
+      return initialData[key] as T;
     }
     // Check if value exists in customSettings (API format)
-    const customSettings = (initialConfig as any)?.customSettings;
+    const customSettings = (initialData as any)?.customSettings;
     if (customSettings && key in customSettings && customSettings[key] !== undefined) {
       return customSettings[key] as T;
     }
@@ -91,8 +103,8 @@ export default function CheckInTaskBuilder({
   };
 
   const [config, setConfig] = useState<CheckInTaskConfig>({
-    name: (initialConfig as any)?.name || "Daily Check-In",
-    description: (initialConfig as any)?.description || "Check in every day to earn points",
+    name: (initialData as any)?.name || "Daily Check-In",
+    description: (initialData as any)?.description || "Check in every day to earn points",
     pointsPerCheckIn: getInitialValue('pointsPerCheckIn', 10),
     frequency: getInitialValue('frequency', 'daily'),
     enableStreak: getInitialValue('enableStreak', true),
@@ -178,6 +190,8 @@ export default function CheckInTaskBuilder({
       name: config.name,
       description: config.description,
       isDraft,
+      rewardType: 'points' as const,
+      pointsToReward: config.pointsPerCheckIn,
       customSettings: {
         pointsPerCheckIn: config.pointsPerCheckIn,
         frequency: config.frequency,
@@ -271,6 +285,7 @@ export default function CheckInTaskBuilder({
       description="Reward fans for regular engagement"
       category="Onboarding"
       previewComponent={previewComponent}
+      programSelector={programSelector}
       onBack={onBack}
       onSaveDraft={handleSaveDraft}
       onPublish={handlePublish}
@@ -285,7 +300,7 @@ export default function CheckInTaskBuilder({
           <CardHeader>
             <CardTitle className="text-white">Basic Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div>
               <Label className="text-white">Task Name</Label>
               <Input
@@ -307,6 +322,22 @@ export default function CheckInTaskBuilder({
             </div>
           </CardContent>
         </Card>
+
+        {/* Verification Tier Guidance */}
+        <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="h-4 w-4 text-green-400" />
+            <span className="font-medium text-green-400">{tierGuidance.label}</span>
+            <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+              {tierGuidance.trustLevel}
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
+          <p className="text-sm font-medium text-green-400">{tierGuidance.pointsRange}</p>
+          {tierGuidance.tip && (
+            <p className="text-xs text-gray-400 mt-2 italic">{tierGuidance.tip}</p>
+          )}
+        </div>
 
         {/* Base Configuration */}
         <Card className="bg-white/5 backdrop-blur-lg border-white/10">

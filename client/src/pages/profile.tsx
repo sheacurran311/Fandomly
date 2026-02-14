@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { Twitter, Youtube } from "lucide-react";
 import { FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
-import { TwitterSDKManager } from "@/lib/twitter";
+import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import { socialManager } from "@/lib/social-integrations";
 import { useCreatorVerification } from "@/hooks/useCreatorVerification";
 import CreatorReferralDashboard from "@/components/referrals/CreatorReferralDashboard";
@@ -56,10 +56,16 @@ export default function Profile() {
   const queryClient = useQueryClient();
   const { creator, verificationData, isVerified } = useCreatorVerification();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [twitterConnecting, setTwitterConnecting] = useState(false);
-  const [twitterConnected, setTwitterConnected] = useState(false);
-  const [twitterHandle, setTwitterHandle] = useState<string | null>(null);
-  const [isCheckingTwitterStatus, setIsCheckingTwitterStatus] = useState(true);
+  
+  // Twitter connection via unified hook (handles saving connections properly)
+  const {
+    isConnected: twitterConnected,
+    isConnecting: twitterConnecting,
+    userInfo: twitterUserInfo,
+    connect: connectTwitter,
+    disconnect: disconnectTwitter,
+  } = useTwitterConnection();
+  const twitterHandle = twitterUserInfo?.username || null;
   
   // Username editing state
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -115,10 +121,10 @@ export default function Profile() {
   const [isCheckingTwitchStatus, setIsCheckingTwitchStatus] = useState(true);
   
   // Check social connections status when user becomes available
+  // Note: Twitter status is managed by useTwitterConnection hook automatically
   useEffect(() => {
     if (user?.dynamicUserId) {
       checkFacebookStatus();
-      checkTwitterStatus();
       checkTiktokStatus();
       checkYoutubeStatus();
       checkSpotifyStatus();
@@ -127,46 +133,8 @@ export default function Profile() {
     }
   }, [user?.dynamicUserId]);
 
-  const checkTwitterStatus = async () => {
-    try {
-      setIsCheckingTwitterStatus(true);
-      
-      // Check Twitter connection status using consistent endpoint
-      const response = await fetch('/api/social-connections/twitter', {
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Profile] Twitter connection data:', data);
-        
-        if (data.connected && data.connection) {
-          console.log('[Profile] Found existing Twitter connection');
-          setTwitterConnected(true);
-          setTwitterHandle(data.connection.platformUsername || data.connection.platformDisplayName);
-        } else {
-          console.log('[Profile] No Twitter connection found');
-          setTwitterConnected(false);
-          setTwitterHandle(null);
-        }
-      } else {
-        console.warn('[Profile] Failed to fetch Twitter connection:', response.statusText);
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-      }
-    } catch (error) {
-      console.error('[Profile] Error checking Twitter status:', error);
-      setTwitterConnected(false);
-      setTwitterHandle(null);
-    } finally {
-      setIsCheckingTwitterStatus(false);
-    }
-  };
-  
+  // Twitter status is managed by useTwitterConnection hook automatically
+
   const checkFacebookStatus = async () => {
     try {
       await FacebookSDKManager.ensureFBReady('creator');
@@ -435,30 +403,21 @@ export default function Profile() {
 
   const disconnectFacebook = async () => {
     try {
+      // Disconnect from backend first
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      await disconnectSocialPlatform('facebook');
+      // Then logout from Facebook SDK
       await FacebookSDKManager.secureLogout();
       setIsConnectedToFacebook(false);
       setFacebookUser(null);
       toast({ title: 'Facebook Disconnected', description: 'Successfully disconnected' });
     } catch (error) {
+      console.error('Facebook disconnect error:', error);
       toast({ title: 'Disconnect Failed', description: 'Please try again', variant: 'destructive' });
     }
   };
 
-  const connectTwitter = async () => {
-    try {
-      setTwitterConnecting(true);
-      const result = await TwitterSDKManager.secureLogin('creator', (user as any)?.dynamicUserId || user?.id);
-      if (result.success && result.user) {
-        setTwitterConnected(true);
-        setTwitterHandle(result.user.username);
-        toast({ title: 'X Connected', description: `@${result.user.username}` });
-      } else if (!result.success) {
-        toast({ title: 'X Connect Failed', description: result.error || 'Try again', variant: 'destructive' });
-      }
-    } finally {
-      setTwitterConnecting(false);
-    }
-  };
+  // Twitter connect is handled by useTwitterConnection hook
 
   // Helpers: format followers and total across connected socials
   const formatFollowers = (num: number): string => {
@@ -478,38 +437,7 @@ export default function Profile() {
     return total;
   };
 
-  const disconnectTwitter = async () => {
-    try {
-      // Call backend to remove connection
-      const response = await fetch('/api/social/twitter', {
-        method: 'DELETE',
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        setTwitterConnected(false);
-        setTwitterHandle(null);
-        toast({
-          title: "X Disconnected",
-          description: "Successfully disconnected from X",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('Twitter disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from X. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
+  // Twitter disconnect is handled by useTwitterConnection hook
   
   const connectTiktok = async () => {
     try {
@@ -865,7 +793,7 @@ export default function Profile() {
                       <div className="relative h-32 bg-gradient-to-r from-brand-primary/30 to-brand-secondary/30">
                         {user.profileData?.bannerImage && (
                           <img 
-                            src={transformImageUrl(user.profileData.bannerImage)} 
+                            src={transformImageUrl(user.profileData?.bannerImage ?? undefined) ?? ''} 
                             alt="Profile Banner"
                             className="w-full h-full object-cover"
                           />
@@ -889,7 +817,7 @@ export default function Profile() {
                           <div className="relative inline-block">
                             <Avatar className="w-32 h-32 mx-auto border-4 border-gray-900" data-testid="img-profile-photo">
                               <AvatarImage 
-                                src={transformImageUrl(user.profileData?.avatar) || undefined} 
+                                src={transformImageUrl(user.profileData?.avatar ?? undefined) ?? undefined} 
                                 alt={user.profileData?.name || user.username || "Creator"} 
                               />
                               <AvatarFallback className="w-32 h-32 bg-gradient-to-br from-pink-400 to-pink-600 text-white text-2xl font-bold">
@@ -1768,8 +1696,8 @@ export default function Profile() {
                             </CardHeader>
                             <CardContent>
                               <CreatorVerificationProgress
-                                creator={creator}
-                                verificationData={verificationData}
+                                creator={creator!}
+                                verificationData={verificationData ?? { profileComplete: false, completionPercentage: 0, requiredFieldsFilled: [] }}
                                 onStartWizard={() => {
                                   setIsEditModalOpen(true);
                                 }}
@@ -1829,8 +1757,8 @@ export default function Profile() {
         <CreatorProfileEditModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          user={user}
-          creator={creator || undefined}
+          user={user as unknown as import("@shared/schema").User}
+          creator={creator as import("@shared/schema").Creator | undefined}
         />
       )}
     </DashboardLayout>

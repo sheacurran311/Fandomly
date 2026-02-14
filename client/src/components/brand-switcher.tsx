@@ -34,11 +34,11 @@ export function BrandSwitcher() {
       if (!response.ok) throw new Error('Failed to fetch managed brands');
       return response.json();
     },
-    enabled: !!user && user.brandType === 'agency',
+    enabled: !!user && user.profileData?.brandType === 'agency',
   });
 
   // Only show for agency users with multiple brands
-  if (!user || user.brandType !== 'agency' || !managedBrands || managedBrands.length <= 1) {
+  if (!user || user.profileData?.brandType !== 'agency' || !managedBrands || managedBrands.length <= 1) {
     return null;
   }
 
