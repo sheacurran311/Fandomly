@@ -1,8 +1,8 @@
 /**
- * Promote User to Fandomly Admin by Dynamic ID
+ * Promote User to Fandomly Admin by email
  * 
  * Usage:
- *   npm run promote-admin <dynamic-user-id>
+ *   npm run promote-admin <email>
  * 
  * This script promotes an existing user to Fandomly admin role.
  */
@@ -16,23 +16,23 @@ async function promoteToAdmin() {
     const args = process.argv.slice(2);
     
     if (args.length < 1) {
-      console.error('\n❌ Usage: npm run promote-admin <dynamic-user-id>\n');
-      console.error('Example: npm run promote-admin 8346873d-a9da-4ac7-9546-c352aa4dee92\n');
+      console.error('\n❌ Usage: npm run promote-admin <email>\n');
+      console.error('Example: npm run promote-admin admin@example.com\n');
       process.exit(1);
     }
 
-    const [dynamicUserId] = args;
+    const [email] = args;
 
     console.log('\n🔑 Promoting User to Fandomly Admin\n');
-    console.log(`Dynamic User ID: ${dynamicUserId}\n`);
+    console.log(`Email: ${email}\n`);
 
-    // Find user by Dynamic ID
+    // Find user by email
     const user = await db.query.users.findFirst({
-      where: eq(users.dynamicUserId, dynamicUserId)
+      where: eq(users.email, email)
     });
 
     if (!user) {
-      console.error(`❌ No user found with Dynamic ID: ${dynamicUserId}`);
+      console.error(`❌ No user found with email: ${email}`);
       console.error('\nMake sure the user has completed registration.\n');
       process.exit(1);
     }
@@ -68,4 +68,3 @@ async function promoteToAdmin() {
 }
 
 promoteToAdmin();
-

@@ -1,5 +1,5 @@
 import { Trophy, Target, Flame, Filter, Search, Star, Plus, Grid, List } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -75,13 +75,16 @@ export default function FanTasksPage() {
   const completions = completionsData?.completions || [];
 
   // Create a map of task completions for quick lookup
-  const completionMap = new Map<string, TaskCompletion>();
-  completions.forEach((completion) => {
-    completionMap.set(completion.taskId, completion);
-  });
+  const completionMap = useMemo(() => {
+    const map = new Map<string, TaskCompletion>();
+    completions.forEach((completion) => {
+      map.set(completion.taskId, completion);
+    });
+    return map;
+  }, [completions]);
 
   // Filter tasks
-  const filteredTasks = tasks.filter((task: Task) => {
+  const filteredTasks = useMemo(() => tasks.filter((task: Task) => {
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -118,15 +121,15 @@ export default function FanTasksPage() {
     }
 
     return true;
-  });
+  }), [tasks, searchQuery, filterType, completionMap]);
 
   // Calculate stats
-  const stats = {
+  const stats = useMemo(() => ({
     total: tasks.length,
     completed: completions.filter(c => c.status === 'completed').length,
     inProgress: completions.filter(c => c.status === 'in_progress').length,
     totalPoints: completions.reduce((sum, c) => sum + (c.pointsEarned || 0), 0),
-  };
+  }), [tasks.length, completions]);
 
   // Fetch task completion stats for charts
   const { data: taskStats } = useQuery({

@@ -11,7 +11,6 @@ interface UserData extends User {
   createdAt?: Date | string | null;
   creator?: any;
   tenant?: any;
-  dynamicUserId?: string; // Legacy field for backward compatibility
   agencyId?: string | null;
   brandType?: string | null;
 }
@@ -53,13 +52,11 @@ export function useAuth() {
   const userData: UserData | undefined = auth.user ? {
     ...auth.user,
     hasCompletedOnboarding: auth.user.onboardingState?.isCompleted || false,
-    dynamicUserId: auth.user.id, // Legacy field
   } : undefined;
 
   return {
     // Auth state - compatible interface
     user: userData,
-    dynamicUser: auth.user, // Legacy field name, now points to our user
     isAuthenticated: auth.isAuthenticated,
     isLoading: auth.isLoading || registerUser.isPending,
     error: auth.error,

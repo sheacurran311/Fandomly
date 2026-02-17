@@ -27,14 +27,36 @@ export default function DiscordCallback() {
     discordCallbackProcessed = true;
 
     const run = async () => {
-      try {
-        // Parse URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
-        const state = params.get("state");
-        const error = params.get("error");
-        const errorDescription = params.get("error_description");
+      // Parse URL parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+      const error = params.get("error");
+      const errorDescription = params.get("error_description");
 
+      // Helper to send result to opener with localStorage COOP fallback
+      const sendResultToOpener = (result: { success: boolean; error?: string; displayName?: string }) => {
+        if (state) {
+          try {
+            localStorage.setItem(`discord_oauth_result_${state}`, JSON.stringify(result));
+          } catch (e) {
+            console.error('[Discord Callback] Failed to store result in localStorage:', e);
+          }
+        }
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: "discord-oauth-result", result }, window.location.origin);
+          (window.opener as any).discordCallbackData = result;
+          window.close();
+          return true;
+        }
+        if (state && state.startsWith('discord_')) {
+          window.close();
+          return true;
+        }
+        return false;
+      };
+
+      try {
         console.log("[Discord Callback] Processing OAuth callback", {
           hasCode: !!code,
           hasState: !!state,
@@ -45,21 +67,7 @@ export default function DiscordCallback() {
         if (error) {
           console.error("[Discord Callback] OAuth error:", error, errorDescription);
           const errorMsg = errorDescription || error || "Discord authorization failed";
-
-          // If opened in popup, send error to parent
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage(
-              {
-                type: "discord-oauth-result",
-                result: { success: false, error: errorMsg },
-              },
-              window.location.origin
-            );
-            window.close();
-            return;
-          }
-
-          // Otherwise show toast and redirect
+          if (sendResultToOpener({ success: false, error: errorMsg })) return;
           toast({
             title: "Discord Connection Failed",
             description: errorMsg,
@@ -159,45 +167,18 @@ export default function DiscordCallback() {
         console.log("[Discord Callback] Connection saved successfully");
 
         const displayName = userData.global_name || userData.username;
-
-        // If opened in popup, send success to parent
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            {
-              type: "discord-oauth-result",
-              result: {
-                success: true,
-                displayName,
-              },
-            },
-            window.location.origin
-          );
-          window.close();
-          return;
-        }
+        if (sendResultToOpener({ success: true, displayName })) return;
 
         // Otherwise show toast and redirect
         toast({
-          title: "Discord Connected! 🎉",
+          title: "Discord Connected!",
           description: `Successfully connected ${displayName}`,
         });
         setLocation("/creator-dashboard/social");
       } catch (error) {
         console.error("[Discord Callback] Error:", error);
         const errorMsg = error instanceof Error ? error.message : "Failed to connect Discord";
-
-        // If opened in popup, send error to parent
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            {
-              type: "discord-oauth-result",
-              result: { success: false, error: errorMsg },
-            },
-            window.location.origin
-          );
-          window.close();
-          return;
-        }
+        if (sendResultToOpener({ success: false, error: errorMsg })) return;
 
         // Otherwise show toast and redirect
         toast({

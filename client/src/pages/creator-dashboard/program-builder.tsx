@@ -28,26 +28,15 @@ import {
   Settings,
   ExternalLink,
   Image as ImageIcon,
-  Pin,
-  Trash2,
-  Edit,
-  Send,
-  Twitter,
-  Instagram,
-  Facebook,
-  Youtube,
-  Video,
   Loader2,
   Check,
   Globe,
   Gift,
-  Type,
   LayoutGrid,
   MapPin,
   User,
   Info
 } from "lucide-react";
-import { FaDiscord, FaTwitch, FaSpotify, FaTiktok } from "react-icons/fa";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { socialManager } from "@/lib/social-integrations";
 import { TwitterSDKManager } from "@/lib/twitter";
@@ -55,8 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { invalidateSocialConnections } from "@/hooks/use-social-connections";
 import { ImageUpload } from "@/components/ui/image-upload";
 import type { Program, Campaign, Task } from "@shared/schema";
-import { THEME_TEMPLATES, getAllThemeTemplates, getThemeTemplate, type ThemeTemplate, type CreatorTypeForTheme } from "@shared/theme-templates";
-import { TypographyToolbar } from "@/components/program/typography-toolbar";
+import { type ThemeTemplate, type CreatorTypeForTheme } from "@shared/theme-templates";
 // New simplified builder components
 import { ProgramBuilderModeToggle, getSavedBuilderMode, type BuilderMode } from "@/components/program/program-builder-mode-toggle";
 import { CollapsibleSection } from "@/components/program/collapsible-section";
@@ -65,6 +53,8 @@ import { EssentialInfoSection } from "@/components/program/essential-info-sectio
 import { PlatformConnectionPriority } from "@/components/program/platform-connection-priority";
 import { getCreatorTemplate, type CreatorType } from "@/components/program/creator-program-templates";
 import { QuickSetupWizard, type QuickSetupData } from "@/components/program/quick-setup-wizard";
+import { PreviewModal } from "@/components/program/preview-modal";
+import { AnnouncementsManager } from "@/components/program/announcements-manager";
 
 interface ProgramWithDetails extends Program {
   campaigns?: Campaign[];
@@ -389,304 +379,86 @@ function ProgramCustomizer({
   );
 
   // Social platform connection handlers
-  const handleConnectTwitter = async () => {
-    setConnectingPlatform('twitter');
+  // Unified connect handler for all social platforms
+  const handleConnectPlatform = async (platformId: string) => {
+    const platformNames: Record<string, string> = {
+      twitter: 'Twitter',
+      instagram: 'Instagram',
+      discord: 'Discord',
+      facebook: 'Facebook',
+      tiktok: 'TikTok',
+      youtube: 'YouTube',
+      spotify: 'Spotify',
+      twitch: 'Twitch',
+    };
+
+    const platformName = platformNames[platformId] || platformId;
+    setConnectingPlatform(platformId);
+
     try {
-      const result = await TwitterSDKManager.secureLogin('creator');
-      if (result.success && result.user) {
-        // Save connection from parent window (reliable - has JWT/cookie auth)
-        try {
-          await fetchApi('/api/social-connections', {
-            method: 'POST',
-            body: JSON.stringify({
-              platform: 'twitter',
-              platformUserId: result.user.id,
-              platformUsername: result.user.username,
-              platformDisplayName: result.user.name,
-              accessToken: result.accessToken,
-              refreshToken: result.refreshToken,
-              profileData: {
-                profileImageUrl: result.user.profileImageUrl,
-                followersCount: result.user.followersCount,
-                followingCount: result.user.followingCount,
-              },
-            }),
-          });
-          console.log('[ProgramBuilder] Twitter connection saved from parent window');
-        } catch (saveErr) {
-          console.warn('[ProgramBuilder] Parent save failed (popup may have already saved):', saveErr);
+      let result: { success: boolean; error?: string; user?: any; accessToken?: string; refreshToken?: string };
+
+      // Handle platform-specific login logic
+      if (platformId === 'twitter') {
+        result = await TwitterSDKManager.secureLogin('creator');
+        // Twitter requires additional save step
+        if (result.success && result.user) {
+          try {
+            await fetchApi('/api/social-connections', {
+              method: 'POST',
+              body: JSON.stringify({
+                platform: 'twitter',
+                platformUserId: result.user.id,
+                platformUsername: result.user.username,
+                platformDisplayName: result.user.name,
+                accessToken: result.accessToken,
+                refreshToken: result.refreshToken,
+                profileData: {
+                  profileImageUrl: result.user.profileImageUrl,
+                  followersCount: result.user.followersCount,
+                  followingCount: result.user.followingCount,
+                },
+              }),
+            });
+          } catch (saveErr) {
+            console.warn('[ProgramBuilder] Parent save failed (popup may have already saved):', saveErr);
+          }
         }
-
-        setRecentlyConnected(prev => new Set(prev).add('twitter'));
-        toast({
-          title: "Twitter Connected! +500 Points",
-          description: `Successfully connected your Twitter account`,
-        });
-        invalidateSocialConnections();
-      } else if (result.success) {
-        // OAuth succeeded but no user info - still mark as connected
-        setRecentlyConnected(prev => new Set(prev).add('twitter'));
-        toast({
-          title: "Twitter Connected! +500 Points",
-          description: `Successfully connected your Twitter account`,
-        });
-        invalidateSocialConnections();
+      } else if (platformId === 'facebook') {
+        result = await FacebookSDKManager.login('pages_show_list,pages_read_engagement,business_management');
+        result.success = result.success && !!result.accessToken;
       } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Failed to connect Twitter",
-          variant: "destructive",
-        });
+        // Use socialManager for other platforms
+        const api = socialManager[platformId as keyof typeof socialManager];
+        if (!api) {
+          console.warn('Unknown platform:', platformId);
+          return;
+        }
+        result = await api.secureLogin();
       }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting Twitter",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
 
-  const handleConnectInstagram = async () => {
-    setConnectingPlatform('instagram');
-    try {
-      const instagramAPI = socialManager['instagram'];
-      const result = await instagramAPI.secureLogin();
       if (result.success) {
-        setRecentlyConnected(prev => new Set(prev).add('instagram'));
+        setRecentlyConnected(prev => new Set(prev).add(platformId));
         toast({
-          title: "Instagram Connected! +500 Points",
-          description: `Successfully connected your Instagram account`,
+          title: `${platformName} Connected! +500 Points`,
+          description: `Successfully connected your ${platformName} account`,
         });
         invalidateSocialConnections();
       } else {
         toast({
           title: "Connection Failed",
-          description: result.error || "Failed to connect Instagram",
+          description: result.error || `Failed to connect ${platformName}`,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
         title: "Connection Failed",
-        description: "An error occurred while connecting Instagram",
+        description: `An error occurred while connecting ${platformName}`,
         variant: "destructive",
       });
     } finally {
       setConnectingPlatform(null);
-    }
-  };
-
-  const handleConnectDiscord = async () => {
-    setConnectingPlatform('discord');
-    try {
-      const discordAPI = socialManager['discord'];
-      const result = await discordAPI.secureLogin();
-      if (result.success) {
-        setRecentlyConnected(prev => new Set(prev).add('discord'));
-        toast({
-          title: "Discord Connected! +500 Points",
-          description: `Successfully connected your Discord account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Failed to connect Discord",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting Discord",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
-
-  const handleConnectFacebook = async () => {
-    setConnectingPlatform('facebook');
-    try {
-      const result = await FacebookSDKManager.login('pages_show_list,pages_read_engagement,business_management');
-      if (result.success && result.accessToken) {
-        setRecentlyConnected(prev => new Set(prev).add('facebook'));
-        toast({
-          title: "Facebook Connected! +500 Points",
-          description: `Successfully connected your Facebook account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: "Failed to connect Facebook",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting Facebook",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
-
-  const handleConnectTikTok = async () => {
-    setConnectingPlatform('tiktok');
-    try {
-      const tiktokAPI = socialManager['tiktok'];
-      const result = await tiktokAPI.secureLogin();
-      if (result.success) {
-        setRecentlyConnected(prev => new Set(prev).add('tiktok'));
-        toast({
-          title: "TikTok Connected! +500 Points",
-          description: `Successfully connected your TikTok account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Failed to connect TikTok",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting TikTok",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
-
-  const handleConnectYouTube = async () => {
-    setConnectingPlatform('youtube');
-    try {
-      const youtubeAPI = socialManager['youtube'];
-      const result = await youtubeAPI.secureLogin();
-      if (result.success) {
-        setRecentlyConnected(prev => new Set(prev).add('youtube'));
-        toast({
-          title: "YouTube Connected! +500 Points",
-          description: `Successfully connected your YouTube account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Failed to connect YouTube",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting YouTube",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
-
-  const handleConnectSpotify = async () => {
-    setConnectingPlatform('spotify');
-    try {
-      const spotifyAPI = socialManager['spotify'];
-      const result = await spotifyAPI.secureLogin();
-      if (result.success) {
-        setRecentlyConnected(prev => new Set(prev).add('spotify'));
-        toast({
-          title: "Spotify Connected! +500 Points",
-          description: `Successfully connected your Spotify account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Failed to connect Spotify",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting Spotify",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
-
-  const handleConnectTwitch = async () => {
-    setConnectingPlatform('twitch');
-    try {
-      const twitchAPI = socialManager['twitch'];
-      const result = await twitchAPI.secureLogin();
-      if (result.success) {
-        setRecentlyConnected(prev => new Set(prev).add('twitch'));
-        toast({
-          title: "Twitch Connected! +500 Points",
-          description: `Successfully connected your Twitch account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Failed to connect Twitch",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "An error occurred while connecting Twitch",
-        variant: "destructive",
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
-  };
-
-  // Unified connect handler for PlatformConnectionPriority component
-  const handleConnectPlatform = (platformId: string) => {
-    switch (platformId) {
-      case 'twitter':
-        handleConnectTwitter();
-        break;
-      case 'instagram':
-        handleConnectInstagram();
-        break;
-      case 'discord':
-        handleConnectDiscord();
-        break;
-      case 'facebook':
-        handleConnectFacebook();
-        break;
-      case 'tiktok':
-        handleConnectTikTok();
-        break;
-      case 'youtube':
-        handleConnectYouTube();
-        break;
-      case 'spotify':
-        handleConnectSpotify();
-        break;
-      case 'twitch':
-        handleConnectTwitch();
-        break;
-      default:
-        console.warn('Unknown platform:', platformId);
     }
   };
 
@@ -1433,36 +1205,6 @@ function ProgramCustomizer({
               </div>
             </div>
           </CollapsibleSection>
-
-          {/* Collapsible: Typography & Layout (Pro) */}
-          <CollapsibleSection
-            title="Typography & Layout"
-            icon={Type}
-            description="Advanced font and spacing customization"
-            enterpriseBadge={true}
-            defaultOpen={false}
-          >
-            <TypographyToolbar
-              value={{
-                typography: customizeData.theme?.typography,
-                layout: customizeData.theme?.layout
-              } as any}
-              onChange={(updates) => {
-                setCustomizeData({
-                  ...customizeData,
-                  theme: {
-                    ...customizeData.theme,
-                    typography: updates.typography 
-                      ? { ...customizeData.theme?.typography, ...updates.typography }
-                      : customizeData.theme?.typography,
-                    layout: updates.layout
-                      ? { ...customizeData.theme?.layout, ...updates.layout }
-                      : customizeData.theme?.layout
-                  }
-                });
-              }}
-            />
-          </CollapsibleSection>
         </>
       )}
 
@@ -1557,343 +1299,28 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
-      {/* Social Connections - Earn Points */}
+      {/* Social Connections - Use shared component */}
+      <PlatformConnectionPriority
+        creatorType={creatorType}
+        connectedPlatforms={connectedPlatforms}
+        socialConnections={socialConnectionsData?.connections || []}
+        recentlyConnected={recentlyConnected}
+        connectingPlatform={connectingPlatform}
+        onConnect={handleConnectPlatform}
+        asCard={true}
+      />
+
+      {/* Website URL */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Gift className="h-5 w-5 text-green-400" />
-            Connect Social Accounts
+            <Globe className="h-5 w-5" />
+            Website
           </CardTitle>
-          <p className="text-sm text-gray-400">Connect your social accounts to earn platform points</p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Twitter Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <Twitter className="h-5 w-5 text-blue-400" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Twitter / X</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('twitter') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'twitter')?.platformUsername || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('twitter') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('twitter') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectTwitter}
-                disabled={connectingPlatform === 'twitter'}
-                variant="outline"
-                className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-              >
-                {connectingPlatform === 'twitter' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Instagram Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center">
-                <Instagram className="h-5 w-5 text-pink-400" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Instagram</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('instagram') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'instagram')?.platformUsername || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('instagram') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('instagram') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectInstagram}
-                disabled={connectingPlatform === 'instagram'}
-                variant="outline"
-                className="border-pink-500/30 text-pink-400 hover:bg-pink-500/10"
-              >
-                {connectingPlatform === 'instagram' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Discord Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                <FaDiscord className="h-5 w-5 text-purple-400" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Discord</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('discord') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'discord')?.platformUsername || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('discord') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('discord') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectDiscord}
-                disabled={connectingPlatform === 'discord'}
-                variant="outline"
-                className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
-              >
-                {connectingPlatform === 'discord' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Facebook Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center">
-                <Facebook className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Facebook</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('facebook') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'facebook')?.platformDisplayName || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('facebook') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('facebook') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectFacebook}
-                disabled={connectingPlatform === 'facebook'}
-                variant="outline"
-                className="border-blue-600/30 text-blue-500 hover:bg-blue-600/10"
-              >
-                {connectingPlatform === 'facebook' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* TikTok Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center">
-                <FaTiktok className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="font-medium text-white">TikTok</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('tiktok') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'tiktok')?.platformUsername || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('tiktok') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('tiktok') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectTikTok}
-                disabled={connectingPlatform === 'tiktok'}
-                variant="outline"
-                className="border-white/30 text-white hover:bg-white/10"
-              >
-                {connectingPlatform === 'tiktok' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* YouTube Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <Youtube className="h-5 w-5 text-red-500" />
-              </div>
-              <div>
-                <p className="font-medium text-white">YouTube</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('youtube') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'youtube')?.platformDisplayName || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('youtube') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('youtube') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectYouTube}
-                disabled={connectingPlatform === 'youtube'}
-                variant="outline"
-                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-              >
-                {connectingPlatform === 'youtube' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Spotify Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                <FaSpotify className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Spotify</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('spotify') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'spotify')?.platformDisplayName || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('spotify') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('spotify') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectSpotify}
-                disabled={connectingPlatform === 'spotify'}
-                variant="outline"
-                className="border-green-500/30 text-green-500 hover:bg-green-500/10"
-              >
-                {connectingPlatform === 'spotify' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Twitch Connection */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-purple-600/20 flex items-center justify-center">
-                <FaTwitch className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Twitch</p>
-                <p className="text-xs text-gray-400">
-                  {connectedPlatforms.has('twitch') 
-                    ? socialConnectionsData?.connections?.find((c: any) => c.platform === 'twitch')?.platformDisplayName || 'Connected'
-                    : 'Not connected'}
-                </p>
-              </div>
-            </div>
-            {connectedPlatforms.has('twitch') ? (
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-400" />
-                {recentlyConnected.has('twitch') ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">+500 Points</Badge>
-                ) : (
-                  <span className="text-green-400 text-sm font-medium">Connected</span>
-                )}
-              </div>
-            ) : (
-              <Button
-                onClick={handleConnectTwitch}
-                disabled={connectingPlatform === 'twitch'}
-                variant="outline"
-                className="border-purple-600/30 text-purple-500 hover:bg-purple-600/10"
-              >
-                {connectingPlatform === 'twitch' ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <>Connect <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30 text-xs">+500 pts</Badge></>
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Website URL - keep this as a manual input */}
-          <Separator className="bg-white/10" />
+        <CardContent>
           <div>
-            <Label className="text-white flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              Website URL
-            </Label>
+            <Label className="text-white">Website URL</Label>
             <Input
               value={customizeData.socialLinks?.website || ''}
               onChange={(e) => setCustomizeData({
@@ -1910,163 +1337,12 @@ function ProgramCustomizer({
         </CardContent>
       </Card>
 
-      {/* Theme Templates Gallery */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Theme Templates
-          </CardTitle>
-          <p className="text-sm text-gray-400">Choose from 12 professional themes - instantly apply a complete design</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Theme Template Gallery */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-white">Select a Theme</Label>
-              {(customizeData.theme as { name?: string })?.name && (
-                <span className="text-xs text-gray-400">
-                  Current: <span className="text-brand-primary font-medium">{(customizeData.theme as { name?: string }).name}</span>
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {getAllThemeTemplates().map((template) => {
-                const isSelected = customizeData.theme?.templateId === template.templateId;
-                return (
-                  <button
-                    key={template.templateId}
-                    onClick={() => {
-                      // Apply the selected theme template
-                      setCustomizeData({
-                        ...customizeData,
-                        theme: template as any,
-                        brandColors: {
-                          primary: template.colors.primary,
-                          secondary: template.colors.secondary,
-                          accent: template.colors.accent
-                        }
-                      });
-                    }}
-                    className={`group p-3 rounded-lg border-2 transition-all text-left hover:scale-105 ${
-                      isSelected
-                        ? 'border-brand-primary bg-brand-primary/10 shadow-lg'
-                        : 'border-white/20 bg-white/5 hover:border-brand-primary/50 hover:bg-white/10'
-                    }`}
-                  >
-                    {/* Theme Preview */}
-                    <div
-                      className="w-full h-20 rounded mb-2 border border-white/10 overflow-hidden relative"
-                      style={{
-                        background: `linear-gradient(135deg, ${template.colors.primary}, ${template.colors.secondary})`,
-                      }}
-                    >
-                      <div className="w-full h-full flex items-center justify-center p-2" style={{ backgroundColor: template.colors.background + 'CC' }}>
-                        <div className="w-full space-y-1">
-                          <div
-                            className="h-1 rounded-full"
-                            style={{ backgroundColor: template.colors.text.primary, width: '70%' }}
-                          />
-                          <div
-                            className="h-1 rounded-full"
-                            style={{ backgroundColor: template.colors.text.secondary, width: '50%' }}
-                          />
-                          <div
-                            className="h-1 rounded-full"
-                            style={{ backgroundColor: template.colors.text.tertiary, width: '60%' }}
-                          />
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <div className="absolute top-1 right-1">
-                          <div className="bg-brand-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                            ✓
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Theme Info */}
-                    <div className="space-y-1">
-                      <p className="text-white font-semibold text-sm truncate">{template.name}</p>
-                      <p className="text-gray-400 text-xs line-clamp-1">{template.description}</p>
-
-                      {/* Color Dots */}
-                      <div className="flex gap-1 pt-1">
-                        <div
-                          className="w-3 h-3 rounded-full border border-white/30"
-                          style={{ backgroundColor: template.colors.primary }}
-                          title="Primary"
-                        />
-                        <div
-                          className="w-3 h-3 rounded-full border border-white/30"
-                          style={{ backgroundColor: template.colors.secondary }}
-                          title="Secondary"
-                        />
-                        <div
-                          className="w-3 h-3 rounded-full border border-white/30"
-                          style={{ backgroundColor: template.colors.accent }}
-                          title="Accent"
-                        />
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Applied Template Info */}
-          {customizeData.theme?.templateId && (
-            <div className="pt-4 border-t border-white/10">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <p className="text-white font-medium mb-1">Applied Theme</p>
-                  <p className="text-gray-400 text-sm mb-2">{(customizeData.theme as { name?: string }).name} - {(customizeData.theme as { description?: string }).description}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge className="bg-white/10 text-white border-white/20 text-xs">
-                      {customizeData.theme.mode === 'light' ? '☀️ Light' : '🌙 Dark'} Mode
-                    </Badge>
-                    <Badge className="bg-white/10 text-white border-white/20 text-xs">
-                      14 Colors
-                    </Badge>
-                    <Badge className="bg-white/10 text-white border-white/20 text-xs">
-                      Typography Included
-                    </Badge>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-white/20 text-white hover:bg-white/10"
-                  onClick={() => {
-                    // Reset to default theme
-                    setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        mode: 'light' as const,
-                        templateId: 'default-light',
-                        backgroundColor: '#ffffff',
-                        textColor: '#111827'
-                      }
-                    });
-                  }}
-                >
-                  Reset
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <Alert className="border-blue-500/20 bg-blue-500/10">
-            <AlertCircle className="h-4 w-4 text-blue-400" />
-            <AlertDescription className="text-gray-300 text-sm">
-              <strong>Pro Tip:</strong> Select a template to instantly apply colors, typography, and layout. Then customize individual colors in the Brand Colors section below.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      {/* Theme Templates - Use shared QuickThemePicker */}
+      <QuickThemePicker
+        creatorType={creatorType as CreatorTypeForTheme}
+        selectedThemeId={customizeData.theme?.templateId || null}
+        onSelectTheme={handleSelectTheme}
+      />
 
       {/* Brand Colors */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
@@ -2358,283 +1634,6 @@ function ProgramCustomizer({
           </div>
         </CardContent>
       </Card>
-
-      {/* Advanced Colors - Surface & State Colors */}
-      <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Advanced Colors
-          </CardTitle>
-          <p className="text-sm text-gray-400">Customize surface backgrounds and state indicator colors</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Surface Colors */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">Surface Colors</Label>
-            <p className="text-xs text-gray-400 mb-3">Colors for cards, panels, and elevated surfaces</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-300 text-sm">Surface</Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.surface || '#ffffff'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, surface: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.surface || '#ffffff'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, surface: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#ffffff"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Card backgrounds</p>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm">Surface Hover</Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.surfaceHover || '#f9fafb'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, surfaceHover: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.surfaceHover || '#f9fafb'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, surfaceHover: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#f9fafb"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Hover state for cards</p>
-              </div>
-            </div>
-          </div>
-
-          <Separator className="bg-white/10" />
-
-          {/* State Colors */}
-          <div>
-            <Label className="text-white mb-3 block font-semibold">State Indicator Colors</Label>
-            <p className="text-xs text-gray-400 mb-3">Colors for success messages, warnings, errors, and info</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-300 text-sm flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                  Success
-                </Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.success || '#10b981'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, success: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.success || '#10b981'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, success: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#10b981"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                  Warning
-                </Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.warning || '#f59e0b'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, warning: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.warning || '#f59e0b'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, warning: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#f59e0b"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                  Error
-                </Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.error || '#ef4444'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, error: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.error || '#ef4444'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, error: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#ef4444"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                  Info
-                </Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.info || '#3b82f6'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, info: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.info || '#3b82f6'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, info: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#3b82f6"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-gray-300 text-sm">Border</Label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="color"
-                    value={customizeData.theme?.colors?.border || '#e5e7eb'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, border: e.target.value }
-                      }
-                    })}
-                    className="w-12 h-10 rounded border-2 border-white/20 cursor-pointer"
-                  />
-                  <Input
-                    value={customizeData.theme?.colors?.border || '#e5e7eb'}
-                    onChange={(e) => setCustomizeData({
-                      ...customizeData,
-                      theme: {
-                        ...customizeData.theme,
-                        colors: { ...customizeData.theme?.colors, border: e.target.value }
-                      }
-                    })}
-                    className="flex-1 bg-white/5 border-white/10 text-white"
-                    placeholder="#e5e7eb"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Card borders and dividers</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Typography & Layout - Visual Toolbar */}
-      <TypographyToolbar
-        value={{
-          typography: customizeData.theme?.typography,
-          layout: customizeData.theme?.layout
-        } as any}
-        onChange={(updates) => {
-          setCustomizeData({
-            ...customizeData,
-            theme: {
-              ...customizeData.theme,
-              typography: updates.typography 
-                ? { ...customizeData.theme?.typography, ...updates.typography }
-                : customizeData.theme?.typography,
-              layout: updates.layout
-                ? { ...customizeData.theme?.layout, ...updates.layout }
-                : customizeData.theme?.layout
-            }
-          });
-        }}
-      />
 
       {/* Page Visibility */}
       <Card className="bg-white/5 backdrop-blur-lg border-white/10">
@@ -3044,250 +2043,6 @@ function ProgramCustomizer({
   );
 }
 
-function PreviewModal({ 
-  program, 
-  customizeData,
-  isOpen, 
-  onClose 
-}: { 
-  program: ProgramWithDetails;
-  customizeData: any;
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  
-  // Get theme colors
-  const theme = customizeData.theme || {};
-  const brandColors = customizeData.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
-  const backgroundColor = theme.backgroundColor || (theme.mode === 'dark' ? '#0f172a' : '#ffffff');
-  const textColor = theme.textColor || (theme.mode === 'dark' ? '#ffffff' : '#111827');
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl h-[95vh] bg-slate-900 border-white/10 p-0 flex flex-col">
-        <DialogHeader className="p-4 border-b border-white/10 flex-shrink-0">
-          <DialogTitle className="text-white flex items-center justify-between">
-            <span>Preview: {customizeData.displayName}</span>
-            <div className="flex items-center gap-3">
-              {/* Device Toggle */}
-              <div className="flex items-center gap-1 bg-white/10 rounded-lg p-1">
-                <button
-                  onClick={() => setPreviewMode('desktop')}
-                  className={`px-3 py-1 rounded text-sm transition-colors ${
-                    previewMode === 'desktop' ? 'bg-brand-primary text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Desktop
-                </button>
-                <button
-                  onClick={() => setPreviewMode('mobile')}
-                  className={`px-3 py-1 rounded text-sm transition-colors ${
-                    previewMode === 'mobile' ? 'bg-brand-primary text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Mobile
-                </button>
-              </div>
-              <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                {program.status === 'published' ? 'Live Preview' : 'Draft Preview'}
-              </Badge>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 overflow-auto flex justify-center p-4 bg-slate-800">
-          {/* Preview Container */}
-          <div 
-            className={`transition-all duration-300 rounded-lg shadow-2xl overflow-auto ${
-              previewMode === 'mobile' ? 'w-[375px]' : 'w-full max-w-5xl'
-            }`}
-            style={{ 
-              backgroundColor,
-              color: textColor,
-              minHeight: '100%'
-            }}
-          >
-            {/* Header Banner */}
-            <div 
-              className="h-48 relative"
-              style={{
-                background: customizeData.headerImage 
-                  ? `url(${customizeData.headerImage}) center/cover`
-                  : `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`
-              }}
-            >
-              {/* Logo */}
-              {customizeData.logo && (
-                <div className="absolute bottom-0 left-6 transform translate-y-1/2">
-                  <img 
-                    src={customizeData.logo} 
-                    alt="Logo" 
-                    className="w-24 h-24 rounded-full border-4 object-cover"
-                    style={{ borderColor: backgroundColor }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Content */}
-            <div className={`p-6 ${customizeData.logo ? 'pt-16' : 'pt-6'}`}>
-              {/* Program Name */}
-              <h1 
-                className="text-3xl font-bold mb-2"
-                style={{ 
-                  color: textColor,
-                  fontFamily: theme.typography?.fontFamily?.heading || 'inherit'
-                }}
-              >
-                {customizeData.displayName || 'Your Program Name'}
-              </h1>
-
-              {/* Points Badge */}
-              <div className="flex items-center gap-2 mb-4">
-                <span 
-                  className="px-3 py-1 rounded-full text-sm font-medium"
-                  style={{ 
-                    backgroundColor: brandColors.primary + '20',
-                    color: brandColors.primary
-                  }}
-                >
-                  Earn {customizeData.pointsName || 'Points'}
-                </span>
-              </div>
-
-              {/* Bio */}
-              {customizeData.bio && (
-                <p 
-                  className="text-base mb-6 opacity-80"
-                  style={{ 
-                    color: textColor,
-                    fontFamily: theme.typography?.fontFamily?.body || 'inherit'
-                  }}
-                >
-                  {customizeData.bio}
-                </p>
-              )}
-
-              {/* Section Previews */}
-              <div className="space-y-4">
-                {customizeData.showCampaigns && (
-                  <div 
-                    className="p-4 rounded-lg"
-                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
-                  >
-                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Active Campaigns</h3>
-                    <div className="flex gap-2">
-                      <div 
-                        className="px-4 py-2 rounded text-sm"
-                        style={{ backgroundColor: brandColors.primary, color: '#fff' }}
-                      >
-                        Sample Campaign
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {customizeData.showTasks && (
-                  <div 
-                    className="p-4 rounded-lg"
-                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
-                  >
-                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Available Tasks</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                        <span>Follow on Twitter</span>
-                        <span style={{ color: brandColors.primary }}>+100 {customizeData.pointsName || 'pts'}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                        <span>Like a Post</span>
-                        <span style={{ color: brandColors.primary }}>+50 {customizeData.pointsName || 'pts'}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {customizeData.showRewards && (
-                  <div 
-                    className="p-4 rounded-lg"
-                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
-                  >
-                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Rewards Store</h3>
-                    <div className="flex gap-3">
-                      <div 
-                        className="p-3 rounded-lg text-center flex-1"
-                        style={{ 
-                          backgroundColor: brandColors.secondary + '15',
-                          borderColor: brandColors.secondary + '30',
-                          borderWidth: 1
-                        }}
-                      >
-                        <div className="text-2xl mb-1">🎁</div>
-                        <p className="text-sm font-medium">Exclusive Merch</p>
-                        <p className="text-xs opacity-70">500 {customizeData.pointsName || 'pts'}</p>
-                      </div>
-                      <div 
-                        className="p-3 rounded-lg text-center flex-1"
-                        style={{ 
-                          backgroundColor: brandColors.accent + '15',
-                          borderColor: brandColors.accent + '30',
-                          borderWidth: 1
-                        }}
-                      >
-                        <div className="text-2xl mb-1">🏆</div>
-                        <p className="text-sm font-medium">VIP Access</p>
-                        <p className="text-xs opacity-70">1000 {customizeData.pointsName || 'pts'}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {customizeData.showLeaderboard && (
-                  <div 
-                    className="p-4 rounded-lg"
-                    style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
-                  >
-                    <h3 className="font-semibold mb-2" style={{ color: textColor }}>Top Fans</h3>
-                    <div className="space-y-2">
-                      {['1st', '2nd', '3rd'].map((place, i) => (
-                        <div key={place} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-                          <span>{place} - Fan{i + 1}</span>
-                          <span style={{ color: brandColors.primary }}>{(1000 - i * 200)} {customizeData.pointsName || 'pts'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Color Palette Preview */}
-              <div className="mt-8 pt-6 border-t" style={{ borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-                <p className="text-xs opacity-50 mb-2">Color Palette</p>
-                <div className="flex gap-2">
-                  <div 
-                    className="w-8 h-8 rounded-full" 
-                    style={{ backgroundColor: brandColors.primary }}
-                    title="Primary"
-                  />
-                  <div 
-                    className="w-8 h-8 rounded-full" 
-                    style={{ backgroundColor: brandColors.secondary }}
-                    title="Secondary"
-                  />
-                  <div 
-                    className="w-8 h-8 rounded-full" 
-                    style={{ backgroundColor: brandColors.accent }}
-                    title="Accent"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function CreateProgramModal({ 
   isOpen, 
   onClose, 
@@ -3369,314 +2124,3 @@ function CreateProgramModal({
     </Dialog>
   );
 }
-
-// Announcements Manager Component
-function AnnouncementsManager({ programId }: { programId: string }) {
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null);
-
-  // Fetch announcements
-  const { data: announcements = [], refetch } = useQuery<any[]>({
-    queryKey: [`/api/programs/${programId}/announcements`],
-    enabled: !!programId,
-  });
-
-  // Create/Update announcement mutation
-  const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (editingAnnouncement) {
-        return fetchApi(`/api/announcements/${editingAnnouncement.id}`, {
-          method: "PUT",
-          body: JSON.stringify(data),
-        });
-      } else {
-        return fetchApi(`/api/programs/${programId}/announcements`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/programs/${programId}/announcements`] });
-      setIsComposerOpen(false);
-      setEditingAnnouncement(null);
-      refetch();
-    },
-  });
-
-  // Delete announcement mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return fetchApi(`/api/announcements/${id}`, {
-        method: "DELETE",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/programs/${programId}/announcements`] });
-      refetch();
-    },
-  });
-
-  // Pin/Unpin announcement mutation
-  const togglePinMutation = useMutation({
-    mutationFn: async ({ id, isPinned }: { id: string; isPinned: boolean }) => {
-      return fetchApi(`/api/announcements/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ isPinned: !isPinned }),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/programs/${programId}/announcements`] });
-      refetch();
-    },
-  });
-
-  const handleEdit = (announcement: any) => {
-    setEditingAnnouncement(announcement);
-    setIsComposerOpen(true);
-  };
-
-  const handleCloseComposer = () => {
-    setIsComposerOpen(false);
-    setEditingAnnouncement(null);
-  };
-
-  return (
-    <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Megaphone className="h-5 w-5" />
-              Announcements & Updates
-            </CardTitle>
-            <p className="text-sm text-gray-400 mt-1">Share news, updates, and achievements with your fans</p>
-          </div>
-          <Button
-            onClick={() => setIsComposerOpen(true)}
-            className="bg-brand-primary hover:bg-brand-primary/80"
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Announcement
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {announcements.length === 0 ? (
-          <div className="text-center py-12">
-            <Megaphone className="h-12 w-12 mx-auto mb-4 text-gray-500" />
-            <p className="text-gray-400 mb-2">No announcements yet</p>
-            <p className="text-sm text-gray-500 mb-4">Share updates with your fans to keep them engaged!</p>
-            <Button
-              onClick={() => setIsComposerOpen(true)}
-              variant="outline"
-              className="border-white/20 text-white hover:bg-white/10"
-            >
-              Create Your First Announcement
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {announcements.map((announcement) => (
-              <Card key={announcement.id} className="bg-white/5 border-white/10">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="text-white font-semibold">{announcement.title}</h4>
-                        {announcement.isPinned && (
-                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
-                            <Pin className="h-3 w-3 mr-1" />
-                            Pinned
-                          </Badge>
-                        )}
-                        <Badge 
-                          variant="outline" 
-                          className="border-white/20 text-gray-400 text-xs"
-                        >
-                          {announcement.type}
-                        </Badge>
-                      </div>
-                      <p className="text-gray-400 text-sm mb-3">{announcement.content}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(announcement.createdAt).toLocaleDateString()} at {new Date(announcement.createdAt).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-white/10 text-white hover:bg-white/10"
-                        onClick={() => togglePinMutation.mutate({ id: announcement.id, isPinned: announcement.isPinned })}
-                      >
-                        <Pin className={`h-4 w-4 ${announcement.isPinned ? 'fill-current' : ''}`} />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-white/10 text-white hover:bg-white/10"
-                        onClick={() => handleEdit(announcement)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-500/20 text-red-400 hover:bg-red-500/10"
-                        onClick={() => deleteMutation.mutate(announcement.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </CardContent>
-
-      {/* Announcement Composer Modal */}
-      <AnnouncementComposer
-        isOpen={isComposerOpen}
-        onClose={handleCloseComposer}
-        onSubmit={(data) => saveMutation.mutate(data)}
-        isSubmitting={saveMutation.isPending}
-        initialData={editingAnnouncement}
-      />
-    </Card>
-  );
-}
-
-// Announcement Composer Component
-function AnnouncementComposer({
-  isOpen,
-  onClose,
-  onSubmit,
-  isSubmitting,
-  initialData
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => void;
-  isSubmitting: boolean;
-  initialData?: any;
-}) {
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    type: 'update' as 'update' | 'new_campaign' | 'new_task' | 'achievement',
-    isPinned: false,
-    isPublished: true,
-  });
-
-  useEffect(() => {
-    if (initialData) {
-      setFormData({
-        title: initialData.title || '',
-        content: initialData.content || '',
-        type: initialData.type || 'update',
-        isPinned: initialData.isPinned || false,
-        isPublished: initialData.isPublished ?? true,
-      });
-    } else {
-      setFormData({
-        title: '',
-        content: '',
-        type: 'update',
-        isPinned: false,
-        isPublished: true,
-      });
-    }
-  }, [initialData, isOpen]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-white/10 max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-white">
-            {initialData ? 'Edit Announcement' : 'Create Announcement'}
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div>
-            <Label className="text-white">Title *</Label>
-            <Input
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="Exciting news!"
-              required
-            />
-          </div>
-          <div>
-            <Label className="text-white">Content *</Label>
-            <Textarea
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              className="bg-white/5 border-white/10 text-white mt-1"
-              placeholder="Share your update with fans..."
-              rows={5}
-              required
-            />
-          </div>
-          <div>
-            <Label className="text-white">Type</Label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-              className="w-full mt-1 px-3 py-2 bg-white/5 border border-white/10 text-white rounded-md"
-            >
-              <option value="update">General Update</option>
-              <option value="new_campaign">New Campaign Launch</option>
-              <option value="new_task">New Task Available</option>
-              <option value="achievement">Achievement/Milestone</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.isPinned}
-                onCheckedChange={(checked) => setFormData({ ...formData, isPinned: checked })}
-              />
-              <Label className="text-white">Pin to top</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.isPublished}
-                onCheckedChange={(checked) => setFormData({ ...formData, isPublished: checked })}
-              />
-              <Label className="text-white">Publish immediately</Label>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="border-white/20 text-white hover:bg-white/10"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="bg-brand-primary hover:bg-brand-primary/80"
-              disabled={isSubmitting || !formData.title || !formData.content}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {isSubmitting ? 'Saving...' : initialData ? 'Update' : 'Publish'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-

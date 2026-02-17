@@ -1,6 +1,10 @@
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY || 'default-key-change-in-production-32-chars';
+if (!process.env.TOKEN_ENCRYPTION_KEY) {
+  throw new Error('FATAL: TOKEN_ENCRYPTION_KEY environment variable is required. Cannot start server without encryption key.');
+}
+
+const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY;
 const ALGORITHM = 'aes-256-gcm';
 
 // Ensure key is proper length for AES-256

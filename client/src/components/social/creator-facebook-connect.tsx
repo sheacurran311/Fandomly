@@ -1,33 +1,51 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Facebook, User, CheckCircle, AlertCircle, Unlink, Plus, Users } from "lucide-react";
-import { useFacebookConnection } from "@/contexts/facebook-connection-context";
+import { useFacebookConnection } from "@/hooks/use-social-connection";
+import { type FacebookPage } from "@/lib/facebook";
 
 export default function CreatorFacebookConnect() {
-  // Use the context instead of managing own state
   const {
     isConnected,
     isConnecting,
     userInfo,
-    connectedPages: pages,
-    selectedPage,
-    connectFacebook,
-    disconnectFacebook,
-    selectPage,
-    refreshConnection
+    connect: connectFacebook,
+    disconnect: disconnectFacebook,
   } = useFacebookConnection();
 
-  // Refresh connection status when component mounts
-  useEffect(() => {
-    if (refreshConnection) {
-      refreshConnection();
-    }
-  }, [refreshConnection]);
+  const [pages, setPages] = useState<FacebookPage[]>([]);
+  const [selectedPage, setSelectedPage] = useState<FacebookPage | null>(null);
 
-  const handlePageSelect = async (page: any) => {
-    await selectPage(page);
+  // Load pages from database profile data when connected
+  useEffect(() => {
+    if (isConnected) {
+      loadPages();
+    } else {
+      setPages([]);
+      setSelectedPage(null);
+    }
+  }, [isConnected]);
+
+  const loadPages = async () => {
+    try {
+      const { getSocialConnection } = await import('@/lib/social-connection-api');
+      const { connection } = await getSocialConnection('facebook');
+      if (connection?.profileData?.pages?.length) {
+        setPages(connection.profileData.pages);
+        const savedId = localStorage.getItem('fandomly_active_facebook_page_id');
+        const page = connection.profileData.pages.find((p: any) => p.id === savedId) || connection.profileData.pages[0];
+        setSelectedPage(page);
+      }
+    } catch (error) {
+      console.error('Error loading Facebook pages:', error);
+    }
+  };
+
+  const handlePageSelect = async (page: FacebookPage) => {
+    setSelectedPage(page);
+    localStorage.setItem('fandomly_active_facebook_page_id', page.id);
   };
 
   return (

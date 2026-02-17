@@ -25,8 +25,8 @@ export default function LeaderboardWidget({ programId }: Props) {
     queryKey: ["program-leaderboard", programId],
     queryFn: async () => {
       const endpoint = programId
-        ? `/api/leaderboards/program/${programId}?period=all_time&limit=5`
-        : `/api/leaderboards/platform?period=all_time&limit=5`;
+        ? `/api/leaderboards/program/${programId}?period=all-time&limit=5`
+        : `/api/leaderboards/platform?period=all-time&limit=5`;
       const res = await fetch(endpoint);
       if (!res.ok) throw new Error("Failed to fetch leaderboard");
       return res.json();

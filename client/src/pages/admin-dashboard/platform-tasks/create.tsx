@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getAuthHeaders } from "@/lib/queryClient";
 import {
   ArrowLeft, Save, Star, Users, Image as ImageIcon, 
   MessageSquare, Twitter, Instagram, Facebook, Music, Trophy,
@@ -390,9 +390,9 @@ export default function AdminPlatformTaskCreate() {
     youtube: { connected: false },
     spotify: { connected: false },
   }) as Record<string, { connected: boolean; handle?: string }>} = useQuery<Record<string, { connected: boolean; handle?: string }>>({
-    queryKey: ['admin-social-connections', user?.dynamicUserId],
+    queryKey: ['admin-social-connections', user?.id],
     queryFn: async () => {
-      if (!user?.dynamicUserId) return {};
+      if (!user?.id) return {};
 
       const platforms = ['facebook', 'twitter', 'instagram', 'tiktok', 'youtube', 'spotify'];
       const connectionStatuses: {[key: string]: {connected: boolean, handle?: string}} = {};
@@ -401,7 +401,7 @@ export default function AdminPlatformTaskCreate() {
         try {
           const response = await fetch(`/api/social-connections/${platform}`, {
             headers: {
-              'x-dynamic-user-id': user.dynamicUserId,
+              ...getAuthHeaders(),
               'Content-Type': 'application/json'
             },
             credentials: 'include'
@@ -445,7 +445,7 @@ export default function AdminPlatformTaskCreate() {
       console.log('[Admin Platform Tasks] Final connection statuses:', connectionStatuses);
       return connectionStatuses;
     },
-    enabled: !!user?.dynamicUserId,
+    enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (was cacheTime in react-query v4)
   });

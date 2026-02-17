@@ -1,0 +1,629 @@
+/**
+ * Redemption Routes
+ * Sprint 6: Reward redemption workflow API endpoints
+ * 
+ * Features:
+ * - GET /api/rewards/catalog - List available rewards
+ * - POST /api/rewards/redeem - Initiate redemption
+ * - GET /api/rewards/redemptions - User's redemption history
+ * - PUT /api/rewards/redemptions/:id/fulfill - Creator fulfillment
+ */
+
+import type { Express } from "express";
+import { db } from '../../db';
+import { 
+  rewards, rewardRedemptions, fanPrograms, loyaltyPrograms, users, creators,
+  nftMints
+} from "@shared/schema";
+import { eq, and, sql, desc, gte } from "drizzle-orm";
+import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
+import { z } from 'zod';
+import { storage } from '../../core/storage';
+import { tierProgressionService } from '../../services/tier-progression-service';
+
+// Validation schemas
+const redeemRewardSchema = z.object({
+  rewardId: z.string().min(1),
+  programId: z.string().min(1).optional(), // Optional for platform-wide rewards
+  quantity: z.number().min(1).max(10).default(1),
+  shippingAddress: z.object({
+    name: z.string().min(1),
+    street: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    postalCode: z.string().min(1),
+    country: z.string().min(1),
+  }).optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+const fulfillRedemptionSchema = z.object({
+  status: z.enum(['shipped', 'delivered', 'cancelled', 'refunded']),
+  trackingNumber: z.string().optional(),
+  trackingUrl: z.string().url().optional(),
+  notes: z.string().optional(),
+});
+
+export function registerRedemptionRoutes(app: Express) {
+  /**
+   * GET /api/rewards/catalog
+   * List available rewards for a program or platform-wide
+   */
+  app.get("/api/rewards/catalog", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const programId = req.query.programId as string | undefined;
+      const tenantId = req.query.tenantId as string | undefined;
+      const category = req.query.category as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      // Build query conditions
+      let conditions = sql`r.is_active = TRUE AND r.deleted_at IS NULL`;
+      
+      if (programId) {
+        conditions = sql`${conditions} AND r.program_id = ${programId}`;
+      }
+      if (tenantId) {
+        conditions = sql`${conditions} AND r.tenant_id = ${tenantId}`;
+      }
+      if (category) {
+        conditions = sql`${conditions} AND r.category = ${category}`;
+      }
+
+      // Get rewards with stock info
+      const rewardsResult = await db.execute(sql`
+        SELECT 
+          r.*,
+          COALESCE(r.stock_quantity, 0) as stock_remaining,
+          CASE WHEN r.stock_quantity IS NULL OR r.stock_quantity > 0 THEN TRUE ELSE FALSE END as in_stock,
+          COUNT(rr.id) FILTER (WHERE rr.user_id = ${userId}) as user_redemption_count
+        FROM rewards r
+        LEFT JOIN reward_redemptions rr ON rr.reward_id = r.id
+        WHERE ${conditions}
+        GROUP BY r.id
+        ORDER BY r.points_cost ASC, r.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `);
+
+      // If programId provided, get user's points balance
+      let userBalance = 0;
+      let userTier = null;
+      if (programId) {
+        const fanProgramResult = await db
+          .select()
+          .from(fanPrograms)
+          .where(and(
+            eq(fanPrograms.fanId, userId),
+            eq(fanPrograms.programId, programId)
+          ))
+          .limit(1);
+
+        if (fanProgramResult[0]) {
+          userBalance = fanProgramResult[0].pointsBalance || 0;
+          userTier = await tierProgressionService.getCurrentTier(fanProgramResult[0].id);
+        }
+      }
+
+      // Mark which rewards user can afford
+      const rewardsWithAffordability = ((rewardsResult as any).rows || []).map((r: any) => ({
+        ...r,
+        canAfford: userBalance >= (r.points_cost || 0),
+        userBalance,
+      }));
+
+      res.json({
+        rewards: rewardsWithAffordability,
+        pagination: { limit, offset },
+        userBalance,
+        userTier,
+      });
+    } catch (error) {
+      console.error("Error fetching reward catalog:", error);
+      res.status(500).json({ error: "Failed to fetch reward catalog" });
+    }
+  });
+
+  /**
+   * GET /api/rewards/catalog/:rewardId
+   * Get detailed info for a specific reward
+   */
+  app.get("/api/rewards/catalog/:rewardId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { rewardId } = req.params;
+      const userId = req.user!.id;
+
+      const [reward] = await db
+        .select()
+        .from(rewards)
+        .where(eq(rewards.id, rewardId))
+        .limit(1);
+
+      if (!reward) {
+        return res.status(404).json({ error: "Reward not found" });
+      }
+
+      // Get user's redemption count for this reward
+      const redemptionCountResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM reward_redemptions
+        WHERE reward_id = ${rewardId} AND user_id = ${userId}
+      `);
+
+      const userRedemptionCount = parseInt((redemptionCountResult as any).rows?.[0]?.count || '0');
+
+      // Check if user can redeem (has points, not exceeded limit)
+      let canRedeem = true;
+      let redeemBlockReason: string | null = null;
+      let userBalance = 0;
+
+      if (reward.programId) {
+        const fanProgramResult = await db
+          .select()
+          .from(fanPrograms)
+          .where(and(
+            eq(fanPrograms.fanId, userId),
+            eq(fanPrograms.programId, reward.programId)
+          ))
+          .limit(1);
+
+        if (fanProgramResult[0]) {
+          userBalance = fanProgramResult[0].pointsBalance || 0;
+          
+          if (userBalance < (reward.pointsCost || 0)) {
+            canRedeem = false;
+            redeemBlockReason = 'insufficient_points';
+          }
+        } else {
+          canRedeem = false;
+          redeemBlockReason = 'not_enrolled_in_program';
+        }
+      }
+
+      // Check stock
+      if (reward.stockQuantity !== null && reward.stockQuantity <= 0) {
+        canRedeem = false;
+        redeemBlockReason = 'out_of_stock';
+      }
+
+      // Check per-user limit
+      const maxPerUser = (reward.redemptionRules as any)?.maxPerUser;
+      if (maxPerUser && userRedemptionCount >= maxPerUser) {
+        canRedeem = false;
+        redeemBlockReason = 'redemption_limit_reached';
+      }
+
+      res.json({
+        reward,
+        userBalance,
+        userRedemptionCount,
+        canRedeem,
+        redeemBlockReason,
+      });
+    } catch (error) {
+      console.error("Error fetching reward details:", error);
+      res.status(500).json({ error: "Failed to fetch reward details" });
+    }
+  });
+
+  /**
+   * POST /api/rewards/redeem
+   * Initiate a reward redemption
+   */
+  app.post("/api/rewards/redeem", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+
+      // Validate request
+      const validation = redeemRewardSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          details: validation.error.issues 
+        });
+      }
+
+      const { rewardId, programId, quantity, shippingAddress, metadata } = validation.data;
+
+      // Get reward
+      const [reward] = await db
+        .select()
+        .from(rewards)
+        .where(eq(rewards.id, rewardId))
+        .limit(1);
+
+      if (!reward || !reward.isActive) {
+        return res.status(404).json({ error: "Reward not found or inactive" });
+      }
+
+      const totalPointsCost = (reward.pointsCost || 0) * quantity;
+      const effectiveProgramId = programId || reward.programId;
+
+      // Get user's fan program to check balance
+      if (!effectiveProgramId) {
+        return res.status(400).json({ error: "Program ID required for redemption" });
+      }
+
+      const [fanProgram] = await db
+        .select()
+        .from(fanPrograms)
+        .where(and(
+          eq(fanPrograms.fanId, userId),
+          eq(fanPrograms.programId, effectiveProgramId)
+        ))
+        .limit(1);
+
+      if (!fanProgram) {
+        return res.status(403).json({ error: "You are not enrolled in this program" });
+      }
+
+      // Check sufficient balance
+      if ((fanProgram.pointsBalance || 0) < totalPointsCost) {
+        return res.status(400).json({ 
+          error: "Insufficient points",
+          required: totalPointsCost,
+          available: fanProgram.pointsBalance || 0
+        });
+      }
+
+      // Check stock
+      if (reward.stockQuantity !== null && reward.stockQuantity < quantity) {
+        return res.status(400).json({ 
+          error: "Insufficient stock",
+          requested: quantity,
+          available: reward.stockQuantity
+        });
+      }
+
+      // Check per-user redemption limit
+      const maxPerUser = (reward.redemptionRules as any)?.maxPerUser;
+      if (maxPerUser) {
+        const userRedemptionCountResult = await db.execute(sql`
+          SELECT COALESCE(SUM(quantity), 0) as total
+          FROM reward_redemptions
+          WHERE reward_id = ${rewardId} AND user_id = ${userId}
+        `);
+        const currentCount = parseInt((userRedemptionCountResult as any).rows?.[0]?.total || '0');
+        
+        if (currentCount + quantity > maxPerUser) {
+          return res.status(400).json({ 
+            error: "Redemption limit exceeded",
+            maxAllowed: maxPerUser,
+            alreadyRedeemed: currentCount
+          });
+        }
+      }
+
+      // Start transaction: deduct points and create redemption
+      const result = await db.transaction(async (tx) => {
+        // Deduct points
+        await tx.execute(sql`
+          UPDATE fan_programs 
+          SET points_balance = points_balance - ${totalPointsCost}
+          WHERE id = ${fanProgram.id}
+        `);
+
+        // Record point transaction
+        await tx.execute(sql`
+          INSERT INTO point_transactions 
+            (fan_program_id, tenant_id, points, type, source, metadata, created_at)
+          VALUES 
+            (${fanProgram.id}, ${reward.tenantId || ''}, ${-totalPointsCost}, 'spent', 'reward_redemption', ${JSON.stringify({ rewardId, rewardName: reward.name })}, NOW())
+        `);
+
+        // Reduce stock if tracked
+        if (reward.stockQuantity !== null) {
+          await tx.execute(sql`
+            UPDATE rewards 
+            SET stock_quantity = stock_quantity - ${quantity}
+            WHERE id = ${rewardId}
+          `);
+        }
+
+        // Create redemption record
+        const [redemption] = await tx
+          .insert(rewardRedemptions)
+          .values({
+            userId,
+            rewardId,
+            programId: effectiveProgramId,
+            tenantId: reward.tenantId || '',
+            quantity,
+            pointsSpent: totalPointsCost,
+            status: reward.rewardType === 'digital' ? 'completed' : 'pending',
+            shippingAddress: shippingAddress || null,
+            metadata: metadata || null,
+          } as any)
+          .returning();
+
+        return redemption;
+      });
+
+      // Check tier progression after points deduction
+      await tierProgressionService.checkAndUpdateTier(
+        fanProgram.id, 
+        'reward_redemption'
+      );
+
+      // If this is an NFT reward, trigger minting
+      if (reward.rewardType === 'nft' && (reward.nftConfig as any)?.templateId) {
+        // Queue NFT minting (would integrate with Crossmint service)
+        console.log(`[Redemption] NFT reward redeemed, would mint to user ${userId}`);
+        // TODO: Call crossmint service to mint NFT
+      }
+
+      res.status(201).json({
+        redemption: result,
+        pointsDeducted: totalPointsCost,
+        newBalance: (fanProgram.pointsBalance || 0) - totalPointsCost,
+      });
+    } catch (error) {
+      console.error("Error processing redemption:", error);
+      res.status(500).json({ error: "Failed to process redemption" });
+    }
+  });
+
+  /**
+   * GET /api/rewards/redemptions
+   * Get user's redemption history
+   */
+  app.get("/api/rewards/redemptions", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const status = req.query.status as string | undefined;
+      const programId = req.query.programId as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      let conditions = sql`rr.user_id = ${userId}`;
+      
+      if (status) {
+        conditions = sql`${conditions} AND rr.status = ${status}`;
+      }
+      if (programId) {
+        conditions = sql`${conditions} AND rr.program_id = ${programId}`;
+      }
+
+      const redemptionsResult = await db.execute(sql`
+        SELECT 
+          rr.*,
+          r.name as reward_name,
+          r.description as reward_description,
+          r.image_url as reward_image,
+          r.reward_type,
+          lp.name as program_name
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        LEFT JOIN loyalty_programs lp ON rr.program_id = lp.id
+        WHERE ${conditions}
+        ORDER BY rr.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `);
+
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM reward_redemptions rr
+        WHERE ${conditions}
+      `);
+
+      res.json({
+        redemptions: (redemptionsResult as any).rows || [],
+        pagination: {
+          limit,
+          offset,
+          total: parseInt((totalResult as any).rows?.[0]?.total || '0'),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching redemptions:", error);
+      res.status(500).json({ error: "Failed to fetch redemptions" });
+    }
+  });
+
+  /**
+   * GET /api/rewards/redemptions/:redemptionId
+   * Get specific redemption details
+   */
+  app.get("/api/rewards/redemptions/:redemptionId", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { redemptionId } = req.params;
+      const userId = req.user!.id;
+
+      const redemptionResult = await db.execute(sql`
+        SELECT 
+          rr.*,
+          r.name as reward_name,
+          r.description as reward_description,
+          r.image_url as reward_image,
+          r.reward_type,
+          r.redemption_instructions,
+          lp.name as program_name
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        LEFT JOIN loyalty_programs lp ON rr.program_id = lp.id
+        WHERE rr.id = ${redemptionId}
+      `);
+
+      const redemption = (redemptionResult as any).rows?.[0];
+      if (!redemption) {
+        return res.status(404).json({ error: "Redemption not found" });
+      }
+
+      // Check ownership unless admin
+      if (redemption.user_id !== userId && req.user?.userType !== 'admin') {
+        return res.status(403).json({ error: "Not authorized to view this redemption" });
+      }
+
+      res.json({ redemption });
+    } catch (error) {
+      console.error("Error fetching redemption:", error);
+      res.status(500).json({ error: "Failed to fetch redemption" });
+    }
+  });
+
+  /**
+   * PUT /api/rewards/redemptions/:redemptionId/fulfill
+   * Creator fulfillment endpoint
+   */
+  app.put("/api/rewards/redemptions/:redemptionId/fulfill", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { redemptionId } = req.params;
+      const userId = req.user!.id;
+
+      // Validate request
+      const validation = fulfillRedemptionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          details: validation.error.issues 
+        });
+      }
+
+      const { status, trackingNumber, trackingUrl, notes } = validation.data;
+
+      // Get redemption with authorization check
+      const redemptionResult = await db.execute(sql`
+        SELECT 
+          rr.*,
+          r.tenant_id as reward_tenant_id,
+          c.user_id as creator_user_id
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        LEFT JOIN creators c ON c.tenant_id = r.tenant_id
+        WHERE rr.id = ${redemptionId}
+      `);
+
+      const redemption = (redemptionResult as any).rows?.[0];
+      if (!redemption) {
+        return res.status(404).json({ error: "Redemption not found" });
+      }
+
+      // Check authorization (creator of the reward or admin)
+      const isCreator = redemption.creator_user_id === userId;
+      const isAdmin = req.user?.userType === 'admin';
+      
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: "Not authorized to fulfill this redemption" });
+      }
+
+      // Update redemption status
+      const updateData: any = {
+        status,
+        updatedAt: new Date(),
+      };
+
+      if (trackingNumber) updateData.trackingNumber = trackingNumber;
+      if (trackingUrl) updateData.trackingUrl = trackingUrl;
+      if (notes) updateData.fulfillmentNotes = notes;
+
+      if (status === 'shipped' || status === 'delivered') {
+        updateData.fulfilledAt = new Date();
+        updateData.fulfilledBy = userId;
+      }
+
+      await db
+        .update(rewardRedemptions)
+        .set(updateData)
+        .where(eq(rewardRedemptions.id, redemptionId));
+
+      // If cancelled/refunded, return points to user
+      if (status === 'cancelled' || status === 'refunded') {
+        const pointsToReturn = redemption.points_spent || 0;
+        
+        // Get fan program
+        const [fanProgram] = await db
+          .select()
+          .from(fanPrograms)
+          .where(and(
+            eq(fanPrograms.fanId, redemption.user_id),
+            eq(fanPrograms.programId, redemption.program_id)
+          ))
+          .limit(1);
+
+        if (fanProgram && pointsToReturn > 0) {
+          // Return points
+          await db.execute(sql`
+            UPDATE fan_programs 
+            SET points_balance = points_balance + ${pointsToReturn}
+            WHERE id = ${fanProgram.id}
+          `);
+
+          // Record refund transaction
+          await db.execute(sql`
+            INSERT INTO point_transactions 
+              (fan_program_id, tenant_id, points, type, source, metadata, created_at)
+            VALUES 
+              (${fanProgram.id}, ${redemption.tenant_id || ''}, ${pointsToReturn}, 'refund', 'redemption_cancelled', ${JSON.stringify({ redemptionId, reason: status })}, NOW())
+          `);
+        }
+      }
+
+      res.json({ 
+        message: `Redemption ${status}`,
+        redemptionId,
+        status,
+      });
+    } catch (error) {
+      console.error("Error fulfilling redemption:", error);
+      res.status(500).json({ error: "Failed to fulfill redemption" });
+    }
+  });
+
+  /**
+   * GET /api/rewards/redemptions/pending
+   * Get pending redemptions for creator to fulfill
+   */
+  app.get("/api/rewards/redemptions/pending", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      // Get creator's tenant
+      const creator = await storage.getCreatorByUserId(userId);
+      if (!creator) {
+        return res.status(403).json({ error: "Only creators can access pending redemptions" });
+      }
+
+      const redemptionsResult = await db.execute(sql`
+        SELECT 
+          rr.*,
+          r.name as reward_name,
+          r.image_url as reward_image,
+          r.reward_type,
+          u.username,
+          u.email
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        INNER JOIN users u ON rr.user_id = u.id
+        WHERE r.tenant_id = ${creator.tenantId}
+          AND rr.status = 'pending'
+        ORDER BY rr.created_at ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `);
+
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        WHERE r.tenant_id = ${creator.tenantId}
+          AND rr.status = 'pending'
+      `);
+
+      res.json({
+        redemptions: (redemptionsResult as any).rows || [],
+        pagination: {
+          limit,
+          offset,
+          total: parseInt((totalResult as any).rows?.[0]?.total || '0'),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching pending redemptions:", error);
+      res.status(500).json({ error: "Failed to fetch pending redemptions" });
+    }
+  });
+}

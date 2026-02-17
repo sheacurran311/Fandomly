@@ -209,42 +209,6 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       }
     }
 
-    // Also sync to old storage system for backwards compatibility
-    try {
-      const { storage } = await import('../../core/storage');
-      const { users } = await import('@shared/schema');
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId)
-      });
-      if (user && (user as any).dynamicUserId) {
-        // Create accountData format expected by storage system
-        // Note: Instagram stores followers as profileData.followers (plain number)
-        const resolvedFollowers = profileData?.public_metrics?.followers_count || profileData?.follower_count || profileData?.followers_count || profileData?.followers?.total || (typeof profileData?.followers === 'number' ? profileData.followers : 0);
-        const resolvedFollowing = profileData?.public_metrics?.following_count || profileData?.following_count || (typeof profileData?.following === 'number' ? profileData.following : 0);
-        const accountData = {
-          user: {
-            id: platformUserId,
-            username: platformUsername,
-            name: platformDisplayName,
-            followersCount: resolvedFollowers,
-            followingCount: resolvedFollowing,
-            ...profileData
-          },
-          id: platformUserId,
-          username: platformUsername,
-          name: platformDisplayName,
-          displayName: platformDisplayName,
-          followersCount: resolvedFollowers,
-          followingCount: resolvedFollowing,
-        };
-        await storage.saveSocialAccount((user as any).dynamicUserId, platform, accountData);
-        console.log(`[Social Connection POST] Also saved ${platform} to old storage system`);
-      }
-    } catch (syncError) {
-      console.error(`[Social Connection POST] Error syncing to old storage system:`, syncError);
-      // Don't fail the request if sync fails
-    }
-
     return res.json({
       success: true,
       connection: {
@@ -265,7 +229,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
 /**
  * POST /api/social-connections/disconnect
- * Disconnect a social platform (supports both JWT and x-dynamic-user-id auth)
+ * Disconnect a social platform
  * Use this when platform is in request body - consistent with profile/fan pages
  */
 router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, res) => {
@@ -308,22 +272,6 @@ router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, r
       console.error(`[Social Disconnect] Error updating sync preferences:`, syncPrefError);
     }
 
-    // Also remove from old storage system for consistency
-    try {
-      const { storage } = await import('../../core/storage');
-      const { users } = await import('@shared/schema');
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId)
-      });
-      if (user && (user as any).dynamicUserId) {
-        await storage.removeSocialAccount((user as any).dynamicUserId, platformLower);
-        console.log(`[Social Disconnect] Also removed ${platformLower} from old storage system`);
-      }
-    } catch (syncError) {
-      console.error(`[Social Disconnect] Error removing from old storage system:`, syncError);
-      // Don't fail - socialConnections table is the source of truth
-    }
-
     console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`);
     res.json({ success: true, message: `${platformLower} account disconnected successfully` });
   } catch (error) {
@@ -354,22 +302,6 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
           eq(socialConnections.platform, platform)
         )
       );
-
-    // Also remove from old storage system for consistency
-    try {
-      const { storage } = await import('../../core/storage');
-      const { users } = await import('@shared/schema');
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId)
-      });
-      if (user && (user as any).dynamicUserId) {
-        await storage.removeSocialAccount((user as any).dynamicUserId, platform);
-        console.log(`[Social Connection DELETE] Also removed ${platform} from old storage system`);
-      }
-    } catch (syncError) {
-      console.error(`[Social Connection DELETE] Error removing from old storage system:`, syncError);
-      // Don't fail the request if sync fails
-    }
 
     res.json({ success: true, message: `${platform} disconnected successfully` });
   } catch (error) {

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { socialManager } from '@/lib/social-integrations';
+import { getAuthHeaders } from '@/lib/queryClient';
 import { Video, Users, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface TikTokUserInfo {
@@ -30,7 +31,7 @@ export default function CreatorTikTokWidget() {
       try {
         const response = await fetch('/api/social-connections/tiktok', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -77,7 +78,7 @@ export default function CreatorTikTokWidget() {
     if (user?.id) {
       loadStatus();
     }
-  }, [user?.id, user?.dynamicUserId]);
+  }, [user?.id]);
 
   const connectTikTok = async () => {
     try {
@@ -88,7 +89,7 @@ export default function CreatorTikTokWidget() {
       setTimeout(async () => {
         const response = await fetch('/api/social-connections/tiktok', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -113,7 +114,7 @@ export default function CreatorTikTokWidget() {
       const response = await fetch('/api/social-connections/disconnect', {
         method: 'POST',
         headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ platform: 'tiktok' }),

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +45,7 @@ export default function FanNotifications() {
       const response = await fetch('/api/notifications?limit=50', {
         credentials: 'include',
         headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          ...getAuthHeaders(),
         }
       });
       if (!response.ok) throw new Error('Failed to fetch notifications');

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, getAuthHeaders } from "@/lib/queryClient";
 import { 
   User, 
   Facebook, 
@@ -206,7 +206,7 @@ export default function AdminProfile() {
     try {
       const response = await fetch('/api/social-connections/tiktok', {
         headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         credentials: 'include'
@@ -256,7 +256,7 @@ export default function AdminProfile() {
     try {
       const response = await fetch('/api/social-connections/youtube', {
         headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         credentials: 'include'
@@ -306,7 +306,7 @@ export default function AdminProfile() {
     try {
       const response = await fetch('/api/social-connections/spotify', {
         headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         credentials: 'include'

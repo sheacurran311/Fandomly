@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ export default function FindCreators() {
     openAuthModal();
   };
 
-  const filteredCreators = creators.filter((creator: any) => {
+  const filteredCreators = useMemo(() => creators.filter((creator: any) => {
     const matchesSearch = !searchQuery ||
       creator.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       creator.bio?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -75,12 +75,12 @@ export default function FindCreators() {
     const hasPublishedProgram = creator.hasPublishedProgram === true;
 
     return matchesSearch && matchesCategory && matchesActive && matchesVerified && hasPublishedProgram;
-  });
+  }), [creators, searchQuery, selectedCategory, showActiveOnly, showVerifiedOnly]);
 
   console.log('Find Creators - After filtering:', filteredCreators.length);
 
   // Sort creators - default is newest first
-  const sortedCreators = [...filteredCreators].sort((a, b) => {
+  const sortedCreators = useMemo(() => [...filteredCreators].sort((a, b) => {
     const aDate = (a as Creator).createdAt ? new Date((a as Creator).createdAt!).getTime() : 0;
     const bDate = (b as Creator).createdAt ? new Date((b as Creator).createdAt!).getTime() : 0;
     if (sortBy === "active") {
@@ -95,7 +95,7 @@ export default function FindCreators() {
       return bDate - aDate;
     }
     return bDate - aDate;
-  });
+  }), [filteredCreators, sortBy]);
 
   const categories = ["athlete", "musician", "creator", "brand"];
 

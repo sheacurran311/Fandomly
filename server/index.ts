@@ -1,16 +1,102 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import { doubleCsrf } from "csrf-csrf";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeCrossmintService } from "./services/nft/crossmint-service";
 import { initializeWalletService } from "./services/wallet/wallet-service";
 import { syncScheduler } from "./services/analytics/sync/sync-scheduler";
 import { groupGoalPoller } from "./services/verification/group-goals/group-goal-poller";
+import { pointExpirationJob } from "./jobs/point-expiration-job";
 
 const app = express();
+
+// Security headers via Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      // Allow Facebook SDK, Google APIs, and other necessary external scripts
+      scriptSrc: [
+        "'self'", 
+        "'unsafe-inline'", 
+        "'unsafe-eval'", // Required for Vite in dev
+        "https://connect.facebook.net",
+        "https://apis.google.com",
+        "https://accounts.google.com",
+        "https://www.googletagmanager.com",
+        "https://replit.com", // For Replit dev banner
+      ],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https:", "wss:"],
+      frameSrc: ["'self'", "https://www.facebook.com", "https://accounts.google.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+    },
+  },
+  crossOriginEmbedderPolicy: false, // May interfere with some embeds
+  crossOriginOpenerPolicy: false, // Required for OAuth popup flows -- popups need window.opener access
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resources
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+// CSRF Protection
+const isProduction = process.env.NODE_ENV === "production";
+const {
+  generateCsrfToken,
+  doubleCsrfProtection,
+} = doubleCsrf({
+  getSecret: () => process.env.CSRF_SECRET || process.env.TOKEN_ENCRYPTION_KEY || 'csrf-secret-change-in-production',
+  // getSessionIdentifier is required in v4 - use a constant for stateless CSRF
+  // The security comes from the httpOnly cookie + token comparison, not session binding
+  getSessionIdentifier: () => 'stateless',
+  // __Host- prefix requires secure:true which only works on HTTPS
+  // Use different cookie name for dev vs prod
+  cookieName: isProduction ? "__Host-csrf" : "csrf-token",
+  cookieOptions: {
+    httpOnly: true,
+    sameSite: isProduction ? "strict" : "lax",
+    secure: isProduction,
+    path: "/",
+  },
+  size: 64,
+  ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+  getTokenFromRequest: (req) => req.headers["x-csrf-token"] as string,
+});
+
+// Expose CSRF token endpoint for frontend
+app.get("/api/csrf-token", (req, res) => {
+  const token = generateCsrfToken(req, res);
+  res.json({ csrfToken: token });
+});
+
+// Apply CSRF protection to all state-changing routes
+// Exclude webhook endpoints that receive external calls
+app.use((req, res, next) => {
+  // Skip CSRF for webhooks (they use signature verification instead)
+  if (req.path.startsWith('/api/webhooks/') || 
+      req.path.startsWith('/api/stripe/webhook') ||
+      req.path.startsWith('/api/crossmint/webhook')) {
+    return next();
+  }
+  // Skip CSRF for auth callback routes (OAuth redirects)
+  if (req.path.includes('/callback') || req.path.includes('/oauth')) {
+    return next();
+  }
+  // Skip CSRF for social token exchange and connection routes
+  // These are protected by JWT authentication and run in popup windows
+  // where CSRF cookies from the main window are not available
+  if (req.path.startsWith('/api/social/') || req.path.startsWith('/api/social-connections')) {
+    return next();
+  }
+  doubleCsrfProtection(req, res, next);
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -51,13 +137,9 @@ app.use((req, res, next) => {
   
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
+  // Use standardized error handling middleware
+  const { errorHandler } = await import("./utils/error-factory");
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
@@ -93,6 +175,13 @@ app.use((req, res, next) => {
       log('Group goal poller started');
     } catch (err) {
       console.error('Failed to start group goal poller:', err);
+    }
+
+    try {
+      pointExpirationJob.start();
+      log('Point expiration job started');
+    } catch (err) {
+      console.error('Failed to start point expiration job:', err);
     }
   });
 })();

@@ -461,29 +461,19 @@ export function registerProgramRoutes(app: Express) {
    * GET /api/programs/:id/preview
    * Get program preview (authenticated creators only, works for draft programs)
    */
-  app.get("/api/programs/:id/preview", async (req, res) => {
+  app.get("/api/programs/:id/preview", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
-      const dynamicUserId = req.query.userId as string || req.headers['x-dynamic-user-id'] as string;
+      const userId = req.user?.id;
 
-      if (!dynamicUserId) {
+      if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      const { creators: creatorsTable, users, campaigns, tasks: tasksTable } = await import("@shared/schema");
-
-      // Get user ID from Dynamic user ID
-      const [user] = await db.select()
-        .from(users)
-        .where(eq(users.dynamicUserId, dynamicUserId))
-        .limit(1);
-
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const { creators: creatorsTable, campaigns, tasks: tasksTable } = await import("@shared/schema");
 
       // Get creator record
-      const [creator] = await db.select().from(creatorsTable).where(eq(creatorsTable.userId, user.id)).limit(1);
+      const [creator] = await db.select().from(creatorsTable).where(eq(creatorsTable.userId, userId)).limit(1);
       
       if (!creator) {
         return res.status(404).json({ error: "Creator not found" });

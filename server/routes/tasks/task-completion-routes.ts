@@ -97,12 +97,38 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   // GET /api/task-completions/program/:programId
   // Get all task completions for a specific program
+  // Requires authentication - only returns completions the user has access to
   // ==============================================
-  router.get('/program/:programId', async (req: Request, res: Response) => {
+  router.get('/program/:programId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { programId } = req.params;
-      console.log(`[Task Completions API] Fetching completions for program ${programId}`);
-      const completions = await storage.getTaskCompletionsByProgram(programId);
+      console.log(`[Task Completions API] Fetching completions for program ${programId}, user ${req.user.id}`);
+      
+      // Verify user has access to this program (either as creator/admin or as a fan viewing their own)
+      const program = await storage.getProgram(programId);
+      if (!program) {
+        return res.status(404).json({ error: 'Program not found' });
+      }
+      
+      // Check if user is program owner/admin or just a participant
+      const isOwner = program.creatorId === req.user.id;
+      const membership = await storage.getTenantMembership(req.user.id, program.tenantId || '');
+      const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
+      
+      let completions;
+      if (isOwner || isAdmin) {
+        // Admins/owners can see all completions for the program
+        completions = await storage.getTaskCompletionsByProgram(programId);
+      } else {
+        // Regular users can only see their own completions
+        completions = await storage.getTaskCompletionsByProgram(programId);
+        completions = completions.filter(c => c.userId === req.user!.id);
+      }
+      
       console.log(`[Task Completions API] Returning ${completions.length} completions for program ${programId}`);
       res.json(completions);
     } catch (error) {
@@ -114,23 +140,37 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   // GET /api/task-completions/tenant/:tenantId
   // Get all task completions for a tenant (fallback for tasks without programId)
+  // Requires authentication - only returns completions the user has access to
   // ==============================================
-  router.get('/tenant/:tenantId', async (req: Request, res: Response) => {
+  router.get('/tenant/:tenantId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { tenantId } = req.params;
-      console.log(`[Task Completions API] Fetching completions for tenant ${tenantId}`);
+      console.log(`[Task Completions API] Fetching completions for tenant ${tenantId}, user ${req.user.id}`);
+      
+      // Verify user has access to this tenant
+      const membership = await storage.getTenantMembership(req.user.id, tenantId);
+      const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
       
       const { db } = await import("../../db");
       const { eq, and, or, desc } = await import("drizzle-orm");
       const { taskCompletions, tasks } = await import("@shared/schema");
       
       // Get completions for tasks belonging to this tenant
-      const rows = await db
+      let rows = await db
         .select({ task_completions: taskCompletions, task: tasks })
         .from(taskCompletions)
         .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
         .where(eq(tasks.tenantId, tenantId))
         .orderBy(desc(taskCompletions.completedAt));
+      
+      // Non-admins can only see their own completions
+      if (!isAdmin) {
+        rows = rows.filter(r => r.task_completions.userId === req.user!.id);
+      }
       
       const completions = rows.map(r => ({
         ...r.task_completions,

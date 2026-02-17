@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { socialManager } from '@/lib/social-integrations';
+import { getAuthHeaders } from '@/lib/queryClient';
 import { Youtube, Users, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface YouTubeUserInfo {
@@ -30,7 +31,7 @@ export default function CreatorYouTubeWidget() {
       try {
         const response = await fetch('/api/social-connections/youtube', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -79,7 +80,7 @@ export default function CreatorYouTubeWidget() {
     if (user?.id) {
       loadStatus();
     }
-  }, [user?.id, user?.dynamicUserId]);
+  }, [user?.id]);
 
   const connectYouTube = async () => {
     try {
@@ -90,7 +91,7 @@ export default function CreatorYouTubeWidget() {
       setTimeout(async () => {
         const response = await fetch('/api/social-connections/youtube', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -115,7 +116,7 @@ export default function CreatorYouTubeWidget() {
       const response = await fetch('/api/social-connections/disconnect', {
         method: 'POST',
         headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ platform: 'youtube' }),

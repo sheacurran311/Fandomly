@@ -47,26 +47,44 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     }
     const programs = await programsResponse.json();
 
+    // Fetch all data for all programs in parallel
+    const programDataPromises = programs.map(async (program: any) => {
+      const [fansResult, completionsResult, redemptionsResult] = await Promise.all([
+        // Fetch fans for this program
+        fetch(`/api/fan-programs/program/${program.id}`)
+          .then(res => res.ok ? res.json() : [])
+          .catch(() => []),
+        // Fetch task completions for this program
+        fetch(`/api/task-completions/program/${program.id}`)
+          .then(res => res.ok ? res.json() : [])
+          .catch(() => []),
+        // Fetch reward redemptions for this program
+        fetch(`/api/reward-redemptions/program/${program.id}`)
+          .then(res => res.ok ? res.json() : [])
+          .catch(() => []),
+      ]);
+
+      return {
+        programId: program.id,
+        tenantId: program.tenantId,
+        fans: fansResult,
+        completions: completionsResult,
+        redemptions: redemptionsResult,
+      };
+    });
+
+    const programDataResults = await Promise.all(programDataPromises);
+
     // ====================
     // 1. TOTAL FANS (enrolled in programs) - deduplicated
     // ====================
     const uniqueFanIds = new Set<string>();
-    for (const program of programs) {
-      try {
-        const fansResponse = await fetch(`/api/fan-programs/program/${program.id}`);
-        if (fansResponse.ok) {
-          const programFans = await fansResponse.json();
-          // Add each fan's ID to the set (automatically deduplicates)
-          // Exclude the creator themselves from the fan count
-          programFans.forEach((fan: any) => {
-            if (fan.fanId && fan.fanId !== creatorId) {
-              uniqueFanIds.add(fan.fanId);
-            }
-          });
+    for (const data of programDataResults) {
+      data.fans.forEach((fan: any) => {
+        if (fan.fanId && fan.fanId !== creatorId) {
+          uniqueFanIds.add(fan.fanId);
         }
-      } catch (error) {
-        console.warn(`Failed to fetch fans for program ${program.id}:`, error);
-      }
+      });
     }
     const totalFans = uniqueFanIds.size;
 
@@ -74,77 +92,56 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     // 2. TOTAL REVENUE (ALL-TIME)
     // ====================
     // TODO: Calculate from actual payment transactions when payment system is built
-    // For now, return 0 as placeholder
-    let totalRevenue = 0;
+    const totalRevenue = 0;
 
     // ====================
     // 3. TASKS COMPLETED (ALL-TIME)
     // ====================
     let tasksCompleted = 0;
-    const processedTenantIds = new Set<string>(); // Track tenants we've already queried
+    const processedTenantIds = new Set<string>();
     
-    try {
-      // Get all task completions for each program
-      for (const program of programs) {
-        console.log(`[Creator Dashboard] Fetching completions for program ${program.id} (tenant: ${program.tenantId})`);
-        const completionsResponse = await fetch(`/api/task-completions/program/${program.id}`);
-        if (completionsResponse.ok) {
-          const completions = await completionsResponse.json();
-          console.log(`[Creator Dashboard] Got ${completions.length} completions for program ${program.id}:`, completions);
-          // Count only completed or claimed tasks
-          const programCompleted = completions.filter((c: any) =>
-            c.status === 'completed' || c.status === 'claimed'
-          ).length;
-          console.log(`[Creator Dashboard] ${programCompleted} completed/claimed for program ${program.id}`);
-          tasksCompleted += programCompleted;
-          
-          // If we found completions, mark this tenant as processed
-          if (completions.length > 0) {
-            processedTenantIds.add(program.tenantId);
-          }
-        } else {
-          console.warn(`[Creator Dashboard] Failed to fetch completions for program ${program.id}: ${completionsResponse.status}`);
-        }
-      }
+    for (const data of programDataResults) {
+      const programCompleted = data.completions.filter((c: any) =>
+        c.status === 'completed' || c.status === 'claimed'
+      ).length;
+      tasksCompleted += programCompleted;
       
-      // Fallback: If no completions found via programId, try by tenantId
-      // This handles tasks that were created before programId was required
-      if (tasksCompleted === 0 && programs.length > 0) {
-        console.log(`[Creator Dashboard] No completions found by programId, trying tenantId fallback`);
-        for (const program of programs) {
-          if (processedTenantIds.has(program.tenantId)) continue;
-          
-          const tenantCompletionsResponse = await fetch(`/api/task-completions/tenant/${program.tenantId}`);
-          if (tenantCompletionsResponse.ok) {
-            const tenantCompletions = await tenantCompletionsResponse.json();
-            console.log(`[Creator Dashboard] Got ${tenantCompletions.length} completions for tenant ${program.tenantId}:`, tenantCompletions);
-            const tenantCompleted = tenantCompletions.filter((c: any) =>
+      if (data.completions.length > 0) {
+        processedTenantIds.add(data.tenantId);
+      }
+    }
+    
+    // Fallback: If no completions found via programId, try by tenantId in parallel
+    if (tasksCompleted === 0 && programs.length > 0) {
+      const uniqueTenantIds = [...new Set(programs.map((p: any) => p.tenantId))].filter(
+        (id: any) => !processedTenantIds.has(id)
+      );
+      
+      const tenantCompletionPromises = uniqueTenantIds.map(async (tenantId: string) => {
+        try {
+          const response = await fetch(`/api/task-completions/tenant/${tenantId}`);
+          if (response.ok) {
+            const completions = await response.json();
+            return completions.filter((c: any) =>
               c.status === 'completed' || c.status === 'claimed'
             ).length;
-            tasksCompleted += tenantCompleted;
-            processedTenantIds.add(program.tenantId);
           }
+        } catch {
+          // Ignore errors
         }
-      }
-    } catch (error) {
-      console.warn('Failed to fetch task completions:', error);
+        return 0;
+      });
+      
+      const tenantCompletionCounts = await Promise.all(tenantCompletionPromises);
+      tasksCompleted = tenantCompletionCounts.reduce((sum, count) => sum + count, 0);
     }
 
     // ====================
     // 4. REWARDS REDEEMED (ALL-TIME)
     // ====================
     let rewardsRedeemed = 0;
-    try {
-      // Get all reward redemptions for each program
-      for (const program of programs) {
-        const redemptionsResponse = await fetch(`/api/reward-redemptions/program/${program.id}`);
-        if (redemptionsResponse.ok) {
-          const redemptions = await redemptionsResponse.json();
-          rewardsRedeemed += redemptions.length;
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to fetch reward redemptions:', error);
+    for (const data of programDataResults) {
+      rewardsRedeemed += data.redemptions.length;
     }
 
     // ====================
@@ -156,28 +153,19 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     let rewardsChange = undefined;
 
     try {
-      // Calculate 30-day changes for comparison
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       // Historical fan count (fans who joined before 30 days ago) - deduplicated
       const previousUniqueFanIds = new Set<string>();
-      for (const program of programs) {
-        try {
-          const fansResponse = await fetch(`/api/fan-programs/program/${program.id}`);
-          if (fansResponse.ok) {
-            const programFans = await fansResponse.json();
-            programFans
-              .filter((fan: any) => new Date(fan.joinedAt) < thirtyDaysAgo)
-              .forEach((fan: any) => {
-                if (fan.fanId && fan.fanId !== creatorId) {
-                  previousUniqueFanIds.add(fan.fanId);
-                }
-              });
-          }
-        } catch (error) {
-          console.warn(`Failed to calculate historical fans for program ${program.id}:`, error);
-        }
+      for (const data of programDataResults) {
+        data.fans
+          .filter((fan: any) => new Date(fan.joinedAt) < thirtyDaysAgo)
+          .forEach((fan: any) => {
+            if (fan.fanId && fan.fanId !== creatorId) {
+              previousUniqueFanIds.add(fan.fanId);
+            }
+          });
       }
       const previousFans = previousUniqueFanIds.size;
 
@@ -190,21 +178,13 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         };
       }
 
-      // Historical tasks completed (before 30 days ago)
+      // Historical tasks completed (before 30 days ago) - use already-fetched data
       let previousTasksCompleted = 0;
-      try {
-        for (const program of programs) {
-          const completionsResponse = await fetch(`/api/task-completions/program/${program.id}`);
-          if (completionsResponse.ok) {
-            const completions = await completionsResponse.json();
-            previousTasksCompleted += completions.filter((c: any) =>
-              (c.status === 'completed' || c.status === 'claimed') &&
-              new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
-            ).length;
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to calculate historical task completions:', error);
+      for (const data of programDataResults) {
+        previousTasksCompleted += data.completions.filter((c: any) =>
+          (c.status === 'completed' || c.status === 'claimed') &&
+          new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
+        ).length;
       }
 
       if (previousTasksCompleted > 0 && tasksCompleted !== previousTasksCompleted) {
@@ -216,20 +196,12 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         };
       }
 
-      // Historical rewards redeemed (before 30 days ago)
+      // Historical rewards redeemed (before 30 days ago) - use already-fetched data
       let previousRewardsRedeemed = 0;
-      try {
-        for (const program of programs) {
-          const redemptionsResponse = await fetch(`/api/reward-redemptions/program/${program.id}`);
-          if (redemptionsResponse.ok) {
-            const redemptions = await redemptionsResponse.json();
-            previousRewardsRedeemed += redemptions.filter((r: any) =>
-              new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
-            ).length;
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to calculate historical reward redemptions:', error);
+      for (const data of programDataResults) {
+        previousRewardsRedeemed += data.redemptions.filter((r: any) =>
+          new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
+        ).length;
       }
 
       if (previousRewardsRedeemed > 0 && rewardsRedeemed !== previousRewardsRedeemed) {
@@ -256,7 +228,6 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     };
   } catch (error) {
     console.error('Failed to fetch creator stats:', error);
-    // Return fallback data if API fails
     return {
       totalFans: 0,
       totalRevenue: 0,

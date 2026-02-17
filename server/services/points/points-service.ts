@@ -315,35 +315,43 @@ export class PointsService {
 
   /**
    * Get all transactions for a user (both Fandomly and Creator points)
+   * Optimized: Uses a single JOIN query instead of N+1 queries
    */
   async getAllTransactions(userId: string, limit: number = 50): Promise<{
     fandomly: PointTransaction[];
     creator: PointTransaction[];
   }> {
     const fandomly = await this.fandomly.getTransactionHistory(userId, limit);
-    const fps = await db.query.fanPrograms.findMany({
-      where: eq(fanPrograms.fanId, userId),
-    });
-    const creatorTxs: PointTransaction[] = [];
-    for (const fp of fps) {
-      const txs = await db.query.pointTransactions.findMany({
-        where: eq(pointTransactions.fanProgramId, fp.id),
-        orderBy: [desc(pointTransactions.createdAt)],
-        limit,
-      });
-      creatorTxs.push(...txs.map(tx => ({
-        id: tx.id,
-        userId,
-        tenantId: tx.tenantId,
-        amount: tx.points ?? 0,
-        type: (tx.points && tx.points >= 0 ? 'earned' : 'spent') as 'earned' | 'spent' | 'bonus' | 'refund',
-        source: tx.source,
-        metadata: tx.metadata ?? undefined,
-        createdAt: tx.createdAt ?? new Date(),
-      })));
-    }
-    creatorTxs.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
-    return { fandomly, creator: creatorTxs.slice(0, limit) };
+    
+    // Single query with JOIN to get all creator point transactions
+    // This replaces the N+1 pattern (1 query for fan programs + N queries for transactions)
+    const creatorTxsRaw = await db.execute(sql`
+      SELECT 
+        pt.id,
+        pt.tenant_id,
+        pt.points,
+        pt.source,
+        pt.metadata,
+        pt.created_at
+      FROM point_transactions pt
+      INNER JOIN fan_programs fp ON pt.fan_program_id = fp.id
+      WHERE fp.fan_id = ${userId}
+      ORDER BY pt.created_at DESC
+      LIMIT ${limit}
+    `);
+    
+    const creatorTxs: PointTransaction[] = (creatorTxsRaw.rows || []).map((tx: any) => ({
+      id: tx.id,
+      userId,
+      tenantId: tx.tenant_id,
+      amount: tx.points ?? 0,
+      type: (tx.points && tx.points >= 0 ? 'earned' : 'spent') as 'earned' | 'spent' | 'bonus' | 'refund',
+      source: tx.source,
+      metadata: tx.metadata ?? undefined,
+      createdAt: tx.created_at ? new Date(tx.created_at) : new Date(),
+    }));
+    
+    return { fandomly, creator: creatorTxs };
   }
 }
 

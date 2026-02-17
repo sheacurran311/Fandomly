@@ -9,6 +9,7 @@ import { sql, eq, and, isNull } from "drizzle-orm";
 import { nftMints, fandomlyBadgeTemplates, users } from "@shared/schema";
 import { CrossmintService } from "../nft/crossmint-service";
 import { getWalletService } from "../wallet/wallet-service";
+import { getSafeLeaderboardView } from "../../utils/safe-sql";
 
 interface BadgeReward {
   badgeTemplateId: string;
@@ -52,10 +53,8 @@ export class BadgeRewardsService {
   async awardPlatformBadges(period: 'week' | 'month' | 'all-time' = 'week'): Promise<BadgeReward[]> {
     console.log(`🏆 Awarding platform badges for period: ${period}`);
 
-    // Get top 10 performers
-    let viewName = 'platform_leaderboard';
-    if (period === 'week') viewName = 'platform_leaderboard_week';
-    else if (period === 'month') viewName = 'platform_leaderboard_month';
+    // Get top 10 performers using safe view name
+    const viewName = getSafeLeaderboardView('platform', period);
 
     const topPerformers = await db.execute(sql`
       SELECT * FROM ${sql.raw(viewName)}
@@ -138,9 +137,8 @@ export class BadgeRewardsService {
   async awardCampaignBadges(campaignId: string, period: 'week' | 'month' | 'all-time' = 'all-time'): Promise<BadgeReward[]> {
     console.log(`🏆 Awarding campaign badges for campaign: ${campaignId}, period: ${period}`);
 
-    let viewName = 'campaign_leaderboard';
-    if (period === 'week') viewName = 'campaign_leaderboard_week';
-    else if (period === 'month') viewName = 'campaign_leaderboard_month';
+    // Use safe view name lookup
+    const viewName = getSafeLeaderboardView('campaign', period);
 
     const topPerformers = await db.execute(sql`
       SELECT * FROM ${sql.raw(viewName)}

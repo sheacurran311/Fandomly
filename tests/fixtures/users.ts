@@ -11,7 +11,6 @@ export const fanUser = {
   username: 'testfan',
   userType: 'fan' as const,
   role: 'user' as const,
-  dynamicUserId: 'dynamic-fan-123',
   profileData: {
     name: 'Test Fan',
     bio: 'I am a test fan user',
@@ -36,7 +35,6 @@ export const creatorUser = {
   username: 'testcreator',
   userType: 'creator' as const,
   role: 'creator' as const,
-  dynamicUserId: 'dynamic-creator-123',
   profileData: {
     name: 'Test Creator',
     bio: 'I am a test creator',
@@ -60,7 +58,6 @@ export const adminUser = {
   username: 'testadmin',
   userType: 'creator' as const,
   role: 'fandomly_admin' as const,
-  dynamicUserId: 'dynamic-admin-123',
   profileData: {
     name: 'Test Admin',
   },
@@ -76,7 +73,6 @@ export const newUser = {
   username: null,
   userType: null,
   role: 'user' as const,
-  dynamicUserId: 'dynamic-new-123',
   onboardingComplete: false,
   isVerified: false,
   createdAt: new Date('2025-01-01'),

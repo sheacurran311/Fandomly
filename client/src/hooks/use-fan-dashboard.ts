@@ -73,61 +73,64 @@ const fetchActiveCampaigns = async (fanId: string): Promise<Campaign[]> => {
     }
     const fanPrograms = await fanProgramsResponse.json();
 
-    const campaigns: Campaign[] = [];
-
-    // For each fan program, get the active campaigns from that creator
-    for (const program of fanPrograms) {
+    // Fetch campaigns for all creators in parallel
+    const campaignPromises = fanPrograms.map(async (program: any) => {
       try {
         const campaignsResponse = await apiRequest('GET', `/api/campaigns/creator/${program.creatorId}`);
-        if (campaignsResponse.ok) {
-          const creatorCampaigns = await campaignsResponse.json();
-          
-          // Add creator campaigns to the list
-          creatorCampaigns.forEach((campaign: any) => {
-            // Calculate real progress based on totalParticipants vs globalBudget
-            const progress = campaign.globalBudget && campaign.totalParticipants 
-              ? Math.min(100, Math.floor((campaign.totalParticipants / campaign.globalBudget) * 100))
-              : 0;
-            
-            // Calculate real time left from endDate
-            let timeLeft = 'Ongoing';
-            if (campaign.endDate) {
-              const endDate = new Date(campaign.endDate);
-              const now = new Date();
-              const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              if (daysLeft < 0) {
-                timeLeft = 'Ended';
-              } else if (daysLeft === 0) {
-                timeLeft = 'Ends today';
-              } else if (daysLeft === 1) {
-                timeLeft = '1 day left';
-              } else if (daysLeft <= 7) {
-                timeLeft = `${daysLeft} days left`;
-              } else if (daysLeft <= 30) {
-                const weeksLeft = Math.ceil(daysLeft / 7);
-                timeLeft = `${weeksLeft} week${weeksLeft > 1 ? 's' : ''} left`;
-              } else {
-                const monthsLeft = Math.ceil(daysLeft / 30);
-                timeLeft = `${monthsLeft} month${monthsLeft > 1 ? 's' : ''} left`;
-              }
-            }
-            
-            campaigns.push({
-              id: campaign.id,
-              creator: campaign.creator?.displayName || 'Unknown Creator',
-              campaign: campaign.name || 'Untitled Campaign',
-              points: campaign.pointValue || 100,
-              progress,
-              category: campaign.category || 'General',
-              timeLeft,
-              creatorId: program.creatorId
-            });
-          });
+        if (!campaignsResponse.ok) {
+          return [];
         }
+        const creatorCampaigns = await campaignsResponse.json();
+        
+        // Transform campaigns with calculated fields
+        return creatorCampaigns.map((campaign: any) => {
+          // Calculate real progress based on totalParticipants vs globalBudget
+          const progress = campaign.globalBudget && campaign.totalParticipants 
+            ? Math.min(100, Math.floor((campaign.totalParticipants / campaign.globalBudget) * 100))
+            : 0;
+          
+          // Calculate real time left from endDate
+          let timeLeft = 'Ongoing';
+          if (campaign.endDate) {
+            const endDate = new Date(campaign.endDate);
+            const now = new Date();
+            const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysLeft < 0) {
+              timeLeft = 'Ended';
+            } else if (daysLeft === 0) {
+              timeLeft = 'Ends today';
+            } else if (daysLeft === 1) {
+              timeLeft = '1 day left';
+            } else if (daysLeft <= 7) {
+              timeLeft = `${daysLeft} days left`;
+            } else if (daysLeft <= 30) {
+              const weeksLeft = Math.ceil(daysLeft / 7);
+              timeLeft = `${weeksLeft} week${weeksLeft > 1 ? 's' : ''} left`;
+            } else {
+              const monthsLeft = Math.ceil(daysLeft / 30);
+              timeLeft = `${monthsLeft} month${monthsLeft > 1 ? 's' : ''} left`;
+            }
+          }
+          
+          return {
+            id: campaign.id,
+            creator: campaign.creator?.displayName || 'Unknown Creator',
+            campaign: campaign.name || 'Untitled Campaign',
+            points: campaign.pointValue || 100,
+            progress,
+            category: campaign.category || 'General',
+            timeLeft,
+            creatorId: program.creatorId
+          };
+        });
       } catch (error) {
         console.warn(`Failed to fetch campaigns for creator ${program.creatorId}:`, error);
+        return [];
       }
-    }
+    });
+
+    const campaignArrays = await Promise.all(campaignPromises);
+    const campaigns: Campaign[] = campaignArrays.flat();
 
     return campaigns.slice(0, 5); // Return top 5 campaigns
   } catch (error) {

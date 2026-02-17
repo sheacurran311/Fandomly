@@ -18,58 +18,16 @@ export function getAccessToken(): string | null {
 }
 
 /**
- * Helper to get current Dynamic user ID from multiple sources (legacy support)
- */
-export function getDynamicUserId(): string | null {
-  try {
-    // 1. Current window (for parent window)
-    if ((window as any).__dynamicUserId) {
-      return (window as any).__dynamicUserId;
-    }
-    
-    // 2. localStorage (for popup window - Twitter OAuth)
-    const fromStorage = localStorage.getItem("twitter_dynamic_user_id");
-    if (fromStorage) {
-      return fromStorage;
-    }
-    
-    // 3. Opener window (for popup window)
-    if ((window as any).opener && (window as any).opener.__dynamicUserId) {
-      return (window as any).opener.__dynamicUserId;
-    }
-    
-    // 4. Opener's localStorage (for popup window)
-    if ((window as any).opener && (window as any).opener.localStorage) {
-      const fromOpenerStorage = (window as any).opener.localStorage.getItem("twitter_dynamic_user_id");
-      if (fromOpenerStorage) {
-        return fromOpenerStorage;
-      }
-    }
-  } catch (e) {
-    console.warn('[Auth] Error accessing Dynamic user ID:', e);
-  }
-  
-  return null;
-}
-
-/**
  * Build auth headers for API requests
- * Supports both JWT (new) and Dynamic user ID (legacy)
+ * Uses JWT authentication only - cookies are sent automatically via credentials: 'include'
  */
 export function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   
-  // Prefer JWT if available
+  // Use JWT access token if available
   const accessToken = getAccessToken();
   if (accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`;
-    return headers;
-  }
-  
-  // Fall back to legacy Dynamic user ID
-  const dynamicUserId = getDynamicUserId();
-  if (dynamicUserId) {
-    headers["x-dynamic-user-id"] = dynamicUserId;
   }
   
   return headers;
@@ -119,16 +77,16 @@ export async function apiRequest(
 }
 
 /**
- * Fetch wrapper for URL-first pattern with options (returns JSON)
+ * Fetch wrapper for URL-first pattern with options (returns typed JSON)
  */
-export async function fetchApi(
+export async function fetchApi<T = unknown>(
   url: string,
   options?: {
     method?: string;
     headers?: Record<string, string>;
     body?: string;
   }
-): Promise<any> {
+): Promise<T> {
   const method = options?.method || "GET";
   const headers: Record<string, string> = { "Content-Type": "application/json", ...options?.headers };
   
@@ -143,7 +101,7 @@ export async function fetchApi(
   });
 
   await throwIfResNotOk(res);
-  return await res.json();
+  return await res.json() as T;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -170,13 +128,16 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Default stale time of 5 minutes for queries
+const DEFAULT_STALE_TIME = 5 * 60 * 1000;
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchOnWindowFocus: true,
+      staleTime: DEFAULT_STALE_TIME,
       retry: false,
     },
     mutations: {

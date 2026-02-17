@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 
@@ -29,6 +29,15 @@ export const useFileUpload = (options: UploadOptions = {}) => {
     onSuccess,
     onError
   } = options;
+
+  // Clean up object URL on unmount or when previewUrl changes to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File): Promise<UploadResponse> => {
@@ -79,13 +88,15 @@ export const useFileUpload = (options: UploadOptions = {}) => {
   });
 
   const handleFileSelect = (file: File) => {
+    // Clean up previous preview URL before creating a new one
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
     // Create preview URL for images
     if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      
-      // Clean up preview URL when component unmounts or new file is selected
-      return () => URL.revokeObjectURL(url);
     }
     
     // Start upload

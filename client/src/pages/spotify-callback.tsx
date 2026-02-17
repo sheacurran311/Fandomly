@@ -1,185 +1,162 @@
-import React, { useEffect, useRef } from 'react';
-import { useAuth } from '@/hooks/use-auth';
-import { Loader2 } from 'lucide-react';
+/**
+ * Spotify OAuth Callback Page
+ *
+ * Handles the OAuth callback from Spotify
+ * Exchanges authorization code for access token
+ * Saves the connection to the database
+ */
 
-function getDynamicUserId(): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    // Check opener window first (for popup)
-    if (window.opener && (window.opener as any).__dynamicUserId) {
-      return (window.opener as any).__dynamicUserId;
-    }
-    
-    // Then check current window
-    if ((window as any).__dynamicUserId) {
-      return (window as any).__dynamicUserId;
-    }
-    
-    // Try localStorage as fallback
-    const stored = localStorage.getItem('dynamicUserId');
-    if (stored) return stored;
-  } catch (error) {
-    console.error('[Spotify Callback] Error getting dynamicUserId:', error);
-  }
-  
-  return null;
-}
+import { useEffect, useRef } from "react";
+import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
-// Global flag to prevent duplicate execution across component remounts
+// Global flag to prevent duplicate execution across multiple renders/remounts
 let spotifyCallbackProcessed = false;
 
 export default function SpotifyCallback() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const ranRef = useRef(false);
 
   useEffect(() => {
-    // Double-check: component-level AND global-level to prevent any duplicates
+    // Prevent duplicate execution
     if (ranRef.current || spotifyCallbackProcessed) {
-      console.log('[Spotify Callback] Already processed, skipping duplicate execution');
       return;
     }
     ranRef.current = true;
     spotifyCallbackProcessed = true;
 
-    let mounted = true;
     const run = async () => {
-      console.log('[Spotify Callback] Starting Spotify OAuth callback processing...');
-      
+      // Parse URL parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+      const error = params.get("error");
+
+      // Helper to send result to opener with localStorage COOP fallback
+      const sendResultToOpener = (result: { success: boolean; error?: string; displayName?: string }) => {
+        if (state) {
+          try {
+            localStorage.setItem(`spotify_oauth_result_${state}`, JSON.stringify(result));
+          } catch (e) {
+            console.error('[Spotify Callback] Failed to store result in localStorage:', e);
+          }
+        }
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: "spotify-oauth-result", result }, window.location.origin);
+          (window.opener as any).spotifyCallbackData = result;
+          window.close();
+          return true;
+        }
+        if (state && state.startsWith('spotify_')) {
+          window.close();
+          return true;
+        }
+        return false;
+      };
+
       try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        const error = urlParams.get('error');
+        console.log("[Spotify Callback] Processing OAuth callback", {
+          hasCode: !!code,
+          hasState: !!state,
+          hasError: !!error,
+        });
 
-        // Handle OAuth errors
+        // Handle OAuth error
         if (error) {
-          const result = {
-            success: false,
-            error: error
-          };
-
-          if (window.opener) {
-            try {
-              window.opener.postMessage({ type: 'spotify-oauth-result', result }, window.location.origin);
-              window.opener.spotifyCallbackData = result;
-            } catch (e) {
-              console.error('[Spotify Callback] Error posting to opener:', e);
-            }
-            window.close();
-            return;
-          }
-
-          console.error('[Spotify Callback] OAuth error:', result);
+          console.error("[Spotify Callback] OAuth error:", error);
+          const errorMsg = error || "Spotify authorization failed";
+          if (sendResultToOpener({ success: false, error: errorMsg })) return;
+          toast({
+            title: "Spotify Connection Failed",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          setLocation("/creator-dashboard/social");
           return;
         }
 
-        // Validate state
-        const savedState = localStorage.getItem('spotify_oauth_state');
-        if (state !== savedState) {
-          const result = {
-            success: false,
-            error: 'Invalid state parameter - possible CSRF attack'
-          };
-
-          if (window.opener) {
-            try {
-              window.opener.postMessage({ type: 'spotify-oauth-result', result }, window.location.origin);
-              window.opener.spotifyCallbackData = result;
-            } catch (e) {
-              console.error('[Spotify Callback] Error posting to opener:', e);
-            }
-            window.close();
-            return;
-          }
-
-          console.error('[Spotify Callback] State mismatch');
-          return;
+        // Validate required parameters
+        if (!code || !state) {
+          throw new Error("Missing code or state parameter");
         }
 
-        if (!code) {
-          const result = {
-            success: false,
-            error: 'Missing authorization code'
-          };
-
-          if (window.opener) {
-            try {
-              window.opener.postMessage({ type: 'spotify-oauth-result', result }, window.location.origin);
-              window.opener.spotifyCallbackData = result;
-            } catch (e) {
-              console.error('[Spotify Callback] Error posting to opener:', e);
-            }
-            window.close();
-            return;
-          }
-
-          console.error('[Spotify Callback] No code provided');
-          return;
+        // Validate CSRF state
+        const savedState = localStorage.getItem("spotify_oauth_state");
+        if (!savedState || savedState !== state) {
+          throw new Error("Invalid state parameter - possible CSRF attack");
         }
 
-        // Exchange code for token
-        const dynamicUserId = getDynamicUserId() || (user as any)?.dynamicUserId || user?.id;
+        // Clear the state from localStorage
+        localStorage.removeItem("spotify_oauth_state");
+
+        console.log("[Spotify Callback] Exchanging code for token...");
+
+        // Exchange code for access token
         const origin = window.location.origin;
-        const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || `${origin}/spotify-callback`;
+        const redirectUri = `${origin}/spotify-callback`;
 
-        console.log('[Spotify Callback] Exchanging code for token...');
-        const tokenResp = await fetch('/api/social/spotify/token', {
-          method: 'POST',
+        const tokenResponse = await fetch("/api/social/spotify/token", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'x-dynamic-user-id': dynamicUserId || ''
+            "Content-Type": "application/json",
           },
-          credentials: 'include',
-          body: JSON.stringify({ code, redirect_uri: redirectUri })
+          body: JSON.stringify({
+            code,
+            redirect_uri: redirectUri,
+          }),
+          credentials: "include",
         });
 
-        if (!tokenResp.ok) {
-          const errorData = await tokenResp.json();
-          throw new Error(errorData.error || errorData.message || 'Token exchange failed');
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          throw new Error(`Token exchange failed: ${errorText}`);
         }
 
-        const tokenData = await tokenResp.json();
-        
-        if (!tokenData.access_token) {
-          throw new Error('No access token received');
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        if (!accessToken) {
+          throw new Error("No access token received");
         }
 
-        // Fetch user profile
-        console.log('[Spotify Callback] Fetching user profile...');
-        const profileResp = await fetch('/api/social/spotify/me', {
+        console.log("[Spotify Callback] Token obtained, fetching user profile...");
+
+        // Get user profile
+        const userResponse = await fetch("/api/social/spotify/me", {
+          method: "GET",
           headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-            'x-dynamic-user-id': dynamicUserId || ''
+            Authorization: `Bearer ${accessToken}`,
           },
-          credentials: 'include'
+          credentials: "include",
         });
 
-        if (!profileResp.ok) {
-          throw new Error('Failed to fetch user profile');
+        if (!userResponse.ok) {
+          const errorText = await userResponse.text();
+          throw new Error(`Failed to fetch user profile: ${errorText}`);
         }
 
-        const profileData = await profileResp.json();
+        const profileData = await userResponse.json();
 
         if (!profileData.id) {
-          throw new Error('No profile data received');
+          throw new Error("No profile data received");
         }
 
-        // Save connection to database
-        console.log('[Spotify Callback] Saving connection to database...');
-        const saveResp = await fetch('/api/social-connections', {
-          method: 'POST',
+        console.log("[Spotify Callback] User profile fetched:", profileData.display_name || profileData.id);
+
+        // Save the connection to the database
+        const saveResponse = await fetch("/api/social-connections", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'x-dynamic-user-id': dynamicUserId || ''
+            "Content-Type": "application/json",
           },
-          credentials: 'include',
           body: JSON.stringify({
-            platform: 'spotify',
+            platform: "spotify",
             platformUserId: profileData.id,
             platformUsername: profileData.id,
             platformDisplayName: profileData.display_name || profileData.id,
-            accessToken: tokenData.access_token,
-            refreshToken: tokenData.refresh_token,
+            accessToken: accessToken,
+            refreshToken: tokenData.refresh_token || null,
             tokenExpiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
             profileData: {
               id: profileData.id,
@@ -192,75 +169,52 @@ export default function SpotifyCallback() {
               profilePictureUrl: profileData.images?.[0]?.url,
               email: profileData.email,
               country: profileData.country,
-              product: profileData.product
-            }
-          })
+              product: profileData.product,
+            },
+          }),
+          credentials: "include",
         });
 
-        if (!saveResp.ok) {
-          console.warn('[Spotify Callback] Failed to save connection to database');
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          throw new Error(`Failed to save connection: ${errorText}`);
         }
 
-        const result = {
-          success: true,
-          displayName: profileData.display_name || profileData.id
-        };
+        console.log("[Spotify Callback] Connection saved successfully");
 
-        // Clean up URL by removing code and state parameters
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('code');
-          url.searchParams.delete('state');
-          window.history.replaceState({}, document.title, url.toString());
-        } catch {}
+        const displayName = profileData.display_name || profileData.id;
+        if (sendResultToOpener({ success: true, displayName })) return;
 
-        if (window.opener) {
-          try {
-            console.log('[Spotify Callback] Posting success result to opener');
-            window.opener.postMessage({ type: 'spotify-oauth-result', result }, window.location.origin);
-            window.opener.spotifyCallbackData = result;
-            console.log('[Spotify Callback] Closing popup');
-          } catch (e) {
-            console.error('[Spotify Callback] Error posting to opener:', e);
-          }
-          window.close();
-          return;
-        }
-
-        if (!mounted) return;
-        // Not a popup - redirect to dashboard
-        window.location.replace('/creator-dashboard/social');
+        // Otherwise show toast and redirect
+        toast({
+          title: "Spotify Connected!",
+          description: `Successfully connected ${displayName}`,
+        });
+        setLocation("/creator-dashboard/social");
       } catch (error) {
-        console.error('[Spotify Callback] Error:', error);
-        const result = {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unexpected error'
-        };
+        console.error("[Spotify Callback] Error:", error);
+        const errorMsg = error instanceof Error ? error.message : "Failed to connect Spotify";
+        if (sendResultToOpener({ success: false, error: errorMsg })) return;
 
-        if (window.opener) {
-          try {
-            window.opener.postMessage({ type: 'spotify-oauth-result', result }, window.location.origin);
-            window.opener.spotifyCallbackData = result;
-          } catch (e) {
-            console.error('[Spotify Callback] Error posting to opener:', e);
-          }
-          window.close();
-          return;
-        }
+        // Otherwise show toast and redirect
+        toast({
+          title: "Spotify Connection Failed",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        setLocation("/creator-dashboard/social");
       }
     };
-    
+
     run();
-    return () => { mounted = false; };
-  }, []); // Empty deps - only run once on mount
+  }, [setLocation, toast]);
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-      <div className="text-white flex items-center gap-2">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        Processing Spotify authorization…
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="text-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        <p className="text-muted-foreground">Connecting your Spotify account...</p>
       </div>
     </div>
   );
 }
-

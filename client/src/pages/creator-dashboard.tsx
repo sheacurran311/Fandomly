@@ -1,16 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useCreatorStats, useCreatorActivity } from "@/hooks/use-creator-dashboard";
 import { useContentAnalytics } from "@/hooks/use-analytics";
+import { useSocialConnections } from "@/hooks/use-social-connections";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
-import CreatorFacebookConnect from "@/components/social/creator-facebook-connect";
-import CreatorInstagramWidget from "@/components/social/creator-instagram-widget";
-import CreatorTwitterWidget from "@/components/social/creator-twitter-widget";
-import CreatorTikTokWidget from "@/components/social/creator-tiktok-widget";
-import CreatorYouTubeWidget from "@/components/social/creator-youtube-widget";
-import CreatorSpotifyWidget from "@/components/social/creator-spotify-widget";
-import CreatorDiscordWidget from "@/components/social/creator-discord-widget";
-import CreatorTwitchWidget from "@/components/social/creator-twitch-widget";
 import RevenueWidget from "@/components/dashboard/revenue-widget";
 import LeaderboardWidget from "@/components/dashboard/leaderboard-widget";
 import NewFansWidget from "@/components/dashboard/new-fans-widget";
@@ -19,38 +12,44 @@ import InstagramSDKManager from "@/lib/instagram";
 import { useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { useCreatorVerification } from "@/hooks/useCreatorVerification";
-import { CreatorVerificationProgress } from "@/components/creator/CreatorVerificationProgress";
-import { calculateCreatorVerification } from "@shared/creatorVerificationSchema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Users,
   DollarSign,
-  TrendingUp,
-  Eye,
-  Heart,
-  MessageSquare,
-  Target,
-  Plus,
-  BarChart3,
-  Facebook,
-  Instagram,
   Loader2,
   CheckCircle2,
   Gift,
-  Sparkles,
-  ArrowRight,
   Circle,
-  Image,
-  Palette,
-  Link2,
-  ListChecks,
   Rocket,
   ChevronRight,
-  Activity
+  Activity,
+  ExternalLink,
+  Link2
 } from "lucide-react";
+import { 
+  FaFacebook, 
+  FaTwitter, 
+  FaInstagram, 
+  FaTiktok, 
+  FaYoutube, 
+  FaSpotify, 
+  FaDiscord, 
+  FaTwitch 
+} from "react-icons/fa";
+
+// Social platforms configuration
+const SOCIAL_PLATFORMS = [
+  { id: 'facebook', name: 'Facebook', icon: FaFacebook, color: 'text-blue-500' },
+  { id: 'twitter', name: 'X', icon: FaTwitter, color: 'text-gray-400' },
+  { id: 'instagram', name: 'Instagram', icon: FaInstagram, color: 'text-pink-500' },
+  { id: 'tiktok', name: 'TikTok', icon: FaTiktok, color: 'text-white' },
+  { id: 'youtube', name: 'YouTube', icon: FaYoutube, color: 'text-red-500' },
+  { id: 'spotify', name: 'Spotify', icon: FaSpotify, color: 'text-green-500' },
+  { id: 'discord', name: 'Discord', icon: FaDiscord, color: 'text-indigo-400' },
+  { id: 'twitch', name: 'Twitch', icon: FaTwitch, color: 'text-purple-500' },
+];
 
 function TopPerformingWidget() {
   const { data, isLoading } = useContentAnalytics('all', 'views', 3);
@@ -58,9 +57,9 @@ function TopPerformingWidget() {
 
   if (isLoading) {
     return (
-      <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+      <Card className="bg-white/5 backdrop-blur-lg border border-white/10 h-full">
         <CardHeader>
-          <CardTitle className="text-white text-sm">Top Performing</CardTitle>
+          <CardTitle className="text-white text-sm">Top Performing Content</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -78,9 +77,9 @@ function TopPerformingWidget() {
 
   if (content.length === 0) {
     return (
-      <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+      <Card className="bg-white/5 backdrop-blur-lg border border-white/10 h-full">
         <CardHeader>
-          <CardTitle className="text-white text-sm">Top Performing</CardTitle>
+          <CardTitle className="text-white text-sm">Top Performing Content</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-400 text-center py-4">
@@ -94,9 +93,9 @@ function TopPerformingWidget() {
   const maxViews = Math.max(...content.map((c: any) => c.totalViews || 0), 1);
 
   return (
-    <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+    <Card className="bg-white/5 backdrop-blur-lg border border-white/10 h-full">
       <CardHeader>
-        <CardTitle className="text-white text-sm">Top Performing</CardTitle>
+        <CardTitle className="text-white text-sm">Top Performing Content</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -119,11 +118,91 @@ function TopPerformingWidget() {
   );
 }
 
+// Compact social connections status row
+function ConnectedPlatformsRow() {
+  const { isPlatformConnected, isLoading } = useSocialConnections();
+  
+  const connectedCount = SOCIAL_PLATFORMS.filter(p => isPlatformConnected(p.id)).length;
+  const totalCount = SOCIAL_PLATFORMS.length;
+
+  return (
+    <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-brand-secondary" />
+            <span>Connected Platforms</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-3 text-xs text-brand-primary hover:text-white hover:bg-brand-primary/20"
+            onClick={() => window.location.href = '/creator-dashboard/social'}
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Manage All
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Platform icons row */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              {SOCIAL_PLATFORMS.map((platform) => {
+                const Icon = platform.icon;
+                const isConnected = isPlatformConnected(platform.id);
+                return (
+                  <div 
+                    key={platform.id} 
+                    className="flex flex-col items-center gap-1.5 min-w-[60px]"
+                    title={`${platform.name}: ${isConnected ? 'Connected' : 'Not connected'}`}
+                  >
+                    <div className={`relative p-2.5 rounded-lg transition-colors ${
+                      isConnected 
+                        ? 'bg-white/10' 
+                        : 'bg-white/5 opacity-50'
+                    }`}>
+                      <Icon className={`h-5 w-5 ${isConnected ? platform.color : 'text-gray-500'}`} />
+                      {/* Status indicator dot */}
+                      <div className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-dark-bg ${
+                        isConnected ? 'bg-green-400' : 'bg-gray-500'
+                      }`} />
+                    </div>
+                    <span className={`text-[10px] ${isConnected ? 'text-gray-300' : 'text-gray-500'}`}>
+                      {platform.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Connection summary */}
+            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <span className="text-sm text-gray-400">
+                {connectedCount} of {totalCount} platforms connected
+              </span>
+              {connectedCount < totalCount && (
+                <span className="text-xs text-brand-secondary">
+                  +{(totalCount - connectedCount) * 500} potential points
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function CreatorDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
   const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
-  const { creator, verificationData, isLoading: verificationLoading } = useCreatorVerification();
   
   // Only use Instagram connection for creators
   const instagramConnection = user?.userType === 'creator' ? useInstagramConnection() : null;
@@ -206,24 +285,36 @@ export default function CreatorDashboard() {
 
       if (error) {
         const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
+        const errorResult = { success: false, error: errorDescription || error };
+        
+        // Always store in localStorage for COOP fallback (Cross-Origin-Opener-Policy can null window.opener)
+        if (state) {
+          try {
+            localStorage.setItem(`instagram_oauth_result_${state}`, JSON.stringify(errorResult));
+            console.log('[Creator Dashboard] Stored error result in localStorage for state:', state);
+          } catch (e) {
+            console.error('[Creator Dashboard] Failed to store result in localStorage:', e);
+          }
+        }
         
         // If opened in popup, communicate result to parent
         if (window.opener) {
           console.log('[Creator Dashboard] Communicating error to parent window');
           window.opener.postMessage({
             type: 'instagram-oauth-result',
-            result: {
-              success: false,
-              error: errorDescription || error
-            }
+            result: errorResult
           }, window.location.origin);
           
           // Store result in parent window for fallback
-          (window.opener as any).instagramCallbackData = {
-            success: false,
-            error: errorDescription || error
-          };
+          (window.opener as any).instagramCallbackData = errorResult;
           
+          window.close();
+          return;
+        }
+        
+        // If no opener but state looks like popup flow, close the window
+        if (state && state.startsWith('instagram_')) {
+          console.log('[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage');
           window.close();
           return;
         }
@@ -246,6 +337,36 @@ export default function CreatorDashboard() {
           const result = await InstagramSDKManager.handleCallback(code, state);
           console.log('[Creator Dashboard] handleCallback result:', result);
           
+          // Always store in localStorage for COOP fallback
+          if (state) {
+            try {
+              // Augment result with connectionData for parent-side saving
+              let augmentedResult: any = result;
+              if (result.success && result.accessToken && result.user) {
+                augmentedResult = {
+                  ...result,
+                  connectionData: {
+                    platform: 'instagram',
+                    platformUserId: result.user.id,
+                    platformUsername: result.user.username,
+                    platformDisplayName: result.user.name || result.user.username,
+                    accessToken: result.accessToken,
+                    profileData: {
+                      profile_picture_url: result.user.profile_picture_url,
+                      followers_count: result.user.followers_count,
+                      media_count: result.user.media_count,
+                      account_type: result.user.account_type,
+                    },
+                  }
+                };
+              }
+              localStorage.setItem(`instagram_oauth_result_${state}`, JSON.stringify(augmentedResult));
+              console.log('[Creator Dashboard] Stored result in localStorage for state:', state);
+            } catch (e) {
+              console.error('[Creator Dashboard] Failed to store result in localStorage:', e);
+            }
+          }
+
           if (result.success) {
             console.log('[Creator Dashboard] Callback successful, calling global handler...');
             
@@ -274,6 +395,13 @@ export default function CreatorDashboard() {
               return;
             }
             
+            // If no opener but state looks like popup flow, close the window
+            if (state && state.startsWith('instagram_')) {
+              console.log('[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage');
+              window.close();
+              return;
+            }
+            
             toast({
               title: "Instagram Connected! 📸",
               description: `Successfully connected @${result.user?.username}`,
@@ -296,6 +424,13 @@ export default function CreatorDashboard() {
               return;
             }
             
+            // If no opener but state looks like popup flow, close the window
+            if (state && state.startsWith('instagram_')) {
+              console.log('[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage');
+              window.close();
+              return;
+            }
+            
             toast({
               title: "Instagram Connection Failed",
               description: result.error || "Failed to complete connection",
@@ -304,23 +439,37 @@ export default function CreatorDashboard() {
           }
         } catch (error) {
           console.error('[Creator Dashboard] Instagram callback error:', error);
+          const errorResult = {
+            success: false,
+            error: error instanceof Error ? error.message : "An error occurred while connecting Instagram"
+          };
+          
+          // Store error in localStorage for COOP fallback
+          if (state) {
+            try {
+              localStorage.setItem(`instagram_oauth_result_${state}`, JSON.stringify(errorResult));
+            } catch (e) {
+              console.error('[Creator Dashboard] Failed to store error in localStorage:', e);
+            }
+          }
           
           // If opened in popup, communicate result to parent
           if (window.opener) {
             window.opener.postMessage({
               type: 'instagram-oauth-result',
-              result: {
-                success: false,
-                error: error instanceof Error ? error.message : "An error occurred while connecting Instagram"
-              }
+              result: errorResult
             }, window.location.origin);
             
             // Store result in parent window for fallback
-            (window.opener as any).instagramCallbackData = {
-              success: false,
-              error: error instanceof Error ? error.message : "An error occurred while connecting Instagram"
-            };
+            (window.opener as any).instagramCallbackData = errorResult;
             
+            window.close();
+            return;
+          }
+          
+          // If no opener but state looks like popup flow, close the window
+          if (state && state.startsWith('instagram_')) {
+            console.log('[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage');
             window.close();
             return;
           }
@@ -333,7 +482,7 @@ export default function CreatorDashboard() {
         }
         
         // Clean up URL after processing (only if not in popup)
-        if (!window.opener) {
+        if (!window.opener && !(state && state.startsWith('instagram_'))) {
           console.log('[Creator Dashboard] Cleaning up URL parameters');
           window.history.replaceState({}, document.title, '/creator-dashboard');
         }
@@ -352,43 +501,73 @@ export default function CreatorDashboard() {
   }
 
   // Fetch creator's program for setup checklist
-  const { data: programs = [] } = useQuery<any[]>({
+  const { data: programs = [], isLoading: programsLoading } = useQuery<any[]>({
     queryKey: ["/api/programs"],
     enabled: isAuthenticated && user?.userType === 'creator',
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
   });
   const program = programs[0]; // Single-program model
   const programPageConfig = program?.pageConfig || {};
 
   // Calculate setup completion checklist
+  // Each step is tied to actual creator work with clear completion criteria
   const setupChecklist = useMemo(() => {
     if (!program) return null;
+
+    // Check if name has been customized from the auto-generated default
+    // Default format is "{DisplayName}'s Program" - we check if it's been changed
+    const defaultNamePattern = /'s Program$/;
+    const hasCustomName = !!program.name && 
+      !defaultNamePattern.test(program.name) && 
+      program.name !== `${user?.username}'s Program`;
+    
+    // Check if description is meaningful (not empty and has some content)
+    const hasDescription = !!program.description && program.description.trim().length > 10;
+    
+    // Check if logo or banner has been uploaded
+    const hasPhoto = !!programPageConfig.logo || !!programPageConfig.headerImage;
+    
+    // Check if theme has been explicitly customized beyond the auto-assigned default
+    // Default themes are assigned based on creator type, so having a templateId alone doesn't mean customization
+    // We consider it "customized" if they've changed colors from common defaults or added branding
+    const defaultColors = ['#8B5CF6', '#06B6D4', '#10B981']; // Common default primaries
+    const hasCustomColors = programPageConfig.brandColors && (
+      !defaultColors.includes(programPageConfig.brandColors.primary) ||
+      !defaultColors.includes(programPageConfig.brandColors.secondary)
+    );
+    const hasCustomTheme = hasCustomColors || hasPhoto; // Consider theme done if they've added any branding
+    
+    // Check if any social links have been added
+    const hasSocialLinks = programPageConfig.socialLinks && 
+      Object.values(programPageConfig.socialLinks).some((v: any) => !!v && String(v).trim() !== '');
 
     const items = [
       {
         id: 'name',
         label: 'Program name & description',
-        completed: !!program.name && !program.name.endsWith("'s Program") && !!program.description,
+        completed: hasCustomName && hasDescription,
         required: true,
         link: '/creator-dashboard/program-builder',
       },
       {
         id: 'photo',
         label: 'Add a photo (logo or banner)',
-        completed: !!programPageConfig.logo || !!programPageConfig.headerImage,
+        completed: hasPhoto,
         required: true,
         link: '/creator-dashboard/program-builder',
       },
       {
         id: 'theme',
         label: 'Customize your theme',
-        completed: !!programPageConfig.theme?.templateId,
+        completed: hasCustomTheme, // Complete if colors changed or branding added
         required: false,
         link: '/creator-dashboard/program-builder',
       },
       {
         id: 'social',
         label: 'Connect social platforms',
-        completed: programPageConfig.socialLinks && Object.values(programPageConfig.socialLinks).some((v: any) => !!v),
+        completed: hasSocialLinks,
         required: false,
         link: '/creator-dashboard/social',
       },
@@ -402,7 +581,7 @@ export default function CreatorDashboard() {
     ];
 
     return items;
-  }, [program, programPageConfig]);
+  }, [program, programPageConfig, user?.username]);
 
   // Check if any tasks exist
   const { data: tasksData } = useQuery<any[]>({
@@ -424,8 +603,17 @@ export default function CreatorDashboard() {
   const completedCount = finalChecklist?.filter(i => i.completed).length || 0;
   const totalCount = finalChecklist?.length || 0;
   const setupProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const requiredItemsComplete = finalChecklist?.filter(i => i.required && !i.completed).length === 0;
   const isPublished = program?.status === 'published';
-  const showSetupChecklist = !!program && !isPublished && finalChecklist;
+  
+  // Show the setup checklist when:
+  // 1. Program exists and is loaded
+  // 2. Program is NOT published (once published, they've completed setup)
+  // 3. Either: not all required items are complete, OR all items aren't complete yet
+  // This ensures the checklist stays visible until the creator publishes or completes all steps
+  const showSetupChecklist = !!program && !programsLoading && !isPublished && finalChecklist && (
+    !requiredItemsComplete || completedCount < totalCount
+  );
 
   if (!isAuthenticated || !user) {
     return (
@@ -442,9 +630,9 @@ export default function CreatorDashboard() {
         <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.10),transparent_60%),radial-gradient(40%_40%_at_90%_10%,rgba(20,254,238,0.10),transparent_60%)]" />
         <div className="absolute inset-0 gradient-primary opacity-[0.03]" />
         
-        <div className="relative z-10 p-6">
+        <div className="relative z-10 p-6 space-y-8">
           {/* Header */}
-          <div className="mb-8">
+          <div>
             <h1 className="text-3xl font-bold text-white mb-2">
               Welcome back, {user.username || "Creator"}!
             </h1>
@@ -455,7 +643,7 @@ export default function CreatorDashboard() {
 
           {/* Program Setup Checklist - shown for unpublished programs */}
           {showSetupChecklist && finalChecklist && (
-            <Card className="bg-gradient-to-br from-brand-primary/10 to-brand-accent/5 backdrop-blur-lg border border-brand-primary/20 mb-8">
+            <Card className="bg-gradient-to-br from-brand-primary/10 to-brand-accent/5 backdrop-blur-lg border border-brand-primary/20">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -524,8 +712,8 @@ export default function CreatorDashboard() {
             </Card>
           )}
 
-          {/* Key Metrics Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* SECTION 1: Key Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {statsLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Card key={i} className="bg-white/5 backdrop-blur-lg border border-white/10">
@@ -574,12 +762,11 @@ export default function CreatorDashboard() {
             )}
           </div>
 
-          {/* Main Content Grid */}
+          {/* SECTION 2: Fans & Engagement Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Content - Recent Activity + Social Widgets */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Recent Activity */}
-              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+            {/* Recent Activity - takes 2/3 */}
+            <div className="lg:col-span-2">
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10 h-full">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center justify-between">
                     <span>Recent Activity</span>
@@ -594,7 +781,7 @@ export default function CreatorDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="max-h-[600px] overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                  <div className="max-h-[400px] overflow-y-auto space-y-3 custom-scrollbar pr-2">
                     {activityLoading ? (
                       // Loading skeleton
                       Array.from({ length: 5 }).map((_, index) => (
@@ -607,7 +794,7 @@ export default function CreatorDashboard() {
                         </div>
                       ))
                     ) : recentActivity && recentActivity.length > 0 ? (
-                      recentActivity.slice(0, 10).map((activity, index) => (
+                      recentActivity.slice(0, 8).map((activity, index) => (
                         <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                           <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
                             activity.type === 'join' ? 'bg-green-400' : 
@@ -636,91 +823,22 @@ export default function CreatorDashboard() {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Social Media Integrations Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <CreatorFacebookConnect />
-                <CreatorTwitterWidget />
-                <CreatorInstagramWidget />
-                <CreatorTikTokWidget />
-                <CreatorYouTubeWidget />
-                <CreatorSpotifyWidget />
-                <CreatorDiscordWidget />
-                <CreatorTwitchWidget />
-              </div>
             </div>
 
-            {/* Right Sidebar - New Widgets */}
+            {/* Fan widgets stacked - takes 1/3 */}
             <div className="space-y-6">
-              {/* Creator Verification Status */}
-              {!verificationLoading && creator && verificationData && (
-                <CreatorVerificationProgress
-                  creator={creator}
-                  verificationData={verificationData}
-                  onStartWizard={() => window.location.href = '/creator-dashboard/profile'}
-                  compact={true}
-                />
-              )}
-              
-              {/* Revenue Widget */}
-              <RevenueWidget />
-              
-              {/* Leaderboard Widget */}
               <LeaderboardWidget />
-              
-              {/* New Fans Widget */}
               <NewFansWidget />
-
-              {/* Quick Actions */}
-              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-white text-sm">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button 
-                    className="w-full bg-brand-primary hover:bg-brand-primary/80 justify-start"
-                    onClick={() => window.location.href = '/campaign-builder'}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Campaign
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-[#101636]/30 text-[#101636] hover:bg-[#101636]/10 justify-start"
-                    onClick={() => {
-                      // Placeholder: open Social page to manage Facebook campaigns
-                      window.location.href = '/creator-dashboard/social';
-                    }}
-                    data-testid="button-facebook-campaign"
-                  >
-                    <Facebook className="h-4 w-4 mr-2" />
-                    Facebook Campaign
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-pink-400/30 text-pink-400 hover:bg-pink-400/10 justify-start"
-                    onClick={() => {
-                      window.location.href = '/creator-dashboard/social';
-                    }}
-                    data-testid="button-instagram-campaign"
-                  >
-                    <Instagram className="h-4 w-4 mr-2" />
-                    Instagram Campaign
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-white/20 text-gray-300 hover:bg-white/10 justify-start"
-                    onClick={() => window.location.href = '/creator-dashboard/analytics'}
-                  >
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Analytics
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Top Performing Content - Real Data */}
-              <TopPerformingWidget />
             </div>
+          </div>
+
+          {/* SECTION 3: Social Networks Row */}
+          <ConnectedPlatformsRow />
+
+          {/* SECTION 4: Revenue & Performance Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <RevenueWidget />
+            <TopPerformingWidget />
           </div>
         </div>
       </div>

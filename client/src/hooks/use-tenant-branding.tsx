@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 interface TenantBranding {
@@ -85,7 +85,7 @@ export function useTenantBranding(tenantId?: string) {
   });
 
   // Apply branding to document
-  const applyBranding = (branding: TenantBranding) => {
+  const applyBranding = useCallback((branding: TenantBranding) => {
     const theme: TenantTheme = {
       ...branding,
       primaryRgb: hexToRgb(branding.primaryColor),
@@ -161,13 +161,13 @@ export function useTenantBranding(tenantId?: string) {
     }
 
     setIsCustomThemeActive(true);
-  };
+  }, []);
 
   // Reset to default branding
-  const resetBranding = () => {
+  const resetBranding = useCallback(() => {
     applyBranding(defaultBranding);
     setIsCustomThemeActive(false);
-  };
+  }, [applyBranding]);
 
   // Preview branding temporarily (for live preview)
   const previewBranding = (branding: Partial<TenantBranding>) => {
@@ -187,7 +187,7 @@ export function useTenantBranding(tenantId?: string) {
       // No tenant specified, use default
       resetBranding();
     }
-  }, [tenantData, isLoading, tenantId]);
+  }, [tenantData, isLoading, tenantId, applyBranding, resetBranding]);
 
   return {
     currentBranding,

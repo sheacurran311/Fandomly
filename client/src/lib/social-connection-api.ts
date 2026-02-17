@@ -1,4 +1,57 @@
-import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
+import { getAuthHeaders } from '@/lib/queryClient';
+
+// CSRF token cache
+let csrfToken: string | null = null;
+
+/**
+ * Fetch a fresh CSRF token from the server
+ */
+async function fetchCsrfToken(): Promise<string | null> {
+  try {
+    console.log('[CSRF] Fetching CSRF token...');
+    const response = await fetch('/api/csrf-token', {
+      credentials: 'include'
+    });
+    console.log('[CSRF] Response:', { ok: response.ok, status: response.status });
+    if (response.ok) {
+      const data = await response.json();
+      csrfToken = data.csrfToken;
+      console.log('[CSRF] Token received:', csrfToken ? 'yes' : 'no');
+      return csrfToken;
+    } else {
+      const errorText = await response.text();
+      console.error('[CSRF] Failed to get token:', errorText);
+    }
+  } catch (error) {
+    console.error('[CSRF] Failed to fetch CSRF token:', error);
+  }
+  return null;
+}
+
+/**
+ * Get CSRF token (cached or fetch fresh)
+ */
+async function getCsrfToken(): Promise<string | null> {
+  if (!csrfToken) {
+    return fetchCsrfToken();
+  }
+  return csrfToken;
+}
+
+/**
+ * Get headers with auth and CSRF token for POST/PUT/DELETE requests
+ */
+async function getProtectedHeaders(): Promise<Record<string, string>> {
+  const token = await getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders()
+  };
+  if (token) {
+    headers['x-csrf-token'] = token;
+  }
+  return headers;
+}
 
 export interface SocialConnection {
   id: string;
@@ -99,12 +152,10 @@ export async function saveSocialConnection(connectionData: {
   profileData?: any;
 }): Promise<{ success: boolean; connection?: SocialConnection; error?: string }> {
   try {
+    const headers = await getProtectedHeaders();
     const response = await fetch('/api/social-connections', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify(connectionData)
     });
@@ -124,21 +175,36 @@ export async function saveSocialConnection(connectionData: {
 
 /**
  * Disconnect a social platform from the database
- * Uses POST /disconnect (unified endpoint) - supports both JWT and x-dynamic-user-id auth
+ * Uses POST /disconnect (unified endpoint) with JWT authentication
  */
 export async function disconnectSocialPlatform(platform: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const headers = await getProtectedHeaders();
     const response = await fetch('/api/social-connections/disconnect', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify({ platform: platform.toLowerCase() })
     });
 
     if (!response.ok) {
+      // If CSRF error, refresh token and retry once
+      if (response.status === 403) {
+        console.log('[Social API] CSRF error, refreshing token and retrying...');
+        csrfToken = null;
+        const newHeaders = await getProtectedHeaders();
+        const retryResponse = await fetch('/api/social-connections/disconnect', {
+          method: 'POST',
+          headers: newHeaders,
+          credentials: 'include',
+          body: JSON.stringify({ platform: platform.toLowerCase() })
+        });
+        
+        if (retryResponse.ok) {
+          return { success: true };
+        }
+      }
+      
       let errorData: { error?: string } = {};
       try {
         errorData = await response.json();

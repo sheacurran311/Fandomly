@@ -70,7 +70,7 @@ const creatorTypes = [
 
 export default function CreatorTypeSelection() {
   const [, setLocation] = useLocation();
-  const { user, dynamicUser, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const { refreshUser } = useAuthContext();
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const { toast } = useToast();
@@ -118,7 +118,7 @@ export default function CreatorTypeSelection() {
   }
 
   // Check for authenticated user
-  if (!dynamicUser && !user) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">

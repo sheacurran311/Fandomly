@@ -25,32 +25,42 @@ export default function InstagramCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        const error = urlParams.get('error');
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const errorParam = urlParams.get('error');
 
+      // Helper to send result to opener with localStorage COOP fallback
+      const sendResultToOpener = (result: { success: boolean; error?: string; [key: string]: any }) => {
+        if (state) {
+          try {
+            localStorage.setItem(`instagram_oauth_result_${state}`, JSON.stringify(result));
+          } catch (e) {
+            console.error('[Instagram Callback] Failed to store result in localStorage:', e);
+          }
+        }
+        if (window.opener) {
+          window.opener.postMessage({ type: 'instagram-oauth-result', result }, window.location.origin);
+          (window.opener as any).instagramCallbackData = result;
+          window.close();
+          return true;
+        }
+        if (state && state.startsWith('instagram_')) {
+          window.close();
+          return true;
+        }
+        return false;
+      };
+
+      try {
         // Handle authorization errors
-        if (error) {
-          const errorReason = urlParams.get('error_reason');
+        if (errorParam) {
           const errorDescription = urlParams.get('error_description');
           
           setStatus('error');
-          setError(`Authorization failed: ${errorDescription || error}`);
+          setError(`Authorization failed: ${errorDescription || errorParam}`);
           
-          // If opened in popup, communicate result to parent
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'instagram-oauth-result',
-              result: {
-                success: false,
-                error: errorDescription || error
-              }
-            }, window.location.origin);
-            window.close();
-            return;
-          }
+          if (sendResultToOpener({ success: false, error: errorDescription || errorParam })) return;
           
           toast({
             title: "Instagram Authorization Failed",
@@ -65,18 +75,7 @@ export default function InstagramCallback() {
           setStatus('error');
           setError('Missing authorization code or state parameter');
           
-          // If opened in popup, communicate result to parent
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'instagram-oauth-result',
-              result: {
-                success: false,
-                error: 'Missing authorization code or state parameter'
-              }
-            }, window.location.origin);
-            window.close();
-            return;
-          }
+          if (sendResultToOpener({ success: false, error: 'Missing authorization code or state parameter' })) return;
           return;
         }
 
@@ -95,36 +94,39 @@ export default function InstagramCallback() {
             (window as any).handleInstagramConnectionResult(result);
           } else {
             console.log('[Instagram Callback] Global callback handler not available, using direct connection');
-            // Fallback: try to update context directly if available
             try {
               await connectInstagram();
-            } catch (error) {
-              console.error('[Instagram Callback] Direct connection failed:', error);
+            } catch (err) {
+              console.error('[Instagram Callback] Direct connection failed:', err);
             }
           }
 
-          // If opened in popup, communicate result to parent and close
-          if (window.opener) {
-            console.log('[Instagram Callback] Communicating result to parent window');
-            window.opener.postMessage({
-              type: 'instagram-oauth-result',
-              result: result
-            }, window.location.origin);
-            
-            // Store result in parent window for fallback
-            (window.opener as any).instagramCallbackData = result;
-            
-            window.close();
-            return;
-          }
+          // Augment result with connectionData for parent-side saving
+          const augmentedResult = {
+            ...result,
+            connectionData: {
+              platform: 'instagram',
+              platformUserId: result.user.id,
+              platformUsername: result.user.username,
+              platformDisplayName: result.user.name || result.user.username,
+              accessToken: result.accessToken,
+              profileData: {
+                profile_picture_url: result.user.profile_picture_url,
+                followers_count: result.user.followers_count,
+                media_count: result.user.media_count,
+                account_type: result.user.account_type,
+              },
+            }
+          };
+
+          if (sendResultToOpener(augmentedResult)) return;
           
           toast({
-            title: "Instagram Connected! 📸",
+            title: "Instagram Connected!",
             description: `Successfully connected @${result.user.username}`,
             duration: 4000
           });
 
-          // Redirect to creator dashboard after a short delay (only if not in popup)
           setTimeout(() => {
             setLocation('/creator-dashboard');
           }, 2000);
@@ -133,15 +135,7 @@ export default function InstagramCallback() {
           setStatus('error');
           setError(result.error || 'Failed to complete Instagram connection');
           
-          // If opened in popup, communicate result to parent
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'instagram-oauth-result',
-              result: result
-            }, window.location.origin);
-            window.close();
-            return;
-          }
+          if (sendResultToOpener(result)) return;
           
           toast({
             title: "Instagram Connection Failed",
@@ -150,23 +144,13 @@ export default function InstagramCallback() {
           });
         }
 
-      } catch (error) {
-        console.error('[Instagram Callback] Error:', error);
+      } catch (err) {
+        console.error('[Instagram Callback] Error:', err);
         setStatus('error');
-        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+        const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
+        setError(errorMsg);
         
-        // If opened in popup, communicate result to parent
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'instagram-oauth-result',
-            result: {
-              success: false,
-              error: error instanceof Error ? error.message : 'An unexpected error occurred'
-            }
-          }, window.location.origin);
-          window.close();
-          return;
-        }
+        if (sendResultToOpener({ success: false, error: errorMsg })) return;
         
         toast({
           title: "Instagram Connection Error",

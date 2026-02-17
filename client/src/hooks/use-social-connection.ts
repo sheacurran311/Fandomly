@@ -100,25 +100,23 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
       error: null,
     });
 
-    // Stable references for user fields to avoid re-render loops
+    // Stable reference for user ID to avoid re-render loops
     const userIdRef = useRef(user?.id);
-    const dynamicUserIdRef = useRef((user as any)?.dynamicUserId || user?.id);
     userIdRef.current = user?.id;
-    dynamicUserIdRef.current = (user as any)?.dynamicUserId || user?.id;
 
     // Check connection status from API
     const checkStatus = useCallback(async () => {
       const uid = userIdRef.current;
-      const dynamicUid = dynamicUserIdRef.current;
       if (!uid) {
         setState(prev => ({ ...prev, isLoading: false }));
         return;
       }
 
       try {
+        const { getAuthHeaders } = await import('@/lib/queryClient');
         const response = await fetch(`/api/social-connections/${platform}`, {
           headers: {
-            'x-dynamic-user-id': dynamicUid || uid || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -309,23 +307,17 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
       }
     }, [user, state.isConnecting, checkStatus, toast, config.name, config.emoji]);
 
-    // Disconnect from the platform
+    // Disconnect from the platform using the standard API endpoint
     const disconnect = useCallback(async () => {
       if (!user?.id || state.isDisconnecting) return;
 
       setState(prev => ({ ...prev, isDisconnecting: true }));
 
       try {
-        const response = await fetch(`/api/social/${platform}`, {
-          method: 'DELETE',
-          headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
+        const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+        const result = await disconnectSocialPlatform(platform);
 
-        if (response.ok) {
+        if (result.success) {
           setState({
             isConnected: false,
             isConnecting: false,
@@ -344,7 +336,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
             duration: 3000,
           });
         } else {
-          throw new Error('Failed to disconnect');
+          throw new Error(result.error || 'Failed to disconnect');
         }
       } catch (error) {
         console.error(`[${config.name} Hook] Error disconnecting:`, error);
@@ -356,7 +348,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
           variant: 'destructive',
         });
       }
-    }, [user, state.isDisconnecting, toast, config.name]);
+    }, [user, state.isDisconnecting, toast, config.name, platform]);
 
     return {
       ...state,

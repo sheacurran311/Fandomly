@@ -13,8 +13,6 @@ export interface User {
   profileData: any;
   onboardingState: any;
   avatar?: string;
-  /** Legacy Dynamic auth user ID */
-  dynamicUserId?: string;
   agencyId?: string | null;
   brandType?: string | null;
   tenantId?: string | null;

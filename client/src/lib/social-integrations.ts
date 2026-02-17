@@ -210,21 +210,47 @@ export class TikTokAPI {
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback)
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startPolling = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(pollTimer);
+                if (!settled) {
+                  // Give localStorage a moment to be written by the callback before checking
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `tiktok_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[TikTok] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[TikTok] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let pollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { pollTimer = startPolling(); }
+        }, 3000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
@@ -405,26 +431,51 @@ export class YouTubeAPI {
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback)
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startPolling = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(ytPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `youtube_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[YouTube] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[YouTube] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let ytPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { ytPollTimer = startPolling(); }
+        }, 3000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(ytPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -539,26 +590,51 @@ export class SpotifyAPI {
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback)
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startSpotifyPoll = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(spotifyPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `spotify_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[Spotify] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Spotify] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let spotifyPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { spotifyPollTimer = startSpotifyPoll(); }
+        }, 3000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(spotifyPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -609,12 +685,12 @@ export class DiscordAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_DISCORD_APP_ID || '';
+    this.clientId = import.meta.env.VITE_DISCORD_CLIENT_ID || import.meta.env.VITE_DISCORD_APP_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI || `${origin}/discord-callback`;
 
     if (!this.clientId) {
-      console.warn('Discord: VITE_DISCORD_APP_ID not configured');
+      console.warn('Discord: VITE_DISCORD_CLIENT_ID not configured');
     }
   }
 
@@ -673,24 +749,50 @@ export class DiscordAPI {
 
         window.addEventListener('message', onMsg);
 
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startDiscordPoll = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(discordPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `discord_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[Discord] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Discord] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let discordPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { discordPollTimer = startDiscordPoll(); }
+        }, 3000);
 
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(discordPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -805,24 +907,50 @@ export class TwitchAPI {
 
         window.addEventListener('message', onMsg);
 
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startTwitchPoll = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(twitchPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `twitch_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[Twitch] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Twitch] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let twitchPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { twitchPollTimer = startTwitchPoll(); }
+        }, 3000);
 
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(twitchPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });

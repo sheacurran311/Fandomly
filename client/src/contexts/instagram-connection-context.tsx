@@ -45,7 +45,6 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
   // Stable references for effect dependencies (avoid re-running on every user object change)
   const userId = user?.id;
   const userType = user?.userType;
-  const dynamicUserId = (user as any)?.dynamicUserId;
 
   // Initialize and check connection status (similar to Facebook pattern)
   useEffect(() => {
@@ -92,9 +91,10 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     const loadSavedConnection = async () => {
       try {
         console.log('[Instagram] Loading saved connection from database...');
+        const { getAuthHeaders } = await import('@/lib/queryClient');
         const response = await fetch('/api/social-connections/instagram', {
           headers: {
-            'x-dynamic-user-id': dynamicUserId || userId || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -129,7 +129,7 @@ export function InstagramConnectionProvider({ children }: { children: ReactNode 
     };
 
     loadSavedConnection();
-  }, [userId, userType, dynamicUserId, isLoading]);
+  }, [userId, userType, isLoading]);
 
   const saveConnection = useCallback(async (data: {
     userInfo: InstagramUser;

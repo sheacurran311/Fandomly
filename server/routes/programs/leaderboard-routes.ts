@@ -9,6 +9,7 @@ import { db } from '../../db';
 import { sql } from "drizzle-orm";
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { BadgeRewardsService } from '../../services/rewards/badge-rewards-service';
+import { getSafeLeaderboardView } from '../../utils/safe-sql';
 
 export function registerLeaderboardRoutes(app: Express) {
 
@@ -28,13 +29,8 @@ export function registerLeaderboardRoutes(app: Express) {
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      // Select appropriate view based on time period
-      let viewName = 'campaign_leaderboard';
-      if (period === 'week') {
-        viewName = 'campaign_leaderboard_week';
-      } else if (period === 'month') {
-        viewName = 'campaign_leaderboard_month';
-      }
+      // Use safe view name lookup to prevent SQL injection
+      const viewName = getSafeLeaderboardView('campaign', period);
 
       // Query the materialized view for real-time data
       const leaderboard = await db.execute(sql`
@@ -97,9 +93,8 @@ export function registerLeaderboardRoutes(app: Express) {
       const { campaignId, userId } = req.params;
       const period = req.query.period as string || 'all-time';
 
-      let viewName = 'campaign_leaderboard';
-      if (period === 'week') viewName = 'campaign_leaderboard_week';
-      else if (period === 'month') viewName = 'campaign_leaderboard_month';
+      // Use safe view name lookup to prevent SQL injection
+      const viewName = getSafeLeaderboardView('campaign', period);
 
       const result = await db.execute(sql`
         SELECT
@@ -311,13 +306,8 @@ export function registerLeaderboardRoutes(app: Express) {
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      // Select appropriate view based on time period
-      let viewName = 'platform_leaderboard';
-      if (period === 'week') {
-        viewName = 'platform_leaderboard_week';
-      } else if (period === 'month') {
-        viewName = 'platform_leaderboard_month';
-      }
+      // Use safe view name lookup to prevent SQL injection
+      const viewName = getSafeLeaderboardView('platform', period);
 
       // Check if materialized view exists first
       const viewExists = await db.execute(sql`
@@ -397,9 +387,8 @@ export function registerLeaderboardRoutes(app: Express) {
       const { userId } = req.params;
       const period = req.query.period as string || 'all-time';
 
-      let viewName = 'platform_leaderboard';
-      if (period === 'week') viewName = 'platform_leaderboard_week';
-      else if (period === 'month') viewName = 'platform_leaderboard_month';
+      // Use safe view name lookup to prevent SQL injection
+      const viewName = getSafeLeaderboardView('platform', period);
 
       const result = await db.execute(sql`
         SELECT

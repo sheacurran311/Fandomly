@@ -4,3 +4,11 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz*.patch
+
+# Database backups - never commit these
+*.sql
+!migrations/*.sql
+backup_*.sql
+*_backup.sql
+*.dump
+*.pgdump

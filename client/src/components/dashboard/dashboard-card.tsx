@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
@@ -18,7 +18,7 @@ interface DashboardCardProps {
   gradient?: boolean;
 }
 
-export default function DashboardCard({
+function DashboardCard({
   title,
   value,
   change,
@@ -100,3 +100,5 @@ export default function DashboardCard({
     </Card>
   );
 }
+
+export default memo(DashboardCard);

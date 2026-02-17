@@ -165,7 +165,6 @@ export const socialConnections = pgTable("social_connections", {
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dynamicUserId: text("dynamic_user_id").unique(),
   email: text("email"),
   username: text("username").unique().notNull(), // Required unique username for all users
   avatar: text("avatar"),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -347,6 +347,46 @@ export default function ProgramPublic() {
   const themeColors = getThemeColors(programData.pageConfig?.theme);
   const isThemeDark = isDarkTheme(programData.pageConfig?.theme);
 
+  // Memoize style objects to prevent unnecessary re-renders
+  const styles = useMemo(() => ({
+    container: { backgroundColor: themeColors.background },
+    gradientBanner: {
+      background: `linear-gradient(135deg, ${brandColors.primary || '#6366f1'}, ${brandColors.secondary || '#8b5cf6'})`
+    },
+    gradientOverlay: { color: themeColors.background },
+    avatar: { borderColor: themeColors.background, backgroundColor: themeColors.background },
+    textPrimary: { color: themeColors.text.primary },
+    textSecondary: { color: themeColors.text.secondary },
+    textTertiary: { color: themeColors.text.tertiary },
+    primaryBadge: {
+      backgroundColor: brandColors.primary + '20',
+      color: brandColors.primary,
+      borderColor: brandColors.primary + '40',
+    },
+    secondaryBadge: {
+      backgroundColor: brandColors.secondary + '20',
+      color: brandColors.secondary,
+      borderColor: brandColors.secondary + '40',
+    },
+    accentBadge: {
+      backgroundColor: brandColors.accent + '20',
+      color: brandColors.accent,
+      borderColor: brandColors.accent + '40',
+    },
+    outlineButton: {
+      borderColor: isThemeDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+      color: themeColors.text.primary,
+    },
+    tabsList: {
+      backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+      borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+    },
+    card: {
+      backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+      borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'
+    },
+  }), [themeColors, brandColors, isThemeDark]);
+
   // Debug logging
   console.log('[ProgramPublic] Image URLs:', {
     programLogo: programData.pageConfig?.logo,
@@ -364,7 +404,7 @@ export default function ProgramPublic() {
   console.log('[ProgramPublic] Brand Colors Injected:', brandColors);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: themeColors.background }}>
+    <div className="min-h-screen" style={styles.container}>
       {/* Hero Banner Section */}
       <div className="relative h-64 md:h-80 bg-gradient-to-r from-brand-primary to-brand-secondary overflow-hidden">
         {bannerImageUrl ? (
@@ -376,14 +416,12 @@ export default function ProgramPublic() {
         ) : (
           <div 
             className="w-full h-full" 
-            style={{
-              background: `linear-gradient(135deg, ${brandColors.primary || '#6366f1'}, ${brandColors.secondary || '#8b5cf6'})`
-            }}
+            style={styles.gradientBanner}
           />
         )}
         <div 
           className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-current" 
-          style={{ color: themeColors.background }}
+          style={styles.gradientOverlay}
         ></div>
       </div>
 
@@ -392,10 +430,7 @@ export default function ProgramPublic() {
         <div className="flex flex-col md:flex-row items-center md:items-end gap-6 mb-6">
           <Avatar 
             className="w-32 h-32 border-4 shadow-xl" 
-            style={{ 
-              borderColor: themeColors.background,
-              backgroundColor: themeColors.background
-            }}
+            style={styles.avatar}
           >
             <AvatarImage src={profileImageUrl || undefined} alt={creator.displayName} />
             <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-3xl font-bold">
@@ -406,45 +441,27 @@ export default function ProgramPublic() {
           <div className="flex-1 text-center md:text-left pb-4">
             <h1 
               className="text-3xl md:text-4xl font-bold mb-2"
-              style={{ color: themeColors.text.primary }}
+              style={styles.textPrimary}
             >
               {programData.name}
             </h1>
             <p 
               className="mb-4 max-w-2xl"
-              style={{ color: themeColors.text.secondary }}
+              style={styles.textSecondary}
             >
               {programData.description}
             </p>
             
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
-              <Badge
-                style={{
-                  backgroundColor: brandColors.primary + '20',
-                  color: brandColors.primary,
-                  borderColor: brandColors.primary + '40'
-                }}
-              >
+              <Badge style={styles.primaryBadge}>
                 <Trophy className="h-3 w-3 mr-1" />
                 {programData.pointsName}
               </Badge>
-              <Badge
-                style={{
-                  backgroundColor: brandColors.secondary + '20',
-                  color: brandColors.secondary,
-                  borderColor: brandColors.secondary + '40'
-                }}
-              >
+              <Badge style={styles.secondaryBadge}>
                 <Megaphone className="h-3 w-3 mr-1" />
                 {activeCampaigns.length} Active Campaigns
               </Badge>
-              <Badge
-                style={{
-                  backgroundColor: brandColors.accent + '20',
-                  color: brandColors.accent,
-                  borderColor: brandColors.accent + '40'
-                }}
-              >
+              <Badge style={styles.accentBadge}>
                 <CheckSquare className="h-3 w-3 mr-1" />
                 {activeTasks.length} Tasks
               </Badge>
@@ -475,11 +492,7 @@ export default function ProgramPublic() {
               </Button>
               <Button 
                 variant="outline" 
-                style={{
-                  borderColor: isThemeDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-                  color: themeColors.text.primary,
-                  backgroundColor: 'transparent'
-                }}
+                style={{...styles.outlineButton, backgroundColor: 'transparent'}}
                 className="hover:opacity-80"
               >
                 <Share2 className="h-4 w-4 mr-2" />
@@ -492,7 +505,7 @@ export default function ProgramPublic() {
                   variant="ghost" 
                   size="icon"
                   className="hover:bg-brand-primary/10"
-                  style={{ color: themeColors.text.tertiary }}
+                  style={styles.textTertiary}
                   onClick={() => window.open(socialLinks.twitter, '_blank')}
                 >
                   <Twitter className="h-5 w-5" />
@@ -503,7 +516,7 @@ export default function ProgramPublic() {
                   variant="ghost" 
                   size="icon"
                   className="hover:bg-brand-primary/10"
-                  style={{ color: themeColors.text.tertiary }}
+                  style={styles.textTertiary}
                   onClick={() => window.open(socialLinks.instagram, '_blank')}
                 >
                   <Instagram className="h-5 w-5" />
@@ -514,7 +527,7 @@ export default function ProgramPublic() {
                   variant="ghost" 
                   size="icon"
                   className="hover:bg-brand-primary/10"
-                  style={{ color: themeColors.text.tertiary }}
+                  style={styles.textTertiary}
                   onClick={() => window.open(socialLinks.discord, '_blank')}
                 >
                   <MessageCircle className="h-5 w-5" />
@@ -525,7 +538,7 @@ export default function ProgramPublic() {
                   variant="ghost" 
                   size="icon"
                   className="hover:bg-brand-primary/10"
-                  style={{ color: themeColors.text.tertiary }}
+                  style={styles.textTertiary}
                   onClick={() => window.open((socialLinks as { website?: string }).website, '_blank')}
                 >
                   <Globe className="h-5 w-5" />
@@ -539,15 +552,12 @@ export default function ProgramPublic() {
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mt-8">
           <TabsList 
             className="w-full justify-start border-b"
-            style={{
-              backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-              borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-            }}
+            style={styles.tabsList}
           >
             {visibility.showActivityFeed && (
               <TabsTrigger 
                 value="dashboard"
-                style={{ color: themeColors.text.secondary }}
+                style={styles.textSecondary}
                 className="data-[state=active]:text-white"
                 data-active-bg={brandColors.primary}
               >
@@ -563,7 +573,7 @@ export default function ProgramPublic() {
             {visibility.showProfile && (
               <TabsTrigger 
                 value="profile"
-                style={{ color: themeColors.text.secondary }}
+                style={styles.textSecondary}
                 className="data-[state=active]:text-white"
                 data-active-bg={brandColors.primary}
               >
@@ -580,7 +590,7 @@ export default function ProgramPublic() {
             {visibility.showCampaigns && (
               <TabsTrigger 
                 value="campaigns"
-                style={{ color: themeColors.text.secondary }}
+                style={styles.textSecondary}
                 className="data-[state=active]:text-white"
                 data-active-bg={brandColors.primary}
               >
@@ -597,7 +607,7 @@ export default function ProgramPublic() {
             {visibility.showTasks && (
               <TabsTrigger 
                 value="tasks"
-                style={{ color: themeColors.text.secondary }}
+                style={styles.textSecondary}
                 className="data-[state=active]:text-white"
                 data-active-bg={brandColors.primary}
               >
@@ -614,7 +624,7 @@ export default function ProgramPublic() {
             {visibility.showRewards && (
               <TabsTrigger 
                 value="rewards"
-                style={{ color: themeColors.text.secondary }}
+                style={styles.textSecondary}
                 className="data-[state=active]:text-white"
                 data-active-bg={brandColors.primary}
               >
@@ -1048,15 +1058,12 @@ function TasksTab({
       {activeTasks.length === 0 ? (
         <Card
           className="shadow-sm"
-          style={{
-            backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
-            borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'
-          }}
+          style={styles.card}
         >
           <CardContent className="p-12 text-center">
-            <CheckSquare className="h-16 w-16 mx-auto mb-4" style={{ color: themeColors.text.tertiary }} />
-            <h3 className="text-lg font-medium mb-2" style={{ color: themeColors.text.primary }}>No Tasks Available</h3>
-            <p style={{ color: themeColors.text.secondary }}>Check back soon for new tasks!</p>
+            <CheckSquare className="h-16 w-16 mx-auto mb-4" style={styles.textTertiary} />
+            <h3 className="text-lg font-medium mb-2" style={styles.textPrimary}>No Tasks Available</h3>
+            <p style={styles.textSecondary}>Check back soon for new tasks!</p>
           </CardContent>
         </Card>
       ) : (

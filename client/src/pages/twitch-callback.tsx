@@ -27,14 +27,36 @@ export default function TwitchCallback() {
     twitchCallbackProcessed = true;
 
     const run = async () => {
-      try {
-        // Parse URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
-        const state = params.get("state");
-        const error = params.get("error");
-        const errorDescription = params.get("error_description");
+      // Parse URL parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+      const error = params.get("error");
+      const errorDescription = params.get("error_description");
 
+      // Helper to send result to opener with localStorage COOP fallback
+      const sendResultToOpener = (result: { success: boolean; error?: string; displayName?: string }) => {
+        if (state) {
+          try {
+            localStorage.setItem(`twitch_oauth_result_${state}`, JSON.stringify(result));
+          } catch (e) {
+            console.error('[Twitch Callback] Failed to store result in localStorage:', e);
+          }
+        }
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: "twitch-oauth-result", result }, window.location.origin);
+          (window.opener as any).twitchCallbackData = result;
+          window.close();
+          return true;
+        }
+        if (state && state.startsWith('twitch_')) {
+          window.close();
+          return true;
+        }
+        return false;
+      };
+
+      try {
         console.log("[Twitch Callback] Processing OAuth callback", {
           hasCode: !!code,
           hasState: !!state,
@@ -45,21 +67,7 @@ export default function TwitchCallback() {
         if (error) {
           console.error("[Twitch Callback] OAuth error:", error, errorDescription);
           const errorMsg = errorDescription || error || "Twitch authorization failed";
-
-          // If opened in popup, send error to parent
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage(
-              {
-                type: "twitch-oauth-result",
-                result: { success: false, error: errorMsg },
-              },
-              window.location.origin
-            );
-            window.close();
-            return;
-          }
-
-          // Otherwise show toast and redirect
+          if (sendResultToOpener({ success: false, error: errorMsg })) return;
           toast({
             title: "Twitch Connection Failed",
             description: errorMsg,
@@ -157,47 +165,18 @@ export default function TwitchCallback() {
         console.log("[Twitch Callback] Connection saved successfully");
 
         const displayName = userData.display_name;
+        if (sendResultToOpener({ success: true, displayName })) return;
 
-        // If opened in popup, send success to parent
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            {
-              type: "twitch-oauth-result",
-              result: {
-                success: true,
-                displayName,
-              },
-            },
-            window.location.origin
-          );
-          window.close();
-          return;
-        }
-
-        // Otherwise show toast and redirect
         toast({
-          title: "Twitch Connected! 🎉",
+          title: "Twitch Connected!",
           description: `Successfully connected ${displayName}`,
         });
         setLocation("/creator-dashboard/social");
       } catch (error) {
         console.error("[Twitch Callback] Error:", error);
         const errorMsg = error instanceof Error ? error.message : "Failed to connect Twitch";
+        if (sendResultToOpener({ success: false, error: errorMsg })) return;
 
-        // If opened in popup, send error to parent
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            {
-              type: "twitch-oauth-result",
-              result: { success: false, error: errorMsg },
-            },
-            window.location.origin
-          );
-          window.close();
-          return;
-        }
-
-        // Otherwise show toast and redirect
         toast({
           title: "Twitch Connection Failed",
           description: errorMsg,
