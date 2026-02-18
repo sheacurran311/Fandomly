@@ -1,129 +1,438 @@
-import { motion } from "framer-motion";
-import { 
-  Trophy, Camera, Music, Building2, ArrowRight, CheckCircle,
-  Users, Zap, BarChart3, Sparkles, Shield, Coins
-} from "lucide-react";
-import { 
-  SiFacebook, SiInstagram, SiX, SiTiktok, 
-  SiYoutube, SiSpotify, SiDiscord, SiTwitch 
+import { useState, useEffect, useRef } from "react";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { ArrowRight, Check, ChevronRight, Mail, Loader2, Sparkles, PartyPopper, X } from "lucide-react";
+import {
+  SiFacebook, SiInstagram, SiX, SiTiktok,
+  SiYoutube, SiSpotify, SiDiscord, SiTwitch,
+  SiPatreon
 } from "react-icons/si";
-import { 
-  FaUserPlus, FaPalette, FaCheckCircle, FaGift, FaTrophy
-} from "react-icons/fa";
-import { BetaSignupForm } from "@/components/landing/beta-signup-form";
-import { HeroBackground } from "@/components/landing/hero-background";
+import { Link } from "wouter";
 
-// Consistent section styling
-const SECTION_PADDING = "py-24 px-4";
-
-export default function Home() {
+// Kick doesn't have an official simple-icons entry, so we use a custom SVG
+function KickIcon({ className }: { className?: string }) {
   return (
-    <div className="min-h-screen bg-[#0a0118] overflow-x-hidden">
-      {/* Fixed Animated Background - stays in place on scroll */}
-      <HeroBackground />
-      
-      {/* ===== HERO SECTION ===== */}
-      <section className="relative z-10 pt-16 pb-24 px-4 overflow-hidden min-h-[85vh] flex items-center">
-        
-        {/* Content */}
-        <div className="relative z-10 max-w-4xl mx-auto text-center">
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M1.333 0h21.334C23.403 0 24 .597 24 1.333v21.334c0 .736-.597 1.333-1.333 1.333H1.333C.597 24 0 23.403 0 22.667V1.333C0 .597.597 0 1.333 0zm4.89 5.14h3.428v4.27l1.26-1.552h3.864l-3.052 3.473L15.077 18.86h-3.972l-2.454-4.742v4.742H5.223V5.14h1z" />
+    </svg>
+  );
+}
+
+// ============================================================
+// INLINE BETA SIGNUP (kept self-contained for the landing page)
+// ============================================================
+function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
+  const [email, setEmail] = useState("");
+  const [userType, setUserType] = useState<"creator" | "fan">("creator");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes("@")) {
+      setStatus("error");
+      setMessage("Please enter a valid email address");
+      return;
+    }
+    setStatus("loading");
+    try {
+      const response = await fetch("/api/beta-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          userType,
+          source: "landing_page",
+          metadata: {
+            referrer: document.referrer || undefined,
+            utmSource: new URLSearchParams(window.location.search).get("utm_source") || undefined,
+            utmMedium: new URLSearchParams(window.location.search).get("utm_medium") || undefined,
+            utmCampaign: new URLSearchParams(window.location.search).get("utm_campaign") || undefined,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStatus("idle");
+        setSuccessMessage(data.message);
+        setShowSuccessModal(true);
+        setEmail("");
+      } else {
+        setStatus("error");
+        setMessage(data.error || "Something went wrong");
+      }
+    } catch {
+      setStatus("error");
+      setMessage("Network error. Please try again.");
+    }
+  };
+
+  return (
+    <>
+      {/* Success Modal */}
+      <AnimatePresence>
+        {showSuccessModal && (
           <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            onClick={() => setShowSuccessModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative z-10 w-full max-w-md bg-[#1a1a2e] border border-white/10 rounded-3xl p-8 text-center shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
+                className="mx-auto w-20 h-20 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-6"
+              >
+                <PartyPopper className="w-10 h-10 text-emerald-400" />
+              </motion.div>
+              <h3 className="text-2xl font-bold text-white mb-2 font-display">You're on the list!</h3>
+              <p className="text-gray-300 mb-2">{successMessage}</p>
+              <p className="text-sm text-gray-500 mb-6">Check your inbox for updates. We can't wait to have you!</p>
+              <motion.button
+                onClick={() => setShowSuccessModal(false)}
+                className="px-8 py-3 bg-emerald-500 text-white rounded-2xl font-semibold hover:bg-emerald-600 transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Check className="w-4 h-4 inline mr-2" />
+                Awesome!
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className={variant === "hero" ? "w-full max-w-2xl" : "w-full max-w-xl mx-auto"}>
+        {variant === "hero" && (
+          <div className="flex gap-3 mb-5">
+            {(["creator", "fan"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setUserType(type)}
+                className={`px-5 py-2 rounded-full text-sm font-medium tracking-wide transition-all duration-300 ${
+                  userType === type
+                    ? "bg-[#e10698] text-white shadow-lg shadow-[#e10698]/20"
+                    : "bg-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.1]"
+                }`}
+              >
+                {type === "creator" ? "I'm a Creator" : "I'm a Fan"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (status === "error") setStatus("idle");
+              }}
+              placeholder="Enter your email for early access"
+              className="w-full pl-12 pr-4 py-4 bg-white/[0.06] border border-white/[0.08] rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-[#e10698]/50 focus:bg-white/[0.08] transition-all text-[15px]"
+              disabled={status === "loading"}
+            />
+          </div>
+          <motion.button
+            type="submit"
+            disabled={status === "loading"}
+            className="group px-7 py-4 bg-[#e10698] text-white rounded-2xl font-semibold hover:bg-[#c90589] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-[15px] whitespace-nowrap"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {status === "loading" ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                Join the Beta
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+              </>
+            )}
+          </motion.button>
+        </form>
+
+        {status === "error" && (
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-2 text-sm text-red-400"
+          >
+            {message}
+          </motion.p>
+        )}
+
+        {variant === "hero" && (
+          <p className="mt-4 text-sm text-gray-500">
+            Join 500+ creators on the waitlist. No spam, ever.
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// PLATFORM DATA
+// ============================================================
+const PLATFORMS = [
+  { name: "Instagram", icon: SiInstagram, color: "#E4405F" },
+  { name: "TikTok", icon: SiTiktok, color: "#ff0050" },
+  { name: "X / Twitter", icon: SiX, color: "#ffffff" },
+  { name: "YouTube", icon: SiYoutube, color: "#FF0000" },
+  { name: "Spotify", icon: SiSpotify, color: "#1DB954" },
+  { name: "Discord", icon: SiDiscord, color: "#5865F2" },
+  { name: "Twitch", icon: SiTwitch, color: "#9146FF" },
+  { name: "Facebook", icon: SiFacebook, color: "#1877F2" },
+  { name: "Kick", icon: KickIcon, color: "#53FC18" },
+  { name: "Patreon", icon: SiPatreon, color: "#FF424D" },
+];
+
+// ============================================================
+// ANIMATED COUNTER
+// ============================================================
+function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated) {
+          setHasAnimated(true);
+          let start = 0;
+          const duration = 1500;
+          const startTime = performance.now();
+          const animate = (currentTime: number) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            start = Math.floor(eased * target);
+            setCount(start);
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [target, hasAnimated]);
+
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+}
+
+// ============================================================
+// MAIN PAGE
+// ============================================================
+export default function Home() {
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.8], [1, 0.95]);
+
+  return (
+    <div className="min-h-screen bg-[#0b0b0f] overflow-x-hidden selection:bg-[#e10698]/30 selection:text-white">
+
+      {/* ===== HERO ===== */}
+      <section ref={heroRef} className="relative min-h-[100vh] flex flex-col justify-center px-6 md:px-12 lg:px-20 pt-24 pb-20 overflow-hidden">
+        {/* Ambient background */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#e10698]/[0.04] blur-[120px]" />
+          <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#14feee]/[0.03] blur-[100px]" />
+          {/* Grain overlay */}
+          <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`, backgroundRepeat: "repeat" }} />
+        </div>
+
+        <motion.div
+          style={{ opacity: heroOpacity, scale: heroScale }}
+          className="relative z-10 max-w-5xl"
+        >
+          {/* Beta badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2.5 px-4 py-2 bg-[#e10698]/10 border border-[#e10698]/20 rounded-full mb-8"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e10698] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#e10698]" />
+            </span>
+            <span className="text-sm text-[#e10698] font-medium tracking-wide">Beta Access Open</span>
+          </motion.div>
+
+          {/* Headline */}
+          <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold leading-[1.05] tracking-tight mb-6 font-display"
           >
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full mb-8">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-sm text-gray-300">Beta Access Open</span>
-            </div>
+            <span className="text-white">Elevate Your Brand.</span>
+            <br />
+            <span className="bg-gradient-to-r from-[#e10698] via-[#ff47b0] to-[#e10698] bg-clip-text text-transparent">
+              Reward Your Community.
+            </span>
+          </motion.h1>
 
-            {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6">
-              <span className="text-white">Elevate Your Brand.</span>
-              <br />
-              <span className="text-[#e10698]">Reward Your Community.</span>
-            </h1>
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl leading-relaxed"
+          >
+            Launch your own loyalty program in minutes. Verify social engagement
+            automatically. Reward fans with points, NFTs, and exclusive perks across
+            10 platforms.
+          </motion.p>
 
-            {/* Subheadline */}
-            <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-              Launch your own loyalty program in minutes. Verify social engagement automatically. 
-              Reward fans with points, NFTs, and exclusive perks.
-            </p>
-
-            {/* Beta Signup Form */}
-            <BetaSignupForm variant="hero" showUserType={true} />
+          {/* Signup form */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+          >
+            <LandingSignup variant="hero" />
           </motion.div>
-        </div>
+        </motion.div>
+
+        {/* Scroll indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
+        >
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="w-6 h-10 border-2 border-white/20 rounded-full flex items-start justify-center p-1.5"
+          >
+            <motion.div className="w-1.5 h-1.5 bg-white/40 rounded-full" />
+          </motion.div>
+        </motion.div>
       </section>
 
-      {/* ===== PLATFORM INTEGRATIONS ===== */}
-      <section className={`${SECTION_PADDING} bg-[#0d0a15] relative z-10`}>
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            className="text-center mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              One dashboard. Eight platforms.
-            </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Verify fan engagement across all major social platforms automatically.
-            </p>
-          </motion.div>
-
-          {/* Platform Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-16">
+      {/* ===== SOCIAL PROOF BAR ===== */}
+      <section className="relative z-10 border-y border-white/[0.04] bg-white/[0.01]">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-14">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
             {[
-              { name: "Facebook", icon: SiFacebook, color: "#1877F2" },
-              { name: "Instagram", icon: SiInstagram, color: "#E4405F" },
-              { name: "X", icon: SiX, color: "#ffffff" },
-              { name: "TikTok", icon: SiTiktok, color: "#ff0050" },
-              { name: "YouTube", icon: SiYoutube, color: "#FF0000" },
-              { name: "Spotify", icon: SiSpotify, color: "#1DB954" },
-              { name: "Discord", icon: SiDiscord, color: "#5865F2" },
-              { name: "Twitch", icon: SiTwitch, color: "#9146FF" },
-            ].map((platform, i) => (
+              { value: 500, suffix: "+", label: "Creators on waitlist" },
+              { value: 10, suffix: "", label: "Platforms integrated" },
+              { value: 35, suffix: "+", label: "Task templates" },
+              { value: 3, suffix: "", label: "Verification tiers" },
+            ].map((stat, i) => (
               <motion.div
-                key={platform.name}
+                key={i}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="group p-6 bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-xl transition-all cursor-default"
+                transition={{ delay: i * 0.1 }}
+                className="text-center"
               >
-                <div className="flex flex-col items-center gap-3">
-                  <platform.icon 
-                    className="w-8 h-8 transition-transform group-hover:scale-110" 
-                    style={{ color: platform.color }} 
-                  />
-                  <span className="text-sm text-gray-400 group-hover:text-white transition-colors">
-                    {platform.name}
-                  </span>
+                <div className="text-3xl md:text-4xl font-extrabold text-white font-display mb-1">
+                  <AnimatedNumber target={stat.value} suffix={stat.suffix} />
                 </div>
+                <div className="text-sm text-gray-500 tracking-wide">{stat.label}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== PLATFORMS ===== */}
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mb-16"
+          >
+            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Integrations</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display leading-tight mb-4">
+              One dashboard.<br />Ten platforms.
+            </h2>
+            <p className="text-gray-400 max-w-xl text-lg">
+              Verify fan engagement across every major social and creator platform.
+              Every follow, like, and share -- confirmed automatically.
+            </p>
+          </motion.div>
+
+          {/* Platform pills */}
+          <div className="flex flex-wrap gap-3 mb-16">
+            {PLATFORMS.map((platform, i) => (
+              <motion.div
+                key={platform.name}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.04 }}
+                whileHover={{ scale: 1.05, y: -2 }}
+                className="group flex items-center gap-3 px-5 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.12] rounded-2xl transition-all duration-300 cursor-default"
+              >
+                <platform.icon
+                  className="w-5 h-5 transition-all duration-300 opacity-60 group-hover:opacity-100"
+                  style={{ color: platform.color }}
+                />
+                <span className="text-sm text-gray-400 group-hover:text-white transition-colors font-medium">
+                  {platform.name}
+                </span>
               </motion.div>
             ))}
           </div>
 
-          {/* Feature Cards */}
+          {/* Feature trio */}
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: Zap,
                 title: "Instant Verification",
-                desc: "Every follow, like, and share is verified automatically via API. No screenshots needed.",
+                desc: "Every follow, like, and share is verified via API. No screenshots. No honor system.",
+                icon: "bolt",
               },
               {
-                icon: BarChart3,
                 title: "Unified Analytics",
                 desc: "Track engagement, growth, and ROI across all platforms from a single dashboard.",
+                icon: "chart",
               },
               {
-                icon: Sparkles,
                 title: "Smart Campaigns",
-                desc: "AI-powered suggestions help you create campaigns that resonate with your audience.",
+                desc: "Build cross-platform campaigns that reward fans for engaging where it matters most.",
+                icon: "spark",
               },
             ].map((feature, i) => (
               <motion.div
@@ -132,10 +441,20 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="p-6 bg-white/[0.02] border border-white/5 rounded-xl"
+                className="group p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] hover:border-white/[0.1] rounded-3xl transition-all duration-500"
               >
-                <feature.icon className="w-8 h-8 text-[#e10698] mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                <div className="w-10 h-10 rounded-xl bg-[#e10698]/10 flex items-center justify-center mb-5">
+                  {feature.icon === "bolt" && (
+                    <svg className="w-5 h-5 text-[#e10698]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                  )}
+                  {feature.icon === "chart" && (
+                    <svg className="w-5 h-5 text-[#e10698]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                  )}
+                  {feature.icon === "spark" && (
+                    <Sparkles className="w-5 h-5 text-[#e10698]" />
+                  )}
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
@@ -143,130 +462,172 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ===== PRODUCT SHOWCASE ===== */}
-      <section className={`${SECTION_PADDING} relative z-10`}>
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            className="text-center mb-16"
+      {/* ===== HOW IT WORKS ===== */}
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12 bg-white/[0.01]">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            className="text-center mb-20"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Built for creators and fans
+            <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">How it works</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display">
+              From zero to loyalty program<br className="hidden md:block" /> in five minutes
             </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Powerful tools to manage your community and reward engagement.
+          </motion.div>
+
+          <div className="grid md:grid-cols-5 gap-4 md:gap-2">
+            {[
+              { step: "01", title: "Sign up", desc: "Create your account and connect your social profiles." },
+              { step: "02", title: "Design", desc: "Pick from 35+ templates or build custom tasks for fans." },
+              { step: "03", title: "Launch", desc: "Share your program link. Fans join in seconds." },
+              { step: "04", title: "Reward", desc: "Points, NFTs, merch, raffle entries -- all automated." },
+              { step: "05", title: "Grow", desc: "Track every metric and scale your community." },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+                className="relative group"
+              >
+                <div className="p-6 md:p-5 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500 h-full">
+                  <div className="text-[#e10698] text-xs font-bold tracking-widest mb-3">{item.step}</div>
+                  <h3 className="text-white font-bold text-lg mb-2 font-display">{item.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
+                </div>
+                {i < 4 && (
+                  <ChevronRight className="hidden md:block absolute top-1/2 -right-3 w-4 h-4 text-white/10 -translate-y-1/2" />
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== PRODUCT SHOWCASE ===== */}
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12 overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mb-16"
+          >
+            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">The Platform</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display leading-tight mb-4">
+              Two sides.<br />One platform.
+            </h2>
+            <p className="text-gray-400 max-w-xl text-lg">
+              Powerful tools for creators. A rewarding experience for fans.
             </p>
           </motion.div>
 
           <div className="grid lg:grid-cols-2 gap-8">
             {/* Creator Dashboard Preview */}
-            <motion.div 
-              className="relative"
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
+              className="rounded-3xl bg-gradient-to-b from-white/[0.04] to-white/[0.01] border border-white/[0.06] p-6 md:p-8"
             >
-              <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <div className="px-3 py-1 bg-[#e10698]/20 text-[#e10698] rounded-full text-xs font-medium">
-                      CREATOR DASHBOARD
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
-                  </div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="px-3 py-1 bg-[#e10698]/15 text-[#e10698] rounded-full text-xs font-semibold tracking-wide">
+                  CREATOR VIEW
                 </div>
+                <div className="flex gap-1.5 ml-auto">
+                  <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+                </div>
+              </div>
 
-                {/* Stats Row */}
-                <div className="grid grid-cols-4 gap-3 mb-6">
-                  {[
-                    { label: "Fans", value: "2,847", color: "text-[#14feee]" },
-                    { label: "Revenue", value: "$7,420", color: "text-emerald-400" },
-                    { label: "Tasks Done", value: "1,247", color: "text-purple-400" },
-                    { label: "Rewards", value: "89", color: "text-[#e10698]" },
-                  ].map((stat, i) => (
-                    <div key={i} className="p-3 bg-white/[0.03] rounded-lg">
-                      <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
-                      <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
-                    </div>
-                  ))}
-                </div>
+              <div className="grid grid-cols-4 gap-3 mb-6">
+                {[
+                  { label: "Fans", value: "2,847", change: "+12%" },
+                  { label: "Revenue", value: "$7.4k", change: "+8%" },
+                  { label: "Tasks", value: "1,247", change: "+23%" },
+                  { label: "Rewards", value: "89", change: "+5%" },
+                ].map((stat, i) => (
+                  <div key={i} className="p-3 bg-white/[0.03] rounded-xl">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{stat.label}</div>
+                    <div className="text-base font-bold text-white">{stat.value}</div>
+                    <div className="text-[10px] text-emerald-400">{stat.change}</div>
+                  </div>
+                ))}
+              </div>
 
-                {/* Chart placeholder */}
-                <div className="h-32 bg-white/[0.02] rounded-lg flex items-end justify-around p-4">
-                  {[40, 65, 45, 80, 55, 70, 90].map((h, i) => (
-                    <div 
-                      key={i} 
-                      className="w-6 bg-gradient-to-t from-[#e10698]/50 to-[#e10698] rounded-t"
-                      style={{ height: `${h}%` }}
-                    ></div>
-                  ))}
-                </div>
+              <div className="h-28 bg-white/[0.02] rounded-xl flex items-end justify-around p-4 gap-1">
+                {[35, 55, 42, 70, 65, 80, 58, 90, 72, 85, 95, 78].map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 bg-gradient-to-t from-[#e10698]/30 to-[#e10698]/80 rounded-t transition-all duration-500"
+                    style={{ height: `${h}%` }}
+                  />
+                ))}
               </div>
             </motion.div>
 
             {/* Fan Dashboard Preview */}
-            <motion.div 
-              className="relative"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
+              transition={{ delay: 0.15 }}
+              className="rounded-3xl bg-gradient-to-b from-white/[0.04] to-white/[0.01] border border-white/[0.06] p-6 md:p-8"
             >
-              <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <div className="px-3 py-1 bg-[#14feee]/20 text-[#14feee] rounded-full text-xs font-medium">
-                      FAN DASHBOARD
-                    </div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="px-3 py-1 bg-[#14feee]/15 text-[#14feee] rounded-full text-xs font-semibold tracking-wide">
+                  FAN VIEW
+                </div>
+                <div className="flex gap-1.5 ml-auto">
+                  <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+                </div>
+              </div>
+
+              {/* Points card */}
+              <div className="p-5 bg-gradient-to-br from-[#e10698]/10 via-transparent to-[#14feee]/10 rounded-2xl border border-white/[0.05] mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1 tracking-wide">Your Points</div>
+                    <div className="text-3xl font-extrabold text-white font-display">1,500</div>
+                    <div className="text-xs text-emerald-400 mt-0.5">Level 4 -- Gold Fan</div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
+                  <div className="w-14 h-14 rounded-2xl bg-[#14feee]/10 flex items-center justify-center">
+                    <Sparkles className="w-7 h-7 text-[#14feee]" />
                   </div>
                 </div>
+              </div>
 
-                {/* Points Display */}
-                <div className="p-4 bg-gradient-to-r from-[#e10698]/10 to-[#14feee]/10 rounded-xl mb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-gray-400 mb-1">Your Points</div>
-                      <div className="text-3xl font-bold text-white">1,500</div>
-                    </div>
-                    <Sparkles className="w-8 h-8 text-[#14feee]" />
-                  </div>
-                </div>
-
-                {/* Task List */}
-                <div className="space-y-3">
-                  {[
-                    { task: "Follow on Twitter", points: 69, done: true },
-                    { task: "Like Facebook Page", points: 501, done: false },
-                    { task: "Comment on Instagram", points: 192, done: false },
-                  ].map((item, i) => (
-                    <div 
-                      key={i} 
-                      className="flex items-center justify-between p-3 bg-white/[0.03] rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        {item.done ? (
-                          <CheckCircle className="w-5 h-5 text-emerald-400" />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full border border-gray-600"></div>
-                        )}
-                        <span className={item.done ? "text-gray-500 line-through" : "text-white text-sm"}>
-                          {item.task}
-                        </span>
+              {/* Task list */}
+              <div className="space-y-2.5">
+                {[
+                  { task: "Follow on Instagram", points: 150, done: true },
+                  { task: "Subscribe on YouTube", points: 250, done: true },
+                  { task: "Share TikTok post", points: 100, done: false },
+                  { task: "Join Discord server", points: 200, done: false },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 bg-white/[0.03] rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-md flex items-center justify-center ${
+                        item.done ? "bg-emerald-500/20" : "border border-white/10"
+                      }`}>
+                        {item.done && <Check className="w-3 h-3 text-emerald-400" />}
                       </div>
-                      <span className="text-xs text-[#14feee] font-medium">+{item.points}</span>
+                      <span className={`text-sm ${item.done ? "text-gray-500 line-through" : "text-white"}`}>
+                        {item.task}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <span className="text-xs text-[#14feee] font-semibold">+{item.points}</span>
+                  </div>
+                ))}
               </div>
             </motion.div>
           </div>
@@ -274,55 +635,57 @@ export default function Home() {
       </section>
 
       {/* ===== WHO IT'S FOR ===== */}
-      <section className={`${SECTION_PADDING} bg-[#0d0a15] relative z-10`}>
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            className="text-center mb-16"
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12 bg-white/[0.01]">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Built for every creator
+            <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">Built for creators</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
+              Your audience. Your rules.
             </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              From athletes to musicians—one platform powers them all.
+            <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+              Whether you have 1,000 followers or 10 million, Fandomly gives you
+              the tools to turn passive audiences into active communities.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-5">
             {[
               {
-                icon: Trophy,
                 title: "NIL Athletes",
-                subtitle: "Name, Image & Likeness",
-                desc: "Monetize your NIL with loyalty programs that turn followers into stakeholders.",
-                items: ["Pro & Olympic Athletes", "College Athletes", "High School Athletes"],
+                subtitle: "Monetize your name, image & likeness",
+                desc: "Turn your fanbase into a loyalty program. Reward fans for wearing your merch, attending games, and engaging with sponsors.",
+                tags: ["Pro Athletes", "College Athletes", "Olympic Athletes"],
                 accent: "#14feee",
+                gradient: "from-[#14feee]/[0.06] to-transparent",
               },
               {
-                icon: Camera,
                 title: "Content Creators",
-                subtitle: "Digital Influence",
-                desc: "Turn casual viewers into devoted fans. Reward every interaction.",
-                items: ["Social Media Influencers", "Video Creators", "Photographers"],
+                subtitle: "Reward every interaction",
+                desc: "Your followers already engage with your content. Now you can track it, reward it, and grow faster because of it.",
+                tags: ["Influencers", "Video Creators", "Podcasters"],
                 accent: "#e10698",
+                gradient: "from-[#e10698]/[0.06] to-transparent",
               },
               {
-                icon: Music,
-                title: "Musicians",
-                subtitle: "Artists & Performers",
-                desc: "Streaming pays pennies. Your superfans? They're worth gold.",
-                items: ["Independent Artists", "Signed Artists", "Cover Artists"],
+                title: "Musicians & Artists",
+                subtitle: "Streaming pays pennies. Your superfans don't.",
+                desc: "Identify your most dedicated listeners. Reward streams, shares, and playlist adds with exclusive drops and NFTs.",
+                tags: ["Independent Artists", "Bands", "DJs & Producers"],
                 accent: "#8B5CF6",
+                gradient: "from-[#8B5CF6]/[0.06] to-transparent",
               },
               {
-                icon: Building2,
                 title: "Brands & Agencies",
-                subtitle: "Enterprise Solutions",
-                desc: "Your brand. Your domain. Your auth. Full white-label solution.",
-                items: ["Marketing Agencies", "Enterprise Companies", "Sports Teams"],
+                subtitle: "White-label everything",
+                desc: "Your brand. Your domain. Your auth. Multi-tenant SaaS that scales with your portfolio of creators.",
+                tags: ["Marketing Agencies", "Sports Teams", "Enterprises"],
                 accent: "#10B981",
+                gradient: "from-[#10B981]/[0.06] to-transparent",
               },
             ].map((card, i) => (
               <motion.div
@@ -330,132 +693,28 @@ export default function Home() {
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-white/10 transition-all"
+                transition={{ delay: i * 0.08 }}
+                className={`group p-7 md:p-8 rounded-3xl bg-gradient-to-br ${card.gradient} border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500`}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div 
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: `${card.accent}20` }}
-                  >
-                    <card.icon className="w-5 h-5" style={{ color: card.accent }} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">{card.title}</h3>
-                    <p className="text-xs" style={{ color: card.accent }}>{card.subtitle}</p>
-                  </div>
+                <div className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: card.accent }}>
+                  {card.subtitle}
                 </div>
-                
-                <p className="text-gray-400 text-sm mb-4 leading-relaxed">{card.desc}</p>
-                
-                <div className="space-y-1.5">
-                  {card.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: card.accent }} />
-                      <span className="text-sm text-gray-300">{item}</span>
-                    </div>
+                <h3 className="text-2xl font-extrabold text-white font-display mb-3">{card.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed mb-5">{card.desc}</p>
+                <div className="flex flex-wrap gap-2">
+                  {card.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-3 py-1 rounded-full text-xs font-medium border"
+                      style={{
+                        color: card.accent,
+                        borderColor: `${card.accent}30`,
+                        backgroundColor: `${card.accent}08`,
+                      }}
+                    >
+                      {tag}
+                    </span>
                   ))}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== HOW IT WORKS ===== */}
-      <section className={`${SECTION_PADDING} relative z-10`}>
-        <div className="max-w-4xl mx-auto">
-          <motion.div 
-            className="text-center mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              How it works
-            </h2>
-            <p className="text-gray-400">From launch to payout in five simple steps.</p>
-          </motion.div>
-
-          <div className="relative">
-            {/* Vertical Line - Gradient */}
-            <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#14feee] via-[#e10698] to-[#8B5CF6] -translate-x-1/2"></div>
-
-            {[
-              {
-                step: "01",
-                title: "Sign Up & Connect",
-                desc: "Create your account and link your socials in under 60 seconds.",
-                icon: FaUserPlus,
-                color: "#14feee",
-              },
-              {
-                step: "02",
-                title: "Design Your Program",
-                desc: "Pick from 32+ proven templates or build custom tasks. Live in 5 minutes.",
-                icon: FaPalette,
-                color: "#10B981",
-              },
-              {
-                step: "03",
-                title: "Fans Complete Tasks",
-                desc: "Your community follows, likes, subscribes—and gets instantly verified.",
-                icon: FaCheckCircle,
-                color: "#e10698",
-              },
-              {
-                step: "04",
-                title: "Rewards Deploy",
-                desc: "Points, NFTs, raffle entries, exclusive merch—all automated.",
-                icon: FaGift,
-                color: "#8B5CF6",
-              },
-              {
-                step: "05",
-                title: "Watch Growth",
-                desc: "Track every metric, prove ROI, and scale your community.",
-                icon: FaTrophy,
-                color: "#14feee",
-              },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: i % 2 === 0 ? -30 : 30 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                className={`relative flex items-start gap-6 mb-12 ${
-                  i % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
-                }`}
-              >
-                {/* Timeline Dot - Colored */}
-                <div 
-                  className="absolute left-6 md:left-1/2 w-4 h-4 rounded-full -translate-x-1/2 mt-1.5 z-10 ring-4 ring-[#0a0118]"
-                  style={{ backgroundColor: item.color }}
-                ></div>
-
-                {/* Content */}
-                <div className={`flex-1 ml-14 md:ml-0 ${i % 2 === 0 ? 'md:pr-16 md:text-right' : 'md:pl-16'}`}>
-                  <div 
-                    className={`inline-block p-5 rounded-xl border ${
-                      i % 2 === 0 ? 'md:ml-auto' : ''
-                    }`}
-                    style={{ 
-                      backgroundColor: `${item.color}08`,
-                      borderColor: `${item.color}30`
-                    }}
-                  >
-                    <div className={`flex items-center gap-3 mb-2 ${i % 2 === 0 ? 'md:justify-end' : ''}`}>
-                      <div 
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${item.color}20` }}
-                      >
-                        <item.icon className="w-4 h-4" style={{ color: item.color }} />
-                      </div>
-                      <span className="text-xs font-semibold" style={{ color: item.color }}>STEP {item.step}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-1">{item.title}</h3>
-                    <p className="text-gray-400 text-sm max-w-sm">{item.desc}</p>
-                  </div>
                 </div>
               </motion.div>
             ))}
@@ -464,66 +723,40 @@ export default function Home() {
       </section>
 
       {/* ===== FEATURES GRID ===== */}
-      <section className={`${SECTION_PADDING} bg-[#0d0a15] relative z-10`}>
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            className="text-center mb-16"
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Everything you need
+            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Features</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
+              Everything you need.<br className="hidden md:block" /> Nothing you don't.
             </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              A complete toolkit for building engaged communities.
-            </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              {
-                icon: Shield,
-                title: "Fraud Protection",
-                desc: "Real-time verification prevents fake engagement and bot activity.",
-              },
-              {
-                icon: Coins,
-                title: "Flexible Rewards",
-                desc: "Points, NFTs, raffle entries, physical merch—all in one system.",
-              },
-              {
-                icon: Users,
-                title: "Fan Tiers",
-                desc: "Automatically segment fans by engagement level and reward loyalty.",
-              },
-              {
-                icon: BarChart3,
-                title: "Deep Analytics",
-                desc: "Track engagement, conversion rates, and ROI in real-time.",
-              },
-              {
-                icon: Sparkles,
-                title: "White-Label",
-                desc: "Your brand, your domain, your colors. Zero Fandomly branding.",
-              },
-              {
-                icon: Zap,
-                title: "No-Code Setup",
-                desc: "Launch your program in 5 minutes. No developers required.",
-              },
+              { title: "Fraud Protection", desc: "Real-time verification prevents fake engagement and bot activity. Three verification tiers for every trust level." },
+              { title: "Flexible Rewards", desc: "Points, NFTs, raffle entries, physical merch, exclusive access -- all in one system." },
+              { title: "Fan Tiers", desc: "Automatically segment fans by engagement level. Reward your most loyal supporters differently." },
+              { title: "Deep Analytics", desc: "Track engagement, conversion rates, and ROI across every platform and campaign in real-time." },
+              { title: "White-Label", desc: "Your brand, your domain, your colors. Remove every trace of Fandomly. Full multi-tenant SaaS." },
+              { title: "No-Code Setup", desc: "Launch a complete loyalty program in 5 minutes. 35+ templates. Zero developers required." },
             ].map((feature, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-white/10 transition-all"
+                transition={{ delay: i * 0.06 }}
+                className="group p-7 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500"
               >
-                <feature.icon className="w-8 h-8 text-[#14feee] mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
+                <div className="w-2 h-2 rounded-full bg-[#e10698] mb-5 group-hover:shadow-[0_0_12px_rgba(225,6,152,0.5)] transition-shadow duration-500" />
+                <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -531,29 +764,34 @@ export default function Home() {
       </section>
 
       {/* ===== FINAL CTA ===== */}
-      <section className={`${SECTION_PADDING} relative z-10`}>
-        <div className="max-w-3xl mx-auto text-center">
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+        <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            className="rounded-[2rem] bg-gradient-to-br from-[#e10698]/10 via-transparent to-[#14feee]/5 border border-white/[0.06] p-10 md:p-16 text-center relative overflow-hidden"
           >
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+            {/* Subtle glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50%] h-32 bg-[#e10698]/10 blur-[80px] rounded-full" />
+
+            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4 relative">
               Ready to build your community?
             </h2>
-            <p className="text-lg text-gray-400 mb-10 max-w-xl mx-auto">
-              Join creators who are turning followers into loyal fans. 
+            <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto relative">
+              Join the creators who are turning followers into loyal fans.
               Get early access to Fandomly.
             </p>
-            
-            <BetaSignupForm variant="section" showUserType={false} />
 
-            {/* Trust badges */}
-            <div className="flex flex-wrap justify-center gap-3 mt-10">
-              {["No-Code Setup", "White-Label", "32+ Templates", "8+ Platforms"].map((badge) => (
-                <span 
-                  key={badge} 
-                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-gray-400"
+            <div className="relative">
+              <LandingSignup variant="bottom" />
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-3 mt-10 relative">
+              {["No-Code Setup", "White-Label", "35+ Templates", "10 Platforms", "NFT Rewards"].map((badge) => (
+                <span
+                  key={badge}
+                  className="px-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-full text-xs text-gray-500 font-medium tracking-wide"
                 >
                   {badge}
                 </span>
@@ -562,6 +800,134 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      {/* ===== FOOTER ===== */}
+      <footer className="relative z-10 border-t border-white/[0.05] bg-[#0b0b0f]">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-20">
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-8 md:gap-12 mb-16">
+            {/* Brand column */}
+            <div className="col-span-2 md:col-span-4">
+              <Link href="/" className="inline-block mb-5">
+                <img src="/fandomly2.png" alt="Fandomly" className="h-16 w-auto" />
+              </Link>
+              <p className="text-gray-500 text-sm leading-relaxed mb-6 max-w-xs">
+                The loyalty and rewards platform for creators, athletes, and musicians.
+                Turn followers into lifelong fans.
+              </p>
+              <div className="flex gap-3">
+                {[
+                  { icon: SiX, href: "#", label: "X" },
+                  { icon: SiInstagram, href: "#", label: "Instagram" },
+                  { icon: SiDiscord, href: "#", label: "Discord" },
+                ].map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    aria-label={social.label}
+                    className="w-9 h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] flex items-center justify-center text-gray-500 hover:text-white transition-all"
+                  >
+                    <social.icon className="w-4 h-4" />
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Product */}
+            <div className="md:col-span-2">
+              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">Product</h4>
+              <ul className="space-y-3">
+                {[
+                  { label: "Features", href: "/#features" },
+                  { label: "Integrations", href: "/#integrations" },
+                  { label: "Pricing", href: "/#pricing" },
+                  { label: "API", href: "#" },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Creators */}
+            <div className="md:col-span-2">
+              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">For Creators</h4>
+              <ul className="space-y-3">
+                {[
+                  { label: "Athletes", href: "#" },
+                  { label: "Musicians", href: "#" },
+                  { label: "Content Creators", href: "#" },
+                  { label: "Brands", href: "#" },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div className="md:col-span-2">
+              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">Company</h4>
+              <ul className="space-y-3">
+                {[
+                  { label: "About", href: "#" },
+                  { label: "Blog", href: "#" },
+                  { label: "Careers", href: "#" },
+                  { label: "Contact", href: "#" },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div className="md:col-span-2">
+              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">Legal</h4>
+              <ul className="space-y-3">
+                {[
+                  { label: "Privacy Policy", href: "/privacy-policy" },
+                  { label: "Terms of Service", href: "/terms-of-service" },
+                  { label: "Data Deletion", href: "/data-deletion" },
+                  { label: "Cookie Policy", href: "#" },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div className="border-t border-white/[0.05] pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-gray-600 text-sm">
+              &copy; {new Date().getFullYear()} Fandomly, LLC. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6">
+              <Link href="/privacy-policy" className="text-gray-600 hover:text-white text-sm transition-colors">
+                Privacy
+              </Link>
+              <Link href="/terms-of-service" className="text-gray-600 hover:text-white text-sm transition-colors">
+                Terms
+              </Link>
+              <Link href="/data-deletion" className="text-gray-600 hover:text-white text-sm transition-colors">
+                Data Deletion
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

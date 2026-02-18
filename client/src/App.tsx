@@ -262,7 +262,7 @@ function App() {
                     <main id="main-content" tabIndex={-1}>
                       <Router />
                     </main>
-                    {isPublicRoute && <Footer />}
+                    {isPublicRoute && location !== '/' && <Footer />}
                 </div>
                 <Toaster />
               </NewAuthRouter>
