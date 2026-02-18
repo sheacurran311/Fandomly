@@ -255,7 +255,7 @@ function App() {
                     <main>
                       <Router />
                     </main>
-                    {isPublicRoute && <Footer />}
+                    {isPublicRoute && location !== '/' && <Footer />}
                 </div>
                 <Toaster />
               </NewAuthRouter>
