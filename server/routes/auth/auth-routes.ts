@@ -238,19 +238,39 @@ export function registerAuthRoutes(app: Express) {
         })
         .where(eq(users.id, user.id));
 
-      // Create social connection
-      await db.insert(socialConnections).values({
-        userId: user.id,
-        platform: provider,
-        platformUserId: platform_user_id,
-        accessToken: access_token,
-        profileData: profile_data ?? undefined,
-        connectedAt: new Date(),
-        isActive: true
-      } as any);
+      // Create or update social connection (upsert to handle existing connections)
+      const existingConnection = await db.query.socialConnections.findFirst({
+        where: and(
+          eq(socialConnections.platform, provider),
+          eq(socialConnections.platformUserId, platform_user_id)
+        )
+      });
+
+      if (existingConnection) {
+        // Update existing connection to point to the linked user
+        await db.update(socialConnections)
+          .set({
+            userId: user.id,
+            accessToken: access_token,
+            profileData: profile_data ?? existingConnection.profileData,
+            isActive: true,
+            updatedAt: new Date()
+          })
+          .where(eq(socialConnections.id, existingConnection.id));
+      } else {
+        await db.insert(socialConnections).values({
+          userId: user.id,
+          platform: provider,
+          platformUserId: platform_user_id,
+          accessToken: access_token,
+          profileData: profile_data ?? undefined,
+          connectedAt: new Date(),
+          isActive: true
+        } as any);
+      }
 
       // Generate tokens
-      const accessToken = signAccessToken({
+      const jwtAccessToken = signAccessToken({
         id: user.id,
         email: user.email,
         provider
@@ -275,7 +295,7 @@ export function registerAuthRoutes(app: Express) {
           profileData: user.profileData,
           onboardingState: user.onboardingState
         },
-        accessToken,
+        accessToken: jwtAccessToken,
         message: 'Account linked successfully'
       });
     } catch (error: any) {

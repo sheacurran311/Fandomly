@@ -827,7 +827,7 @@ export default function CreatorDashboard() {
 
             {/* Fan widgets stacked - takes 1/3 */}
             <div className="space-y-6">
-              <LeaderboardWidget />
+              <LeaderboardWidget programId={program?.id} />
               <NewFansWidget />
             </div>
           </div>

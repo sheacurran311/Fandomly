@@ -362,8 +362,22 @@ export function registerLeaderboardRoutes(app: Express) {
 
       const total = totalResult.rows[0]?.total || 0;
 
+      // Transform to match expected frontend format (camelCase)
+      const formattedLeaderboard = leaderboard.rows.map((row: any) => ({
+        userId: row.user_id,
+        username: row.username || 'Anonymous',
+        fullName: row.username || 'Anonymous',
+        avatarUrl: row.avatar,
+        totalPoints: parseInt(row.total_points?.toString() || '0'),
+        transactionCount: parseInt(row.transaction_count?.toString() || '0'),
+        lastActivity: row.last_activity,
+        rank: parseInt(row.rank?.toString() || '0'),
+        rankChange: parseInt(row.rank_change?.toString() || '0'),
+        pointsChange: parseInt(row.points_change?.toString() || '0')
+      }));
+
       res.json({
-        leaderboard: leaderboard.rows,
+        leaderboard: formattedLeaderboard,
         pagination: {
           limit,
           offset,

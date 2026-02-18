@@ -1357,6 +1357,11 @@ export const taskCompletions = pgTable("task_completions", {
   // Campaign association (for starter pack campaign exceptions)
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
   
+  // Completion context - enables campaign-specific completions of one-time tasks
+  // 'standalone' = completed outside a campaign (default for backwards compatibility)
+  // 'campaign' = completed as part of a specific campaign (allows re-earning points via re-verification)
+  completionContext: text("completion_context").default('standalone'),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

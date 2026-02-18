@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { socialConnections, syncPreferences } from '@shared/schema';
+import { socialConnections, syncPreferences, platformPointsTransactions } from '@shared/schema';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
 
@@ -116,6 +116,8 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'Platform is required' });
     }
 
+    let pointsActuallyAwarded = 0;
+
     // Check if connection already exists
     const existingConnection = await db.query.socialConnections.findFirst({
       where: and(
@@ -166,19 +168,33 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
       savedConnection = newConnection;
 
-      // Award platform points for new social connection
+      // Award platform points for new social connection (one-time per platform)
+      // Check transaction history to prevent exploit via disconnect/reconnect
       try {
-        await platformPointsService.awardPoints(
-          userId,
-          SOCIAL_CONNECTION_POINTS,
-          'social_connection_reward',
-          {
-            platform,
-            platformUsername,
-            connectionId: newConnection.id,
-          }
-        );
-        console.log(`[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+        const existingReward = await db.query.platformPointsTransactions.findFirst({
+          where: and(
+            eq(platformPointsTransactions.userId, userId),
+            eq(platformPointsTransactions.source, 'social_connection_reward'),
+            sql`metadata->>'platform' = ${platform}`
+          ),
+        });
+
+        if (!existingReward) {
+          await platformPointsService.awardPoints(
+            userId,
+            SOCIAL_CONNECTION_POINTS,
+            'social_connection_reward',
+            {
+              platform,
+              platformUsername,
+              connectionId: newConnection.id,
+            }
+          );
+          pointsActuallyAwarded = SOCIAL_CONNECTION_POINTS;
+          console.log(`[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+        } else {
+          console.log(`[Social Connection] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`);
+        }
       } catch (pointsError) {
         console.error(`[Social Connection] Error awarding points:`, pointsError);
         // Don't fail the connection if points award fails
@@ -218,7 +234,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         platformDisplayName: savedConnection.platformDisplayName,
         profileData: savedConnection.profileData,
       },
-      pointsAwarded: !existingConnection ? SOCIAL_CONNECTION_POINTS : 0,
+      pointsAwarded: pointsActuallyAwarded,
       isNewConnection: !existingConnection,
     });
   } catch (error) {

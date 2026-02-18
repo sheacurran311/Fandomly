@@ -28,14 +28,8 @@ describe('taskFieldSchemas', () => {
       expect(normalizeUsername('https://twitter.com/testuser')).toBe('testuser');
     });
 
-    // Note: x.com URL extraction is not currently supported in normalizeUsername
-    // The function only has patterns for twitter.com, not x.com
-    // This test documents current behavior - consider adding x.com support
-    it('should handle X.com URL (currently returns as-is without extraction)', () => {
-      // Current behavior: x.com URLs are not parsed, returned as lowercase
-      const result = normalizeUsername('https://x.com/testuser');
-      // Accept either the URL or extracted username depending on future implementation
-      expect(result === 'https://x.com/testuser' || result === 'testuser').toBe(true);
+    it('should extract username from X.com URL', () => {
+      expect(normalizeUsername('https://x.com/testuser')).toBe('testuser');
     });
 
     it('should extract username from Instagram URL', () => {

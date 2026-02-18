@@ -434,7 +434,7 @@ export default function TwitterTaskBuilder({ onSave, onPublish, onBack, taskType
                 <Input
                   value={tweetUrl}
                   onChange={(e) => handleTweetUrlChange(e.target.value)}
-                  placeholder="https://twitter.com/username/status/1234567890"
+                  placeholder="https://x.com/username/status/1234567890"
                   className={`bg-white/5 border-white/10 text-white ${!twitterConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
                   disabled={!twitterConnected}
                 />

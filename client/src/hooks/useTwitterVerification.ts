@@ -3,7 +3,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAccessToken } from "@/lib/queryClient";
+import { getAccessToken, getCsrfToken, resetCsrfToken } from "@/lib/queryClient";
 
 interface VerificationResult {
   verified: boolean;
@@ -34,10 +34,11 @@ interface TwitterTweet {
 }
 
 /**
- * Authenticated fetch helper
+ * Authenticated fetch helper with CSRF support
  */
 async function authenticatedFetch(url: string, options: RequestInit = {}) {
   const accessToken = getAccessToken();
+  const method = options.method?.toUpperCase() || 'GET';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -48,11 +49,33 @@ async function authenticatedFetch(url: string, options: RequestInit = {}) {
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(url, {
+  // Add CSRF token for state-changing requests
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    const csrfToken = await getCsrfToken();
+    if (csrfToken) {
+      headers['x-csrf-token'] = csrfToken;
+    }
+  }
+
+  let response = await fetch(url, {
     ...options,
     headers,
     credentials: 'include',
   });
+
+  // On CSRF rejection (403), refresh token and retry once
+  if (response.status === 403 && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    resetCsrfToken();
+    const freshToken = await getCsrfToken();
+    if (freshToken) {
+      headers['x-csrf-token'] = freshToken;
+      response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json();

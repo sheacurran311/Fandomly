@@ -1,45 +1,8 @@
-import { getAuthHeaders } from '@/lib/queryClient';
-
-// CSRF token cache
-let csrfToken: string | null = null;
+import { getAuthHeaders, getCsrfToken, resetCsrfToken } from '@/lib/queryClient';
 
 /**
- * Fetch a fresh CSRF token from the server
- */
-async function fetchCsrfToken(): Promise<string | null> {
-  try {
-    console.log('[CSRF] Fetching CSRF token...');
-    const response = await fetch('/api/csrf-token', {
-      credentials: 'include'
-    });
-    console.log('[CSRF] Response:', { ok: response.ok, status: response.status });
-    if (response.ok) {
-      const data = await response.json();
-      csrfToken = data.csrfToken;
-      console.log('[CSRF] Token received:', csrfToken ? 'yes' : 'no');
-      return csrfToken;
-    } else {
-      const errorText = await response.text();
-      console.error('[CSRF] Failed to get token:', errorText);
-    }
-  } catch (error) {
-    console.error('[CSRF] Failed to fetch CSRF token:', error);
-  }
-  return null;
-}
-
-/**
- * Get CSRF token (cached or fetch fresh)
- */
-async function getCsrfToken(): Promise<string | null> {
-  if (!csrfToken) {
-    return fetchCsrfToken();
-  }
-  return csrfToken;
-}
-
-/**
- * Get headers with auth and CSRF token for POST/PUT/DELETE requests
+ * Get headers with auth and CSRF token for POST/PUT/DELETE requests.
+ * Uses the centralized CSRF token from queryClient.
  */
 async function getProtectedHeaders(): Promise<Record<string, string>> {
   const token = await getCsrfToken();
@@ -191,7 +154,7 @@ export async function disconnectSocialPlatform(platform: string): Promise<{ succ
       // If CSRF error, refresh token and retry once
       if (response.status === 403) {
         console.log('[Social API] CSRF error, refreshing token and retrying...');
-        csrfToken = null;
+        resetCsrfToken();
         const newHeaders = await getProtectedHeaders();
         const retryResponse = await fetch('/api/social-connections/disconnect', {
           method: 'POST',

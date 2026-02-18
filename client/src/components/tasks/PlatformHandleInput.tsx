@@ -40,7 +40,7 @@ const HANDLE_PATTERNS: Record<string, {
     pattern: /^@?[a-zA-Z0-9_]{1,15}$/,
     placeholder: "@handle",
     example: "myhandle",
-    profileUrlTemplate: "https://twitter.com/{handle}",
+    profileUrlTemplate: "https://x.com/{handle}",
     description: "Your X/Twitter handle (1-15 characters)",
   },
   youtube: {

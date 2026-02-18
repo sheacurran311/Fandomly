@@ -37,7 +37,7 @@ export function registerSyncPreferencesRoutes(app: Express) {
           where: eq(socialConnections.userId, userId),
         });
 
-        const connectedPlatforms = connections.map(c => c.platform);
+        const connectedPlatforms = [...new Set(connections.map(c => c.platform))];
 
         res.json({
           preferences: prefs,

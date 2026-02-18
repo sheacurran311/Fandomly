@@ -9,6 +9,10 @@ import { taskFrequencyService } from '../../services/task-frequency-service';
 const startTaskSchema = z.object({
   taskId: z.string().min(1, 'Task ID is required'),
   tenantId: z.string().min(1, 'Tenant ID is required'),
+  // Optional campaignId for campaign-scoped completions
+  // When provided, the completion is marked as 'campaign' context and scoped to that campaign
+  // This enables re-verification of one-time tasks within campaigns
+  campaignId: z.string().optional(),
 });
 
 const updateProgressSchema = z.object({
@@ -213,6 +217,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   // GET /api/task-completions/check-eligibility/:taskId
   // Check if user can complete a task based on frequency rules
+  // Supports campaign-scoped eligibility checks via campaignId query param
   // ==============================================
   router.get('/check-eligibility/:taskId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -222,11 +227,13 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
       const { taskId } = req.params;
       const tenantId = req.query.tenantId as string | undefined;
+      const campaignId = req.query.campaignId as string | undefined;
 
       const eligibility = await taskFrequencyService.checkEligibility({
         userId: req.user.id,
         taskId,
         tenantId,
+        campaignId, // Campaign-scoped check if provided
       });
 
       // Also get time remaining if not eligible
@@ -242,6 +249,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
       res.json({
         ...eligibility,
         timeRemaining,
+        context: campaignId ? 'campaign' : 'standalone', // Include context in response
       });
     } catch (error: any) {
       console.error('Error checking task eligibility:', error);
@@ -268,7 +276,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         });
       }
 
-      const { taskId, tenantId } = validation.data;
+      const { taskId, tenantId, campaignId } = validation.data;
 
       // Check if task exists
       const task = await storage.getTask(taskId, tenantId);
@@ -276,11 +284,18 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         return res.status(404).json({ error: 'Task not found' });
       }
 
+      // Determine completion context based on whether campaignId is provided
+      // Campaign completions are scoped separately from standalone completions
+      // This enables the re-verification model for one-time tasks within campaigns
+      const completionContext = campaignId ? 'campaign' : 'standalone';
+
       // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
+      // Pass campaignId to scope the eligibility check to the appropriate context
       const frequencyCheck = await taskFrequencyService.checkEligibility({
         userId: req.user.id,
         taskId,
         tenantId,
+        campaignId, // Campaign-scoped check if campaignId provided
       });
 
       if (!frequencyCheck.isEligible) {
@@ -293,8 +308,8 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         });
       }
 
-      // Check if user has already started this task (but not completed)
-      const existingCompletion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);
+      // Check if user has already started this task (but not completed) within the same context
+      const existingCompletion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId, campaignId);
       if (existingCompletion && existingCompletion.status === 'in_progress') {
         return res.json({ 
           completion: existingCompletion,
@@ -302,11 +317,13 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         });
       }
 
-      // Create new task completion
+      // Create new task completion with appropriate context
       const completion = await storage.createTaskCompletion({
         taskId,
         userId: req.user.id,
         tenantId,
+        campaignId: campaignId || undefined, // Set campaignId if provided
+        completionContext, // 'standalone' or 'campaign'
         status: 'in_progress',
         progress: 0,
         completionData: {},

@@ -48,6 +48,9 @@ import {
   Code,
   Eye,
   Coins,
+  Globe,
+  Layers,
+  LayoutGrid,
 } from "lucide-react";
 import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube, SiDiscord, SiTwitch } from "react-icons/si";
 import { TIER_GUIDANCE } from "@shared/taskTemplates";
@@ -55,6 +58,8 @@ import { TIER_GUIDANCE } from "@shared/taskTemplates";
 // Verification tier type
 type VerificationTier = 'T1' | 'T2' | 'T3';
 type VerificationMethod = 'api' | 'code_comment' | 'code_repost' | 'manual' | 'starter_pack' | 'platform';
+type TemplatePlatform = 'twitter' | 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'spotify' | 'discord' | 'twitch' | 'general';
+type ViewMode = 'grid' | 'by-platform' | 'by-verification';
 
 export type TaskTemplateType =
   | 'complete_profile'
@@ -103,6 +108,7 @@ interface TaskTemplate {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   category: 'onboarding' | 'social' | 'community' | 'custom';
+  platform: TemplatePlatform;
   difficulty: 'easy' | 'medium' | 'advanced';
   status: 'ready' | 'coming_soon';
   popularityScore: number;
@@ -161,6 +167,79 @@ const METHOD_CONFIG: Record<VerificationMethod, {
   manual: { icon: Eye, label: 'Manual Review' },
   starter_pack: { icon: Gift, label: 'Starter Pack' },
   platform: { icon: Zap, label: 'Platform Verified' },
+};
+
+// Platform configuration for grouping and display
+const PLATFORM_CONFIG: Record<TemplatePlatform, {
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  textColor: string;
+  borderColor: string;
+  sortOrder: number;
+}> = {
+  twitter: {
+    name: 'Twitter / X',
+    icon: Twitter,
+    textColor: 'text-white',
+    borderColor: 'border-white/20',
+    sortOrder: 1,
+  },
+  instagram: {
+    name: 'Instagram',
+    icon: SiInstagram,
+    textColor: 'text-pink-400',
+    borderColor: 'border-pink-500/20',
+    sortOrder: 2,
+  },
+  youtube: {
+    name: 'YouTube',
+    icon: SiYoutube,
+    textColor: 'text-red-500',
+    borderColor: 'border-red-500/20',
+    sortOrder: 3,
+  },
+  tiktok: {
+    name: 'TikTok',
+    icon: SiTiktok,
+    textColor: 'text-white',
+    borderColor: 'border-white/20',
+    sortOrder: 4,
+  },
+  facebook: {
+    name: 'Facebook',
+    icon: SiFacebook,
+    textColor: 'text-blue-500',
+    borderColor: 'border-blue-500/20',
+    sortOrder: 5,
+  },
+  spotify: {
+    name: 'Spotify',
+    icon: SiSpotify,
+    textColor: 'text-green-500',
+    borderColor: 'border-green-500/20',
+    sortOrder: 6,
+  },
+  discord: {
+    name: 'Discord',
+    icon: SiDiscord,
+    textColor: 'text-indigo-400',
+    borderColor: 'border-indigo-500/20',
+    sortOrder: 7,
+  },
+  twitch: {
+    name: 'Twitch',
+    icon: SiTwitch,
+    textColor: 'text-purple-500',
+    borderColor: 'border-purple-500/20',
+    sortOrder: 8,
+  },
+  general: {
+    name: 'General / Multi-Platform',
+    icon: Globe,
+    textColor: 'text-gray-300',
+    borderColor: 'border-white/10',
+    sortOrder: 9,
+  },
 };
 
 // TierBadge component with tooltip
@@ -251,6 +330,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Incentivize fans to invite friends with points or percentage earnings',
     icon: Users,
     category: 'onboarding',
+    platform: 'general',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 98,
@@ -275,6 +355,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Build engagement habits with daily check-ins and streak bonuses',
     icon: Flame,
     category: 'onboarding',
+    platform: 'general',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 92,
@@ -299,6 +380,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans when you reach social media follower goals',
     icon: TrendingUp,
     category: 'social',
+    platform: 'general',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 88,
@@ -323,6 +405,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following your Twitter account with instant API verification',
     icon: Twitter,
     category: 'social',
+    platform: 'twitter',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 95,
@@ -347,6 +430,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking a specific tweet with instant verification',
     icon: Heart,
     category: 'social',
+    platform: 'twitter',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 92,
@@ -371,6 +455,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for retweeting your content with instant verification',
     icon: Repeat2,
     category: 'social',
+    platform: 'twitter',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 94,
@@ -395,6 +480,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for quote tweeting your post with their thoughts',
     icon: MessageCircle,
     category: 'social',
+    platform: 'twitter',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 90,
@@ -421,6 +507,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking your Facebook page',
     icon: SiFacebook,
     category: 'social',
+    platform: 'facebook',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 90,
@@ -445,6 +532,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking a specific Facebook post',
     icon: ThumbsUp,
     category: 'social',
+    platform: 'facebook',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 88,
@@ -469,6 +557,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for commenting on a specific Facebook post with a code',
     icon: MessageCircle,
     category: 'social',
+    platform: 'facebook',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 85,
@@ -493,6 +582,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for commenting on a specific Facebook photo with a code',
     icon: MessageSquare,
     category: 'social',
+    platform: 'facebook',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 83,
@@ -519,6 +609,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following your Instagram account (honor system)',
     icon: SiInstagram,
     category: 'social',
+    platform: 'instagram',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 95,
@@ -543,6 +634,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking a specific Instagram post (honor system)',
     icon: Heart,
     category: 'social',
+    platform: 'instagram',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 92,
@@ -567,6 +659,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Fans comment a unique code on your Instagram post - automatic verification',
     icon: MessageSquare,
     category: 'social',
+    platform: 'instagram',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 88,
@@ -591,6 +684,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Fans mention you in their Instagram Story - code verified',
     icon: Camera,
     category: 'social',
+    platform: 'instagram',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 91,
@@ -615,6 +709,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Fans comment a specific keyword on your Instagram post - automatic verification',
     icon: Hash,
     category: 'social',
+    platform: 'instagram',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 86,
@@ -641,6 +736,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for subscribing to your YouTube channel - API verified',
     icon: SiYoutube,
     category: 'social',
+    platform: 'youtube',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 93,
@@ -665,6 +761,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking a specific YouTube video (honor system)',
     icon: ThumbsUp,
     category: 'social',
+    platform: 'youtube',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 89,
@@ -689,6 +786,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for commenting with a code on your YouTube video',
     icon: MessageCircle,
     category: 'social',
+    platform: 'youtube',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 87,
@@ -715,6 +813,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following your TikTok account (honor system)',
     icon: SiTiktok,
     category: 'social',
+    platform: 'tiktok',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 91,
@@ -739,6 +838,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking a specific TikTok video (honor system)',
     icon: Heart,
     category: 'social',
+    platform: 'tiktok',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 88,
@@ -763,6 +863,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for commenting with a code on your TikTok video',
     icon: MessageCircle,
     category: 'social',
+    platform: 'tiktok',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 85,
@@ -787,6 +888,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for creating their own TikTok post with specific hashtags',
     icon: Camera,
     category: 'social',
+    platform: 'tiktok',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 92,
@@ -813,6 +915,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Create interactive polls to gather fan opinions and feedback',
     icon: HelpCircle,
     category: 'community',
+    platform: 'general',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 89,
@@ -837,6 +940,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Create quizzes to test fan knowledge and reward correct answers',
     icon: Trophy,
     category: 'community',
+    platform: 'general',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 86,
@@ -861,6 +965,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for visiting your website or clicking specific links',
     icon: ExternalLink,
     category: 'custom',
+    platform: 'general',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 94,
@@ -887,6 +992,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following your Spotify artist profile - API verified',
     icon: SiSpotify,
     category: 'social',
+    platform: 'spotify',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 87,
@@ -911,6 +1017,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following a specific Spotify playlist - API verified',
     icon: ListMusic,
     category: 'social',
+    platform: 'spotify',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 85,
@@ -937,6 +1044,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for joining your Discord community server - API verified',
     icon: SiDiscord,
     category: 'community',
+    platform: 'discord',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 93,
@@ -961,6 +1069,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for obtaining a specific member role - API verified',
     icon: SiDiscord,
     category: 'community',
+    platform: 'discord',
     difficulty: 'medium',
     status: 'ready',
     popularityScore: 88,
@@ -987,6 +1096,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following your Twitch channel - API verified',
     icon: SiTwitch,
     category: 'social',
+    platform: 'twitch',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 91,
@@ -1011,6 +1121,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for subscribing to your Twitch channel - API verified',
     icon: SiTwitch,
     category: 'social',
+    platform: 'twitch',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 89,
@@ -1037,6 +1148,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans who attend your live streams/spaces by entering a secret code',
     icon: Video,
     category: 'community',
+    platform: 'general',
     difficulty: 'easy',
     status: 'ready',
     popularityScore: 95,
@@ -1062,6 +1174,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for following you on social media platforms',
     icon: UserPlus,
     category: 'social',
+    platform: 'general',
     difficulty: 'easy',
     status: 'coming_soon',
     popularityScore: 90,
@@ -1086,6 +1199,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for liking specific posts, tweets, or videos',
     icon: Heart,
     category: 'social',
+    platform: 'general',
     difficulty: 'easy',
     status: 'coming_soon',
     popularityScore: 85,
@@ -1110,6 +1224,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for sharing your content with their followers',
     icon: Share2,
     category: 'social',
+    platform: 'general',
     difficulty: 'medium',
     status: 'coming_soon',
     popularityScore: 87,
@@ -1134,6 +1249,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Reward fans for leaving comments on your social content',
     icon: MessageCircle,
     category: 'social',
+    platform: 'general',
     difficulty: 'medium',
     status: 'coming_soon',
     popularityScore: 82,
@@ -1158,6 +1274,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     description: 'Create custom tasks for unique actions and events',
     icon: Zap,
     category: 'custom',
+    platform: 'general',
     difficulty: 'advanced',
     status: 'coming_soon',
     popularityScore: 75,
@@ -1187,6 +1304,7 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedTier, setSelectedTier] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("by-platform");
 
   const filteredTemplates = TASK_TEMPLATES.filter(template => {
     const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1198,6 +1316,30 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
 
   const readyTemplates = filteredTemplates.filter(t => t.status === 'ready');
   const comingSoonTemplates = filteredTemplates.filter(t => t.status === 'coming_soon');
+
+  // Group templates by platform (sorted by platform sort order, then by popularity within each platform)
+  const templatesByPlatform = readyTemplates.reduce((acc, template) => {
+    const platform = template.platform;
+    if (!acc[platform]) acc[platform] = [];
+    acc[platform].push(template);
+    return acc;
+  }, {} as Record<TemplatePlatform, TaskTemplate[]>);
+
+  // Sort platforms by their configured sort order
+  const sortedPlatforms = (Object.keys(templatesByPlatform) as TemplatePlatform[])
+    .sort((a, b) => PLATFORM_CONFIG[a].sortOrder - PLATFORM_CONFIG[b].sortOrder);
+
+  // Sort templates within each platform by popularity
+  sortedPlatforms.forEach(platform => {
+    templatesByPlatform[platform].sort((a, b) => b.popularityScore - a.popularityScore);
+  });
+
+  // Group templates by verification tier
+  const templatesByTier = {
+    T1: readyTemplates.filter(t => t.verificationTier === 'T1').sort((a, b) => b.popularityScore - a.popularityScore),
+    T2: readyTemplates.filter(t => t.verificationTier === 'T2').sort((a, b) => b.popularityScore - a.popularityScore),
+    T3: readyTemplates.filter(t => t.verificationTier === 'T3').sort((a, b) => b.popularityScore - a.popularityScore),
+  };
 
   // Count templates by tier for filter badges
   const tierCounts = {
@@ -1260,11 +1402,43 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
               <h1 className="text-3xl font-bold text-white mb-2">Create New Task</h1>
               <p className="text-gray-400">Choose a template to get started</p>
             </div>
-            {onBack && (
-              <Button variant="outline" onClick={onBack} className="border-white/20 text-white">
-                Cancel
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-white/5 rounded-lg p-1 border border-white/10">
+                <Button
+                  onClick={() => setViewMode('grid')}
+                  variant="ghost"
+                  size="sm"
+                  className={`px-3 ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => setViewMode('by-platform')}
+                  variant="ghost"
+                  size="sm"
+                  className={`px-3 ${viewMode === 'by-platform' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
+                  title="Group by Platform"
+                >
+                  <Globe className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => setViewMode('by-verification')}
+                  variant="ghost"
+                  size="sm"
+                  className={`px-3 ${viewMode === 'by-verification' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
+                  title="Group by Verification Tier"
+                >
+                  <Layers className="h-4 w-4" />
+                </Button>
+              </div>
+              {onBack && (
+                <Button variant="outline" onClick={onBack} className="border-white/20 text-white">
+                  Cancel
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Search & Filter */}
@@ -1353,100 +1527,159 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
         {/* Ready Templates */}
         {readyTemplates.length > 0 && (
           <div className="mb-12">
-            <div className="flex items-center gap-2 mb-6">
-              <Sparkles className="h-5 w-5 text-brand-primary" />
-              <h2 className="text-2xl font-bold text-white">Ready to Use</h2>
-              <Badge variant="outline" className="text-brand-primary border-brand-primary">
-                {readyTemplates.length}
-              </Badge>
-            </div>
+            {viewMode === 'grid' ? (
+              // Grid View - Flat layout
+              <>
+                <div className="flex items-center gap-2 mb-6">
+                  <Sparkles className="h-5 w-5 text-brand-primary" />
+                  <h2 className="text-2xl font-bold text-white">Ready to Use</h2>
+                  <Badge variant="outline" className="text-brand-primary border-brand-primary">
+                    {readyTemplates.length}
+                  </Badge>
+                </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {readyTemplates.map((template) => {
-                const Icon = template.icon;
-                const platformBg = getPlatformIconBg(template.id);
-                const iconBgClass = platformBg || getCategoryColor(template.category);
-                return (
-                  <Card
-                    key={template.id}
-                    className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all hover:scale-105 cursor-pointer group"
-                    onClick={() => onSelectTemplate(template.id)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className={`w-12 h-12 rounded-lg ${iconBgClass} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                          <Icon className="h-6 w-6 text-white" />
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge variant="outline" className={`text-xs ${getCategoryColor(template.category)}`}>
-                            {template.category}
-                          </Badge>
-                          {template.popularityScore >= 90 && (
-                            <Badge variant="outline" className="text-xs text-brand-secondary border-brand-secondary">
-                              Popular
-                            </Badge>
-                          )}
-                        </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {readyTemplates.map((template) => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onSelectTemplate={onSelectTemplate}
+                      getPlatformIconBg={getPlatformIconBg}
+                      getCategoryColor={getCategoryColor}
+                      getDifficultyColor={getDifficultyColor}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : viewMode === 'by-platform' ? (
+              // Group by Platform
+              <div className="space-y-10">
+                {sortedPlatforms.map((platform) => {
+                  const config = PLATFORM_CONFIG[platform];
+                  const templates = templatesByPlatform[platform];
+                  const PlatformIcon = config.icon;
+                  
+                  return (
+                    <div key={platform}>
+                      <div className={`flex items-center gap-3 mb-4 pb-2 border-b ${config.borderColor}`}>
+                        <PlatformIcon className={`h-5 w-5 ${config.textColor}`} />
+                        <h3 className={`text-lg font-semibold ${config.textColor}`}>
+                          {config.name}
+                        </h3>
+                        <span className="text-sm text-gray-400">
+                          {templates.length} template{templates.length !== 1 ? 's' : ''}
+                        </span>
                       </div>
-
-                      <CardTitle className="text-white">{template.name}</CardTitle>
-                      <CardDescription className="text-gray-400">
-                        {template.description}
-                      </CardDescription>
-                    </CardHeader>
-
-                    <CardContent className="space-y-4">
-                      {/* Verification Tier & Method Badges */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <TierBadge tier={template.verificationTier} />
-                        <MethodBadge method={template.verificationMethod} />
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {templates.map((template) => (
+                          <TemplateCard
+                            key={template.id}
+                            template={template}
+                            onSelectTemplate={onSelectTemplate}
+                            getPlatformIconBg={getPlatformIconBg}
+                            getCategoryColor={getCategoryColor}
+                            getDifficultyColor={getDifficultyColor}
+                          />
+                        ))}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Group by Verification Tier
+              <div className="space-y-10">
+                {/* T1 Group */}
+                {templatesByTier.T1.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4 pb-2 border-b border-green-500/20">
+                      <ShieldCheck className="h-5 w-5 text-green-400" />
+                      <h3 className="text-lg font-semibold text-green-400">
+                        T1 - API Verified ({TIER_GUIDANCE.T1.trustLevel} Trust)
+                      </h3>
+                      <span className="text-sm text-gray-400">
+                        {templatesByTier.T1.length} template{templatesByTier.T1.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-xs text-green-400/70 ml-auto">
+                        Recommended: {TIER_GUIDANCE.T1.pointsRange}
+                      </span>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {templatesByTier.T1.map((template) => (
+                        <TemplateCard
+                          key={template.id}
+                          template={template}
+                          onSelectTemplate={onSelectTemplate}
+                          getPlatformIconBg={getPlatformIconBg}
+                          getCategoryColor={getCategoryColor}
+                          getDifficultyColor={getDifficultyColor}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                      {/* Recommended Points */}
-                      <div className="flex items-center gap-2 text-sm bg-white/5 rounded-lg px-3 py-2">
-                        <Coins className="h-4 w-4 text-amber-400" />
-                        <span className="text-gray-300">Recommended:</span>
-                        <span className="font-semibold text-white">{template.recommendedPoints} pts</span>
-                        {template.verificationTier && (
-                          <span className="text-xs text-gray-500 ml-auto">
-                            ({TIER_GUIDANCE[template.verificationTier].pointsRange.replace(' points recommended', '')})
-                          </span>
-                        )}
-                      </div>
+                {/* T2 Group */}
+                {templatesByTier.T2.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4 pb-2 border-b border-blue-500/20">
+                      <Shield className="h-5 w-5 text-blue-400" />
+                      <h3 className="text-lg font-semibold text-blue-400">
+                        T2 - Code Verified ({TIER_GUIDANCE.T2.trustLevel} Trust)
+                      </h3>
+                      <span className="text-sm text-gray-400">
+                        {templatesByTier.T2.length} template{templatesByTier.T2.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-xs text-blue-400/70 ml-auto">
+                        Recommended: {TIER_GUIDANCE.T2.pointsRange}
+                      </span>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {templatesByTier.T2.map((template) => (
+                        <TemplateCard
+                          key={template.id}
+                          template={template}
+                          onSelectTemplate={onSelectTemplate}
+                          getPlatformIconBg={getPlatformIconBg}
+                          getCategoryColor={getCategoryColor}
+                          getDifficultyColor={getDifficultyColor}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2 text-gray-400">
-                          <Target className="h-4 w-4" />
-                          <span className={getDifficultyColor(template.difficulty)}>
-                            {template.difficulty}
-                          </span>
-                        </div>
-                        <div className="text-gray-400">
-                          ~{template.estimatedSetupTime}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-gray-300">Key Benefits:</div>
-                        <ul className="space-y-1">
-                          {template.benefits.slice(0, 2).map((benefit, index) => (
-                            <li key={index} className="text-xs text-gray-400 flex items-start gap-2">
-                              <CheckCircle className="h-3 w-3 text-green-400 shrink-0 mt-0.5" />
-                              {benefit}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <Button className="w-full bg-brand-primary hover:bg-brand-primary/90 group-hover:scale-105 transition-transform">
-                        <Gift className="h-4 w-4 mr-2" />
-                        Use Template
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                {/* T3 Group */}
+                {templatesByTier.T3.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4 pb-2 border-b border-amber-500/20">
+                      <ShieldAlert className="h-5 w-5 text-amber-400" />
+                      <h3 className="text-lg font-semibold text-amber-400">
+                        T3 - Honor System ({TIER_GUIDANCE.T3.trustLevel} Trust)
+                      </h3>
+                      <span className="text-sm text-gray-400">
+                        {templatesByTier.T3.length} template{templatesByTier.T3.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-xs text-amber-400/70 ml-auto">
+                        Recommended: {TIER_GUIDANCE.T3.pointsRange}
+                      </span>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {templatesByTier.T3.map((template) => (
+                        <TemplateCard
+                          key={template.id}
+                          template={template}
+                          onSelectTemplate={onSelectTemplate}
+                          getPlatformIconBg={getPlatformIconBg}
+                          getCategoryColor={getCategoryColor}
+                          getDifficultyColor={getDifficultyColor}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1509,6 +1742,104 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
         )}
       </div>
     </div>
+  );
+}
+
+// Template Card Component - extracted for reuse
+function TemplateCard({
+  template,
+  onSelectTemplate,
+  getPlatformIconBg,
+  getCategoryColor,
+  getDifficultyColor,
+}: {
+  template: TaskTemplate;
+  onSelectTemplate: (template: TaskTemplateType) => void;
+  getPlatformIconBg: (templateId: TaskTemplateType) => string;
+  getCategoryColor: (category: string) => string;
+  getDifficultyColor: (difficulty: string) => string;
+}) {
+  const Icon = template.icon;
+  const platformBg = getPlatformIconBg(template.id);
+  const iconBgClass = platformBg || getCategoryColor(template.category);
+
+  return (
+    <Card
+      className="bg-white/5 backdrop-blur-lg border-white/10 hover:bg-white/10 transition-all hover:scale-105 cursor-pointer group"
+      onClick={() => onSelectTemplate(template.id)}
+    >
+      <CardHeader>
+        <div className="flex items-start justify-between mb-3">
+          <div className={`w-12 h-12 rounded-lg ${iconBgClass} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+            <Icon className="h-6 w-6 text-white" />
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant="outline" className={`text-xs ${getCategoryColor(template.category)}`}>
+              {template.category}
+            </Badge>
+            {template.popularityScore >= 90 && (
+              <Badge variant="outline" className="text-xs text-brand-secondary border-brand-secondary">
+                Popular
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <CardTitle className="text-white">{template.name}</CardTitle>
+        <CardDescription className="text-gray-400">
+          {template.description}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Verification Tier & Method Badges */}
+        <div className="flex flex-wrap items-center gap-2">
+          <TierBadge tier={template.verificationTier} />
+          <MethodBadge method={template.verificationMethod} />
+        </div>
+
+        {/* Recommended Points */}
+        <div className="flex items-center gap-2 text-sm bg-white/5 rounded-lg px-3 py-2">
+          <Coins className="h-4 w-4 text-amber-400" />
+          <span className="text-gray-300">Recommended:</span>
+          <span className="font-semibold text-white">{template.recommendedPoints} pts</span>
+          {template.verificationTier && (
+            <span className="text-xs text-gray-500 ml-auto">
+              ({TIER_GUIDANCE[template.verificationTier].pointsRange.replace(' points recommended', '')})
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-gray-400">
+            <Target className="h-4 w-4" />
+            <span className={getDifficultyColor(template.difficulty)}>
+              {template.difficulty}
+            </span>
+          </div>
+          <div className="text-gray-400">
+            ~{template.estimatedSetupTime}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-gray-300">Key Benefits:</div>
+          <ul className="space-y-1">
+            {template.benefits.slice(0, 2).map((benefit, index) => (
+              <li key={index} className="text-xs text-gray-400 flex items-start gap-2">
+                <CheckCircle className="h-3 w-3 text-green-400 shrink-0 mt-0.5" />
+                {benefit}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <Button className="w-full bg-brand-primary hover:bg-brand-primary/90 group-hover:scale-105 transition-transform">
+          <Gift className="h-4 w-4 mr-2" />
+          Use Template
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

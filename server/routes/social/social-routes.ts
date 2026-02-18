@@ -5,8 +5,8 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { URLSearchParams } from "url";
 import { storage } from '../../core/storage';
 import { db } from '../../db';
-import { socialConnections } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { socialConnections, platformPointsTransactions } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { platformPointsService } from '../../services/points/platform-points-service';
 
 // Points awarded for connecting a social account
@@ -1577,21 +1577,35 @@ export function registerSocialRoutes(app: Express) {
         // Don't fail the request if the sync fails
       }
       
-      // Award platform points for new social connection
+      // Award platform points for new social connection (one-time per platform)
+      // Check transaction history to prevent exploit via disconnect/reconnect
       let pointsAwarded = 0;
       if (isNewConnection) {
         try {
-          await platformPointsService.awardPoints(
-            userId,
-            SOCIAL_CONNECTION_POINTS,
-            'social_connection_reward',
-            {
-              platform,
-              platformUsername: accountData?.user?.username || accountData?.username,
-            }
-          );
-          pointsAwarded = SOCIAL_CONNECTION_POINTS;
-          console.log(`[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+          // Check if user already received points for this platform
+          const existingReward = await db.query.platformPointsTransactions.findFirst({
+            where: and(
+              eq(platformPointsTransactions.userId, userId),
+              eq(platformPointsTransactions.source, 'social_connection_reward'),
+              sql`metadata->>'platform' = ${platform}`
+            ),
+          });
+
+          if (!existingReward) {
+            await platformPointsService.awardPoints(
+              userId,
+              SOCIAL_CONNECTION_POINTS,
+              'social_connection_reward',
+              {
+                platform,
+                platformUsername: accountData?.user?.username || accountData?.username,
+              }
+            );
+            pointsAwarded = SOCIAL_CONNECTION_POINTS;
+            console.log(`[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+          } else {
+            console.log(`[Social Connect] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`);
+          }
         } catch (pointsError) {
           console.error(`[Social Connect] Error awarding points:`, pointsError);
           // Don't fail the connection if points award fails

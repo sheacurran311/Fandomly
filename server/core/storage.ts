@@ -18,7 +18,7 @@ import {
   creatorFacebookPages
 } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull } from "drizzle-orm";
 import { encryptToken, decryptToken } from "../utils/crypto-utils";
 
 export interface IStorage {
@@ -141,7 +141,7 @@ export interface IStorage {
   
   // Task Completion operations
   getTaskCompletion(id: string): Promise<TaskCompletion | undefined>;
-  getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined>;
+  getTaskCompletionByUserAndTask(userId: string, taskId: string, campaignId?: string | null): Promise<TaskCompletion | undefined>;
   getUserTaskCompletions(userId: string, tenantId?: string): Promise<any[]>;
   getTaskCompletions(taskId: string): Promise<TaskCompletion[]>;
   getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]>;
@@ -350,7 +350,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLoyaltyProgramsByCreator(creatorId: string): Promise<LoyaltyProgram[]> {
-    return await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creatorId));
+    // First, try to find programs by creator_id directly
+    let programs = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creatorId));
+    
+    // If no programs found, the creatorId might be a user_id - look up the creator and try again
+    if (programs.length === 0) {
+      const [creator] = await db.select().from(creators).where(eq(creators.userId, creatorId));
+      if (creator) {
+        programs = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creator.id));
+      }
+    }
+    
+    return programs;
   }
 
   async createLoyaltyProgram(insertProgram: InsertLoyaltyProgram): Promise<LoyaltyProgram> {
@@ -975,12 +986,47 @@ export class DatabaseStorage implements IStorage {
     return completion;
   }
 
-  async getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined> {
+  /**
+   * Get task completion by user and task, optionally scoped by campaign context.
+   * 
+   * @param userId - The user's ID
+   * @param taskId - The task's ID
+   * @param campaignId - Optional campaign ID. If provided, looks for campaign-context completions.
+   *                     If not provided, looks for standalone-context completions (or null for backwards compatibility).
+   * 
+   * This enables the campaign override model where:
+   * - Standalone completion: completionContext = 'standalone', campaignId = null
+   * - Campaign completion: completionContext = 'campaign', campaignId = <specific campaign>
+   * - Each context is independently deduped
+   */
+  async getTaskCompletionByUserAndTask(
+    userId: string, 
+    taskId: string, 
+    campaignId?: string | null
+  ): Promise<TaskCompletion | undefined> {
+    const baseConditions = [
+      eq(taskCompletions.userId, userId),
+      eq(taskCompletions.taskId, taskId),
+    ];
+
+    let contextCondition;
+    if (campaignId) {
+      // Looking for a completion within a specific campaign
+      contextCondition = and(
+        eq(taskCompletions.campaignId, campaignId),
+        eq(taskCompletions.completionContext, 'campaign')
+      );
+    } else {
+      // Looking for a standalone completion (or legacy rows with null context)
+      contextCondition = or(
+        isNull(taskCompletions.completionContext),
+        eq(taskCompletions.completionContext, 'standalone')
+      );
+    }
+
     const [completion] = await db.select().from(taskCompletions)
-      .where(and(
-        eq(taskCompletions.userId, userId),
-        eq(taskCompletions.taskId, taskId)
-      ));
+      .where(and(...baseConditions, contextCondition))
+      .limit(1);
     return completion;
   }
 

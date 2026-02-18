@@ -3525,14 +3525,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { creatorId } = req.params;
       const period = (req.query.period as string) || 'week';
 
-      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks, pointTransactions } = await import("@shared/schema");
+      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks, pointTransactions, creators } = await import("@shared/schema");
       const { eq, and, gte, lt, sql, inArray, or } = await import("drizzle-orm");
       const db = (await import("../db")).db;
 
-      // Get creator's programs
-      const programs = await db.select()
+      // Get creator's programs - first try by creatorId directly, then by user_id lookup
+      let programs = await db.select()
         .from(loyaltyPrograms)
         .where(eq(loyaltyPrograms.creatorId, creatorId));
+
+      // If no programs found, the creatorId might be a user_id - look up the creator and try again
+      if (programs.length === 0) {
+        const [creator] = await db.select().from(creators).where(eq(creators.userId, creatorId));
+        if (creator) {
+          programs = await db.select()
+            .from(loyaltyPrograms)
+            .where(eq(loyaltyPrograms.creatorId, creator.id));
+        }
+      }
 
       if (programs.length === 0) {
         return res.json({
@@ -4376,120 +4386,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============================================================================
   // SPRINT 8: LEADERBOARD ENDPOINTS
-  // Real-time calculations only - no mock/hardcoded data
+  // NOTE: Main leaderboard routes are registered in leaderboard-routes.ts
+  // Only admin/utility routes remain here
   // ============================================================================
-
-  // Platform Leaderboard - Global rankings across all fans
-  app.get("/api/leaderboards/platform", async (req, res) => {
-    try {
-      const { sql } = await import("drizzle-orm");
-      const db = (await import("../db")).db;
-
-      const timePeriod = (req.query.period as string) || 'all_time';
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Use the database function for real-time calculation
-      const result = await db.execute(sql`
-        SELECT * FROM get_platform_leaderboard(${timePeriod}, ${limit})
-      `);
-
-      res.json({
-        leaderboard: result.rows.map(row => ({
-          userId: row.user_id,
-          username: row.username,
-          fullName: row.full_name,
-          avatarUrl: row.avatar_url,
-          totalPoints: row.total_points || 0,
-          rank: row.rank || 0
-        })),
-        timePeriod,
-        totalParticipants: result.rows.length
-      });
-    } catch (error) {
-      console.error("Failed to fetch platform leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch platform leaderboard" });
-    }
-  });
-
-  // Campaign Leaderboard - Per-campaign rankings
-  app.get("/api/leaderboards/campaign/:campaignId", async (req, res) => {
-    try {
-      const { sql, eq } = await import("drizzle-orm");
-      const db = (await import("../db")).db;
-      const { campaigns } = await import("@shared/schema");
-
-      const { campaignId } = req.params;
-      const timePeriod = (req.query.period as string) || 'all_time';
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Use the database function for real-time calculation
-      const result = await db.execute(sql`
-        SELECT * FROM get_campaign_leaderboard(${campaignId}, ${timePeriod}, ${limit})
-      `);
-
-      // Get campaign details
-      const campaign = await db.select().from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
-
-      res.json({
-        campaignId,
-        campaignName: campaign[0]?.name || 'Unknown Campaign',
-        leaderboard: result.rows.map(row => ({
-          userId: row.user_id,
-          username: row.username,
-          fullName: row.full_name,
-          avatarUrl: row.avatar_url,
-          totalPoints: row.total_points || 0,
-          participationCount: row.participation_count || 0,
-          rank: row.rank || 0
-        })),
-        timePeriod,
-        totalParticipants: result.rows.length
-      });
-    } catch (error) {
-      console.error("Failed to fetch campaign leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch campaign leaderboard" });
-    }
-  });
-
-  // Program Leaderboard - Per-program rankings
-  app.get("/api/leaderboards/program/:programId", async (req, res) => {
-    try {
-      const { sql, eq } = await import("drizzle-orm");
-      const db = (await import("../db")).db;
-      const { loyaltyPrograms } = await import("@shared/schema");
-
-      const { programId } = req.params;
-      const timePeriod = (req.query.period as string) || 'all_time';
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Use the database function for real-time calculation
-      const result = await db.execute(sql`
-        SELECT * FROM get_program_leaderboard(${programId}, ${timePeriod}, ${limit})
-      `);
-
-      // Get program details
-      const program = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.id, programId)).limit(1);
-
-      res.json({
-        programId,
-        programName: program[0]?.name || 'Unknown Program',
-        leaderboard: result.rows.map(row => ({
-          userId: row.user_id,
-          username: row.username,
-          fullName: row.full_name,
-          avatarUrl: row.avatar_url,
-          totalPoints: row.total_points || 0,
-          currentTier: row.current_tier,
-          rank: row.rank || 0
-        })),
-        timePeriod,
-        totalParticipants: result.rows.length
-      });
-    } catch (error) {
-      console.error("Failed to fetch program leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch program leaderboard" });
-    }
-  });
 
   // Refresh leaderboard views (admin only)
   app.post("/api/leaderboards/refresh", authenticateUser, async (req: AuthenticatedRequest, res) => {

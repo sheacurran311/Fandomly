@@ -95,6 +95,15 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api/social/') || req.path.startsWith('/api/social-connections')) {
     return next();
   }
+  // Skip CSRF for auth routes that handle social login/linking
+  // These are protected by their own mechanisms (OAuth tokens, pending link IDs with expiration)
+  if (req.path.startsWith('/api/auth/')) {
+    return next();
+  }
+  // Skip CSRF for stateless utility endpoints that don't modify server state
+  if (req.path === '/api/twitter/extract-tweet-id') {
+    return next();
+  }
   doubleCsrfProtection(req, res, next);
 });
 

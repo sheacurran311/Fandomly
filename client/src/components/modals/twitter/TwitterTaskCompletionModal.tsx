@@ -356,7 +356,7 @@ export default function TwitterTaskCompletionModal({
           <div className="space-y-1.5">
             <Label className="text-xs text-white/50">Paste your tweet URL</Label>
             <Input
-              placeholder="https://twitter.com/username/status/..."
+              placeholder="https://x.com/username/status/..."
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
               className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
