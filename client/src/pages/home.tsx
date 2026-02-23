@@ -277,55 +277,184 @@ export default function Home() {
 
         <motion.div
           style={{ opacity: heroOpacity, scale: heroScale }}
-          className="relative z-10 max-w-5xl"
+          className="relative z-10 max-w-7xl mx-auto w-full grid lg:grid-cols-[1fr,1fr] gap-12 lg:gap-16 items-center"
         >
-          {/* Beta badge */}
+          {/* Left column - text content */}
+          <div>
+            {/* Beta badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2.5 px-4 py-2 bg-[#e10698]/10 border border-[#e10698]/20 rounded-full mb-8"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e10698] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#e10698]" />
+              </span>
+              <span className="text-sm text-[#e10698] font-medium tracking-wide">Beta Access Open</span>
+            </motion.div>
+
+            {/* Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-[clamp(2.5rem,5.5vw,4.5rem)] font-extrabold leading-[1.05] tracking-tight mb-6 font-display"
+            >
+              <span className="text-white">Elevate Your Brand.</span>
+              <br />
+              <span className="bg-gradient-to-r from-[#e10698] via-[#ff47b0] to-[#e10698] bg-clip-text text-transparent">
+                Reward Your Community.
+              </span>
+            </motion.h1>
+
+            {/* Subheadline */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="text-lg md:text-xl text-gray-400 mb-10 max-w-xl leading-relaxed"
+            >
+              Launch your own loyalty program in minutes. Verify social engagement
+              automatically. Reward fans with points, NFTs, and exclusive perks across
+              10 platforms.
+            </motion.p>
+
+            {/* Signup form */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <LandingSignup variant="hero" />
+            </motion.div>
+          </div>
+
+          {/* Right column - Dashboard mockup */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2.5 px-4 py-2 bg-[#e10698]/10 border border-[#e10698]/20 rounded-full mb-8"
+            initial={{ opacity: 0, x: 40, rotateY: -8 }}
+            animate={{ opacity: 1, x: 0, rotateY: 0 }}
+            transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+            className="hidden lg:block relative"
           >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e10698] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#e10698]" />
-            </span>
-            <span className="text-sm text-[#e10698] font-medium tracking-wide">Beta Access Open</span>
-          </motion.div>
+            {/* Floating glow behind card */}
+            <div className="absolute -inset-8 bg-gradient-to-br from-[#e10698]/20 via-transparent to-[#14feee]/10 rounded-[40px] blur-[60px] opacity-40" />
 
-          {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold leading-[1.05] tracking-tight mb-6 font-display"
-          >
-            <span className="text-white">Elevate Your Brand.</span>
-            <br />
-            <span className="bg-gradient-to-r from-[#e10698] via-[#ff47b0] to-[#e10698] bg-clip-text text-transparent">
-              Reward Your Community.
-            </span>
-          </motion.h1>
+            {/* Main dashboard card */}
+            <div className="relative bg-[#111116]/80 backdrop-blur-xl border border-white/[0.08] rounded-3xl p-6 shadow-2xl">
+              {/* Top bar */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#e10698] to-[#ff47b0] flex items-center justify-center">
+                    <span className="text-white font-extrabold text-xs">F</span>
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-semibold">Creator Dashboard</p>
+                    <p className="text-gray-500 text-xs">@alexrivera</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#14feee]/60" />
+                  <span className="text-[#14feee] text-xs font-medium">Live</span>
+                </div>
+              </div>
 
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl leading-relaxed"
-          >
-            Launch your own loyalty program in minutes. Verify social engagement
-            automatically. Reward fans with points, NFTs, and exclusive perks across
-            10 platforms.
-          </motion.p>
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                {[
+                  { label: "Total Fans", value: "2,847", change: "+12%" },
+                  { label: "Engagement", value: "89.2%", change: "+5.4%" },
+                  { label: "Points Given", value: "45.2K", change: "+28%" },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{stat.label}</p>
+                    <p className="text-white font-bold text-lg leading-tight">{stat.value}</p>
+                    <p className="text-[#14feee] text-[10px] font-semibold mt-0.5">{stat.change}</p>
+                  </div>
+                ))}
+              </div>
 
-          {/* Signup form */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <LandingSignup variant="hero" />
+              {/* Activity feed */}
+              <div className="space-y-2.5 mb-5">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Recent Activity</p>
+                {[
+                  { platform: "Instagram", action: "Liked post", user: "fan_sarah", points: "+15", color: "#E4405F", icon: SiInstagram },
+                  { platform: "YouTube", action: "Subscribed", user: "musiclover99", points: "+50", color: "#FF0000", icon: SiYoutube },
+                  { platform: "TikTok", action: "Shared video", user: "dance_mike", points: "+25", color: "#ffffff", icon: SiTiktok },
+                  { platform: "X", action: "Retweeted", user: "crypto_jen", points: "+20", color: "#ffffff", icon: SiX },
+                ].map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6 + i * 0.15 }}
+                    className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.04] rounded-xl px-3 py-2.5"
+                  >
+                    <item.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: item.color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium truncate">{item.user}</p>
+                      <p className="text-gray-500 text-[10px]">{item.action}</p>
+                    </div>
+                    <span className="text-[#14feee] text-xs font-bold flex-shrink-0">{item.points}</span>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Connected platforms bar */}
+              <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.04] rounded-xl px-4 py-3">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Connected</span>
+                <div className="flex items-center gap-2">
+                  {[
+                    { icon: SiInstagram, color: "#E4405F" },
+                    { icon: SiYoutube, color: "#FF0000" },
+                    { icon: SiTiktok, color: "#69C9D0" },
+                    { icon: SiX, color: "#fff" },
+                    { icon: SiSpotify, color: "#1DB954" },
+                    { icon: SiDiscord, color: "#5865F2" },
+                  ].map((p, i) => (
+                    <p.icon key={i} className="w-3.5 h-3.5 opacity-60 hover:opacity-100 transition-opacity" style={{ color: p.color }} />
+                  ))}
+                  <span className="text-gray-600 text-[10px] ml-1">+4</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating notification card - top right */}
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 1.2, duration: 0.5 }}
+              className="absolute -top-4 -right-4 bg-[#111116] border border-white/[0.08] rounded-2xl px-4 py-3 shadow-xl"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-[#e10698]/20 flex items-center justify-center">
+                  <PartyPopper className="w-3.5 h-3.5 text-[#e10698]" />
+                </div>
+                <div>
+                  <p className="text-white text-xs font-semibold">New milestone!</p>
+                  <p className="text-gray-500 text-[10px]">1,000 fans reached</p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Floating reward card - bottom left */}
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 1.5, duration: 0.5 }}
+              className="absolute -bottom-3 -left-6 bg-[#111116] border border-white/[0.08] rounded-2xl px-4 py-3 shadow-xl"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-[#14feee]/15 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5 text-[#14feee]" />
+                </div>
+                <div>
+                  <p className="text-white text-xs font-semibold">+250 points</p>
+                  <p className="text-gray-500 text-[10px]">Reward claimed</p>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         </motion.div>
 
