@@ -274,6 +274,21 @@ function App() {
   );
 }
 
+/**
+ * Landing-only mode: when VITE_LANDING_ONLY=true, renders just the Home page
+ * with no auth, nav, footer, or routing. Used for production beta collection.
+ */
+function LandingOnlyApp() {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Home />
+        <Toaster />
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+}
+
 export default function AppEntry() {
   if (import.meta.env.VITE_LANDING_ONLY === "true") {
     return <LandingOnlyApp />;
