@@ -11,6 +11,7 @@ import {
 } from '../../services/auth/jwt-service';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { nanoid } from 'nanoid';
+import { claimBetaWelcomePoints } from '../../services/beta-signup-service';
 
 /**
  * Register general authentication routes
@@ -151,6 +152,15 @@ export function registerAuthRoutes(app: Express) {
         return res.status(500).json({ error: 'Failed to create or find user' });
       }
 
+      // If this is a new user, check for beta welcome points
+      let betaPointsClaimed = false;
+      let betaPointsAmount = 0;
+      if (isNewUser && user.email) {
+        const result = await claimBetaWelcomePoints(user.id, user.email);
+        betaPointsClaimed = result.claimed;
+        betaPointsAmount = result.points;
+      }
+
       // Generate tokens
       const accessToken = signAccessToken({
         id: user.id,
@@ -179,7 +189,11 @@ export function registerAuthRoutes(app: Express) {
           onboardingState: user.onboardingState
         },
         accessToken,
-        isNewUser
+        isNewUser,
+        betaWelcome: betaPointsClaimed ? {
+          pointsAwarded: betaPointsAmount,
+          message: `Welcome bonus: ${betaPointsAmount} Fandomly Points credited!`
+        } : undefined
       });
     } catch (error: any) {
       console.error('[Social Auth] Callback error:', error);

@@ -104,6 +104,10 @@ app.use((req, res, next) => {
   if (req.path === '/api/twitter/extract-tweet-id') {
     return next();
   }
+  // Skip CSRF for public beta signup (landing page form has no auth/CSRF token)
+  if (req.path === '/api/beta-signup') {
+    return next();
+  }
   doubleCsrfProtection(req, res, next);
 });
 

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { ArrowRight, Check, ChevronRight, Mail, Loader2, Sparkles, PartyPopper, X } from "lucide-react";
+import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, animate } from "framer-motion";
+import { ArrowRight, Check, ChevronRight, Mail, Loader2, Sparkles, PartyPopper, X, ShieldCheck, Gift, Crown, BarChart3, Palette, Zap } from "lucide-react";
 import {
   SiFacebook, SiInstagram, SiX, SiTiktok,
   SiYoutube, SiSpotify, SiDiscord, SiTwitch,
   SiPatreon
 } from "react-icons/si";
 import { Link } from "wouter";
+import { SectionGeometry } from "@/components/landing/section-geometry";
 
 // Kick doesn't have an official simple-icons entry, so we use a custom SVG
 function KickIcon({ className }: { className?: string }) {
@@ -14,6 +15,145 @@ function KickIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path d="M1.333 0h21.334C23.403 0 24 .597 24 1.333v21.334c0 .736-.597 1.333-1.333 1.333H1.333C.597 24 0 23.403 0 22.667V1.333C0 .597.597 0 1.333 0zm4.89 5.14h3.428v4.27l1.26-1.552h3.864l-3.052 3.473L15.077 18.86h-3.972l-2.454-4.742v4.742H5.223V5.14h1z" />
     </svg>
+  );
+}
+
+// ============================================================
+// SUCCESS MODAL (enhanced with Points, confetti, differentiated copy)
+// ============================================================
+function AnimatedPointsCounter() {
+  const count = useMotionValue(0);
+  const [displayValue, setDisplayValue] = useState("0");
+
+  useEffect(() => {
+    const controls = animate(count, 1000, {
+      duration: 1.2,
+      ease: "easeOut",
+    });
+    const unsubscribe = count.on("change", (v) => setDisplayValue(Math.round(v).toLocaleString()));
+    return () => {
+      controls.stop();
+      unsubscribe();
+    };
+  }, [count]);
+
+  return <motion.span>{displayValue}</motion.span>;
+}
+
+function SuccessModalContent({
+  successMessage,
+  isAlreadyRegistered,
+  onClose,
+}: {
+  successMessage: string;
+  isAlreadyRegistered: boolean;
+  onClose: () => void;
+}) {
+  const confettiColors = ["#e10698", "#14feee", "#8B5CF6", "#F59E0B", "#10B981", "#3B82F6"];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.85, y: 20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="relative z-10 w-full max-w-md bg-[#1a1a2e] border border-white/10 rounded-3xl p-8 text-center shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Confetti particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-3xl">
+          {confettiColors.map((color, i) => (
+            <motion.div
+              key={i}
+              initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
+              animate={{
+                scale: 1,
+                x: (i % 2 === 0 ? 1 : -1) * (40 + i * 15),
+                y: (i % 3 === 0 ? -1 : 1) * (30 + (i % 2) * 20),
+                opacity: 0,
+              }}
+              transition={{ delay: 0.3 + i * 0.08, duration: 0.8, ease: "easeOut" }}
+              className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
+          className="mx-auto w-20 h-20 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-6"
+        >
+          <PartyPopper className="w-10 h-10 text-emerald-400" />
+        </motion.div>
+
+        <h3 className="text-2xl font-bold text-white mb-2 font-display">You're on the list!</h3>
+        <p className="text-gray-300 mb-2">{successMessage}</p>
+
+        {isAlreadyRegistered ? (
+          <p className="text-sm text-gray-500 mb-6">Thanks for your interest — we'll be in touch!</p>
+        ) : (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mb-4 px-4 py-3 rounded-2xl bg-gradient-to-r from-[#e10698]/20 to-[#14feee]/20 border border-[#e10698]/30"
+            >
+              <p className="text-[#14feee] font-bold text-lg">
+                <AnimatedPointsCounter /> Fandomly Points
+              </p>
+              <p className="text-gray-400 text-xs mt-0.5">Will be credited when you sign up with this email</p>
+            </motion.div>
+            <ul className="text-left text-sm text-gray-400 mb-6 space-y-1.5 max-w-xs mx-auto">
+              <li className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#14feee] flex-shrink-0" />
+                Creator monthly fee credits
+              </li>
+              <li className="flex items-center gap-2">
+                <Gift className="w-4 h-4 text-[#e10698] flex-shrink-0" />
+                Fandomly swag
+              </li>
+            </ul>
+          </>
+        )}
+
+        {!isAlreadyRegistered && (
+          <p className="text-sm text-gray-500 mb-6">Check your inbox for updates. We can't wait to have you!</p>
+        )}
+
+        <motion.button
+          onClick={onClose}
+          className="px-8 py-3 bg-emerald-500 text-white rounded-2xl font-semibold hover:bg-emerald-600 transition-all"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Check className="w-4 h-4 inline mr-2" />
+          Awesome!
+        </motion.button>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -27,6 +167,7 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
   const [message, setMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,11 +197,13 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
       if (data.success) {
         setStatus("idle");
         setSuccessMessage(data.message);
+        setIsAlreadyRegistered(!!data.alreadyRegistered);
         setShowSuccessModal(true);
         setEmail("");
       } else {
         setStatus("error");
-        setMessage(data.error || "Something went wrong");
+        const err = data.error;
+        setMessage(typeof err === "string" ? err : "Something went wrong");
       }
     } catch {
       setStatus("error");
@@ -73,55 +216,11 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
       {/* Success Modal */}
       <AnimatePresence>
         {showSuccessModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-            onClick={() => setShowSuccessModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.85, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative z-10 w-full max-w-md bg-[#1a1a2e] border border-white/10 rounded-3xl p-8 text-center shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
-                className="mx-auto w-20 h-20 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-6"
-              >
-                <PartyPopper className="w-10 h-10 text-emerald-400" />
-              </motion.div>
-              <h3 className="text-2xl font-bold text-white mb-2 font-display">You're on the list!</h3>
-              <p className="text-gray-300 mb-2">{successMessage}</p>
-              <p className="text-sm text-gray-500 mb-6">Check your inbox for updates. We can't wait to have you!</p>
-              <motion.button
-                onClick={() => setShowSuccessModal(false)}
-                className="px-8 py-3 bg-emerald-500 text-white rounded-2xl font-semibold hover:bg-emerald-600 transition-all"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Check className="w-4 h-4 inline mr-2" />
-                Awesome!
-              </motion.button>
-            </motion.div>
-          </motion.div>
+          <SuccessModalContent
+            successMessage={successMessage}
+            isAlreadyRegistered={isAlreadyRegistered}
+            onClose={() => setShowSuccessModal(false)}
+          />
         )}
       </AnimatePresence>
 
@@ -135,7 +234,9 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
                 onClick={() => setUserType(type)}
                 className={`px-5 py-2 rounded-full text-sm font-medium tracking-wide transition-all duration-300 ${
                   userType === type
-                    ? "bg-[#e10698] text-white shadow-lg shadow-[#e10698]/20"
+                    ? type === "creator"
+                      ? "bg-[#e10698] text-white shadow-lg shadow-[#e10698]/20"
+                      : "bg-[#14feee] text-[#0b0b0f] shadow-lg shadow-[#14feee]/20"
                     : "bg-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.1]"
                 }`}
               >
@@ -163,7 +264,7 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
           <motion.button
             type="submit"
             disabled={status === "loading"}
-            className="group px-7 py-4 bg-[#e10698] text-white rounded-2xl font-semibold hover:bg-[#c90589] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-[15px] whitespace-nowrap"
+            className="group px-7 py-4 bg-gradient-to-r from-[#e10698] to-[#14feee] text-white rounded-2xl font-semibold hover:from-[#c90589] hover:to-[#00e8d5] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-[15px] whitespace-nowrap"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -189,9 +290,14 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
         )}
 
         {variant === "hero" && (
-          <p className="mt-4 text-sm text-gray-500">
-            Join 500+ creators on the waitlist. No spam, ever.
-          </p>
+          <div className="mt-4 space-y-2">
+            <p className="text-sm text-gray-400">
+              <span className="text-gray-500">💡 Tip:</span> Use the email from your social account (Google, X, Facebook, TikTok, etc.) to ensure your 1,000 welcome points are automatically credited when you join.
+            </p>
+            <p className="text-xs text-gray-600">
+              Join 500+ creators on the waitlist. No spam, ever.
+            </p>
+          </div>
         )}
       </div>
     </>
@@ -241,7 +347,7 @@ function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: stri
           requestAnimationFrame(animate);
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.5, rootMargin: "-50px" }
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
@@ -263,10 +369,11 @@ export default function Home() {
   const heroScale = useTransform(scrollYProgress, [0, 0.8], [1, 0.95]);
 
   return (
-    <div className="min-h-screen bg-[#0b0b0f] overflow-x-hidden selection:bg-[#e10698]/30 selection:text-white">
+    <div className="min-h-screen bg-[#0a0118] overflow-x-hidden selection:bg-[#e10698]/30 selection:text-white">
 
       {/* ===== HERO ===== */}
       <section ref={heroRef} className="relative min-h-[100vh] flex flex-col justify-center px-6 md:px-12 lg:px-20 pt-24 pb-20 overflow-hidden">
+        <SectionGeometry variant="hero" />
         {/* Ambient background */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#e10698]/[0.04] blur-[120px]" />
@@ -283,7 +390,7 @@ export default function Home() {
           <div>
             {/* Beta badge */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2.5 px-4 py-2 bg-[#e10698]/10 border border-[#e10698]/20 rounded-full mb-8"
@@ -297,7 +404,7 @@ export default function Home() {
 
             {/* Headline */}
             <motion.h1
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-[clamp(2.5rem,5.5vw,4.5rem)] font-extrabold leading-[1.05] tracking-tight mb-6 font-display"
@@ -311,7 +418,7 @@ export default function Home() {
 
             {/* Subheadline */}
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.25 }}
               className="text-lg md:text-xl text-gray-400 mb-10 max-w-xl leading-relaxed"
@@ -323,7 +430,7 @@ export default function Home() {
 
             {/* Signup form */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
@@ -476,7 +583,7 @@ export default function Home() {
       </section>
 
       {/* ===== SOCIAL PROOF BAR ===== */}
-      <section className="relative z-10 border-y border-white/[0.04] bg-white/[0.01]">
+      <section className="relative z-10 border-y border-white/[0.04]" style={{ backgroundColor: "rgba(255,255,255,0.008)" }}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-14">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
             {[
@@ -487,10 +594,10 @@ export default function Home() {
             ].map((stat, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: i * 0.07 }}
                 className="text-center"
               >
                 <div className="text-3xl md:text-4xl font-extrabold text-white font-display mb-1">
@@ -505,11 +612,13 @@ export default function Home() {
 
       {/* ===== PLATFORMS ===== */}
       <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+        <SectionGeometry variant="platforms" />
         <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="mb-16"
           >
             <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Integrations</p>
@@ -529,8 +638,8 @@ export default function Home() {
                 key={platform.name}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.04 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: i * 0.04 }}
                 whileHover={{ scale: 1.05, y: -2 }}
                 className="group flex items-center gap-3 px-5 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.12] rounded-2xl transition-all duration-300 cursor-default"
               >
@@ -549,39 +658,60 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
+                num: "01",
                 title: "Instant Verification",
                 desc: "Every follow, like, and share is verified via API. No screenshots. No honor system.",
                 icon: "bolt",
+                accent: "#14feee",
+                iconBg: "bg-[#14feee]/10",
+                topBorder: "border-t-2 border-[#14feee]/40",
+                cardHover: "hover:border-[#14feee]/30",
+                numColor: "text-[#14feee]",
               },
               {
+                num: "02",
                 title: "Unified Analytics",
                 desc: "Track engagement, growth, and ROI across all platforms from a single dashboard.",
                 icon: "chart",
+                accent: "#e10698",
+                iconBg: "bg-[#e10698]/10",
+                topBorder: "border-t-2 border-[#e10698]/40",
+                cardHover: "hover:border-[#e10698]/30",
+                numColor: "text-[#e10698]",
               },
               {
+                num: "03",
                 title: "Smart Campaigns",
                 desc: "Build cross-platform campaigns that reward fans for engaging where it matters most.",
                 icon: "spark",
+                accent: "#8B5CF6",
+                iconBg: "bg-[#8B5CF6]/10",
+                topBorder: "border-t-2 border-[#8B5CF6]/40",
+                cardHover: "hover:border-[#8B5CF6]/30",
+                numColor: "text-[#8B5CF6]",
               },
             ].map((feature, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="group p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] hover:border-white/[0.1] rounded-3xl transition-all duration-500"
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: i * 0.07 }}
+                className={`group p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] ${feature.cardHover} ${feature.topBorder} rounded-3xl transition-all duration-500`}
               >
-                <div className="w-10 h-10 rounded-xl bg-[#e10698]/10 flex items-center justify-center mb-5">
-                  {feature.icon === "bolt" && (
-                    <svg className="w-5 h-5 text-[#e10698]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
-                  )}
-                  {feature.icon === "chart" && (
-                    <svg className="w-5 h-5 text-[#e10698]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-                  )}
-                  {feature.icon === "spark" && (
-                    <Sparkles className="w-5 h-5 text-[#e10698]" />
-                  )}
+                <div className="flex items-center justify-between mb-5">
+                  <div className={`w-10 h-10 rounded-xl ${feature.iconBg} flex items-center justify-center`}>
+                    {feature.icon === "bolt" && (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke={feature.accent}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                    )}
+                    {feature.icon === "chart" && (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke={feature.accent}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                    )}
+                    {feature.icon === "spark" && (
+                      <Sparkles className="w-5 h-5" style={{ color: feature.accent }} />
+                    )}
+                  </div>
+                  <span className={`text-xs font-bold tracking-widest ${feature.numColor} opacity-60`}>{feature.num}</span>
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
@@ -592,12 +722,14 @@ export default function Home() {
       </section>
 
       {/* ===== HOW IT WORKS ===== */}
-      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12 bg-white/[0.01]">
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: "rgba(255,255,255,0.008)" }}>
+        <SectionGeometry variant="howItWorks" />
         <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="text-center mb-20"
           >
             <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">How it works</p>
@@ -608,27 +740,48 @@ export default function Home() {
 
           <div className="grid md:grid-cols-5 gap-4 md:gap-2">
             {[
-              { step: "01", title: "Sign up", desc: "Create your account and connect your social profiles." },
-              { step: "02", title: "Design", desc: "Pick from 35+ templates or build custom tasks for fans." },
-              { step: "03", title: "Launch", desc: "Share your program link. Fans join in seconds." },
-              { step: "04", title: "Reward", desc: "Points, NFTs, merch, raffle entries -- all automated." },
-              { step: "05", title: "Grow", desc: "Track every metric and scale your community." },
+              { step: "01", title: "Sign up", desc: "Create your account and connect your social profiles.", pink: true },
+              { step: "02", title: "Design", desc: "Pick from 35+ templates or build custom tasks for fans.", pink: false },
+              { step: "03", title: "Launch", desc: "Share your program link. Fans join in seconds.", pink: true },
+              { step: "04", title: "Reward", desc: "Points, NFTs, merch, raffle entries -- all automated.", pink: false },
+              { step: "05", title: "Grow", desc: "Track every metric and scale your community.", pink: true },
             ].map((item, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 14 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: i * 0.06 }}
                 className="relative group"
               >
-                <div className="p-6 md:p-5 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500 h-full">
-                  <div className="text-[#e10698] text-xs font-bold tracking-widest mb-3">{item.step}</div>
+                <div
+                  className={`p-6 md:p-5 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500 h-full border-l-2 ${item.pink ? "border-l-[#e10698]/50 hover:border-l-[#e10698]/80" : "border-l-[#14feee]/50 hover:border-l-[#14feee]/80"}`}
+                >
+                  {/* Circular step badge */}
+                  <div
+                    className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold tracking-widest mb-4 border ${
+                      item.pink
+                        ? "bg-[#e10698]/15 text-[#e10698] border-[#e10698]/30"
+                        : "bg-[#14feee]/15 text-[#14feee] border-[#14feee]/30"
+                    }`}
+                  >
+                    {item.step}
+                  </div>
                   <h3 className="text-white font-bold text-lg mb-2 font-display">{item.title}</h3>
                   <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
                 </div>
                 {i < 4 && (
-                  <ChevronRight className="hidden md:block absolute top-1/2 -right-3 w-4 h-4 text-white/10 -translate-y-1/2" />
+                  <div className="hidden md:flex absolute top-1/2 -right-3.5 -translate-y-1/2 z-10">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M2 7 L12 7 M8 3 L12 7 L8 11" stroke="url(#chevron-grad)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <defs>
+                        <linearGradient id="chevron-grad" x1="0" y1="0" x2="14" y2="0">
+                          <stop offset="0%" stopColor="#e10698" stopOpacity="0.5" />
+                          <stop offset="100%" stopColor="#14feee" stopOpacity="0.5" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </div>
                 )}
               </motion.div>
             ))}
@@ -640,9 +793,10 @@ export default function Home() {
       <section className="relative z-10 py-24 md:py-32 px-6 md:px-12 overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="mb-16"
           >
             <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">The Platform</p>
@@ -657,9 +811,10 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-8">
             {/* Creator Dashboard Preview */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
               className="rounded-3xl bg-gradient-to-b from-white/[0.04] to-white/[0.01] border border-white/[0.06] p-6 md:p-8"
             >
               <div className="flex items-center gap-3 mb-6">
@@ -701,10 +856,10 @@ export default function Home() {
 
             {/* Fan Dashboard Preview */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.15 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
               className="rounded-3xl bg-gradient-to-b from-white/[0.04] to-white/[0.01] border border-white/[0.06] p-6 md:p-8"
             >
               <div className="flex items-center gap-3 mb-6">
@@ -764,67 +919,64 @@ export default function Home() {
       </section>
 
       {/* ===== WHO IT'S FOR ===== */}
-      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12 bg-white/[0.01]">
+      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: "rgba(255,255,255,0.008)" }}>
         <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
           >
-            <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">Built for creators</p>
-            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
-              Your audience. Your rules.
-            </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto text-lg">
-              Whether you have 1,000 followers or 10 million, Fandomly gives you
-              the tools to turn passive audiences into active communities.
-            </p>
-          </motion.div>
+            <div className="text-center mb-16">
+              <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">Built for creators</p>
+              <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
+                Your audience. Your rules.
+              </h2>
+              <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+                Whether you have 1,000 followers or 10 million, Fandomly gives you
+                the tools to turn passive audiences into active communities.
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
-            {[
-              {
-                title: "NIL Athletes",
-                subtitle: "Monetize your name, image & likeness",
-                desc: "Turn your fanbase into a loyalty program. Reward fans for wearing your merch, attending games, and engaging with sponsors.",
-                tags: ["Pro Athletes", "College Athletes", "Olympic Athletes"],
-                accent: "#14feee",
-                gradient: "from-[#14feee]/[0.06] to-transparent",
-              },
-              {
-                title: "Content Creators",
-                subtitle: "Reward every interaction",
-                desc: "Your followers already engage with your content. Now you can track it, reward it, and grow faster because of it.",
-                tags: ["Influencers", "Video Creators", "Podcasters"],
-                accent: "#e10698",
-                gradient: "from-[#e10698]/[0.06] to-transparent",
-              },
-              {
-                title: "Musicians & Artists",
-                subtitle: "Streaming pays pennies. Your superfans don't.",
-                desc: "Identify your most dedicated listeners. Reward streams, shares, and playlist adds with exclusive drops and NFTs.",
-                tags: ["Independent Artists", "Bands", "DJs & Producers"],
-                accent: "#8B5CF6",
-                gradient: "from-[#8B5CF6]/[0.06] to-transparent",
-              },
-              {
-                title: "Brands & Agencies",
-                subtitle: "White-label everything",
-                desc: "Your brand. Your domain. Your auth. Multi-tenant SaaS that scales with your portfolio of creators.",
-                tags: ["Marketing Agencies", "Sports Teams", "Enterprises"],
-                accent: "#10B981",
-                gradient: "from-[#10B981]/[0.06] to-transparent",
-              },
-            ].map((card, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className={`group p-7 md:p-8 rounded-3xl bg-gradient-to-br ${card.gradient} border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500`}
-              >
+            <div className="grid md:grid-cols-2 gap-5">
+              {[
+                {
+                  title: "NIL Athletes",
+                  subtitle: "Monetize your name, image & likeness",
+                  desc: "Turn your fanbase into a loyalty program. Reward fans for wearing your merch, attending games, and engaging with sponsors.",
+                  tags: ["Pro Athletes", "College Athletes", "Olympic Athletes"],
+                  accent: "#14feee",
+                  gradient: "from-[#14feee]/[0.06] to-transparent",
+                },
+                {
+                  title: "Content Creators",
+                  subtitle: "Reward every interaction",
+                  desc: "Your followers already engage with your content. Now you can track it, reward it, and grow faster because of it.",
+                  tags: ["Influencers", "Video Creators", "Podcasters"],
+                  accent: "#e10698",
+                  gradient: "from-[#e10698]/[0.06] to-transparent",
+                },
+                {
+                  title: "Musicians & Artists",
+                  subtitle: "Streaming pays pennies. Your superfans don't.",
+                  desc: "Identify your most dedicated listeners. Reward streams, shares, and playlist adds with exclusive drops and NFTs.",
+                  tags: ["Independent Artists", "Bands", "DJs & Producers"],
+                  accent: "#8B5CF6",
+                  gradient: "from-[#8B5CF6]/[0.06] to-transparent",
+                },
+                {
+                  title: "Brands & Agencies",
+                  subtitle: "White-label everything",
+                  desc: "Your brand. Your domain. Your auth. Multi-tenant SaaS that scales with your portfolio of creators.",
+                  tags: ["Marketing Agencies", "Sports Teams", "Enterprises"],
+                  accent: "#10B981",
+                  gradient: "from-[#10B981]/[0.06] to-transparent",
+                },
+              ].map((card, i) => (
+                <div
+                  key={i}
+                  className={`group p-7 md:p-8 rounded-3xl bg-gradient-to-br ${card.gradient} border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500`}
+                >
                 <div className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: card.accent }}>
                   {card.subtitle}
                 </div>
@@ -845,60 +997,112 @@ export default function Home() {
                     </span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
             ))}
-          </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ===== FEATURES GRID ===== */}
       <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+        <SectionGeometry variant="features" />
         <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
           >
-            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Features</p>
-            <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
-              Everything you need.<br className="hidden md:block" /> Nothing you don't.
-            </h2>
-          </motion.div>
+            <div className="text-center mb-16">
+              <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Features</p>
+              <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
+                Everything you need.<br className="hidden md:block" /> Nothing you don't.
+              </h2>
+            </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { title: "Fraud Protection", desc: "Real-time verification prevents fake engagement and bot activity. Three verification tiers for every trust level." },
-              { title: "Flexible Rewards", desc: "Points, NFTs, raffle entries, physical merch, exclusive access -- all in one system." },
-              { title: "Fan Tiers", desc: "Automatically segment fans by engagement level. Reward your most loyal supporters differently." },
-              { title: "Deep Analytics", desc: "Track engagement, conversion rates, and ROI across every platform and campaign in real-time." },
-              { title: "White-Label", desc: "Your brand, your domain, your colors. Remove every trace of Fandomly. Full multi-tenant SaaS." },
-              { title: "No-Code Setup", desc: "Launch a complete loyalty program in 5 minutes. 35+ templates. Zero developers required." },
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[
+              {
+                title: "Fraud Protection",
+                desc: "Real-time verification prevents fake engagement and bot activity. Three verification tiers for every trust level.",
+                Icon: ShieldCheck,
+                accent: "#14feee",
+                iconBg: "bg-[#14feee]/10",
+                hoverBorder: "hover:border-[#14feee]/25",
+                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(20,254,238,0.12)]",
+              },
+              {
+                title: "Flexible Rewards",
+                desc: "Points, NFTs, raffle entries, physical merch, exclusive access -- all in one system.",
+                Icon: Gift,
+                accent: "#e10698",
+                iconBg: "bg-[#e10698]/10",
+                hoverBorder: "hover:border-[#e10698]/25",
+                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(225,6,152,0.12)]",
+              },
+              {
+                title: "Fan Tiers",
+                desc: "Automatically segment fans by engagement level. Reward your most loyal supporters differently.",
+                Icon: Crown,
+                accent: "#F59E0B",
+                iconBg: "bg-[#F59E0B]/10",
+                hoverBorder: "hover:border-[#F59E0B]/25",
+                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(245,158,11,0.12)]",
+              },
+              {
+                title: "Deep Analytics",
+                desc: "Track engagement, conversion rates, and ROI across every platform and campaign in real-time.",
+                Icon: BarChart3,
+                accent: "#3B82F6",
+                iconBg: "bg-[#3B82F6]/10",
+                hoverBorder: "hover:border-[#3B82F6]/25",
+                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(59,130,246,0.12)]",
+              },
+              {
+                title: "White-Label",
+                desc: "Your brand, your domain, your colors. Remove every trace of Fandomly. Full multi-tenant SaaS.",
+                Icon: Palette,
+                accent: "#8B5CF6",
+                iconBg: "bg-[#8B5CF6]/10",
+                hoverBorder: "hover:border-[#8B5CF6]/25",
+                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(139,92,246,0.12)]",
+              },
+              {
+                title: "No-Code Setup",
+                desc: "Launch a complete loyalty program in 5 minutes. 35+ templates. Zero developers required.",
+                Icon: Zap,
+                accent: "#10B981",
+                iconBg: "bg-[#10B981]/10",
+                hoverBorder: "hover:border-[#10B981]/25",
+                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(16,185,129,0.12)]",
+              },
             ].map((feature, i) => (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
-                className="group p-7 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500"
+                className={`group p-7 rounded-3xl bg-white/[0.02] border border-white/[0.05] ${feature.hoverBorder} ${feature.hoverGlow} transition-all duration-500`}
               >
-                <div className="w-2 h-2 rounded-full bg-[#e10698] mb-5 group-hover:shadow-[0_0_12px_rgba(225,6,152,0.5)] transition-shadow duration-500" />
+                <div className={`w-10 h-10 rounded-xl ${feature.iconBg} flex items-center justify-center mb-5`}>
+                  <feature.Icon className="w-5 h-5" style={{ color: feature.accent }} />
+                </div>
                 <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{feature.desc}</p>
-              </motion.div>
+              </div>
             ))}
-          </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ===== FINAL CTA ===== */}
       <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+        <SectionGeometry variant="cta" />
         <div className="max-w-4xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 14 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="rounded-[2rem] bg-gradient-to-br from-[#e10698]/10 via-transparent to-[#14feee]/5 border border-white/[0.06] p-10 md:p-16 text-center relative overflow-hidden"
           >
             {/* Subtle glow */}
@@ -914,6 +1118,9 @@ export default function Home() {
 
             <div className="relative">
               <LandingSignup variant="bottom" />
+              <p className="text-sm text-gray-500 mt-4 max-w-xl mx-auto">
+                <span className="text-gray-400">💡 Tip:</span> Use the email from your social account (Google, X, Facebook, TikTok, etc.) so your 1,000 welcome points are automatically credited.
+              </p>
             </div>
 
             <div className="flex flex-wrap justify-center gap-3 mt-10 relative">
@@ -930,130 +1137,45 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ===== FOOTER ===== */}
-      <footer className="relative z-10 border-t border-white/[0.05] bg-[#0b0b0f]">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-20">
-          <div className="grid grid-cols-2 md:grid-cols-12 gap-8 md:gap-12 mb-16">
-            {/* Brand column */}
-            <div className="col-span-2 md:col-span-4">
-              <Link href="/" className="inline-block mb-5">
-                <img src="/fandomly2.png" alt="Fandomly" className="h-16 w-auto" />
+      {/* ===== FOOTER (minimal) ===== */}
+      <footer className="relative z-10 border-t border-white/[0.05] bg-[#0a0118]">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <Link href="/" className="flex-shrink-0">
+              <img src="/fandomly2.png" alt="Fandomly" className="h-12 w-auto" />
+            </Link>
+            <div className="flex items-center gap-4">
+              {[
+                { icon: SiX, href: "#", label: "X" },
+                { icon: SiInstagram, href: "#", label: "Instagram" },
+                { icon: SiDiscord, href: "#", label: "Discord" },
+              ].map((social) => (
+                <a
+                  key={social.label}
+                  href={social.href}
+                  aria-label={social.label}
+                  className="w-9 h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] flex items-center justify-center text-gray-500 hover:text-white transition-all"
+                >
+                  <social.icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <Link href="/privacy-policy" className="text-gray-500 hover:text-white transition-colors">
+                Privacy Policy
               </Link>
-              <p className="text-gray-500 text-sm leading-relaxed mb-6 max-w-xs">
-                The loyalty and rewards platform for creators, athletes, and musicians.
-                Turn followers into lifelong fans.
-              </p>
-              <div className="flex gap-3">
-                {[
-                  { icon: SiX, href: "#", label: "X" },
-                  { icon: SiInstagram, href: "#", label: "Instagram" },
-                  { icon: SiDiscord, href: "#", label: "Discord" },
-                ].map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    aria-label={social.label}
-                    className="w-9 h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] flex items-center justify-center text-gray-500 hover:text-white transition-all"
-                  >
-                    <social.icon className="w-4 h-4" />
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            {/* Product */}
-            <div className="md:col-span-2">
-              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">Product</h4>
-              <ul className="space-y-3">
-                {[
-                  { label: "Features", href: "/#features" },
-                  { label: "Integrations", href: "/#integrations" },
-                  { label: "Pricing", href: "/#pricing" },
-                  { label: "API", href: "#" },
-                ].map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Creators */}
-            <div className="md:col-span-2">
-              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">For Creators</h4>
-              <ul className="space-y-3">
-                {[
-                  { label: "Athletes", href: "#" },
-                  { label: "Musicians", href: "#" },
-                  { label: "Content Creators", href: "#" },
-                  { label: "Brands", href: "#" },
-                ].map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div className="md:col-span-2">
-              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">Company</h4>
-              <ul className="space-y-3">
-                {[
-                  { label: "About", href: "#" },
-                  { label: "Blog", href: "#" },
-                  { label: "Careers", href: "#" },
-                  { label: "Contact", href: "#" },
-                ].map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div className="md:col-span-2">
-              <h4 className="text-white text-xs font-bold tracking-widest uppercase mb-5">Legal</h4>
-              <ul className="space-y-3">
-                {[
-                  { label: "Privacy Policy", href: "/privacy-policy" },
-                  { label: "Terms of Service", href: "/terms-of-service" },
-                  { label: "Data Deletion", href: "/data-deletion" },
-                  { label: "Cookie Policy", href: "#" },
-                ].map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-gray-500 hover:text-white text-sm transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Bottom bar */}
-          <div className="border-t border-white/[0.05] pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-gray-600 text-sm">
-              &copy; {new Date().getFullYear()} Fandomly, LLC. All rights reserved.
-            </p>
-            <div className="flex items-center gap-6">
-              <Link href="/privacy-policy" className="text-gray-600 hover:text-white text-sm transition-colors">
-                Privacy
+              <span className="text-gray-600">·</span>
+              <Link href="/terms-of-service" className="text-gray-500 hover:text-white transition-colors">
+                Terms of Service
               </Link>
-              <Link href="/terms-of-service" className="text-gray-600 hover:text-white text-sm transition-colors">
-                Terms
-              </Link>
-              <Link href="/data-deletion" className="text-gray-600 hover:text-white text-sm transition-colors">
+              <span className="text-gray-600">·</span>
+              <Link href="/data-deletion" className="text-gray-500 hover:text-white transition-colors">
                 Data Deletion
               </Link>
             </div>
+            <p className="text-gray-600 text-sm">
+              &copy; {new Date().getFullYear()} Fandomly, LLC
+            </p>
           </div>
         </div>
       </footer>

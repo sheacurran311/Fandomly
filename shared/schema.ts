@@ -3121,6 +3121,9 @@ export const betaSignups = pgTable("beta_signups", {
     utmMedium?: string;
     utmCampaign?: string;
   }>(),
+  claimed: boolean("claimed").default(false).notNull(), // Track if points were awarded
+  claimedAt: timestamp("claimed_at"), // When points were claimed
+  claimedByUserId: varchar("claimed_by_user_id"), // User who claimed the points
   createdAt: timestamp("created_at").defaultNow(),
 });
 

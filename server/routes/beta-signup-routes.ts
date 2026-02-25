@@ -41,7 +41,15 @@ export function registerBetaSignupRoutes(app: Express) {
         });
       }
 
-      const { email, userType, source, metadata } = validationResult.data;
+      const { email, userType, source, metadata: rawMetadata } = validationResult.data;
+
+      // Sanitize metadata: remove undefined values so JSONB insert doesn't fail
+      const metadata =
+        rawMetadata && typeof rawMetadata === "object"
+          ? Object.fromEntries(
+              Object.entries(rawMetadata).filter(([, v]) => v != null && v !== "")
+            )
+          : undefined;
 
       // Check if email already exists
       const existingSignup = await db
@@ -58,15 +66,19 @@ export function registerBetaSignupRoutes(app: Express) {
         });
       }
 
-      // Insert new signup
+      // Insert new signup (only include metadata if we have keys)
+      const insertValues: Record<string, unknown> = {
+        email: email.toLowerCase(),
+        userType: userType ?? "unknown",
+        source: source ?? "landing_page",
+      };
+      if (metadata && Object.keys(metadata).length > 0) {
+        insertValues.metadata = metadata;
+      }
+
       const [newSignup] = await db
         .insert(betaSignups)
-        .values({
-          email: email.toLowerCase(),
-          userType,
-          source,
-          metadata,
-        })
+        .values(insertValues as typeof betaSignups.$inferInsert)
         .returning();
 
       return res.status(201).json({
@@ -75,12 +87,25 @@ export function registerBetaSignupRoutes(app: Express) {
         alreadyRegistered: false,
         id: newSignup.id,
       });
-
     } catch (error) {
-      console.error("Beta signup error:", error);
+      const err = error as Error;
+      const message = err?.message ?? String(error);
+      console.error("Beta signup error:", message, error);
+
+      // If table is missing, hint at running migrations
+      const isMissingTable =
+        typeof message === "string" &&
+        (message.includes("beta_signups") || message.includes("does not exist"));
+      const hint = isMissingTable
+        ? " Run migrations (e.g. npm run db:push or apply migrations/0028_add_beta_signups.sql) and try again."
+        : "";
+
       return res.status(500).json({
         success: false,
-        error: "Something went wrong. Please try again.",
+        error:
+          process.env.NODE_ENV === "development"
+            ? `${message}${hint}`
+            : "Something went wrong. Please try again.",
       });
     }
   });
