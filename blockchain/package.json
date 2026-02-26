@@ -1,0 +1,20 @@
+{
+  "name": "fandomly-blockchain",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Fandomly Chain L1 smart contracts",
+  "type": "module",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.ts --network fandomlyChain",
+    "test": "npx hardhat test"
+  },
+  "devDependencies": {
+    "hardhat": "^3.1.10",
+    "@types/node": "^22.8.5",
+    "typescript": "~5.8.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.6"
+  }
+}
