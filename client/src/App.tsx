@@ -8,6 +8,9 @@ import AuthProvider from "@/components/auth/auth-provider";
 import NewAuthRouter from "@/components/auth/new-auth-router";
 import { AuthModalProvider } from "@/hooks/use-auth-modal";
 import ErrorBoundary from "@/components/error-boundary";
+// Particle Network - Feature-flagged Web3 auth (wraps above AuthProvider)
+import { ParticleProvider } from "@/contexts/particle-provider";
+import ParticleAuthListener from "@/components/auth/particle-auth-listener";
 import { useEffect } from "react";
 import { initTikTokErrorHandler } from "@/lib/tiktok-error-handler";
 import Navigation from "@/components/layout/navigation";
@@ -246,22 +249,25 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <AuthModalProvider>
-              <NewAuthRouter>
-                <div className="min-h-screen bg-brand-dark-bg">
-                    {!isOnboardingRoute && <Navigation />}
-                    <main>
-                      <Router />
-                    </main>
-                    {isPublicRoute && location !== '/' && <Footer />}
-                </div>
-                <Toaster />
-              </NewAuthRouter>
-            </AuthModalProvider>
-          </TooltipProvider>
-        </AuthProvider>
+        <ParticleProvider>
+          <AuthProvider>
+            <ParticleAuthListener />
+            <TooltipProvider>
+              <AuthModalProvider>
+                <NewAuthRouter>
+                  <div className="min-h-screen bg-brand-dark-bg">
+                      {!isOnboardingRoute && <Navigation />}
+                      <main>
+                        <Router />
+                      </main>
+                      {isPublicRoute && location !== '/' && <Footer />}
+                  </div>
+                  <Toaster />
+                </NewAuthRouter>
+              </AuthModalProvider>
+            </TooltipProvider>
+          </AuthProvider>
+        </ParticleProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

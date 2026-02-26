@@ -36,6 +36,7 @@ import { registerVerificationAnalyticsRoutes } from "./analytics/verification-an
 import { registerSyncPreferencesRoutes } from "./analytics/sync-preferences-routes";
 import { registerCreatorAnalyticsRoutes } from "./analytics/creator-analytics-routes";
 import { registerHealthRoutes } from "./health/health-routes";
+import { registerParticleAuthRoutes } from "./auth/particle-routes";
 import { 
   insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema, 
   insertRewardSchema, insertFanProgramSchema,
@@ -3937,6 +3938,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register authentication routes (Google OAuth and general auth)
   registerGoogleAuthRoutes(app);
   registerAuthRoutes(app);
+
+  // Register Particle Network auth routes (feature-flagged via env vars)
+  registerParticleAuthRoutes(app);
 
   // Register social media routes (includes Instagram webhooks)
   registerSocialRoutes(app);
