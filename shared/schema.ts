@@ -358,11 +358,16 @@ export const users = pgTable("users", {
     monthlyReport: false,
   }),
   
+  // Particle Network / Blockchain Integration
+  particleUserId: text("particle_user_id").unique(), // Particle Network UUID
+  avalancheL1Address: text("avalanche_l1_address"), // Fandomly Chain wallet address
+  blockchainEnabled: boolean("blockchain_enabled").default(false), // Whether user has on-chain wallet
+
   // Soft delete columns
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by"),
   deletionReason: text("deletion_reason"),
-  
+
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

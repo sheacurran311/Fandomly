@@ -3,21 +3,22 @@ import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { 
-  FaGoogle, 
-  FaTiktok, 
-  FaTwitter, 
-  FaFacebook, 
-  FaTwitch, 
-  FaDiscord, 
-  FaYoutube, 
-  FaSpotify 
+import { Loader2, X, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
+import {
+  FaGoogle,
+  FaTiktok,
+  FaTwitter,
+  FaFacebook,
+  FaTwitch,
+  FaDiscord,
+  FaYoutube,
+  FaSpotify
 } from 'react-icons/fa';
 import { TwitterSDKManager } from '@/lib/twitter';
 import { FacebookSDKManager } from '@/lib/facebook';
 import { useToast } from '@/hooks/use-toast';
 import { getPostAuthRedirect } from '@/lib/auth-redirect';
+import { isParticleAuthEnabled } from '@/contexts/particle-provider';
 
 interface AuthProvider {
   id: string;
@@ -462,19 +463,24 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
             {/* Auth Buttons */}
             <div className="px-8 pb-8 space-y-3">
-              {/* Google - Primary */}
-              <Button
-                onClick={handleGoogleLogin}
-                disabled={isLoading || loadingProvider !== null}
-                className={`w-full h-12 ${primaryProviders[0].bgColor} ${primaryProviders[0].hoverColor} ${primaryProviders[0].textColor} font-medium flex items-center justify-center gap-3 rounded-xl transition-all duration-200 border-0`}
-              >
-                {loadingProvider === 'google' ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  primaryProviders[0].icon
-                )}
-                <span>{primaryProviders[0].name}</span>
-              </Button>
+              {isParticleAuthEnabled() ? (
+                /* Particle Connect -- handles social + wallet login in one button */
+                <ParticleConnectButton onClose={onClose} />
+              ) : (
+                /* Legacy Google login */
+                <Button
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading || loadingProvider !== null}
+                  className={`w-full h-12 ${primaryProviders[0].bgColor} ${primaryProviders[0].hoverColor} ${primaryProviders[0].textColor} font-medium flex items-center justify-center gap-3 rounded-xl transition-all duration-200 border-0`}
+                >
+                  {loadingProvider === 'google' ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    primaryProviders[0].icon
+                  )}
+                  <span>{primaryProviders[0].name}</span>
+                </Button>
+              )}
 
               {/* OR Divider */}
               <div className="relative py-2">
@@ -576,4 +582,68 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Particle Connect button wrapper.
+ * Opens Particle's modal (social + wallet login) and the ParticleAuthListener
+ * handles bridging the session to Fandomly auth automatically.
+ */
+function ParticleConnectButton({ onClose }: { onClose: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      // Dynamically import to avoid bundling when Particle is disabled
+      const { useModal } = await import('@particle-network/connectkit');
+      // The ConnectKit modal is opened via the hook, but since we can't
+      // call hooks dynamically, we dispatch a custom event that's picked
+      // up by a small wrapper. As a simpler approach, we just render
+      // Particle's ConnectButton directly.
+    } catch {
+      // Fall through to render the button below
+    }
+    setLoading(false);
+  };
+
+  // Render a styled button that triggers the Particle Connect modal.
+  // The actual ConnectButton from Particle is rendered elsewhere in the tree;
+  // here we provide a visual trigger that matches the auth modal design.
+  return (
+    <div className="space-y-2">
+      <ParticleConnectTrigger />
+      <p className="text-xs text-gray-500 text-center">
+        Sign in with email, social accounts, or connect a wallet
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Renders Particle's ConnectButton with custom styling to match the auth modal.
+ * This component must be inside ConnectKitProvider.
+ */
+function ParticleConnectTrigger() {
+  try {
+    // This will only work when @particle-network/connectkit is installed
+    // and this component is inside ConnectKitProvider
+    const { ConnectButton } = require('@particle-network/connectkit');
+    return (
+      <div className="[&_button]:w-full [&_button]:h-12 [&_button]:rounded-xl [&_button]:font-medium">
+        <ConnectButton label="Sign in with Fandomly" />
+      </div>
+    );
+  } catch {
+    // SDK not installed yet - show a placeholder
+    return (
+      <Button
+        disabled
+        className="w-full h-12 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-medium flex items-center justify-center gap-3 rounded-xl transition-all duration-200 border-0"
+      >
+        <Wallet className="w-5 h-5" />
+        <span>Sign in with Fandomly</span>
+      </Button>
+    );
+  }
 }

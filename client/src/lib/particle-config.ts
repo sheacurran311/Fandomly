@@ -28,7 +28,8 @@ export const fandomlyChain = defineChain({
   rpcUrls: {
     default: {
       http: [
-        'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
+        import.meta.env.VITE_FANDOMLY_RPC_URL ||
+          'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
       ],
     },
   },

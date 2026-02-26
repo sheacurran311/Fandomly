@@ -136,7 +136,7 @@ export async function handleParticleCallback(
     const [byParticleId] = await db
       .select()
       .from(users)
-      .where(eq(users.particleUserId as any, particleUuid))
+      .where(eq(users.particleUserId, particleUuid))
       .limit(1);
 
     if (byParticleId) {
@@ -245,7 +245,7 @@ export async function handleParticleCallback(
       profileData: fullUser.profileData,
       onboardingState: fullUser.onboardingState,
       avatar: (fullUser.profileData as any)?.avatar,
-      avalancheL1Address: walletAddress || (fullUser as any).avalancheL1Address,
+      avalancheL1Address: walletAddress || fullUser.avalancheL1Address,
     },
     accessToken,
     isNewUser,
