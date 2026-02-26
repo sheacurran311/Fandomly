@@ -9,10 +9,12 @@ channel = "stable-24_05"
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
+publicDir = "dist/public"
 
 [[ports]]
 localPort = 4983
 externalPort = 3003
+exposeLocalhost = true
 
 [[ports]]
 localPort = 5000

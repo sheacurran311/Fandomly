@@ -419,7 +419,7 @@ export function normalizeUsername(input: string): string {
 
   // Extract from URL if present
   const urlPatterns = [
-    /twitter\.com\/([^\/\?]+)/,
+    /(?:twitter|x)\.com\/([^\/\?]+)/,
     /instagram\.com\/([^\/\?]+)/,
     /tiktok\.com\/@([^\/\?]+)/,
     /youtube\.com\/@([^\/\?]+)/,

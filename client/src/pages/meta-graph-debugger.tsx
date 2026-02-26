@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { getAuthHeaders } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ export default function MetaGraphDebugger() {
         method: "GET",
         headers: new Headers({
           "Content-Type": "application/json",
-          ...(user.dynamicUserId ? { "x-dynamic-user-id": user.dynamicUserId } : {}),
+          ...getAuthHeaders(),
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         }),
         credentials: "include",
@@ -53,7 +54,7 @@ export default function MetaGraphDebugger() {
         method: 'POST',
         headers: new Headers({
           'Content-Type': 'application/json',
-          ...(user.dynamicUserId ? { 'x-dynamic-user-id': user.dynamicUserId } : {}),
+          ...getAuthHeaders(),
         }),
         body: JSON.stringify({ path, method, params: parsed, accessToken })
       });

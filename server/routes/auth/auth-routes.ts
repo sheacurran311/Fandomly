@@ -11,6 +11,7 @@ import {
 } from '../../services/auth/jwt-service';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { nanoid } from 'nanoid';
+import { claimBetaWelcomePoints } from '../../services/beta-signup-service';
 
 /**
  * Register general authentication routes
@@ -151,6 +152,15 @@ export function registerAuthRoutes(app: Express) {
         return res.status(500).json({ error: 'Failed to create or find user' });
       }
 
+      // If this is a new user, check for beta welcome points
+      let betaPointsClaimed = false;
+      let betaPointsAmount = 0;
+      if (isNewUser && user.email) {
+        const result = await claimBetaWelcomePoints(user.id, user.email);
+        betaPointsClaimed = result.claimed;
+        betaPointsAmount = result.points;
+      }
+
       // Generate tokens
       const accessToken = signAccessToken({
         id: user.id,
@@ -179,7 +189,11 @@ export function registerAuthRoutes(app: Express) {
           onboardingState: user.onboardingState
         },
         accessToken,
-        isNewUser
+        isNewUser,
+        betaWelcome: betaPointsClaimed ? {
+          pointsAwarded: betaPointsAmount,
+          message: `Welcome bonus: ${betaPointsAmount} Fandomly Points credited!`
+        } : undefined
       });
     } catch (error: any) {
       console.error('[Social Auth] Callback error:', error);
@@ -238,19 +252,39 @@ export function registerAuthRoutes(app: Express) {
         })
         .where(eq(users.id, user.id));
 
-      // Create social connection
-      await db.insert(socialConnections).values({
-        userId: user.id,
-        platform: provider,
-        platformUserId: platform_user_id,
-        accessToken: access_token,
-        profileData: profile_data ?? undefined,
-        connectedAt: new Date(),
-        isActive: true
-      } as any);
+      // Create or update social connection (upsert to handle existing connections)
+      const existingConnection = await db.query.socialConnections.findFirst({
+        where: and(
+          eq(socialConnections.platform, provider),
+          eq(socialConnections.platformUserId, platform_user_id)
+        )
+      });
+
+      if (existingConnection) {
+        // Update existing connection to point to the linked user
+        await db.update(socialConnections)
+          .set({
+            userId: user.id,
+            accessToken: access_token,
+            profileData: profile_data ?? existingConnection.profileData,
+            isActive: true,
+            updatedAt: new Date()
+          })
+          .where(eq(socialConnections.id, existingConnection.id));
+      } else {
+        await db.insert(socialConnections).values({
+          userId: user.id,
+          platform: provider,
+          platformUserId: platform_user_id,
+          accessToken: access_token,
+          profileData: profile_data ?? undefined,
+          connectedAt: new Date(),
+          isActive: true
+        } as any);
+      }
 
       // Generate tokens
-      const accessToken = signAccessToken({
+      const jwtAccessToken = signAccessToken({
         id: user.id,
         email: user.email,
         provider
@@ -275,7 +309,7 @@ export function registerAuthRoutes(app: Express) {
           profileData: user.profileData,
           onboardingState: user.onboardingState
         },
-        accessToken,
+        accessToken: jwtAccessToken,
         message: 'Account linked successfully'
       });
     } catch (error: any) {

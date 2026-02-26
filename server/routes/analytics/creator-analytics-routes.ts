@@ -90,7 +90,7 @@ export function registerCreatorAnalyticsRoutes(app: Express) {
           ),
         });
 
-        const connectedPlatforms = connections.map(c => c.platform);
+        const connectedPlatforms = [...new Set(connections.map(c => c.platform))];
         const activePlatforms = platformFilter
           ? platformFilter.filter(p => connectedPlatforms.includes(p))
           : connectedPlatforms;

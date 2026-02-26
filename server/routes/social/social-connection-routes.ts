@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { socialConnections, syncPreferences } from '@shared/schema';
+import { socialConnections, syncPreferences, platformPointsTransactions } from '@shared/schema';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
 
@@ -116,6 +116,8 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'Platform is required' });
     }
 
+    let pointsActuallyAwarded = 0;
+
     // Check if connection already exists
     const existingConnection = await db.query.socialConnections.findFirst({
       where: and(
@@ -166,19 +168,33 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
       savedConnection = newConnection;
 
-      // Award platform points for new social connection
+      // Award platform points for new social connection (one-time per platform)
+      // Check transaction history to prevent exploit via disconnect/reconnect
       try {
-        await platformPointsService.awardPoints(
-          userId,
-          SOCIAL_CONNECTION_POINTS,
-          'social_connection_reward',
-          {
-            platform,
-            platformUsername,
-            connectionId: newConnection.id,
-          }
-        );
-        console.log(`[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+        const existingReward = await db.query.platformPointsTransactions.findFirst({
+          where: and(
+            eq(platformPointsTransactions.userId, userId),
+            eq(platformPointsTransactions.source, 'social_connection_reward'),
+            sql`metadata->>'platform' = ${platform}`
+          ),
+        });
+
+        if (!existingReward) {
+          await platformPointsService.awardPoints(
+            userId,
+            SOCIAL_CONNECTION_POINTS,
+            'social_connection_reward',
+            {
+              platform,
+              platformUsername,
+              connectionId: newConnection.id,
+            }
+          );
+          pointsActuallyAwarded = SOCIAL_CONNECTION_POINTS;
+          console.log(`[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+        } else {
+          console.log(`[Social Connection] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`);
+        }
       } catch (pointsError) {
         console.error(`[Social Connection] Error awarding points:`, pointsError);
         // Don't fail the connection if points award fails
@@ -209,42 +225,6 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       }
     }
 
-    // Also sync to old storage system for backwards compatibility
-    try {
-      const { storage } = await import('../../core/storage');
-      const { users } = await import('@shared/schema');
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId)
-      });
-      if (user && (user as any).dynamicUserId) {
-        // Create accountData format expected by storage system
-        // Note: Instagram stores followers as profileData.followers (plain number)
-        const resolvedFollowers = profileData?.public_metrics?.followers_count || profileData?.follower_count || profileData?.followers_count || profileData?.followers?.total || (typeof profileData?.followers === 'number' ? profileData.followers : 0);
-        const resolvedFollowing = profileData?.public_metrics?.following_count || profileData?.following_count || (typeof profileData?.following === 'number' ? profileData.following : 0);
-        const accountData = {
-          user: {
-            id: platformUserId,
-            username: platformUsername,
-            name: platformDisplayName,
-            followersCount: resolvedFollowers,
-            followingCount: resolvedFollowing,
-            ...profileData
-          },
-          id: platformUserId,
-          username: platformUsername,
-          name: platformDisplayName,
-          displayName: platformDisplayName,
-          followersCount: resolvedFollowers,
-          followingCount: resolvedFollowing,
-        };
-        await storage.saveSocialAccount((user as any).dynamicUserId, platform, accountData);
-        console.log(`[Social Connection POST] Also saved ${platform} to old storage system`);
-      }
-    } catch (syncError) {
-      console.error(`[Social Connection POST] Error syncing to old storage system:`, syncError);
-      // Don't fail the request if sync fails
-    }
-
     return res.json({
       success: true,
       connection: {
@@ -254,7 +234,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         platformDisplayName: savedConnection.platformDisplayName,
         profileData: savedConnection.profileData,
       },
-      pointsAwarded: !existingConnection ? SOCIAL_CONNECTION_POINTS : 0,
+      pointsAwarded: pointsActuallyAwarded,
       isNewConnection: !existingConnection,
     });
   } catch (error) {
@@ -265,7 +245,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
 /**
  * POST /api/social-connections/disconnect
- * Disconnect a social platform (supports both JWT and x-dynamic-user-id auth)
+ * Disconnect a social platform
  * Use this when platform is in request body - consistent with profile/fan pages
  */
 router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, res) => {
@@ -308,22 +288,6 @@ router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, r
       console.error(`[Social Disconnect] Error updating sync preferences:`, syncPrefError);
     }
 
-    // Also remove from old storage system for consistency
-    try {
-      const { storage } = await import('../../core/storage');
-      const { users } = await import('@shared/schema');
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId)
-      });
-      if (user && (user as any).dynamicUserId) {
-        await storage.removeSocialAccount((user as any).dynamicUserId, platformLower);
-        console.log(`[Social Disconnect] Also removed ${platformLower} from old storage system`);
-      }
-    } catch (syncError) {
-      console.error(`[Social Disconnect] Error removing from old storage system:`, syncError);
-      // Don't fail - socialConnections table is the source of truth
-    }
-
     console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`);
     res.json({ success: true, message: `${platformLower} account disconnected successfully` });
   } catch (error) {
@@ -354,22 +318,6 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
           eq(socialConnections.platform, platform)
         )
       );
-
-    // Also remove from old storage system for consistency
-    try {
-      const { storage } = await import('../../core/storage');
-      const { users } = await import('@shared/schema');
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId)
-      });
-      if (user && (user as any).dynamicUserId) {
-        await storage.removeSocialAccount((user as any).dynamicUserId, platform);
-        console.log(`[Social Connection DELETE] Also removed ${platform} from old storage system`);
-      }
-    } catch (syncError) {
-      console.error(`[Social Connection DELETE] Error removing from old storage system:`, syncError);
-      // Don't fail the request if sync fails
-    }
 
     res.json({ success: true, message: `${platform} disconnected successfully` });
   } catch (error) {

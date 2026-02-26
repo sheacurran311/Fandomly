@@ -9,12 +9,20 @@
 
 import { db } from '../db';
 import { taskCompletions, tasks } from '@shared/schema';
-import { eq, and, desc, gte } from 'drizzle-orm';
+import { eq, and, desc, gte, or, isNull } from 'drizzle-orm';
 
 export interface FrequencyCheckRequest {
   userId: string;
   taskId: string;
   tenantId?: string;
+  /**
+   * Optional campaign ID for campaign-scoped completion checks.
+   * If provided, only completions within this campaign are considered.
+   * If not provided, only standalone completions are considered.
+   * This enables the same one-time task to be completed both standalone
+   * and within campaigns separately (re-verification model).
+   */
+  campaignId?: string | null;
 }
 
 export interface FrequencyCheckResult {
@@ -27,10 +35,15 @@ export interface FrequencyCheckResult {
 
 export class TaskFrequencyService {
   /**
-   * Check if user is eligible to complete a task based on frequency rules
+   * Check if user is eligible to complete a task based on frequency rules.
+   * 
+   * Campaign-aware: When campaignId is provided, only completions within that
+   * campaign are considered. When not provided, only standalone completions
+   * are considered. This enables one-time tasks to be completed both standalone
+   * and within campaigns separately (re-verification model).
    */
   async checkEligibility(request: FrequencyCheckRequest): Promise<FrequencyCheckResult> {
-    const { userId, taskId } = request;
+    const { userId, taskId, campaignId } = request;
 
     // 1. Get task frequency configuration
     const task = await db.query.tasks.findFirst({
@@ -46,20 +59,40 @@ export class TaskFrequencyService {
 
     const rewardFrequency = task.rewardFrequency; // 'one_time' | 'daily' | 'weekly' | 'monthly'
 
-    // 2. Get user's completion history for this task
+    // 2. Build context-aware query conditions
+    // If campaignId is provided, scope to campaign completions only
+    // If not provided, scope to standalone completions only
+    const baseConditions = [
+      eq(taskCompletions.userId, userId),
+      eq(taskCompletions.taskId, taskId),
+      eq(taskCompletions.status, 'completed'),
+    ];
+
+    let contextCondition;
+    if (campaignId) {
+      // Looking for completions within a specific campaign
+      contextCondition = and(
+        eq(taskCompletions.campaignId, campaignId),
+        eq(taskCompletions.completionContext, 'campaign')
+      );
+    } else {
+      // Looking for standalone completions (or legacy rows with null context)
+      contextCondition = or(
+        isNull(taskCompletions.completionContext),
+        eq(taskCompletions.completionContext, 'standalone')
+      );
+    }
+
+    // 3. Get user's completion history for this task within the appropriate context
     const completions = await db.query.taskCompletions.findMany({
-      where: and(
-        eq(taskCompletions.userId, userId),
-        eq(taskCompletions.taskId, taskId),
-        eq(taskCompletions.status, 'completed')
-      ),
+      where: and(...baseConditions, contextCondition),
       orderBy: [desc(taskCompletions.completedAt)],
     });
 
     const lastCompletion = completions[0];
     const completionsCount = completions.length;
 
-    // 3. Check eligibility based on frequency type
+    // 4. Check eligibility based on frequency type
     switch (rewardFrequency) {
       case 'one_time':
         return this.checkOneTime(completionsCount, lastCompletion);
@@ -276,19 +309,34 @@ export class TaskFrequencyService {
   }
 
   /**
-   * Get user's completion stats for a task
+   * Get user's completion stats for a task, optionally scoped by campaign.
    */
-  async getCompletionStats(userId: string, taskId: string): Promise<{
+  async getCompletionStats(userId: string, taskId: string, campaignId?: string | null): Promise<{
     totalCompletions: number;
     lastCompletedAt?: Date;
     firstCompletedAt?: Date;
   }> {
+    const baseConditions = [
+      eq(taskCompletions.userId, userId),
+      eq(taskCompletions.taskId, taskId),
+      eq(taskCompletions.status, 'completed'),
+    ];
+
+    let contextCondition;
+    if (campaignId) {
+      contextCondition = and(
+        eq(taskCompletions.campaignId, campaignId),
+        eq(taskCompletions.completionContext, 'campaign')
+      );
+    } else {
+      contextCondition = or(
+        isNull(taskCompletions.completionContext),
+        eq(taskCompletions.completionContext, 'standalone')
+      );
+    }
+
     const completions = await db.query.taskCompletions.findMany({
-      where: and(
-        eq(taskCompletions.userId, userId),
-        eq(taskCompletions.taskId, taskId),
-        eq(taskCompletions.status, 'completed')
-      ),
+      where: and(...baseConditions, contextCondition),
       orderBy: [desc(taskCompletions.completedAt)],
     });
 

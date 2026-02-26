@@ -74,13 +74,14 @@ export const usePointTransactionHistory = () => {
       const fanProgramsResponse = await apiRequest('GET', `/api/fan-programs/user/${user.id}`);
       const fanPrograms: FanProgram[] = await fanProgramsResponse.json();
       
-      // Get transactions for all programs
-      const allTransactions: PointTransaction[] = [];
-      for (const program of fanPrograms) {
+      // Get transactions for all programs in parallel
+      const transactionPromises = fanPrograms.map(async (program) => {
         const transactionsResponse = await apiRequest('GET', `/api/point-transactions/fan-program/${program.id}`);
-        const transactions: PointTransaction[] = await transactionsResponse.json();
-        allTransactions.push(...transactions);
-      }
+        return transactionsResponse.json() as Promise<PointTransaction[]>;
+      });
+      
+      const transactionArrays = await Promise.all(transactionPromises);
+      const allTransactions = transactionArrays.flat();
       
       // Sort by most recent first
       return allTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -102,15 +103,15 @@ export const useAvailableRewards = () => {
       const fanProgramsResponse = await apiRequest('GET', `/api/fan-programs/user/${user.id}`);
       const fanPrograms: FanProgram[] = await fanProgramsResponse.json();
       
-      // Get rewards for all programs
-      const allRewards: Reward[] = [];
-      for (const program of fanPrograms) {
+      // Get rewards for all programs in parallel
+      const rewardPromises = fanPrograms.map(async (program) => {
         const rewardsResponse = await apiRequest('GET', `/api/rewards/program/${program.programId}`);
         const rewards: Reward[] = await rewardsResponse.json();
-        allRewards.push(...rewards.filter(r => r.isActive));
-      }
+        return rewards.filter(r => r.isActive);
+      });
       
-      return allRewards;
+      const rewardArrays = await Promise.all(rewardPromises);
+      return rewardArrays.flat();
     },
     enabled: !!user?.id,
   });
@@ -148,14 +149,19 @@ export const usePointsSummary = () => {
       const fanProgramsResponse = await apiRequest('GET', `/api/fan-programs/user/${user.id}`);
       const fanPrograms: FanProgram[] = await fanProgramsResponse.json();
       
+      // Fetch transactions for all programs in parallel
+      const transactionPromises = fanPrograms.map(async (program) => {
+        const transactionsResponse = await apiRequest('GET', `/api/point-transactions/fan-program/${program.id}`);
+        return transactionsResponse.json() as Promise<PointTransaction[]>;
+      });
+      
+      const transactionArrays = await Promise.all(transactionPromises);
+      
+      // Calculate totals from all transactions
       let totalEarned = 0;
       let totalSpent = 0;
       
-      // Calculate earned points from all programs
-      for (const program of fanPrograms) {
-        const transactionsResponse = await apiRequest('GET', `/api/point-transactions/fan-program/${program.id}`);
-        const transactions: PointTransaction[] = await transactionsResponse.json();
-        
+      for (const transactions of transactionArrays) {
         for (const tx of transactions) {
           if (tx.type === 'earned') {
             totalEarned += tx.points;

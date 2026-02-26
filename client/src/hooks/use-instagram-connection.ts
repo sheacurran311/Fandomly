@@ -29,7 +29,6 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
   // Stable primitive refs to avoid re-creating callbacks on every user object change
   const userId = user?.id;
   const userType = user?.userType;
-  const dynamicUserId = (user as any)?.dynamicUserId;
   
   const [state, setState] = useState<InstagramConnectionState>({
     isConnected: false,
@@ -46,9 +45,10 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
 
     try {
       console.log('[Instagram Hook] Checking connection status...');
+      const { getAuthHeaders } = await import('@/lib/queryClient');
       const response = await fetch('/api/social-connections/instagram', {
         headers: {
-          'x-dynamic-user-id': dynamicUserId || userId || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         credentials: 'include'
@@ -86,7 +86,7 @@ export function useInstagramConnection(): UseInstagramConnectionReturn {
     } catch (error) {
       console.error('[Instagram Hook] Error checking status:', error);
     }
-  }, [userId, dynamicUserId]);
+  }, [userId]);
 
   // Initial status check
   useEffect(() => {

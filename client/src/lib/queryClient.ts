@@ -3,6 +3,10 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // Store for JWT access token (in memory for security)
 let accessTokenStorage: string | null = null;
 
+// CSRF token cache (shared across all API calls)
+let csrfTokenCache: string | null = null;
+let csrfTokenFetchPromise: Promise<string | null> | null = null;
+
 /**
  * Set the JWT access token (called by AuthContext)
  */
@@ -18,58 +22,57 @@ export function getAccessToken(): string | null {
 }
 
 /**
- * Helper to get current Dynamic user ID from multiple sources (legacy support)
+ * Fetch a fresh CSRF token from the server.
+ * Deduplicates concurrent requests so only one fetch happens at a time.
  */
-export function getDynamicUserId(): string | null {
-  try {
-    // 1. Current window (for parent window)
-    if ((window as any).__dynamicUserId) {
-      return (window as any).__dynamicUserId;
-    }
-    
-    // 2. localStorage (for popup window - Twitter OAuth)
-    const fromStorage = localStorage.getItem("twitter_dynamic_user_id");
-    if (fromStorage) {
-      return fromStorage;
-    }
-    
-    // 3. Opener window (for popup window)
-    if ((window as any).opener && (window as any).opener.__dynamicUserId) {
-      return (window as any).opener.__dynamicUserId;
-    }
-    
-    // 4. Opener's localStorage (for popup window)
-    if ((window as any).opener && (window as any).opener.localStorage) {
-      const fromOpenerStorage = (window as any).opener.localStorage.getItem("twitter_dynamic_user_id");
-      if (fromOpenerStorage) {
-        return fromOpenerStorage;
+async function fetchCsrfToken(): Promise<string | null> {
+  if (csrfTokenFetchPromise) return csrfTokenFetchPromise;
+
+  csrfTokenFetchPromise = (async () => {
+    try {
+      const response = await fetch('/api/csrf-token', { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        csrfTokenCache = data.csrfToken;
+        return csrfTokenCache;
       }
+    } catch (error) {
+      console.error('[CSRF] Failed to fetch token:', error);
     }
-  } catch (e) {
-    console.warn('[Auth] Error accessing Dynamic user ID:', e);
-  }
-  
-  return null;
+    return null;
+  })();
+
+  const token = await csrfTokenFetchPromise;
+  csrfTokenFetchPromise = null;
+  return token;
+}
+
+/**
+ * Get CSRF token (cached or fetch fresh)
+ */
+export async function getCsrfToken(): Promise<string | null> {
+  if (csrfTokenCache) return csrfTokenCache;
+  return fetchCsrfToken();
+}
+
+/**
+ * Reset cached CSRF token (call on 403 to force re-fetch)
+ */
+export function resetCsrfToken(): void {
+  csrfTokenCache = null;
 }
 
 /**
  * Build auth headers for API requests
- * Supports both JWT (new) and Dynamic user ID (legacy)
+ * Uses JWT authentication only - cookies are sent automatically via credentials: 'include'
  */
 export function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   
-  // Prefer JWT if available
+  // Use JWT access token if available
   const accessToken = getAccessToken();
   if (accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`;
-    return headers;
-  }
-  
-  // Fall back to legacy Dynamic user ID
-  const dynamicUserId = getDynamicUserId();
-  if (dynamicUserId) {
-    headers["x-dynamic-user-id"] = dynamicUserId;
   }
   
   return headers;
@@ -94,6 +97,21 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/** Methods that mutate server state and need CSRF protection */
+const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE', 'PATCH']);
+
+/**
+ * Add CSRF token to headers for state-changing requests
+ */
+async function addCsrfHeader(headers: Record<string, string>, method: string): Promise<void> {
+  if (CSRF_METHODS.has(method.toUpperCase())) {
+    const token = await getCsrfToken();
+    if (token) {
+      headers['x-csrf-token'] = token;
+    }
+  }
+}
+
 /**
  * Traditional apiRequest function (method first)
  */
@@ -104,46 +122,78 @@ export async function apiRequest(
 ): Promise<Response> {
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
   
-  // Add auth headers
+  // Add auth + CSRF headers
   Object.assign(headers, getAuthHeaders());
+  await addCsrfHeader(headers, method);
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
+  // On CSRF rejection, fetch a fresh token and retry once
+  if (res.status === 403) {
+    resetCsrfToken();
+    const freshToken = await getCsrfToken();
+    if (freshToken) {
+      headers['x-csrf-token'] = freshToken;
+      res = await fetch(url, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+    }
+  }
+
   await throwIfResNotOk(res);
   return res;
 }
 
 /**
- * Fetch wrapper for URL-first pattern with options (returns JSON)
+ * Fetch wrapper for URL-first pattern with options (returns typed JSON)
  */
-export async function fetchApi(
+export async function fetchApi<T = unknown>(
   url: string,
   options?: {
     method?: string;
     headers?: Record<string, string>;
     body?: string;
   }
-): Promise<any> {
+): Promise<T> {
   const method = options?.method || "GET";
   const headers: Record<string, string> = { "Content-Type": "application/json", ...options?.headers };
   
-  // Add auth headers
+  // Add auth + CSRF headers
   Object.assign(headers, getAuthHeaders());
+  await addCsrfHeader(headers, method);
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method,
     headers,
     body: options?.body,
     credentials: "include",
   });
 
+  // On CSRF rejection, fetch a fresh token and retry once
+  if (res.status === 403) {
+    resetCsrfToken();
+    const freshToken = await getCsrfToken();
+    if (freshToken) {
+      headers['x-csrf-token'] = freshToken;
+      res = await fetch(url, {
+        method,
+        headers,
+        body: options?.body,
+        credentials: "include",
+      });
+    }
+  }
+
   await throwIfResNotOk(res);
-  return await res.json();
+  return await res.json() as T;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -170,13 +220,16 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Default stale time of 5 minutes for queries
+const DEFAULT_STALE_TIME = 5 * 60 * 1000;
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchOnWindowFocus: true,
+      staleTime: DEFAULT_STALE_TIME,
       retry: false,
     },
     mutations: {

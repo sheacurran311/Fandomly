@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { Facebook, Users, TrendingUp, Check, Download } from 'lucide-react';
 import { type FacebookPage, type FacebookUser } from '@/lib/facebook';
-import { useFacebookConnection } from '@/contexts/facebook-connection-context';
+import { useFacebookConnection } from '@/hooks/use-social-connection';
 
 interface FacebookConnectProps {
   onConnectionSuccess?: (pageData: FacebookPage) => void;
@@ -20,14 +20,37 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
     isConnected,
     isConnecting,
     userInfo,
-    connectedPages,
-    selectedPage,
-    connectFacebook,
-    disconnectFacebook,
-    selectPage,
-    refreshConnection,
+    connect: connectFacebook,
+    disconnect: disconnectFacebook,
   } = useFacebookConnection();
   const [isImportingProfile, setIsImportingProfile] = useState(false);
+  const [connectedPages, setConnectedPages] = useState<FacebookPage[]>([]);
+  const [selectedPage, setSelectedPage] = useState<FacebookPage | null>(null);
+
+  // Load pages from database when connected
+  useEffect(() => {
+    if (isConnected) {
+      loadPages();
+    } else {
+      setConnectedPages([]);
+      setSelectedPage(null);
+    }
+  }, [isConnected]);
+
+  const loadPages = async () => {
+    try {
+      const { getSocialConnection } = await import('@/lib/social-connection-api');
+      const { connection } = await getSocialConnection('facebook');
+      if (connection?.profileData?.pages?.length) {
+        setConnectedPages(connection.profileData.pages);
+        const savedId = localStorage.getItem('fandomly_active_facebook_page_id');
+        const page = connection.profileData.pages.find((p: any) => p.id === savedId) || connection.profileData.pages[0];
+        setSelectedPage(page);
+      }
+    } catch (error) {
+      console.error('Error loading Facebook pages:', error);
+    }
+  };
 
   // Removed automatic refresh on mount - Facebook connection is now opt-in only
 
@@ -73,12 +96,9 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   };
 
   const handlePageSelect = async (page: FacebookPage) => {
-    try {
-      await selectPage(page);
-      onConnectionSuccess?.(page);
-    } catch (error) {
-      console.error('Select page failed:', error);
-    }
+    setSelectedPage(page);
+    localStorage.setItem('fandomly_active_facebook_page_id', page.id);
+    onConnectionSuccess?.(page);
   };
 
   if (!isConnected) {

@@ -7,8 +7,6 @@ import { useSyncHistory } from "@/hooks/use-analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -18,24 +16,27 @@ import {
   Twitter, 
   Facebook, 
   Youtube, 
-  Music, 
   Link as LinkIcon,
   Plus,
   Settings,
-  Eye,
   Users,
   TrendingUp,
   ExternalLink,
   CheckCircle,
   AlertCircle,
-  Zap,
   Unlink,
   Video
 } from "lucide-react";
 import { FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
-import { TwitterSDKManager } from "@/lib/twitter";
-import { socialManager } from "@/lib/social-integrations";
 import { useTwitterConnection } from "@/hooks/use-twitter-connection";
+import { 
+  useTikTokConnection,
+  useYouTubeConnection,
+  useSpotifyConnection,
+  useDiscordConnection,
+  useTwitchConnection,
+  useFacebookConnection,
+} from "@/hooks/use-social-connection";
 
 function SyncHistorySection() {
   const { data, isLoading } = useSyncHistory(10);
@@ -93,12 +94,19 @@ export default function CreatorSocial() {
     disconnectInstagram
   } = useInstagramConnection();
   
-  // Facebook connection state
-  const [facebookConnected, setFacebookConnected] = useState(false);
-  const [facebookConnecting, setFacebookConnecting] = useState(false);
+  // Facebook connection via unified hook (same pattern as Twitter)
+  const {
+    isConnected: facebookConnected,
+    isConnecting: facebookConnecting,
+    userInfo: facebookUserInfo,
+    connect: connectFacebook,
+    disconnect: disconnectFacebook,
+    refresh: refreshFacebook,
+  } = useFacebookConnection();
+  
+  // Facebook page state (needed for page selection UI on social page)
   const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
   const [activePage, setActivePage] = useState<FacebookPage | null>(null);
-  const [isCheckingFacebookStatus, setIsCheckingFacebookStatus] = useState(true);
   const [showPageModal, setShowPageModal] = useState(false);
   
   // Twitter connection using unified hook
@@ -112,728 +120,115 @@ export default function CreatorSocial() {
   
   const twitterHandle = twitterUserInfo?.username || null;
   const twitterFollowers = twitterUserInfo?.followersCount || twitterUserInfo?.followers_count || 0;
-  
-  // TikTok connection state
-  const [tiktokConnected, setTiktokConnected] = useState(false);
-  const [tiktokConnecting, setTiktokConnecting] = useState(false);
-  const [tiktokHandle, setTiktokHandle] = useState<string | null>(null);
-  const [tiktokFollowers, setTiktokFollowers] = useState<number>(0);
-  const [isCheckingTiktokStatus, setIsCheckingTiktokStatus] = useState(true);
 
-  // YouTube connection state
-  const [youtubeConnected, setYoutubeConnected] = useState(false);
-  const [youtubeConnecting, setYoutubeConnecting] = useState(false);
-  const [youtubeChannelName, setYoutubeChannelName] = useState<string | null>(null);
-  const [youtubeSubscribers, setYoutubeSubscribers] = useState<number>(0);
-  const [isCheckingYoutubeStatus, setIsCheckingYoutubeStatus] = useState(true);
+  // TikTok connection via standardized hook
+  const {
+    isConnected: tiktokConnected,
+    isConnecting: tiktokConnecting,
+    userInfo: tiktokUserInfo,
+    connect: connectTiktok,
+    disconnect: disconnectTiktok,
+  } = useTikTokConnection();
 
-  // Spotify connection state
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [spotifyConnecting, setSpotifyConnecting] = useState(false);
-  const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
-  const [spotifyFollowers, setSpotifyFollowers] = useState<number>(0);
-  const [isCheckingSpotifyStatus, setIsCheckingSpotifyStatus] = useState(true);
+  const tiktokHandle = tiktokUserInfo?.username || tiktokUserInfo?.displayName || null;
+  const tiktokFollowers = tiktokUserInfo?.followersCount || tiktokUserInfo?.followers_count || 0;
 
-  // Discord connection state
-  const [discordConnected, setDiscordConnected] = useState(false);
-  const [discordConnecting, setDiscordConnecting] = useState(false);
-  const [discordDisplayName, setDiscordDisplayName] = useState<string | null>(null);
-  const [isCheckingDiscordStatus, setIsCheckingDiscordStatus] = useState(true);
+  // YouTube connection via standardized hook
+  const {
+    isConnected: youtubeConnected,
+    isConnecting: youtubeConnecting,
+    userInfo: youtubeUserInfo,
+    connect: connectYoutube,
+    disconnect: disconnectYoutube,
+  } = useYouTubeConnection();
 
-  // Twitch connection state
-  const [twitchConnected, setTwitchConnected] = useState(false);
-  const [twitchConnecting, setTwitchConnecting] = useState(false);
-  const [twitchDisplayName, setTwitchDisplayName] = useState<string | null>(null);
-  const [twitchFollowers, setTwitchFollowers] = useState<number>(0);
-  const [isCheckingTwitchStatus, setIsCheckingTwitchStatus] = useState(true);
+  const youtubeChannelName = youtubeUserInfo?.displayName || youtubeUserInfo?.name || null;
+  const youtubeSubscribers = youtubeUserInfo?.followersCount || youtubeUserInfo?.followers_count || 0;
 
-  // Check all social platform statuses when user becomes available
+  // Spotify connection via standardized hook
+  const {
+    isConnected: spotifyConnected,
+    isConnecting: spotifyConnecting,
+    userInfo: spotifyUserInfo,
+    connect: connectSpotify,
+    disconnect: disconnectSpotify,
+  } = useSpotifyConnection();
+
+  const spotifyDisplayName = spotifyUserInfo?.displayName || spotifyUserInfo?.name || null;
+  const spotifyFollowers = spotifyUserInfo?.followersCount || spotifyUserInfo?.followers_count || 0;
+
+  // Discord connection via standardized hook
+  const {
+    isConnected: discordConnected,
+    isConnecting: discordConnecting,
+    userInfo: discordUserInfo,
+    connect: connectDiscord,
+    disconnect: disconnectDiscord,
+  } = useDiscordConnection();
+
+  const discordDisplayName = discordUserInfo?.displayName || discordUserInfo?.username || null;
+
+  // Twitch connection via standardized hook
+  const {
+    isConnected: twitchConnected,
+    isConnecting: twitchConnecting,
+    userInfo: twitchUserInfo,
+    connect: connectTwitch,
+    disconnect: disconnectTwitch,
+  } = useTwitchConnection();
+
+  const twitchDisplayName = twitchUserInfo?.displayName || twitchUserInfo?.username || null;
+  const twitchFollowers = twitchUserInfo?.followersCount || twitchUserInfo?.followers_count || 0;
+
+  // Load Facebook pages when connection status changes to connected
   useEffect(() => {
-    if (user?.dynamicUserId) {
-      checkFacebookStatus();
-      checkTwitterStatus();
-      checkTiktokStatus();
-      checkYoutubeStatus();
-      checkSpotifyStatus();
-      checkDiscordStatus();
-      checkTwitchStatus();
-      // Load saved active page ID from localStorage
-      const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
-      if (savedActivePageId) {
-        // We'll set this after pages are loaded in loadFacebookPages
-      }
-    }
-  }, [user?.dynamicUserId]);
-
-  // Listen for OAuth callback completion messages
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Verify origin for security
-      if (event.origin !== window.location.origin) {
-        return;
-      }
-
-      const data = event.data;
-      
-      // Ignore non-OAuth messages (like MetaMask, browser extensions, etc.)
-      if (!data || !data.type || 
-          (!data.type.includes('OAUTH') && 
-           !data.type.includes('AUTH_SUCCESS') &&
-           !data.type.includes('TIKTOK') &&
-           !data.type.includes('discord') &&
-           !data.type.includes('twitch'))) {
-        return;
-      }
-
-      console.log('[Creator Social] Received message from OAuth callback:', data);
-
-      // Refresh connection status based on the platform
-      if (data.type === 'OAUTH_SUCCESS' || data.type === 'TIKTOK_AUTH_SUCCESS') {
-        const platform = data.platform || data.type.toLowerCase().replace('_auth_success', '');
-        console.log('[Creator Social] Refreshing status for platform:', platform);
-        
-        if (platform === 'tiktok') {
-          checkTiktokStatus();
-        } else if (platform === 'youtube') {
-          checkYoutubeStatus();
-        } else if (platform === 'spotify') {
-          checkSpotifyStatus();
-        } else if (platform === 'discord') {
-          checkDiscordStatus();
-        } else if (platform === 'twitch') {
-          checkTwitchStatus();
-        }
-      }
-      
-      // Handle Discord OAuth callback - save connection from parent window (has session)
-      // Note: Primary save is done by social-integrations.ts secureLogin, this is a backup
-      if (data.type === 'discord-oauth-result') {
-        if (data.result?.success) {
-          // Just refresh status - the secureLogin method handles saving
-          checkDiscordStatus();
-        }
-      }
-      
-      // Handle Twitch OAuth callback - save connection from parent window (has session)
-      // Note: Primary save is done by social-integrations.ts secureLogin, this is a backup
-      if (data.type === 'twitch-oauth-result') {
-        if (data.result?.success) {
-          // Just refresh status - the secureLogin method handles saving
-          checkTwitchStatus();
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // Twitter status checking is now handled by useTwitterConnection hook
-  const checkTwitterStatus = async () => {
-    // This function is no longer needed - useTwitterConnection hook handles status automatically
-    console.log('[Creator Social] Twitter status is managed by useTwitterConnection hook');
-  };
-
-  const checkTiktokStatus = async () => {
-    console.log('[Creator Social] Starting TikTok status check...');
-    try {
-      setIsCheckingTiktokStatus(true);
-      const response = await fetch('/api/social-connections/tiktok', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('[Creator Social] TikTok status check failed:', response.status);
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Creator Social] TikTok raw response:', data);
-      
-      const connected = data.connected;
-      const connection = data.connection;
-      console.log('[Creator Social] TikTok status check:', { connected, connection });
-      
-      setTiktokConnected(connected);
-      if (connected && connection) {
-        const profile = connection.profileData;
-        // Check multiple possible fields for the username/handle
-        const handle = 
-          connection.platformUsername || 
-          profile?.display_name || 
-          profile?.username ||
-          connection.platformDisplayName ||
-          null;
-        const followers = 
-          profile?.follower_count || 
-          profile?.followers || 
-          0;
-        console.log('[Creator Social] TikTok extracted:', { handle, followers });
-        setTiktokHandle(handle);
-        setTiktokFollowers(followers);
-      } else {
-        console.log('[Creator Social] TikTok not connected, clearing state');
-        setTiktokHandle(null);
-        setTiktokFollowers(0);
-      }
-    } catch (error) {
-      console.error('[Creator Social] Error checking TikTok status:', error);
-      setTiktokConnected(false);
-      setTiktokHandle(null);
-      setTiktokFollowers(0);
-    } finally {
-      setIsCheckingTiktokStatus(false);
-      console.log('[Creator Social] TikTok status check complete');
-    }
-  };
-
-  const checkYoutubeStatus = async () => {
-    console.log('[Creator Social] Starting YouTube status check...');
-    try {
-      setIsCheckingYoutubeStatus(true);
-      const response = await fetch('/api/social-connections/youtube', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('[Creator Social] YouTube status check failed:', response.status);
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Creator Social] YouTube raw response:', data);
-      
-      const connected = data.connected;
-      const connection = data.connection;
-      console.log('[Creator Social] YouTube status check:', { connected, connection });
-      
-      setYoutubeConnected(connected);
-      if (connected && connection) {
-        const profile = connection.profileData;
-        const channelName = 
-          connection.platformDisplayName || 
-          profile?.title ||
-          profile?.name ||
-          profile?.channelTitle ||
-          null;
-        const subscribers = 
-          profile?.subscriberCount || 
-          profile?.followers || 
-          profile?.follower_count || 
-          0;
-        console.log('[Creator Social] YouTube extracted:', { channelName, subscribers });
-        setYoutubeChannelName(channelName);
-        setYoutubeSubscribers(subscribers);
-      } else {
-        console.log('[Creator Social] YouTube not connected, clearing state');
-        setYoutubeChannelName(null);
-        setYoutubeSubscribers(0);
-      }
-    } catch (error) {
-      console.error('[Creator Social] Error checking YouTube status:', error);
-      setYoutubeConnected(false);
-      setYoutubeChannelName(null);
-      setYoutubeSubscribers(0);
-    } finally {
-      setIsCheckingYoutubeStatus(false);
-      console.log('[Creator Social] YouTube status check complete');
-    }
-  };
-
-  const checkSpotifyStatus = async () => {
-    console.log('[Creator Social] Starting Spotify status check...');
-    try {
-      setIsCheckingSpotifyStatus(true);
-      const response = await fetch('/api/social-connections/spotify', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('[Creator Social] Spotify status check failed:', response.status);
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Creator Social] Spotify raw response:', data);
-      
-      const connected = data.connected;
-      const connection = data.connection;
-      console.log('[Creator Social] Spotify status check:', { connected, connection });
-      
-      setSpotifyConnected(connected);
-      if (connected && connection) {
-        const profile = connection.profileData;
-        const displayName = 
-          connection.platformDisplayName || 
-          profile?.display_name ||
-          profile?.name ||
-          profile?.username ||
-          null;
-        const followers = 
-          profile?.followers?.total || 
-          profile?.followers || 
-          profile?.follower_count || 
-          0;
-        console.log('[Creator Social] Spotify extracted:', { displayName, followers });
-        setSpotifyDisplayName(displayName);
-        setSpotifyFollowers(followers);
-      } else {
-        console.log('[Creator Social] Spotify not connected, clearing state');
-        setSpotifyDisplayName(null);
-        setSpotifyFollowers(0);
-      }
-    } catch (error) {
-      console.error('[Creator Social] Error checking Spotify status:', error);
-      setSpotifyConnected(false);
-      setSpotifyDisplayName(null);
-      setSpotifyFollowers(0);
-    } finally {
-      setIsCheckingSpotifyStatus(false);
-      console.log('[Creator Social] Spotify status check complete');
-    }
-  };
-
-  const checkDiscordStatus = async () => {
-    console.log('[Creator Social] Starting Discord status check...');
-    try {
-      setIsCheckingDiscordStatus(true);
-      const response = await fetch('/api/social-connections/discord', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('[Creator Social] Discord status check failed:', response.status);
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Creator Social] Discord raw response:', data);
-      
-      const connected = data.connected;
-      const connection = data.connection;
-      console.log('[Creator Social] Discord status check:', { connected, connection });
-      
-      setDiscordConnected(connected);
-      if (connected && connection) {
-        const displayName = 
-          connection.platformDisplayName || 
-          connection.platformUsername ||
-          connection.profileData?.username ||
-          null;
-        console.log('[Creator Social] Discord extracted:', { displayName });
-        setDiscordDisplayName(displayName);
-      } else {
-        console.log('[Creator Social] Discord not connected, clearing state');
-        setDiscordDisplayName(null);
-      }
-    } catch (error) {
-      console.error('[Creator Social] Error checking Discord status:', error);
-      setDiscordConnected(false);
-      setDiscordDisplayName(null);
-    } finally {
-      setIsCheckingDiscordStatus(false);
-      console.log('[Creator Social] Discord status check complete');
-    }
-  };
-
-  const checkTwitchStatus = async () => {
-    console.log('[Creator Social] Starting Twitch status check...');
-    try {
-      setIsCheckingTwitchStatus(true);
-      const response = await fetch('/api/social-connections/twitch', {
-        headers: {
-          'x-dynamic-user-id': user?.dynamicUserId || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('[Creator Social] Twitch status check failed:', response.status);
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Creator Social] Twitch raw response:', data);
-      
-      const connected = data.connected;
-      const connection = data.connection;
-      console.log('[Creator Social] Twitch status check:', { connected, connection });
-      
-      setTwitchConnected(connected);
-      if (connected && connection) {
-        const profile = connection.profileData;
-        const displayName = 
-          connection.platformDisplayName || 
-          profile?.display_name ||
-          profile?.login ||
-          null;
-        const followers = 
-          profile?.followers || 
-          profile?.follower_count || 
-          0;
-        console.log('[Creator Social] Twitch extracted:', { displayName, followers });
-        setTwitchDisplayName(displayName);
-        setTwitchFollowers(followers);
-      } else {
-        console.log('[Creator Social] Twitch not connected, clearing state');
-        setTwitchDisplayName(null);
-        setTwitchFollowers(0);
-      }
-    } catch (error) {
-      console.error('[Creator Social] Error checking Twitch status:', error);
-      setTwitchConnected(false);
-      setTwitchDisplayName(null);
-      setTwitchFollowers(0);
-    } finally {
-      setIsCheckingTwitchStatus(false);
-      console.log('[Creator Social] Twitch status check complete');
-    }
-  };
-
-  const checkFacebookStatus = async () => {
-    try {
-      await FacebookSDKManager.ensureFBReady('creator');
-      const status = await FacebookSDKManager.getLoginStatus();
-      
-      if (status.isLoggedIn) {
-        setFacebookConnected(true);
-        await loadFacebookPages();
-      } else {
-        setFacebookConnected(false);
-        setFacebookPages([]);
-        setActivePage(null); // Clear active page when not logged in
-        localStorage.removeItem('fandomly_active_facebook_page_id'); // Clear saved page
-      }
-    } catch (error) {
-      console.error('Error checking Facebook status:', error);
-      setFacebookConnected(false);
+    if (facebookConnected) {
+      loadFacebookPages();
+    } else {
       setFacebookPages([]);
-    } finally {
-      setIsCheckingFacebookStatus(false);
+      setActivePage(null);
     }
-  };
-
-  // Twitter connect/disconnect are now handled by useTwitterConnection hook
-
-  const connectTiktok = async () => {
-    // Prevent duplicate calls
-    if (tiktokConnecting) {
-      console.log('[Connect TikTok] Already connecting, ignoring duplicate call');
-      return;
-    }
-    
-    try {
-      setTiktokConnecting(true);
-      const tiktokAPI = socialManager['tiktok'];
-      const result = await tiktokAPI.secureLogin();
-      if (result.success) {
-        await checkTiktokStatus();
-        toast({
-          title: "TikTok Connected! 🎵",
-          description: "Successfully connected to TikTok",
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'TikTok login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e: any) {
-      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect TikTok', variant: 'destructive' });
-    } finally {
-      setTiktokConnecting(false);
-    }
-  };
-
-  const disconnectTiktok = async () => {
-    try {
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      const result = await disconnectSocialPlatform('tiktok');
-      if (result.success) {
-        setTiktokConnected(false);
-        setTiktokHandle(null);
-        setTiktokFollowers(0);
-        toast({
-          title: "TikTok Disconnected",
-          description: "Successfully disconnected from TikTok",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('TikTok disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from TikTok. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const connectYoutube = async () => {
-    try {
-      setYoutubeConnecting(true);
-      const youtubeAPI = socialManager['youtube'];
-      const result = await youtubeAPI.secureLogin();
-      if (result.success) {
-        await checkYoutubeStatus();
-        toast({
-          title: "YouTube Connected! 📺",
-          description: result.channelName ? `Connected ${result.channelName}` : "Successfully connected to YouTube",
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'YouTube login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e: any) {
-      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect YouTube', variant: 'destructive' });
-    } finally {
-      setYoutubeConnecting(false);
-    }
-  };
-
-  const disconnectYoutube = async () => {
-    try {
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      const result = await disconnectSocialPlatform('youtube');
-      if (result.success) {
-        setYoutubeConnected(false);
-        setYoutubeChannelName(null);
-        setYoutubeSubscribers(0);
-        toast({
-          title: "YouTube Disconnected",
-          description: "Successfully disconnected from YouTube",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('YouTube disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from YouTube. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const connectSpotify = async () => {
-    try {
-      setSpotifyConnecting(true);
-      const spotifyAPI = socialManager['spotify'];
-      const result = await spotifyAPI.secureLogin();
-      if (result.success) {
-        await checkSpotifyStatus();
-        toast({
-          title: "Spotify Connected! 🎵",
-          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Spotify",
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Spotify login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e: any) {
-      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect Spotify', variant: 'destructive' });
-    } finally {
-      setSpotifyConnecting(false);
-    }
-  };
-
-  const disconnectSpotify = async () => {
-    try {
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      const result = await disconnectSocialPlatform('spotify');
-      if (result.success) {
-        setSpotifyConnected(false);
-        setSpotifyDisplayName(null);
-        setSpotifyFollowers(0);
-        toast({
-          title: "Spotify Disconnected",
-          description: "Successfully disconnected from Spotify",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('Spotify disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from Spotify. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const connectDiscord = async () => {
-    try {
-      setDiscordConnecting(true);
-      const discordAPI = socialManager['discord'];
-      const result = await discordAPI.secureLogin();
-      if (result.success) {
-        await checkDiscordStatus();
-        toast({
-          title: "Discord Connected! 🎮",
-          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Discord",
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Discord login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e: any) {
-      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect Discord', variant: 'destructive' });
-    } finally {
-      setDiscordConnecting(false);
-    }
-  };
-
-  const disconnectDiscord = async () => {
-    try {
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      const result = await disconnectSocialPlatform('discord');
-      if (result.success) {
-        setDiscordConnected(false);
-        setDiscordDisplayName(null);
-        toast({
-          title: "Discord Disconnected",
-          description: "Successfully disconnected from Discord",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('Discord disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from Discord. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const connectTwitch = async () => {
-    try {
-      setTwitchConnecting(true);
-      const twitchAPI = socialManager['twitch'];
-      const result = await twitchAPI.secureLogin();
-      if (result.success) {
-        await checkTwitchStatus();
-        toast({
-          title: "Twitch Connected! 🎮",
-          description: result.displayName ? `Connected ${result.displayName}` : "Successfully connected to Twitch",
-          duration: 3000,
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || 'Twitch login failed. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (e: any) {
-      toast({ title: 'Connection Error', description: e?.message || 'Failed to connect Twitch', variant: 'destructive' });
-    } finally {
-      setTwitchConnecting(false);
-    }
-  };
-
-  const disconnectTwitch = async () => {
-    try {
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      const result = await disconnectSocialPlatform('twitch');
-      if (result.success) {
-        setTwitchConnected(false);
-        setTwitchDisplayName(null);
-        setTwitchFollowers(0);
-        toast({
-          title: "Twitch Disconnected",
-          description: "Successfully disconnected from Twitch",
-          duration: 3000,
-        });
-      } else {
-        throw new Error('Failed to disconnect');
-      }
-    } catch (error) {
-      console.error('Twitch disconnect error:', error);
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect from Twitch. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
+  }, [facebookConnected]);
 
   const loadFacebookPages = async () => {
     try {
-      const pages = await FacebookSDKManager.getUserPages();
+      // Try live SDK pages first
+      let pages: FacebookPage[] = [];
+      try {
+        await FacebookSDKManager.ensureFBReady('creator');
+        const status = await FacebookSDKManager.getLoginStatus();
+        if (status.isLoggedIn) {
+          pages = await FacebookSDKManager.getUserPages();
+        }
+      } catch {
+        // SDK not available
+      }
+
+      // Fall back to stored pages from database profile data
+      if (pages.length === 0 && facebookUserInfo) {
+        const { getSocialConnection } = await import('@/lib/social-connection-api');
+        const { connection } = await getSocialConnection('facebook');
+        if (connection?.profileData?.pages?.length) {
+          pages = connection.profileData.pages;
+        }
+      }
+
       setFacebookPages(pages);
       
-      // Handle active page reconciliation with localStorage persistence
       if (pages.length > 0) {
         const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
         let pageToSet: FacebookPage | null = null;
         
         if (savedActivePageId) {
-          // Try to find the saved page
           pageToSet = pages.find(page => page.id === savedActivePageId) || null;
         }
         
-        if (!pageToSet && activePage) {
-          // Check if current active page still exists
-          pageToSet = pages.find(page => page.id === activePage.id) || null;
-        }
-        
         if (!pageToSet) {
-          // Fall back to first page
           pageToSet = pages[0];
         }
         
         setActivePage(pageToSet);
-        // Save to localStorage
         localStorage.setItem('fandomly_active_facebook_page_id', pageToSet.id);
-        
-        // Notify if we had to switch from a previously saved page
-        if (savedActivePageId && pageToSet.id !== savedActivePageId) {
-          toast({
-            title: "Active Page Updated",
-            description: `Your previous active page is no longer available. Switched to "${pageToSet.name}".`,
-            duration: 4000
-          });
-        }
       } else {
         setActivePage(null);
         localStorage.removeItem('fandomly_active_facebook_page_id');
@@ -845,70 +240,6 @@ export default function CreatorSocial() {
       localStorage.removeItem('fandomly_active_facebook_page_id');
     }
   };
-
-
-  const connectFacebook = async () => {
-    setFacebookConnecting(true);
-    try {
-      const result = await FacebookSDKManager.secureLogin('creator');
-      if (result.success) {
-        setFacebookConnected(true);
-        await loadFacebookPages();
-        toast({
-          title: "Facebook Connected! 🎉",
-          description: "Successfully connected to Facebook for creator campaigns.",
-          duration: 4000
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.error || "Facebook login was cancelled or failed.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Facebook connection error:', error);
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to Facebook.",
-        variant: "destructive"
-      });
-    } finally {
-      setFacebookConnecting(false);
-    }
-  };
-
-  const disconnectFacebook = async () => {
-    try {
-      // Disconnect from backend first
-      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
-      await disconnectSocialPlatform('facebook');
-      // Then logout from Facebook SDK
-      await FacebookSDKManager.logoutFromFacebook();
-      setFacebookConnected(false);
-      setFacebookPages([]);
-      setActivePage(null); // Clear active page on disconnect
-      localStorage.removeItem('fandomly_active_facebook_page_id'); // Clear saved page
-      toast({
-        title: "Facebook Disconnected",
-        description: "Successfully disconnected from Facebook.",
-      });
-    } catch (error) {
-      console.error('Error during Facebook logout:', error);
-      toast({
-        title: "Logout Error", 
-        description: "Error occurred while disconnecting. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  // Simplified: Using direct Facebook component instead of complex context
-
-  // Load saved creator pages from backend
-  // Note: In real app, use creatorId from user.creator.id
-  // For brevity, fetch on mount and ignore errors
-  // and show count in UI next to Facebook platform
 
   if (isLoading) {
     return (

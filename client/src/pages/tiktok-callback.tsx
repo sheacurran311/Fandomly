@@ -2,178 +2,165 @@
  * TikTok OAuth Callback Page
  *
  * Handles the OAuth callback from TikTok
- * Supports both authentication (login/signup) and social account linking
+ * Exchanges authorization code for access token
+ * Saves the connection to the database
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import {
-  getPostAuthRedirect,
-  getSocialLinkingRedirect,
-  checkAuthState,
-  authenticateWithSocial,
-  saveSocialConnection,
-} from '@/lib/auth-redirect';
-import { invalidateSocialConnections } from '@/hooks/use-social-connections';
+import { useEffect, useRef } from "react";
+import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
-// Global flag to prevent duplicate execution across component remounts
+// Global flag to prevent duplicate execution across multiple renders/remounts
 let tiktokCallbackProcessed = false;
 
 export default function TikTokCallback() {
-  const ranRef = useRef(false);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'link_required'>('processing');
-  const [error, setError] = useState<string | null>(null);
-  const [linkInfo, setLinkInfo] = useState<{ existingProviders: string[]; message: string } | null>(null);
+  const ranRef = useRef(false);
 
   useEffect(() => {
-    // Double-check: component-level AND global-level to prevent any duplicates
+    // Prevent duplicate execution
     if (ranRef.current || tiktokCallbackProcessed) {
-      console.log('[TikTok Callback] Already processed, skipping duplicate execution');
       return;
     }
     ranRef.current = true;
     tiktokCallbackProcessed = true;
 
-    let mounted = true;
     const run = async () => {
-      console.log('[TikTok Callback] Starting TikTok OAuth callback processing...');
-      
+      // Parse URL parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+      const error = params.get("error");
+      const errorDescription = params.get("error_description");
+
+      // Helper to send result to opener with localStorage COOP fallback
+      const sendResultToOpener = (result: { success: boolean; error?: string; displayName?: string }) => {
+        if (state) {
+          try {
+            localStorage.setItem(`tiktok_oauth_result_${state}`, JSON.stringify(result));
+          } catch (e) {
+            console.error('[TikTok Callback] Failed to store result in localStorage:', e);
+          }
+        }
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: "tiktok-oauth-result", result }, window.location.origin);
+          (window.opener as any).tiktokCallbackData = result;
+          window.close();
+          return true;
+        }
+        if (state && state.startsWith('tiktok_')) {
+          window.close();
+          return true;
+        }
+        return false;
+      };
+
       try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        const errorParam = urlParams.get('error');
-        const errorDescription = urlParams.get('error_description');
+        console.log("[TikTok Callback] Processing OAuth callback", {
+          hasCode: !!code,
+          hasState: !!state,
+          hasError: !!error,
+        });
 
-        // Handle OAuth errors
-        if (errorParam) {
-          const result = {
-            success: false,
-            error: errorDescription || errorParam
-          };
-
-          if (window.opener) {
-            try {
-              window.opener.postMessage({ type: 'tiktok-oauth-result', result }, window.location.origin);
-              (window.opener as any).tiktokCallbackData = result;
-            } catch (e) {
-              console.error('[TikTok Callback] Error posting to opener:', e);
-            }
-            window.close();
-            return;
-          }
-
-          setStatus('error');
-          setError(errorDescription || errorParam);
+        // Handle OAuth error
+        if (error) {
+          console.error("[TikTok Callback] OAuth error:", error, errorDescription);
+          const errorMsg = errorDescription || error || "TikTok authorization failed";
+          if (sendResultToOpener({ success: false, error: errorMsg })) return;
+          toast({
+            title: "TikTok Connection Failed",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          setLocation("/creator-dashboard/social");
           return;
         }
 
-        // Validate state
-        const savedState = localStorage.getItem('tiktok_oauth_state');
-        if (state !== savedState) {
-          const errorMsg = 'Invalid state parameter - possible CSRF attack';
-          const result = { success: false, error: errorMsg };
-
-          if (window.opener) {
-            try {
-              window.opener.postMessage({ type: 'tiktok-oauth-result', result }, window.location.origin);
-              (window.opener as any).tiktokCallbackData = result;
-            } catch (e) {
-              console.error('[TikTok Callback] Error posting to opener:', e);
-            }
-            window.close();
-            return;
-          }
-
-          setStatus('error');
-          setError(errorMsg);
-          return;
+        // Validate required parameters
+        if (!code || !state) {
+          throw new Error("Missing code or state parameter");
         }
 
-        if (!code) {
-          const errorMsg = 'Missing authorization code';
-          const result = { success: false, error: errorMsg };
-
-          if (window.opener) {
-            try {
-              window.opener.postMessage({ type: 'tiktok-oauth-result', result }, window.location.origin);
-              (window.opener as any).tiktokCallbackData = result;
-            } catch (e) {
-              console.error('[TikTok Callback] Error posting to opener:', e);
-            }
-            window.close();
-            return;
-          }
-
-          setStatus('error');
-          setError(errorMsg);
-          return;
+        // Validate CSRF state
+        const savedState = localStorage.getItem("tiktok_oauth_state");
+        if (!savedState || savedState !== state) {
+          throw new Error("Invalid state parameter - possible CSRF attack");
         }
 
-        // Clear state from localStorage
-        localStorage.removeItem('tiktok_oauth_state');
+        // Clear the state from localStorage
+        localStorage.removeItem("tiktok_oauth_state");
 
-        // Exchange code for token
+        console.log("[TikTok Callback] Exchanging code for token...");
+
+        // Exchange code for access token
         const origin = window.location.origin;
         const redirectUri = `${origin}/tiktok-callback`;
 
-        console.log('[TikTok Callback] Exchanging code for token...');
-        const tokenResp = await fetch('/api/social/tiktok/token', {
-          method: 'POST',
+        const tokenResponse = await fetch("/api/social/tiktok/token", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          credentials: 'include',
-          body: JSON.stringify({ code, redirect_uri: redirectUri })
+          body: JSON.stringify({
+            code,
+            redirect_uri: redirectUri,
+          }),
+          credentials: "include",
         });
 
-        if (!tokenResp.ok) {
-          const errorData = await tokenResp.json();
-          throw new Error(errorData.error || errorData.message || 'Token exchange failed');
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          throw new Error(`Token exchange failed: ${errorText}`);
         }
 
-        const tokenData = await tokenResp.json();
-        console.log('[TikTok Callback] Token response received');
-        
-        if (!tokenData.access_token) {
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        if (!accessToken) {
           console.error('[TikTok Callback] Token data missing access_token:', tokenData);
           throw new Error(`No access token received. Server returned: ${JSON.stringify(tokenData)}`);
         }
 
-        // Fetch user info
-        console.log('[TikTok Callback] Fetching user info...');
-        const userResp = await fetch('/api/social/tiktok/user', {
+        console.log("[TikTok Callback] Token obtained, fetching user info...");
+
+        // Get user info
+        const userResponse = await fetch("/api/social/tiktok/user", {
+          method: "GET",
           headers: {
-            'X-Social-Token': `Bearer ${tokenData.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
-          credentials: 'include'
+          credentials: "include",
         });
 
-        if (!userResp.ok) {
-          throw new Error('Failed to fetch user info');
+        if (!userResponse.ok) {
+          const errorText = await userResponse.text();
+          throw new Error(`Failed to fetch user info: ${errorText}`);
         }
 
-        const userData = await userResp.json();
+        const userData = await userResponse.json();
         const tiktokUser = userData.data?.user;
 
         if (!tiktokUser) {
-          throw new Error('No user data received');
+          throw new Error("No user data received");
         }
 
-        const displayName = tiktokUser.display_name || tiktokUser.username;
-        const platformUserId = tiktokUser.open_id || tiktokUser.union_id;
+        console.log("[TikTok Callback] User info fetched:", tiktokUser.display_name);
 
-        // POPUP FLOW: If opened in popup, send data to parent
-        if (window.opener) {
-          const connectionData = {
-            platform: 'tiktok',
-            platformUserId: platformUserId,
+        // Save the connection to the database
+        const saveResponse = await fetch("/api/social-connections", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            platform: "tiktok",
+            platformUserId: tiktokUser.open_id || tiktokUser.union_id,
             platformUsername: tiktokUser.username || tiktokUser.display_name,
-            platformDisplayName: displayName,
-            accessToken: tokenData.access_token,
+            platformDisplayName: tiktokUser.display_name,
+            accessToken: accessToken,
             refreshToken: tokenData.refresh_token || null,
+            tokenExpiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
             profileData: {
               open_id: tiktokUser.open_id,
               display_name: tiktokUser.display_name,
@@ -185,212 +172,49 @@ export default function TikTokCallback() {
               profilePictureUrl: tiktokUser.avatar_url,
               bio: tiktokUser.bio_description,
             },
-          };
-
-          const result = {
-            success: true,
-            displayName,
-            userId: platformUserId,
-            username: tiktokUser.username || tiktokUser.display_name,
-            accessToken: tokenData.access_token,
-            refreshToken: tokenData.refresh_token,
-            connectionData,
-            profileData: connectionData.profileData,
-          };
-
-          try {
-            console.log('[TikTok Callback] Posting success result to opener');
-            window.opener.postMessage({ type: 'tiktok-oauth-result', result }, window.location.origin);
-            (window.opener as any).tiktokCallbackData = result;
-          } catch (e) {
-            console.error('[TikTok Callback] Error posting to opener:', e);
-          }
-          window.close();
-          return;
-        }
-
-        if (!mounted) return;
-
-        // DIRECT NAVIGATION FLOW: Handle authentication or social linking
-        console.log('[TikTok Callback] Direct navigation detected, handling auth/linking flow...');
-
-        // Clean up URL
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('code');
-          url.searchParams.delete('state');
-          window.history.replaceState({}, document.title, url.toString());
-        } catch {}
-
-        // Check if user is already authenticated
-        const authCheck = await checkAuthState();
-        console.log('[TikTok Callback] Auth check result:', authCheck);
-
-        if (!authCheck.isAuthenticated) {
-          // AUTHENTICATION FLOW: User is not logged in, authenticate with social
-          console.log('[TikTok Callback] User not authenticated, initiating social auth...');
-          
-          const authResult = await authenticateWithSocial('tiktok', {
-            access_token: tokenData.access_token,
-            platform_user_id: platformUserId,
-            email: undefined, // TikTok doesn't provide email
-            username: tiktokUser.username || tiktokUser.display_name,
-            display_name: displayName,
-            profile_data: {
-              open_id: tiktokUser.open_id,
-              follower_count: tiktokUser.follower_count || 0,
-              following_count: tiktokUser.following_count || 0,
-              verified: tiktokUser.is_verified || false,
-              profilePictureUrl: tiktokUser.avatar_url,
-              bio: tiktokUser.bio_description,
-            },
-          });
-
-          console.log('[TikTok Callback] Social auth result:', authResult);
-
-          if (authResult.linkRequired) {
-            setStatus('link_required');
-            setLinkInfo({
-              existingProviders: authResult.existingProviders || [],
-              message: authResult.message || 'An account with this email already exists.',
-            });
-            return;
-          }
-
-          if (!authResult.success) {
-            setStatus('error');
-            setError(authResult.error || 'Authentication failed');
-            return;
-          }
-
-          // Success - redirect based on user state
-          toast({
-            title: "Welcome to Fandomly!",
-            description: `Successfully signed in as ${displayName}`,
-          });
-
-          const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
-          console.log('[TikTok Callback] Auth successful, redirecting to:', redirectUrl);
-          window.location.replace(redirectUrl);
-          return;
-        }
-
-        // SOCIAL LINKING FLOW: User is already authenticated, save the connection
-        console.log('[TikTok Callback] User already authenticated, saving social connection...');
-
-        const saveResult = await saveSocialConnection({
-          platform: 'tiktok',
-          platformUserId: platformUserId,
-          platformUsername: tiktokUser.username || tiktokUser.display_name,
-          platformDisplayName: displayName,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
-          profileData: {
-            open_id: tiktokUser.open_id,
-            display_name: tiktokUser.display_name,
-            username: tiktokUser.username || tiktokUser.display_name,
-            follower_count: tiktokUser.follower_count || 0,
-            followers: tiktokUser.follower_count || 0,
-            following: tiktokUser.following_count || 0,
-            verified: tiktokUser.is_verified || false,
-            profilePictureUrl: tiktokUser.avatar_url,
-            bio: tiktokUser.bio_description,
-          },
+          }),
+          credentials: "include",
         });
 
-        if (!saveResult.success) {
-          console.error('[TikTok Callback] Failed to save connection:', saveResult.error);
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          throw new Error(`Failed to save connection: ${errorText}`);
         }
 
-        // Invalidate social connections cache so all components get fresh data
-        invalidateSocialConnections();
+        console.log("[TikTok Callback] Connection saved successfully");
 
+        const displayName = tiktokUser.display_name;
+        if (sendResultToOpener({ success: true, displayName })) return;
+
+        // Otherwise show toast and redirect
         toast({
           title: "TikTok Connected!",
           description: `Successfully connected ${displayName}`,
         });
+        setLocation("/creator-dashboard/social");
+      } catch (error) {
+        console.error("[TikTok Callback] Error:", error);
+        const errorMsg = error instanceof Error ? error.message : "Failed to connect TikTok";
+        if (sendResultToOpener({ success: false, error: errorMsg })) return;
 
-        // Redirect to appropriate dashboard based on user type
-        const redirectUrl = getSocialLinkingRedirect(authCheck.user?.userType);
-        console.log('[TikTok Callback] Connection saved, redirecting to:', redirectUrl);
-        window.location.replace(redirectUrl);
-
-      } catch (err) {
-        console.error('[TikTok Callback] Error:', err);
-        const errorMsg = err instanceof Error ? err.message : 'Unexpected error';
-        const result = { success: false, error: errorMsg };
-
-        if (window.opener) {
-          try {
-            window.opener.postMessage({ type: 'tiktok-oauth-result', result }, window.location.origin);
-            (window.opener as any).tiktokCallbackData = result;
-          } catch (e) {
-            console.error('[TikTok Callback] Error posting to opener:', e);
-          }
-          window.close();
-          return;
-        }
-
-        if (mounted) {
-          setStatus('error');
-          setError(errorMsg);
-        }
+        // Otherwise show toast and redirect
+        toast({
+          title: "TikTok Connection Failed",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        setLocation("/creator-dashboard/social");
       }
     };
-    
+
     run();
-    return () => { mounted = false; };
-  }, [toast]);
+  }, [setLocation, toast]);
 
-  // Error state
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
-        <div className="bg-brand-card rounded-lg p-8 max-w-md w-full text-center">
-          <div className="text-red-500 text-5xl mb-4">!</div>
-          <h2 className="text-2xl font-bold text-white mb-4">Connection Failed</h2>
-          <p className="text-gray-300 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.replace('/')}
-            className="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-          >
-            Go Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Account linking required
-  if (status === 'link_required' && linkInfo) {
-    return (
-      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
-        <div className="bg-brand-card rounded-lg p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-white mb-4">Account Found</h2>
-          <p className="text-gray-300 mb-6">{linkInfo.message}</p>
-          <p className="text-gray-400 text-sm mb-6">
-            Existing login method: {linkInfo.existingProviders.join(', ')}
-          </p>
-          <p className="text-gray-400 text-sm mb-6">
-            Please sign in with your existing account to link TikTok.
-          </p>
-          <button
-            onClick={() => window.location.replace('/')}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-          >
-            Go to Sign In
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Processing state
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-      <div className="text-white flex items-center gap-2">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        Processing TikTok authorization…
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="text-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        <p className="text-muted-foreground">Connecting your TikTok account...</p>
       </div>
     </div>
   );

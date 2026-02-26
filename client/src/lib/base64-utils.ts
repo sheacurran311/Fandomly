@@ -32,9 +32,23 @@ export function safeBtoa(str: string): string | null {
 }
 
 /**
+ * Standard JWT payload fields
+ */
+export interface JWTPayload {
+  sub?: string;
+  iss?: string;
+  aud?: string | string[];
+  exp?: number;
+  nbf?: number;
+  iat?: number;
+  jti?: string;
+  [key: string]: unknown;
+}
+
+/**
  * Parse JWT token safely without throwing errors
  */
-export function parseJWT(token: string): any | null {
+export function parseJWT(token: string): JWTPayload | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) {
@@ -46,7 +60,7 @@ export function parseJWT(token: string): any | null {
       return null;
     }
     
-    return JSON.parse(payload);
+    return JSON.parse(payload) as JWTPayload;
   } catch (error) {
     console.warn('JWT parse failed:', error, 'Token:', token);
     return null;

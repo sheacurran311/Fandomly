@@ -18,14 +18,13 @@ import {
   creatorFacebookPages
 } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, or, isNull } from "drizzle-orm";
 import { encryptToken, decryptToken } from "../utils/crypto-utils";
 
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  getUserByDynamicId(dynamicUserId: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUsersByFacebookId(facebookId: string): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
@@ -142,7 +141,7 @@ export interface IStorage {
   
   // Task Completion operations
   getTaskCompletion(id: string): Promise<TaskCompletion | undefined>;
-  getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined>;
+  getTaskCompletionByUserAndTask(userId: string, taskId: string, campaignId?: string | null): Promise<TaskCompletion | undefined>;
   getUserTaskCompletions(userId: string, tenantId?: string): Promise<any[]>;
   getTaskCompletions(taskId: string): Promise<TaskCompletion[]>;
   getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]>;
@@ -170,8 +169,8 @@ export interface IStorage {
   getCreatorFacebookPages(creatorId: string): Promise<any[]>;
 
   // Social OAuth token storage
-  saveSocialTokenBundle(dynamicUserId: string, platform: string, tokenBundle: any): Promise<void>;
-  getSocialTokenBundle(dynamicUserId: string, platform: string): Promise<any | undefined>;
+  saveSocialTokenBundle(userId: string, platform: string, tokenBundle: any): Promise<void>;
+  getSocialTokenBundle(userId: string, platform: string): Promise<any | undefined>;
 
   // Audit Log operations
   createAuditLog(log: any): Promise<any>;
@@ -197,11 +196,6 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user || undefined;
-  }
-
-  async getUserByDynamicId(dynamicUserId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.dynamicUserId, dynamicUserId));
     return user || undefined;
   }
 
@@ -356,7 +350,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLoyaltyProgramsByCreator(creatorId: string): Promise<LoyaltyProgram[]> {
-    return await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creatorId));
+    // First, try to find programs by creator_id directly
+    let programs = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creatorId));
+    
+    // If no programs found, the creatorId might be a user_id - look up the creator and try again
+    if (programs.length === 0) {
+      const [creator] = await db.select().from(creators).where(eq(creators.userId, creatorId));
+      if (creator) {
+        programs = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creator.id));
+      }
+    }
+    
+    return programs;
   }
 
   async createLoyaltyProgram(insertProgram: InsertLoyaltyProgram): Promise<LoyaltyProgram> {
@@ -749,7 +754,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(socialCampaignTasks).where(eq(socialCampaignTasks.id, id));
   }
 
-  // Creator Facebook Pages
+  // Creator Facebook Pages - Optimized batch upsert (fixes N+1 query)
   async upsertCreatorFacebookPages(creatorId: string, pages: Array<{
     pageId: string;
     name: string;
@@ -759,37 +764,40 @@ export class DatabaseStorage implements IStorage {
     instagramBusinessAccountId?: string;
     connectedInstagramAccountId?: string;
   }>): Promise<number> {
-    let count = 0;
-    for (const p of pages) {
-      const existing = await db.select().from(creatorFacebookPages)
-        .where(and(eq(creatorFacebookPages.creatorId, creatorId), eq(creatorFacebookPages.pageId, p.pageId)));
-      if (existing && existing.length > 0) {
-        await db.update(creatorFacebookPages).set({
-          name: p.name,
-          accessToken: p.accessToken,
-          followersCount: p.followersCount || 0,
-          fanCount: p.fanCount || 0,
-          instagramBusinessAccountId: p.instagramBusinessAccountId,
-          connectedInstagramAccountId: p.connectedInstagramAccountId,
-          updatedAt: new Date()
-        } as any).where(and(eq(creatorFacebookPages.creatorId, creatorId), eq(creatorFacebookPages.pageId, p.pageId)));
-      } else {
-        await db.insert(creatorFacebookPages).values({
-          creatorId,
-          pageId: p.pageId,
-          name: p.name,
-          accessToken: p.accessToken,
-          followersCount: p.followersCount || 0,
-          fanCount: p.fanCount || 0,
-          instagramBusinessAccountId: p.instagramBusinessAccountId,
-          connectedInstagramAccountId: p.connectedInstagramAccountId,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        } as any);
-      }
-      count++;
-    }
-    return count;
+    if (pages.length === 0) return 0;
+    
+    const now = new Date();
+    
+    // Batch upsert using ON CONFLICT DO UPDATE
+    // This is a single query instead of 2*N queries
+    const values = pages.map(p => ({
+      creatorId,
+      pageId: p.pageId,
+      name: p.name,
+      accessToken: p.accessToken,
+      followersCount: p.followersCount || 0,
+      fanCount: p.fanCount || 0,
+      instagramBusinessAccountId: p.instagramBusinessAccountId || null,
+      connectedInstagramAccountId: p.connectedInstagramAccountId || null,
+      createdAt: now,
+      updatedAt: now
+    }));
+    
+    // Use raw SQL for proper ON CONFLICT handling with Drizzle
+    await db.execute(sql`
+      INSERT INTO creator_facebook_pages (creator_id, page_id, name, access_token, followers_count, fan_count, instagram_business_account_id, connected_instagram_account_id, created_at, updated_at)
+      VALUES ${sql.join(values.map(v => sql`(${v.creatorId}, ${v.pageId}, ${v.name}, ${v.accessToken}, ${v.followersCount}, ${v.fanCount}, ${v.instagramBusinessAccountId}, ${v.connectedInstagramAccountId}, ${v.createdAt}, ${v.updatedAt})`), sql`, `)}
+      ON CONFLICT (creator_id, page_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        access_token = EXCLUDED.access_token,
+        followers_count = EXCLUDED.followers_count,
+        fan_count = EXCLUDED.fan_count,
+        instagram_business_account_id = EXCLUDED.instagram_business_account_id,
+        connected_instagram_account_id = EXCLUDED.connected_instagram_account_id,
+        updated_at = EXCLUDED.updated_at
+    `);
+    
+    return pages.length;
   }
 
   async getCreatorFacebookPages(creatorId: string): Promise<any[]> {
@@ -978,12 +986,47 @@ export class DatabaseStorage implements IStorage {
     return completion;
   }
 
-  async getTaskCompletionByUserAndTask(userId: string, taskId: string): Promise<TaskCompletion | undefined> {
+  /**
+   * Get task completion by user and task, optionally scoped by campaign context.
+   * 
+   * @param userId - The user's ID
+   * @param taskId - The task's ID
+   * @param campaignId - Optional campaign ID. If provided, looks for campaign-context completions.
+   *                     If not provided, looks for standalone-context completions (or null for backwards compatibility).
+   * 
+   * This enables the campaign override model where:
+   * - Standalone completion: completionContext = 'standalone', campaignId = null
+   * - Campaign completion: completionContext = 'campaign', campaignId = <specific campaign>
+   * - Each context is independently deduped
+   */
+  async getTaskCompletionByUserAndTask(
+    userId: string, 
+    taskId: string, 
+    campaignId?: string | null
+  ): Promise<TaskCompletion | undefined> {
+    const baseConditions = [
+      eq(taskCompletions.userId, userId),
+      eq(taskCompletions.taskId, taskId),
+    ];
+
+    let contextCondition;
+    if (campaignId) {
+      // Looking for a completion within a specific campaign
+      contextCondition = and(
+        eq(taskCompletions.campaignId, campaignId),
+        eq(taskCompletions.completionContext, 'campaign')
+      );
+    } else {
+      // Looking for a standalone completion (or legacy rows with null context)
+      contextCondition = or(
+        isNull(taskCompletions.completionContext),
+        eq(taskCompletions.completionContext, 'standalone')
+      );
+    }
+
     const [completion] = await db.select().from(taskCompletions)
-      .where(and(
-        eq(taskCompletions.userId, userId),
-        eq(taskCompletions.taskId, taskId)
-      ));
+      .where(and(...baseConditions, contextCondition))
+      .limit(1);
     return completion;
   }
 
@@ -1147,12 +1190,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Social Account Management
-  async saveSocialAccount(dynamicUserId: string, platform: string, accountData: any): Promise<void> {
+  async saveSocialAccount(userId: string, platform: string, accountData: any): Promise<void> {
     try {
-      // First, get the user's internal ID from their Dynamic ID
-      const user = await this.getUserByDynamicId(dynamicUserId);
+      const user = await this.getUser(userId);
       if (!user) {
-        throw new Error(`User not found for Dynamic ID: ${dynamicUserId}`);
+        throw new Error(`User not found for ID: ${userId}`);
       }
 
       // Create or update social account connection
@@ -1197,9 +1239,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getSocialAccounts(dynamicUserId: string): Promise<any[]> {
+  async getSocialAccounts(userId: string): Promise<any[]> {
     try {
-      const user = await this.getUserByDynamicId(dynamicUserId);
+      const user = await this.getUser(userId);
       if (!user) {
         return [];
       }
@@ -1217,11 +1259,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async removeSocialAccount(dynamicUserId: string, platform: string): Promise<boolean> {
+  async removeSocialAccount(userId: string, platform: string): Promise<boolean> {
     try {
-      const user = await this.getUserByDynamicId(dynamicUserId);
+      const user = await this.getUser(userId);
       if (!user) {
-        console.log(`[Storage] User not found for dynamicUserId: ${dynamicUserId}`);
+        console.log(`[Storage] User not found for userId: ${userId}`);
         return false;
       }
 
@@ -1252,11 +1294,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async saveSocialTokenBundle(dynamicUserId: string, platform: string, tokenBundle: any): Promise<void> {
+  async saveSocialTokenBundle(userId: string, platform: string, tokenBundle: any): Promise<void> {
     try {
-      const user = await this.getUserByDynamicId(dynamicUserId);
+      const user = await this.getUser(userId);
       if (!user) {
-        throw new Error(`User not found for Dynamic ID: ${dynamicUserId}`);
+        throw new Error(`User not found for ID: ${userId}`);
       }
 
       const profileData: any = (user as any).profileData || {};
@@ -1282,9 +1324,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getSocialTokenBundle(dynamicUserId: string, platform: string): Promise<any | undefined> {
+  async getSocialTokenBundle(userId: string, platform: string): Promise<any | undefined> {
     try {
-      const user = await this.getUserByDynamicId(dynamicUserId);
+      const user = await this.getUser(userId);
       if (!user) return undefined;
       const profileData: any = (user as any).profileData || {};
       const socialTokens = profileData.socialTokens && typeof profileData.socialTokens === 'object'

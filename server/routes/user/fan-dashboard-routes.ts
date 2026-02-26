@@ -4,6 +4,7 @@ import { users, fanPrograms, campaigns, platformTaskCompletions, platformPointsT
 import { eq, and, sql, count } from "drizzle-orm";
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
+import { getSafeDateGroupConfig } from '../../utils/safe-sql';
 
 export function registerFanDashboardRoutes(app: Express) {
   /**
@@ -276,66 +277,37 @@ export function registerFanDashboardRoutes(app: Express) {
       const userId = req.user!.id;
       const timeframe = (req.query.timeframe as string) || 'weekly';
       
-      // Determine date grouping and range based on timeframe
-      let dateFormat: string;
-      let daysBack: number;
-      let groupByFormat: string;
-      
-      switch (timeframe) {
-        case 'daily':
-          dateFormat = 'YYYY-MM-DD';
-          daysBack = 30;
-          groupByFormat = 'DATE(%s)';
-          break;
-        case 'weekly':
-          dateFormat = 'Mon DD';  // e.g., "Feb 09" instead of "2026-W07"
-          daysBack = 90;
-          groupByFormat = 'DATE_TRUNC(\'week\', %s)';
-          break;
-        case 'monthly':
-          dateFormat = 'YYYY-MM';
-          daysBack = 365;
-          groupByFormat = 'DATE_TRUNC(\'month\', %s)';
-          break;
-        case 'yearly':
-          dateFormat = 'YYYY';
-          daysBack = 1095; // 3 years
-          groupByFormat = 'DATE_TRUNC(\'year\', %s)';
-          break;
-        default:
-          dateFormat = 'YYYY-MM-DD';
-          daysBack = 30;
-          groupByFormat = 'DATE(%s)';
-      }
+      // Use safe date grouping config to prevent SQL injection
+      const dateConfig = getSafeDateGroupConfig(timeframe);
 
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - daysBack);
+      startDate.setDate(startDate.getDate() - dateConfig.daysBack);
 
-      // Platform points history
+      // Platform points history - using safe SQL expressions
       const platformPointsHistory = await db.execute(sql`
         SELECT 
-          TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'created_at'))}, ${dateFormat}) as period,
+          ${sql.raw(dateConfig.toCharExpr('created_at'))} as period,
           COALESCE(SUM(points), 0) as points
         FROM platform_points_transactions
         WHERE user_id = ${userId}
           AND created_at >= ${startDate.toISOString()}
-        GROUP BY ${sql.raw(groupByFormat.replace('%s', 'created_at'))}
+        GROUP BY ${sql.raw(dateConfig.groupByExpr('created_at'))}
         ORDER BY period
       `);
 
-      // Creator points history
+      // Creator points history - using safe SQL expressions
       // Points are already stored correctly: positive for earned, negative for spent
       // So we just SUM directly without any CASE transformation
       const creatorPointsHistory = await db.execute(sql`
         SELECT 
-          TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'pt.created_at'))}, ${dateFormat}) as period,
+          ${sql.raw(dateConfig.toCharExpr('pt.created_at'))} as period,
           COALESCE(SUM(pt.points), 0) as points
         FROM ${pointTransactions} pt
         WHERE pt.fan_program_id IN (
           SELECT id FROM ${fanPrograms} WHERE fan_id = ${userId}
         )
         AND pt.created_at >= ${startDate.toISOString()}
-        GROUP BY ${sql.raw(groupByFormat.replace('%s', 'pt.created_at'))}
+        GROUP BY ${sql.raw(dateConfig.groupByExpr('pt.created_at'))}
         ORDER BY period
       `);
 
@@ -359,63 +331,35 @@ export function registerFanDashboardRoutes(app: Express) {
       const userId = req.user!.id;
       const timeframe = (req.query.timeframe as string) || 'weekly';
       
-      let dateFormat: string;
-      let daysBack: number;
-      let groupByFormat: string;
-      
-      switch (timeframe) {
-        case 'daily':
-          dateFormat = 'YYYY-MM-DD';
-          daysBack = 30;
-          groupByFormat = 'DATE(%s)';
-          break;
-        case 'weekly':
-          dateFormat = 'Mon DD';  // e.g., "Feb 09" instead of "2026-W07"
-          daysBack = 90;
-          groupByFormat = 'DATE_TRUNC(\'week\', %s)';
-          break;
-        case 'monthly':
-          dateFormat = 'YYYY-MM';
-          daysBack = 365;
-          groupByFormat = 'DATE_TRUNC(\'month\', %s)';
-          break;
-        case 'yearly':
-          dateFormat = 'YYYY';
-          daysBack = 1095;
-          groupByFormat = 'DATE_TRUNC(\'year\', %s)';
-          break;
-        default:
-          dateFormat = 'YYYY-MM-DD';
-          daysBack = 30;
-          groupByFormat = 'DATE(%s)';
-      }
+      // Use safe date grouping config to prevent SQL injection
+      const dateConfig = getSafeDateGroupConfig(timeframe);
 
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - daysBack);
+      startDate.setDate(startDate.getDate() - dateConfig.daysBack);
 
-      // Platform task completions over time
+      // Platform task completions over time - using safe SQL expressions
       const platformCompletionStats = await db.execute(sql`
         SELECT 
-          TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'created_at'))}, ${dateFormat}) as period,
+          ${sql.raw(dateConfig.toCharExpr('created_at'))} as period,
           COUNT(*) as completed
         FROM ${platformTaskCompletions}
         WHERE user_id = ${userId}
           AND created_at >= ${startDate.toISOString()}
-        GROUP BY ${sql.raw(groupByFormat.replace('%s', 'created_at'))}
+        GROUP BY ${sql.raw(dateConfig.groupByExpr('created_at'))}
         ORDER BY period
       `);
 
-      // Creator task completions over time (from task_completions table)
+      // Creator task completions over time (from task_completions table) - using safe SQL expressions
       const creatorCompletionStats = await db.execute(sql`
         SELECT 
-          TO_CHAR(${sql.raw(groupByFormat.replace('%s', 'completed_at'))}, ${dateFormat}) as period,
+          ${sql.raw(dateConfig.toCharExpr('completed_at'))} as period,
           COUNT(*) as completed
         FROM ${taskCompletions}
         WHERE user_id = ${userId}
           AND status = 'completed'
           AND completed_at IS NOT NULL
           AND completed_at >= ${startDate.toISOString()}
-        GROUP BY ${sql.raw(groupByFormat.replace('%s', 'completed_at'))}
+        GROUP BY ${sql.raw(dateConfig.groupByExpr('completed_at'))}
         ORDER BY period
       `);
 

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { socialManager } from '@/lib/social-integrations';
+import { getAuthHeaders } from '@/lib/queryClient';
 import { FaSpotify } from 'react-icons/fa';
 import { Users, ExternalLink, Loader2, CheckCircle, AlertTriangle, Music } from 'lucide-react';
 
@@ -31,7 +32,7 @@ export default function CreatorSpotifyWidget() {
       try {
         const response = await fetch('/api/social-connections/spotify', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -80,7 +81,7 @@ export default function CreatorSpotifyWidget() {
     if (user?.id) {
       loadStatus();
     }
-  }, [user?.id, user?.dynamicUserId]);
+  }, [user?.id]);
 
   const connectSpotify = async () => {
     try {
@@ -91,7 +92,7 @@ export default function CreatorSpotifyWidget() {
       setTimeout(async () => {
         const response = await fetch('/api/social-connections/spotify', {
           headers: {
-            'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+            ...getAuthHeaders(),
             'Content-Type': 'application/json'
           },
           credentials: 'include'
@@ -116,7 +117,7 @@ export default function CreatorSpotifyWidget() {
       const response = await fetch('/api/social-connections/disconnect', {
         method: 'POST',
         headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user?.id || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ platform: 'spotify' }),

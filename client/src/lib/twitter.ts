@@ -79,8 +79,6 @@ function getClientId(): string {
   return clientId;
 }
 
-// getDynamicUserId removed - no longer using Dynamic auth provider
-
 export class TwitterSDKManager {
   static async getAuthUrl(userType: UserType, state?: string, forcedRedirectUri?: string): Promise<string> {
     // Prevent duplicate calls within 200ms
@@ -200,7 +198,7 @@ export class TwitterSDKManager {
           cleanup();
           resolve(event.data.result as TwitterLoginResult);
         };
-        window.addEventListener("message", onMsg, { once: true });
+        window.addEventListener("message", onMsg);
 
         const poll = setInterval(() => {
           try {
@@ -209,13 +207,31 @@ export class TwitterSDKManager {
               if (!settled) {
                 settled = true;
                 cleanup();
-                const cb = (window as any).twitterCallbackData as TwitterLoginResult | undefined;
+                
+                // Check window callback data first
+                let cb = (window as any).twitterCallbackData as TwitterLoginResult | undefined;
                 if (cb) {
                   delete (window as any).twitterCallbackData;
                   resolve(cb);
-                } else {
-                  resolve({ success: false, error: "Twitter authorization was cancelled or failed" });
+                  return;
                 }
+                
+                // Check localStorage as COOP fallback (Cross-Origin-Opener-Policy can null window.opener)
+                try {
+                  const lsKey = `twitter_oauth_result_${stateValue}`;
+                  const lsResult = localStorage.getItem(lsKey);
+                  if (lsResult) {
+                    localStorage.removeItem(lsKey);
+                    const parsed = JSON.parse(lsResult) as TwitterLoginResult;
+                    console.log('[Twitter] Found result in localStorage (COOP fallback):', parsed.success);
+                    resolve(parsed);
+                    return;
+                  }
+                } catch (e) {
+                  console.error('[Twitter] Error reading localStorage fallback:', e);
+                }
+                
+                resolve({ success: false, error: "Twitter authorization was cancelled or failed" });
               }
             }
           } catch {}

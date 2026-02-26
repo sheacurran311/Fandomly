@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useFanStats, useActiveCampaigns } from "@/hooks/use-fan-dashboard";
@@ -77,12 +77,40 @@ export default function FanDashboard() {
   });
 
   // Calculate total tasks completed
-  const totalTasksCompleted = userCompletions?.completions?.filter(
-    (c: any) => c.status === 'completed' || c.status === 'claimed'
-  ).length || 0;
+  const totalTasksCompleted = useMemo(() => 
+    userCompletions?.completions?.filter(
+      (c: any) => c.status === 'completed' || c.status === 'claimed'
+    ).length || 0,
+    [userCompletions?.completions]
+  );
 
   // Calculate total points (platform + creator)
   const totalPoints = (fanStats?.platformPoints || 0) + (fanStats?.creatorPoints || 0);
+
+  // Memoize merged points history data for chart
+  const mergedPointsHistory = useMemo(() => {
+    const periodMap = new Map<string, { period: string; platformPoints: number; creatorPoints: number }>();
+    
+    // Process platform points
+    (pointsHistory?.platformPoints || []).forEach((item: any) => {
+      const period = item.period;
+      if (!periodMap.has(period)) {
+        periodMap.set(period, { period, platformPoints: 0, creatorPoints: 0 });
+      }
+      periodMap.get(period)!.platformPoints = Number(item.points) || 0;
+    });
+    
+    // Process creator points
+    (pointsHistory?.creatorPoints || []).forEach((item: any) => {
+      const period = item.period;
+      if (!periodMap.has(period)) {
+        periodMap.set(period, { period, platformPoints: 0, creatorPoints: 0 });
+      }
+      periodMap.get(period)!.creatorPoints = Number(item.points) || 0;
+    });
+    
+    return Array.from(periodMap.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }, [pointsHistory]);
 
   if (isLoading) {
     return (
@@ -178,30 +206,7 @@ export default function FanDashboard() {
             <BarChartCard
               title="Points Earned"
               description="Platform and creator points over time"
-              data={(() => {
-                // Properly merge platform and creator points by period
-                const periodMap = new Map<string, { period: string; platformPoints: number; creatorPoints: number }>();
-                
-                // Process platform points
-                (pointsHistory?.platformPoints || []).forEach((item: any) => {
-                  const period = item.period;
-                  if (!periodMap.has(period)) {
-                    periodMap.set(period, { period, platformPoints: 0, creatorPoints: 0 });
-                  }
-                  periodMap.get(period)!.platformPoints = Number(item.points) || 0;
-                });
-                
-                // Process creator points
-                (pointsHistory?.creatorPoints || []).forEach((item: any) => {
-                  const period = item.period;
-                  if (!periodMap.has(period)) {
-                    periodMap.set(period, { period, platformPoints: 0, creatorPoints: 0 });
-                  }
-                  periodMap.get(period)!.creatorPoints = Number(item.points) || 0;
-                });
-                
-                return Array.from(periodMap.values()).sort((a, b) => a.period.localeCompare(b.period));
-              })()}
+              data={mergedPointsHistory}
               dataKeys={[
                 { key: 'platformPoints', color: '#8b5cf6', name: 'Platform' },
                 { key: 'creatorPoints', color: '#3b82f6', name: 'Creator' }

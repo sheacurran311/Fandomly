@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Instagram, Sparkles, MessageSquare, Camera, Hash, CheckCircle, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface InstagramTaskCreatorProps {
   creatorId: string;
@@ -79,23 +80,13 @@ export function InstagramTaskCreator({ creatorId, onTaskCreated }: InstagramTask
     setIsCreating(true);
 
     try {
-      const response = await fetch('/api/tasks/instagram/comment-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: commentTitle,
-          description: commentDescription,
-          rewardPoints: commentPoints,
-          mediaId,
-          mediaUrl: commentMediaUrl
-        })
+      const response = await apiRequest('POST', '/api/tasks/instagram/comment-code', {
+        title: commentTitle,
+        description: commentDescription,
+        rewardPoints: commentPoints,
+        mediaId,
+        mediaUrl: commentMediaUrl
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create task');
-      }
 
       const data = await response.json();
       
@@ -126,22 +117,12 @@ export function InstagramTaskCreator({ creatorId, onTaskCreated }: InstagramTask
     setIsCreating(true);
 
     try {
-      const response = await fetch('/api/tasks/instagram/mention-story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: mentionTitle,
-          description: mentionDescription,
-          rewardPoints: mentionPoints,
-          requireHashtag: mentionHashtag || undefined
-        })
+      const response = await apiRequest('POST', '/api/tasks/instagram/mention-story', {
+        title: mentionTitle,
+        description: mentionDescription,
+        rewardPoints: mentionPoints,
+        requireHashtag: mentionHashtag || undefined
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create task');
-      }
 
       const data = await response.json();
       
@@ -199,24 +180,14 @@ export function InstagramTaskCreator({ creatorId, onTaskCreated }: InstagramTask
     setIsCreating(true);
 
     try {
-      const response = await fetch('/api/tasks/instagram/keyword-comment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: keywordTitle,
-          description: keywordDescription,
-          rewardPoints: keywordPoints,
-          mediaId,
-          mediaUrl: keywordMediaUrl,
-          keyword
-        })
+      const response = await apiRequest('POST', '/api/tasks/instagram/keyword-comment', {
+        title: keywordTitle,
+        description: keywordDescription,
+        rewardPoints: keywordPoints,
+        mediaId,
+        mediaUrl: keywordMediaUrl,
+        keyword
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create task');
-      }
 
       const data = await response.json();
       

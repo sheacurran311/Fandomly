@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
+import { useFacebookConnection } from "@/hooks/use-social-connection";
 import { getNavigationItems, type NavigationItem } from "@/config/navigation";
 import { 
   ChevronLeft,
@@ -29,12 +30,16 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]); // Collapse parent menus by default
   const { toast } = useToast();
   
-  // Facebook page state for creators
-  const [facebookConnected, setFacebookConnected] = useState(false);
+  // Facebook connection via unified hook
+  const {
+    isConnected: facebookConnected,
+    isLoading: isLoadingFacebook,
+  } = useFacebookConnection();
+
+  // Facebook page state for page selection display
   const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
   const [activePage, setActivePage] = useState<FacebookPage | null>(null);
   const [showPageModal, setShowPageModal] = useState(false);
-  const [isLoadingFacebook, setIsLoadingFacebook] = useState(false);
   
   const items = getNavigationItems(userType, isNILAthlete);
   
@@ -46,46 +51,45 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
     );
   };
 
-  // Load Facebook status for creators
+  // Load Facebook pages when connection status becomes connected
   useEffect(() => {
-    if (userType === 'creator') {
-      checkFacebookStatus();
+    if (userType === 'creator' && facebookConnected) {
+      loadFacebookPages();
+    } else if (!facebookConnected) {
+      setFacebookPages([]);
+      setActivePage(null);
     }
-  }, [userType]);
-
-  const checkFacebookStatus = async () => {
-    try {
-      setIsLoadingFacebook(true);
-      await FacebookSDKManager.ensureFBReady('creator');
-      const status = await FacebookSDKManager.getLoginStatus();
-      
-      if (status.isLoggedIn) {
-        setFacebookConnected(true);
-        await loadFacebookPages();
-      } else {
-        setFacebookConnected(false);
-        setFacebookPages([]);
-        setActivePage(null);
-        localStorage.removeItem('fandomly_active_facebook_page_id'); // Clear saved page when not logged in
-      }
-    } catch (error) {
-      console.error('Error checking Facebook status in sidebar:', error);
-      setFacebookConnected(false);
-    } finally {
-      setIsLoadingFacebook(false);
-    }
-  };
+  }, [userType, facebookConnected]);
 
   const loadFacebookPages = async () => {
     try {
-      const pages = await FacebookSDKManager.getUserPages();
+      // Try live SDK pages first
+      let pages: FacebookPage[] = [];
+      try {
+        await FacebookSDKManager.ensureFBReady('creator');
+        const status = await FacebookSDKManager.getLoginStatus();
+        if (status.isLoggedIn) {
+          pages = await FacebookSDKManager.getUserPages();
+        }
+      } catch {
+        // SDK not available
+      }
+
+      // Fall back to stored pages from database
+      if (pages.length === 0) {
+        const { getSocialConnection } = await import('@/lib/social-connection-api');
+        const { connection } = await getSocialConnection('facebook');
+        if (connection?.profileData?.pages?.length) {
+          pages = connection.profileData.pages;
+        }
+      }
+
       setFacebookPages(pages);
       
       if (pages.length > 0) {
         const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
-        let pageToSet = pages.find(page => page.id === savedActivePageId) || pages[0];
+        const pageToSet = pages.find(page => page.id === savedActivePageId) || pages[0];
         setActivePage(pageToSet);
-        // Save to localStorage if we're setting a default page
         if (!savedActivePageId && pageToSet) {
           localStorage.setItem('fandomly_active_facebook_page_id', pageToSet.id);
         }

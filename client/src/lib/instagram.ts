@@ -43,10 +43,14 @@ export type UserType = 'creator' | 'fan';
 
 // Instagram App Configuration
 // Only creator/business auth is supported -- no fan-level Instagram auth
-const INSTAGRAM_CLIENT_ID = import.meta.env.VITE_INSTAGRAM_CREATOR_APP_ID || '1157911489578561';
+const INSTAGRAM_CLIENT_ID = import.meta.env.VITE_INSTAGRAM_CREATOR_APP_ID;
+
+if (!INSTAGRAM_CLIENT_ID) {
+  console.warn('[Instagram] VITE_INSTAGRAM_CREATOR_APP_ID is not configured. Instagram integration will be disabled.');
+}
 
 const CREATOR_CONFIG = {
-  clientId: INSTAGRAM_CLIENT_ID,
+  clientId: INSTAGRAM_CLIENT_ID || '',
   redirectUri: `${window.location.origin}/creator-dashboard`, // Must match Instagram App Dashboard exactly
   requiredScopes: [
     'instagram_business_basic',
@@ -379,18 +383,36 @@ class InstagramSDKManager {
           try {
             if (popup.closed) {
               clearInterval(pollTimer);
-              // Check if we have callback data in the global handler
-              const callbackData = (window as any).instagramCallbackData;
+              
+              // Check if we have callback data in the global handler first
+              let callbackData = (window as any).instagramCallbackData;
               if (callbackData) {
                 delete (window as any).instagramCallbackData;
                 const finalResult = await saveConnectionIfNeeded(callbackData);
                 resolve(finalResult);
-              } else {
-                resolve({
-                  success: false,
-                  error: 'Instagram authorization was cancelled or failed'
-                });
+                return;
               }
+              
+              // Check localStorage as COOP fallback (Cross-Origin-Opener-Policy can null window.opener)
+              try {
+                const lsKey = `instagram_oauth_result_${stateValue}`;
+                const lsResult = localStorage.getItem(lsKey);
+                if (lsResult) {
+                  localStorage.removeItem(lsKey);
+                  const parsed = JSON.parse(lsResult);
+                  console.log('[Instagram Manager] Found result in localStorage (COOP fallback):', parsed.success);
+                  const finalResult = await saveConnectionIfNeeded(parsed);
+                  resolve(finalResult);
+                  return;
+                }
+              } catch (e) {
+                console.error('[Instagram Manager] Error reading localStorage fallback:', e);
+              }
+              
+              resolve({
+                success: false,
+                error: 'Instagram authorization was cancelled or failed'
+              });
             }
           } catch (error) {
             // Cross-origin error means popup is still open

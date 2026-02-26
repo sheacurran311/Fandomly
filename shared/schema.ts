@@ -165,7 +165,6 @@ export const socialConnections = pgTable("social_connections", {
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dynamicUserId: text("dynamic_user_id").unique(),
   email: text("email"),
   username: text("username").unique().notNull(), // Required unique username for all users
   avatar: text("avatar"),
@@ -1357,6 +1356,11 @@ export const taskCompletions = pgTable("task_completions", {
   
   // Campaign association (for starter pack campaign exceptions)
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
+  
+  // Completion context - enables campaign-specific completions of one-time tasks
+  // 'standalone' = completed outside a campaign (default for backwards compatibility)
+  // 'campaign' = completed as part of a specific campaign (allows re-earning points via re-verification)
+  completionContext: text("completion_context").default('standalone'),
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -3117,6 +3121,9 @@ export const betaSignups = pgTable("beta_signups", {
     utmMedium?: string;
     utmCampaign?: string;
   }>(),
+  claimed: boolean("claimed").default(false).notNull(), // Track if points were awarded
+  claimedAt: timestamp("claimed_at"), // When points were claimed
+  claimedByUserId: varchar("claimed_by_user_id"), // User who claimed the points
   createdAt: timestamp("created_at").defaultNow(),
 });
 

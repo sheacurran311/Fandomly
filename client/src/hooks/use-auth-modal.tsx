@@ -40,7 +40,18 @@ export function AuthModalProvider({ children }: AuthModalProviderProps) {
 export function useAuthModal() {
   const context = useContext(AuthModalContext);
   if (!context) {
-    throw new Error('useAuthModal must be used within an AuthModalProvider');
+    // During HMR or when context is temporarily unavailable, return no-op functions
+    // This prevents crashes during development hot reloads
+    console.warn('[useAuthModal] Context not available - returning fallback. This is normal during HMR.');
+    return {
+      isOpen: false,
+      openAuthModal: () => {
+        console.warn('[useAuthModal] openAuthModal called but provider not ready');
+      },
+      closeAuthModal: () => {
+        console.warn('[useAuthModal] closeAuthModal called but provider not ready');
+      }
+    };
   }
   return context;
 }

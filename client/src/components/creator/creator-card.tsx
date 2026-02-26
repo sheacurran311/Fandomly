@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type Creator } from "@shared/schema";
@@ -72,7 +73,7 @@ interface CreatorCardProps {
   onUnauthenticatedClick?: () => void;
 }
 
-export default function CreatorCard({ 
+function CreatorCard({ 
   creator, 
   variant = "full",
   showBanner: showBannerProp,
@@ -582,3 +583,5 @@ export default function CreatorCard({
     </div>
   );
 }
+
+export default memo(CreatorCard);

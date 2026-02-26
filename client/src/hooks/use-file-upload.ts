@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useToast } from './use-toast';
+import { getCsrfToken, resetCsrfToken, getAuthHeaders } from '@/lib/queryClient';
 
 interface UploadOptions {
   maxSize?: number; // in MB
@@ -30,6 +31,15 @@ export const useFileUpload = (options: UploadOptions = {}) => {
     onError
   } = options;
 
+  // Clean up object URL on unmount or when previewUrl changes to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const uploadMutation = useMutation({
     mutationFn: async (file: File): Promise<UploadResponse> => {
       // Validate file size
@@ -45,13 +55,37 @@ export const useFileUpload = (options: UploadOptions = {}) => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/upload/image', {
+      // Get CSRF token and auth headers for the upload
+      const csrfToken = await getCsrfToken();
+      const headers: Record<string, string> = {
+        // Don't set Content-Type header - let browser set it with boundary for FormData
+        ...getAuthHeaders(),
+      };
+      if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+      }
+
+      let response = await fetch('/api/upload/image', {
         method: 'POST',
         body: formData,
-        headers: {
-          // Don't set Content-Type header - let browser set it with boundary for FormData
-        }
+        headers,
+        credentials: 'include',
       });
+
+      // Retry once on CSRF failure
+      if (response.status === 403) {
+        resetCsrfToken();
+        const freshToken = await getCsrfToken();
+        if (freshToken) {
+          headers['x-csrf-token'] = freshToken;
+          response = await fetch('/api/upload/image', {
+            method: 'POST',
+            body: formData,
+            headers,
+            credentials: 'include',
+          });
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
@@ -79,13 +113,15 @@ export const useFileUpload = (options: UploadOptions = {}) => {
   });
 
   const handleFileSelect = (file: File) => {
+    // Clean up previous preview URL before creating a new one
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
     // Create preview URL for images
     if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      
-      // Clean up preview URL when component unmounts or new file is selected
-      return () => URL.revokeObjectURL(url);
     }
     
     // Start upload

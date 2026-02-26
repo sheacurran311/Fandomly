@@ -232,23 +232,8 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       }
     }
     
-    // Redirect authenticated users away from homepage to their appropriate dashboard
-    // (pending users were already caught by the iron wall above — user has a real type here)
-    if (currentPath === '/') {
-      const hasCallbackParams = window.location.search.includes('code=') || window.location.search.includes('state=');
-      
-      if (user.userType === 'creator') {
-        const redirectUrl = hasCallbackParams ? `/creator-dashboard${window.location.search}` : '/creator-dashboard';
-        setLocation(redirectUrl);
-      } else if (user.userType === 'fan') {
-        setLocation('/fan-dashboard');
-      } else {
-        // Unknown type — send to type selection
-        setLocation('/user-type-selection');
-      }
-      return;
-    }
-    
+    // No redirect from / — authenticated users can stay on the landing page for testing
+
     // Dashboard mismatch guards - prevent creators on fan dashboard and vice versa
     if (currentPath.startsWith('/fan-dashboard') && user.userType === 'creator') {
       setLocation('/creator-dashboard');

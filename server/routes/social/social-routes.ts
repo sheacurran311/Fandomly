@@ -5,8 +5,8 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { URLSearchParams } from "url";
 import { storage } from '../../core/storage';
 import { db } from '../../db';
-import { socialConnections, users } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { socialConnections, platformPointsTransactions } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { platformPointsService } from '../../services/points/platform-points-service';
 
 // Points awarded for connecting a social account
@@ -928,7 +928,7 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Instagram Business Login token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
-  app.post('/api/social/instagram/token', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/social/instagram/token', async (req: Request, res: Response) => {
     try {
       const { code, redirect_uri, user_type = 'creator' } = req.body;
       
@@ -1056,19 +1056,16 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // TikTok token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
-  app.post('/api/social/tiktok/token', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/social/tiktok/token', async (req: Request, res: Response) => {
     try {
       const { code, redirect_uri } = req.body || {};
       if (!code) {
         return res.status(400).json({ error: 'code is required' });
       }
       
-      console.log('[TikTok Token Route] Processing token exchange for user:', req.user?.id);
+      console.log('[TikTok Token Route] Processing token exchange');
       const tokenData = await exchangeTikTokToken(code, redirect_uri);
-      
-      // Store the token data for the user if needed
-      // TODO: Save to database if you want to persist TikTok connections
-      
+      // Token bundle is saved via the callback page's POST to /api/social-connections
       res.json(tokenData);
     } catch (error: any) {
       console.error('TikTok token exchange error:', error);
@@ -1098,22 +1095,18 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter token exchange (PKCE)
-  app.post('/api/social/twitter/token', async (req: AuthenticatedRequest, res) => {
+  // Twitter token exchange (PKCE) - no auth required, runs in popup window
+  app.post('/api/social/twitter/token', async (req: Request, res: Response) => {
     try {
       const timestamp = new Date().toISOString();
       const { code, redirect_uri, code_verifier } = req.body || {};
-      const dynamicUserIdHeader = req.headers['x-dynamic-user-id'] as string | undefined;
-      const dynamicUserIdBody = (req.body && (req.body.dynamicUserId || req.body.userId)) as string | undefined;
-      const dynamicUserId = dynamicUserIdHeader || dynamicUserIdBody;
 
       console.log(`[Twitter Token] ${timestamp} Request received:`, {
         hasCode: !!code,
         codeLength: code?.length || 0,
         redirect_uri,
         hasCodeVerifier: !!code_verifier,
-        verifierLength: code_verifier?.length || 0,
-        userId: dynamicUserId || 'unknown'
+        verifierLength: code_verifier?.length || 0
       });
 
       if (!code || !redirect_uri || !code_verifier) {
@@ -1146,20 +1139,7 @@ export function registerSocialRoutes(app: Express) {
         usedCodeCache.delete(codeKey);
         return res.status(result.status).json(result.body);
       }
-      // Persist token bundle if we have a user context
-      if (dynamicUserId && result.body?.access_token) {
-        try {
-          const tokenBundle = {
-            ...result.body,
-            received_at: Date.now(),
-            expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
-          };
-          await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', tokenBundle);
-          console.log('[Twitter Token] Token bundle persisted successfully');
-        } catch (e) {
-          console.warn('[Twitter Token] Failed to persist token bundle:', e);
-        }
-      }
+      // Token bundle is saved via the callback page's POST to /api/social-connections
       return res.json(result.body);
     } catch (error) {
       console.error('Twitter token exchange error:', error);
@@ -1167,11 +1147,10 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter token refresh (no custom auth middleware)
-  app.post('/api/social/twitter/refresh', async (req: AuthenticatedRequest, res) => {
+  // Twitter token refresh - no auth required, runs in popup window context
+  app.post('/api/social/twitter/refresh', async (req: Request, res: Response) => {
     try {
       const { refresh_token } = req.body || {};
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
       if (!refresh_token) {
         return res.status(400).json({ error: 'refresh_token is required' });
       }
@@ -1179,20 +1158,7 @@ export function registerSocialRoutes(app: Express) {
       if (!result.ok) {
         return res.status(result.status).json(result.body);
       }
-      // Persist rotated token bundle
-      if (dynamicUserId && result.body?.access_token) {
-        try {
-          const tokenBundle = {
-            ...result.body,
-            received_at: Date.now(),
-            expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
-          };
-          await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', tokenBundle);
-          console.log('[Twitter Refresh] Token bundle rotated and persisted successfully');
-        } catch (e) {
-          console.warn('[Twitter Refresh] Failed to persist token bundle:', e);
-        }
-      }
+      // Token bundle persistence is handled via the callback page's POST to /api/social-connections
       // Return the full token bundle so clients can atomically rotate stored refresh_token
       return res.json(result.body);
     } catch (error) {
@@ -1201,8 +1167,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter user info (no custom auth middleware)
-  app.get('/api/social/twitter/user', async (req: AuthenticatedRequest, res) => {
+  // Twitter user info (uses OAuth access token for auth, not session)
+  app.get('/api/social/twitter/user', async (req: Request, res: Response) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1218,22 +1184,18 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Get stored Twitter token bundle for a user
-  app.get('/api/social/twitter/token-bundle', async (req: AuthenticatedRequest, res) => {
+  app.get('/api/social/twitter/token-bundle', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string);
+      const userId = req.user!.id;
       const includeToken = req.query?.includeToken === 'true';
       
       console.log('[Twitter Token Bundle] Request params:', {
-        dynamicUserId,
+        userId,
         includeToken,
         queryParams: req.query
       });
       
-      if (!dynamicUserId) {
-        return res.status(400).json({ error: 'dynamicUserId required' });
-      }
-      
-      const tokenBundle = await storage.getSocialTokenBundle(dynamicUserId, 'twitter');
+      const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
       if (!tokenBundle) {
         return res.status(404).json({ error: 'No Twitter tokens found for user' });
       }
@@ -1268,14 +1230,11 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Debug endpoint to see raw stored token data
-  app.get('/api/social/twitter/debug-tokens', async (req: AuthenticatedRequest, res) => {
+  app.get('/api/social/twitter/debug-tokens', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string);
-      if (!dynamicUserId) {
-        return res.status(400).json({ error: 'dynamicUserId required' });
-      }
+      const userId = req.user!.id;
       
-      const tokenBundle = await storage.getSocialTokenBundle(dynamicUserId, 'twitter');
+      const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
       if (!tokenBundle) {
         return res.status(404).json({ error: 'No Twitter tokens found for user' });
       }
@@ -1302,14 +1261,11 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Proactive token refresh endpoint
-  app.post('/api/social/twitter/refresh-if-needed', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/social/twitter/refresh-if-needed', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId;
-      if (!dynamicUserId) {
-        return res.status(400).json({ error: 'dynamicUserId required' });
-      }
+      const userId = req.user!.id;
 
-      const tokenBundle = await storage.getSocialTokenBundle(dynamicUserId, 'twitter');
+      const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
       if (!tokenBundle?.refresh_token) {
         return res.status(404).json({ error: 'No refresh token found' });
       }
@@ -1321,7 +1277,7 @@ export function registerSocialRoutes(app: Express) {
         return res.json({ refreshed: false, message: 'Token still valid' });
       }
 
-      console.log('[Twitter Proactive Refresh] Refreshing token for user:', dynamicUserId);
+      console.log('[Twitter Proactive Refresh] Refreshing token for user:', userId);
       const result = await refreshTwitterToken(tokenBundle.refresh_token);
       
       if (!result.ok) {
@@ -1334,7 +1290,7 @@ export function registerSocialRoutes(app: Express) {
         received_at: Date.now(),
         expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
       };
-      await storage.saveSocialTokenBundle(dynamicUserId, 'twitter', newTokenBundle);
+      await storage.saveSocialTokenBundle(userId, 'twitter', newTokenBundle);
       
       console.log('[Twitter Proactive Refresh] Token refreshed successfully');
       res.json({ refreshed: true, expiresAt: newTokenBundle.expires_at });
@@ -1345,7 +1301,7 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // YouTube token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
-  app.post('/api/social/youtube/token', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/social/youtube/token', async (req: Request, res: Response) => {
     try {
       const { code, redirect_uri } = req.body;
       if (!code || !redirect_uri) {
@@ -1414,7 +1370,7 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Spotify token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
-  app.post('/api/social/spotify/token', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/social/spotify/token', async (req: Request, res: Response) => {
     try {
       const { code, redirect_uri } = req.body;
       if (!code || !redirect_uri) {
@@ -1554,22 +1510,18 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Save connected social account (no custom auth middleware)
-  app.post('/api/social/connect', async (req: AuthenticatedRequest, res) => {
+  // Save connected social account
+  app.post('/api/social/connect', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
+      const userId = req.user!.id;
       const { platform, accountData } = req.body;
       
       console.log(`[Social Connect] Request received:`, { 
-        dynamicUserId, 
+        userId, 
         platform, 
         hasAccountData: !!accountData,
         accountUsername: accountData?.user?.username 
       });
-      
-      if (!dynamicUserId) {
-        return res.status(400).json({ error: 'dynamicUserId required' });
-      }
       
       if (!platform || !accountData) {
         return res.status(400).json({ error: 'Platform and account data are required' });
@@ -1577,82 +1529,90 @@ export function registerSocialRoutes(app: Express) {
       
       // Save to BOTH systems for consistency
       // 1. Save to old storage system (users.profileData.socialConnections)
-      await storage.saveSocialAccount(dynamicUserId, platform, accountData);
+      await storage.saveSocialAccount(userId, platform, accountData);
       
       // 2. Also save to socialConnections table for consistency across all pages
       let isNewConnection = false;
-      let internalUserId: string | null = null;
       
       try {
-        const user = await storage.getUserByDynamicId(dynamicUserId);
-        if (user) {
-          internalUserId = user.id;
-          
-          // Check if connection already exists in socialConnections table
-          const existingConnection = await db.query.socialConnections.findFirst({
-            where: and(
-              eq(socialConnections.userId, user.id),
-              eq(socialConnections.platform, platform)
-            ),
-          });
+        // Check if connection already exists in socialConnections table
+        const existingConnection = await db.query.socialConnections.findFirst({
+          where: and(
+            eq(socialConnections.userId, userId),
+            eq(socialConnections.platform, platform)
+          ),
+        });
 
-          const connectionData = {
-            platformUserId: accountData.user?.id || accountData.id,
-            platformUsername: accountData.user?.username || accountData.username,
-            platformDisplayName: accountData.user?.name || accountData.name || accountData.displayName,
-            profileData: accountData,
-            lastSyncedAt: new Date(),
-            isActive: true,
-            updatedAt: new Date(),
-          };
+        const connectionData = {
+          platformUserId: accountData.user?.id || accountData.id,
+          platformUsername: accountData.user?.username || accountData.username,
+          platformDisplayName: accountData.user?.name || accountData.name || accountData.displayName,
+          profileData: accountData,
+          lastSyncedAt: new Date(),
+          isActive: true,
+          updatedAt: new Date(),
+        };
 
-          if (existingConnection) {
-            // Update existing connection
-            await db
-              .update(socialConnections)
-              .set(connectionData)
-              .where(eq(socialConnections.id, existingConnection.id));
-            console.log(`[Social Connect] Updated ${platform} in socialConnections table for user ${user.id}`);
-          } else {
-            // Create new connection
-            await db
-              .insert(socialConnections)
-              .values({
-                userId: user.id,
-                platform,
-                ...connectionData,
-              });
-            isNewConnection = true;
-            console.log(`[Social Connect] Created ${platform} in socialConnections table for user ${user.id}`);
-          }
+        if (existingConnection) {
+          // Update existing connection
+          await db
+            .update(socialConnections)
+            .set(connectionData)
+            .where(eq(socialConnections.id, existingConnection.id));
+          console.log(`[Social Connect] Updated ${platform} in socialConnections table for user ${userId}`);
+        } else {
+          // Create new connection
+          await db
+            .insert(socialConnections)
+            .values({
+              userId,
+              platform,
+              ...connectionData,
+            });
+          isNewConnection = true;
+          console.log(`[Social Connect] Created ${platform} in socialConnections table for user ${userId}`);
         }
       } catch (syncError) {
         console.error(`[Social Connect] Error syncing to socialConnections table:`, syncError);
         // Don't fail the request if the sync fails
       }
       
-      // Award platform points for new social connection
+      // Award platform points for new social connection (one-time per platform)
+      // Check transaction history to prevent exploit via disconnect/reconnect
       let pointsAwarded = 0;
-      if (isNewConnection && internalUserId) {
+      if (isNewConnection) {
         try {
-          await platformPointsService.awardPoints(
-            internalUserId,
-            SOCIAL_CONNECTION_POINTS,
-            'social_connection_reward',
-            {
-              platform,
-              platformUsername: accountData?.user?.username || accountData?.username,
-            }
-          );
-          pointsAwarded = SOCIAL_CONNECTION_POINTS;
-          console.log(`[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${internalUserId} for connecting ${platform}`);
+          // Check if user already received points for this platform
+          const existingReward = await db.query.platformPointsTransactions.findFirst({
+            where: and(
+              eq(platformPointsTransactions.userId, userId),
+              eq(platformPointsTransactions.source, 'social_connection_reward'),
+              sql`metadata->>'platform' = ${platform}`
+            ),
+          });
+
+          if (!existingReward) {
+            await platformPointsService.awardPoints(
+              userId,
+              SOCIAL_CONNECTION_POINTS,
+              'social_connection_reward',
+              {
+                platform,
+                platformUsername: accountData?.user?.username || accountData?.username,
+              }
+            );
+            pointsAwarded = SOCIAL_CONNECTION_POINTS;
+            console.log(`[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+          } else {
+            console.log(`[Social Connect] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`);
+          }
         } catch (pointsError) {
           console.error(`[Social Connect] Error awarding points:`, pointsError);
           // Don't fail the connection if points award fails
         }
       }
       
-      console.log(`[Social Connect] Successfully saved ${platform} account for user ${dynamicUserId}`);
+      console.log(`[Social Connect] Successfully saved ${platform} account for user ${userId}`);
       res.json({ 
         success: true, 
         message: `${platform} account connected successfully`,
@@ -1665,14 +1625,11 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Get user's connected social accounts (no custom auth middleware)
-  app.get('/api/social/accounts', async (req: AuthenticatedRequest, res) => {
+  // Get user's connected social accounts
+  app.get('/api/social/accounts', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
-      if (!dynamicUserId) {
-        return res.json([]);
-      }
-      const accounts = await storage.getSocialAccounts(dynamicUserId);
+      const userId = req.user!.id;
+      const accounts = await storage.getSocialAccounts(userId);
       res.json(accounts);
     } catch (error) {
       console.error('Get social accounts error:', error);
@@ -1681,24 +1638,14 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Get individual platform connection status
-  app.get('/api/social-connections/:platform', async (req: AuthenticatedRequest, res) => {
+  app.get('/api/social-connections/:platform', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
+      const userId = req.user!.id;
       const { platform } = req.params;
-      
-      if (!dynamicUserId) {
-        return res.json({ connected: false, connectionData: null });
-      }
-      
-      // Query from socialConnections table for consistency
-      const user = await storage.getUserByDynamicId(dynamicUserId);
-      if (!user) {
-        return res.json({ connected: false, connectionData: null });
-      }
 
       const connection = await db.query.socialConnections.findFirst({
         where: and(
-          eq(socialConnections.userId, user.id),
+          eq(socialConnections.userId, userId),
           eq(socialConnections.platform, platform)
         ),
       });
@@ -1728,18 +1675,12 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Disconnect social account (generic endpoint for all platforms)
-  // NOTE: Prefer using POST /api/social-connections/disconnect from social-connection-routes (uses authenticateUser)
-  // This route supports x-dynamic-user-id for legacy clients; socialConnections table is source of truth
-  app.post('/api/social-connections/disconnect', async (req: AuthenticatedRequest, res) => {
+  app.post('/api/social-connections/disconnect', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
+      const userId = req.user!.id;
       const { platform } = req.body;
       
-      console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${dynamicUserId}`);
-      
-      if (!dynamicUserId) {
-        return res.status(400).json({ error: 'dynamicUserId required' });
-      }
+      console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${userId}`);
       
       if (!platform) {
         return res.status(400).json({ error: 'platform required' });
@@ -1747,40 +1688,26 @@ export function registerSocialRoutes(app: Express) {
 
       const platformLower = String(platform).toLowerCase();
       
-      // 1. Resolve user - try dynamicUserId first, then internal id (when client passes user.id)
-      let user = await storage.getUserByDynamicId(dynamicUserId);
-      if (!user) {
-        const { users } = await import('@shared/schema');
-        const [byId] = await db.select().from(users).where(eq(users.id, dynamicUserId)).limit(1);
-        user = byId;
-      }
-      
-      if (!user) {
-        console.log(`[Social Disconnect] User not found for: ${dynamicUserId}`);
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      // 2. Remove from socialConnections table (PRIMARY - source of truth)
+      // 1. Remove from socialConnections table (PRIMARY - source of truth)
       await db
         .delete(socialConnections)
         .where(
           and(
-            eq(socialConnections.userId, user.id),
+            eq(socialConnections.userId, userId),
             eq(socialConnections.platform, platformLower)
           )
         );
-      console.log(`[Social Disconnect] Removed ${platformLower} from socialConnections table for user ${user.id}`);
+      console.log(`[Social Disconnect] Removed ${platformLower} from socialConnections table for user ${userId}`);
       
-      // 3. Also remove from old storage (profileData.socialConnections) - best effort
+      // 2. Also remove from old storage (profileData.socialConnections) - best effort
       try {
-        const dynamicId = (user as any).dynamicUserId || dynamicUserId;
-        await storage.removeSocialAccount(dynamicId, platformLower);
+        await storage.removeSocialAccount(userId, platformLower);
         console.log(`[Social Disconnect] Also removed ${platformLower} from old storage system`);
       } catch (storageErr) {
         console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
       }
       
-      console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${dynamicUserId}`);
+      console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`);
       res.json({ success: true, message: `${platformLower} account disconnected successfully` });
     } catch (error) {
       console.error('Social disconnect error:', error);
@@ -1788,52 +1715,34 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Disconnect social account (no custom auth middleware) - legacy endpoint
+  // Disconnect social account - legacy endpoint
   // Used by use-twitter-connection, use-social-connection (DELETE /api/social/twitter, etc.)
-  app.delete('/api/social/:platform', async (req: AuthenticatedRequest, res) => {
+  app.delete('/api/social/:platform', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || req.body?.dynamicUserId || req.body?.userId;
+      const userId = req.user!.id;
       const platform = (req.params.platform || '').toLowerCase();
       
-      console.log(`[Social Disconnect] DELETE request to disconnect ${platform} for user: ${dynamicUserId}`);
+      console.log(`[Social Disconnect] DELETE request to disconnect ${platform} for user: ${userId}`);
       
-      if (!dynamicUserId) {
-        return res.status(400).json({ error: 'dynamicUserId required' });
-      }
-      
-      // 1. Resolve user - try dynamicUserId first, then internal id
-      let user = await storage.getUserByDynamicId(dynamicUserId);
-      if (!user) {
-        const { users } = await import('@shared/schema');
-        const [byId] = await db.select().from(users).where(eq(users.id, dynamicUserId)).limit(1);
-        user = byId;
-      }
-      
-      if (!user) {
-        console.log(`[Social Disconnect] User not found for: ${dynamicUserId}`);
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      // 2. Remove from socialConnections table (PRIMARY - source of truth)
+      // 1. Remove from socialConnections table (PRIMARY - source of truth)
       await db
         .delete(socialConnections)
         .where(
           and(
-            eq(socialConnections.userId, user.id),
+            eq(socialConnections.userId, userId),
             eq(socialConnections.platform, platform)
           )
         );
-      console.log(`[Social Disconnect] Removed ${platform} from socialConnections table for user ${user.id}`);
+      console.log(`[Social Disconnect] Removed ${platform} from socialConnections table for user ${userId}`);
       
-      // 3. Also remove from old storage - best effort
+      // 2. Also remove from old storage - best effort
       try {
-        const dynamicId = (user as any).dynamicUserId || dynamicUserId;
-        await storage.removeSocialAccount(dynamicId, platform);
+        await storage.removeSocialAccount(userId, platform);
       } catch (storageErr) {
         console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
       }
       
-      console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${dynamicUserId}`);
+      console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${userId}`);
       res.json({ success: true, message: `${platform} account disconnected successfully` });
     } catch (error) {
       console.error('Social disconnect error:', error);

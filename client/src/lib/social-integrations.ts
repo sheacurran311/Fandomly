@@ -1,7 +1,5 @@
 // Social Media Integration APIs
 import FacebookSDK, { type FacebookUser, type FacebookPage } from './facebook';
-import { saveSocialConnection } from './auth-redirect';
-import { invalidateSocialConnections } from '@/hooks/use-social-connections';
 
 export interface SocialMediaAccount {
   platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify' | 'discord' | 'twitch';
@@ -86,28 +84,26 @@ export class FacebookAPI {
   }
 }
 
-// Instagram API -- delegates to InstagramSDKManager for all auth
-// Only creator/business auth is supported
+// Instagram Basic Display API
 export class InstagramAPI {
   private clientId: string;
   private redirectUri: string;
 
   constructor() {
-    // Use the same creator app ID as InstagramSDKManager
-    this.clientId = import.meta.env.VITE_INSTAGRAM_CREATOR_APP_ID || '1157911489578561';
-    this.redirectUri = `${window.location.origin}/instagram-callback`;
+    this.clientId = import.meta.env.VITE_INSTAGRAM_CLIENT_ID || '';
+    this.redirectUri = `${window.location.origin}/auth/instagram/callback`;
   }
 
   getAuthUrl(): string {
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
-      scope: 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights',
+      scope: 'user_profile,user_media',
       response_type: 'code',
-      state: `instagram_creator_${Date.now()}`
+      state: 'instagram_auth'
     });
     
-    return `https://www.instagram.com/oauth/authorize?${params}`;
+    return `https://api.instagram.com/oauth/authorize?${params}`;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
@@ -136,56 +132,6 @@ export class InstagramAPI {
       accessToken,
       connectedAt: new Date()
     };
-  }
-
-  async secureLogin(): Promise<{ success: boolean; error?: string }> {
-    return new Promise((resolve) => {
-      try {
-        const authUrl = this.getAuthUrl();
-        const popup = window.open(authUrl, 'instagram-oauth', 'width=600,height=700,scrollbars=yes,resizable=yes');
-        if (!popup) {
-          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
-          return;
-        }
-        let settled = false;
-        const cleanup = () => {
-          try { window.removeEventListener('message', onMsg); } catch {}
-          try { popup?.close(); } catch {}
-        };
-        const onMsg = async (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
-          if (event.data?.type !== 'instagram-oauth-result') return;
-          if (settled) return;
-          settled = true;
-          cleanup();
-          const result = event.data.result;
-          if (result?.success && result?.connectionData) {
-            try {
-              const saveResult = await saveSocialConnection(result.connectionData);
-              invalidateSocialConnections();
-              resolve(saveResult.success ? { success: true } : { success: false, error: saveResult.error });
-            } catch (e) {
-              resolve({ success: false, error: 'Failed to save connection' });
-            }
-          } else {
-            resolve(result?.success ? { success: true } : { success: false, error: result?.error || 'Connection failed' });
-          }
-        };
-        window.addEventListener('message', onMsg);
-        const checkClosed = setInterval(() => {
-          if (popup?.closed) {
-            clearInterval(checkClosed);
-            if (!settled) {
-              settled = true;
-              cleanup();
-              resolve({ success: false, error: 'Popup closed without completing' });
-            }
-          }
-        }, 300);
-      } catch (e) {
-        resolve({ success: false, error: 'Failed to start Instagram connection' });
-      }
-    });
   }
 }
 
@@ -227,7 +173,7 @@ export class TikTokAPI {
     return authUrl;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+  async secureLogin(): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
       try {
         // Generate CSRF state token
@@ -253,52 +199,58 @@ export class TikTokAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = async (event: MessageEvent) => {
+        const onMsg = (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'tiktok-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          
-          // If the popup sent connection data, save it from parent window (which has session cookies)
-          if (event.data.result?.success && event.data.result?.connectionData) {
-            try {
-              console.log('[TikTok secureLogin] Saving connection from parent window...');
-              const saveResult = await saveSocialConnection(event.data.result.connectionData);
-              if (!saveResult.success) {
-                console.error('[TikTok secureLogin] Failed to save connection:', saveResult.error);
-                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
-                return;
-              }
-              console.log('[TikTok secureLogin] Connection saved successfully');
-              invalidateSocialConnections();
-              resolve({ success: true, displayName: event.data.result.displayName });
-            } catch (error) {
-              console.error('[TikTok secureLogin] Error saving connection:', error);
-              resolve({ success: false, error: 'Failed to save connection' });
-            }
-          } else {
-            resolve(event.data.result);
-          }
+          resolve(event.data.result);
         };
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback)
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startPolling = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(pollTimer);
+                if (!settled) {
+                  // Give localStorage a moment to be written by the callback before checking
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `tiktok_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[TikTok] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[TikTok] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let pollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { pollTimer = startPolling(); }
+        }, 3000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
@@ -357,7 +309,7 @@ export class TwitterAPI {
   constructor() {
     this.clientId = import.meta.env.VITE_TWITTER_CLIENT_ID || '';
     this.redirectUri = (import.meta.env.VITE_TWITTER_REDIRECT_URI as string) || `${window.location.origin}/x-callback`;
-    this.scopes = (import.meta.env.VITE_TWITTER_SCOPES as string) || 'users.read tweet.read tweet.write follows.read like.read offline.access';
+    this.scopes = (import.meta.env.VITE_TWITTER_SCOPES as string) || 'tweet.read tweet.write users.read follows.read offline.access';
   }
 
   getAuthUrl(): string {
@@ -413,13 +365,12 @@ export class YouTubeAPI {
   private redirectUri: string;
 
   constructor() {
-    // Use dedicated YouTube OAuth client ID (not basic Google auth client)
-    this.clientId = import.meta.env.VITE_GOOGLE_YOUTUBE_CLIENT_ID || '';
+    this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_YOUTUBE_REDIRECT_URI || `${origin}/youtube-callback`;
     
     if (!this.clientId) {
-      console.warn('YouTube: VITE_GOOGLE_YOUTUBE_CLIENT_ID not configured');
+      console.warn('YouTube: VITE_GOOGLE_CLIENT_ID not configured');
     }
   }
 
@@ -434,9 +385,7 @@ export class YouTubeAPI {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      // Scopes: youtube.readonly for API access + identity scopes
-      // Removed unused youtube.channel-memberships.creator scope
-      scope: 'https://www.googleapis.com/auth/youtube.readonly openid email profile',
+      scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.channel-memberships.creator',
       access_type: 'offline',
       prompt: 'consent',
       state: csrfState
@@ -471,64 +420,62 @@ export class YouTubeAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = async (event: MessageEvent) => {
+        const onMsg = (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'youtube-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          
-          // If the popup sent connection data, save it from parent window (which has session cookies)
-          if (event.data.result?.success && event.data.result?.connectionData) {
-            try {
-              console.log('[YouTube secureLogin] Saving connection from parent window...');
-              const saveResult = await saveSocialConnection(event.data.result.connectionData);
-              if (!saveResult.success) {
-                console.error('[YouTube secureLogin] Failed to save connection:', saveResult.error);
-                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
-                return;
-              }
-              console.log('[YouTube secureLogin] Connection saved successfully');
-              invalidateSocialConnections();
-              resolve({ success: true, channelName: event.data.result.channelName });
-            } catch (error) {
-              console.error('[YouTube secureLogin] Error saving connection:', error);
-              resolve({ success: false, error: 'Failed to save connection' });
-            }
-          } else {
-            resolve(event.data.result);
-          }
+          resolve(event.data.result);
         };
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback - also handles COOP blocking popup.closed)
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                // Check for fallback data set by callback page (handles COOP race condition)
-                const fallback = (window as any).youtubeCallbackData;
-                if (fallback) {
-                  delete (window as any).youtubeCallbackData;
-                  resolve(fallback);
-                } else {
-                  resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startPolling = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(ytPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `youtube_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[YouTube] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[YouTube] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
                 }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open on provider page
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let ytPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { ytPollTimer = startPolling(); }
+        }, 3000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(ytPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -632,64 +579,62 @@ export class SpotifyAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = async (event: MessageEvent) => {
+        const onMsg = (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'spotify-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          
-          // If the popup sent connection data, save it from parent window (which has session cookies)
-          if (event.data.result?.success && event.data.result?.connectionData) {
-            try {
-              console.log('[Spotify secureLogin] Saving connection from parent window...');
-              const saveResult = await saveSocialConnection(event.data.result.connectionData);
-              if (!saveResult.success) {
-                console.error('[Spotify secureLogin] Failed to save connection:', saveResult.error);
-                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
-                return;
-              }
-              console.log('[Spotify secureLogin] Connection saved successfully');
-              invalidateSocialConnections();
-              resolve({ success: true, displayName: event.data.result.displayName });
-            } catch (error) {
-              console.error('[Spotify secureLogin] Error saving connection:', error);
-              resolve({ success: false, error: 'Failed to save connection' });
-            }
-          } else {
-            resolve(event.data.result);
-          }
+          resolve(event.data.result);
         };
         
         window.addEventListener('message', onMsg);
 
-        // Poll for popup closure (fallback - also handles COOP blocking popup.closed)
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                // Check for fallback data set by callback page (handles COOP race condition)
-                const fallback = (window as any).spotifyCallbackData;
-                if (fallback) {
-                  delete (window as any).spotifyCallbackData;
-                  resolve(fallback);
-                } else {
-                  resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startSpotifyPoll = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(spotifyPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `spotify_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[Spotify] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Spotify] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
                 }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open on provider page
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let spotifyPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { spotifyPollTimer = startSpotifyPoll(); }
+        }, 3000);
 
         // Timeout after 5 minutes
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(spotifyPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -740,7 +685,7 @@ export class DiscordAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_DISCORD_CLIENT_ID || '';
+    this.clientId = import.meta.env.VITE_DISCORD_CLIENT_ID || import.meta.env.VITE_DISCORD_APP_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI || `${origin}/discord-callback`;
 
@@ -793,55 +738,61 @@ export class DiscordAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = async (event: MessageEvent) => {
+        const onMsg = (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'discord-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          
-          // If the popup sent connection data, save it from parent window (which has session cookies)
-          if (event.data.result?.success && event.data.result?.connectionData) {
-            try {
-              console.log('[Discord secureLogin] Saving connection from parent window...');
-              const saveResult = await saveSocialConnection(event.data.result.connectionData);
-              if (!saveResult.success) {
-                console.error('[Discord secureLogin] Failed to save connection:', saveResult.error);
-                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
-                return;
-              }
-              
-              console.log('[Discord secureLogin] Connection saved successfully');
-              resolve({ success: true, displayName: event.data.result.displayName });
-            } catch (error) {
-              console.error('[Discord secureLogin] Error saving connection:', error);
-              resolve({ success: false, error: 'Failed to save connection' });
-            }
-          } else {
-            resolve(event.data.result);
-          }
+          resolve(event.data.result);
         };
 
         window.addEventListener('message', onMsg);
 
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startDiscordPoll = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(discordPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `discord_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[Discord] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Discord] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let discordPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { discordPollTimer = startDiscordPoll(); }
+        }, 3000);
 
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(discordPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -945,55 +896,61 @@ export class TwitchAPI {
           try { popup?.close(); } catch {}
         };
 
-        const onMsg = async (event: MessageEvent) => {
+        const onMsg = (event: MessageEvent) => {
           if (event.origin !== window.location.origin) return;
           if (event.data?.type !== 'twitch-oauth-result') return;
           if (settled) return;
           settled = true;
           cleanup();
-          
-          // If the popup sent connection data, save it from parent window (which has session cookies)
-          if (event.data.result?.success && event.data.result?.connectionData) {
-            try {
-              console.log('[Twitch secureLogin] Saving connection from parent window...');
-              const saveResult = await saveSocialConnection(event.data.result.connectionData);
-              if (!saveResult.success) {
-                console.error('[Twitch secureLogin] Failed to save connection:', saveResult.error);
-                resolve({ success: false, error: saveResult.error || 'Failed to save connection' });
-                return;
-              }
-              
-              console.log('[Twitch secureLogin] Connection saved successfully');
-              resolve({ success: true, displayName: event.data.result.displayName });
-            } catch (error) {
-              console.error('[Twitch secureLogin] Error saving connection:', error);
-              resolve({ success: false, error: 'Failed to save connection' });
-            }
-          } else {
-            resolve(event.data.result);
-          }
+          resolve(event.data.result);
         };
 
         window.addEventListener('message', onMsg);
 
-        const pollTimer = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              if (!settled) {
-                settled = true;
-                cleanup();
-                resolve({ success: false, error: 'Authorization cancelled' });
+        // Poll for popup closure (fallback) -- delay first check to avoid false positives
+        const startTwitchPoll = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(twitchPollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `twitch_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log('[Twitch] Found result in localStorage (COOP fallback):', parsed.success);
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Twitch] Error reading localStorage fallback:', e);
+                    }
+                    
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
               }
+            } catch (error) {
+              // Cross-origin error means popup is still open
             }
-          } catch (error) {
-            // Cross-origin error means popup is still open
-          }
-        }, 1000);
+          }, 1000);
+        };
+        let twitchPollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) { twitchPollTimer = startTwitchPoll(); }
+        }, 3000);
 
         setTimeout(() => {
           if (!settled) {
-            clearInterval(pollTimer);
+            clearInterval(twitchPollTimer);
             settled = true;
             cleanup();
             resolve({ success: false, error: 'Authorization timeout' });
@@ -1066,17 +1023,6 @@ export class SocialIntegrationManager {
     this.spotify = new SpotifyAPI();
     this.discord = new DiscordAPI();
     this.twitch = new TwitchAPI();
-  }
-
-  getAPI(platform: string): TikTokAPI | YouTubeAPI | SpotifyAPI | DiscordAPI | TwitchAPI {
-    switch (platform) {
-      case 'tiktok': return this.tiktok;
-      case 'youtube': return this.youtube;
-      case 'spotify': return this.spotify;
-      case 'discord': return this.discord;
-      case 'twitch': return this.twitch;
-      default: throw new Error(`Unsupported platform for getAPI: ${platform}`);
-    }
   }
 
   getAuthUrl(platform: string): string {

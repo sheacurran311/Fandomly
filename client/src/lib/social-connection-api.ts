@@ -1,4 +1,20 @@
-import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
+import { getAuthHeaders, getCsrfToken, resetCsrfToken } from '@/lib/queryClient';
+
+/**
+ * Get headers with auth and CSRF token for POST/PUT/DELETE requests.
+ * Uses the centralized CSRF token from queryClient.
+ */
+async function getProtectedHeaders(): Promise<Record<string, string>> {
+  const token = await getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders()
+  };
+  if (token) {
+    headers['x-csrf-token'] = token;
+  }
+  return headers;
+}
 
 export interface SocialConnection {
   id: string;
@@ -99,12 +115,10 @@ export async function saveSocialConnection(connectionData: {
   profileData?: any;
 }): Promise<{ success: boolean; connection?: SocialConnection; error?: string }> {
   try {
+    const headers = await getProtectedHeaders();
     const response = await fetch('/api/social-connections', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify(connectionData)
     });
@@ -124,21 +138,36 @@ export async function saveSocialConnection(connectionData: {
 
 /**
  * Disconnect a social platform from the database
- * Uses POST /disconnect (unified endpoint) - supports both JWT and x-dynamic-user-id auth
+ * Uses POST /disconnect (unified endpoint) with JWT authentication
  */
 export async function disconnectSocialPlatform(platform: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const headers = await getProtectedHeaders();
     const response = await fetch('/api/social-connections/disconnect', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify({ platform: platform.toLowerCase() })
     });
 
     if (!response.ok) {
+      // If CSRF error, refresh token and retry once
+      if (response.status === 403) {
+        console.log('[Social API] CSRF error, refreshing token and retrying...');
+        resetCsrfToken();
+        const newHeaders = await getProtectedHeaders();
+        const retryResponse = await fetch('/api/social-connections/disconnect', {
+          method: 'POST',
+          headers: newHeaders,
+          credentials: 'include',
+          body: JSON.stringify({ platform: platform.toLowerCase() })
+        });
+        
+        if (retryResponse.ok) {
+          return { success: true };
+        }
+      }
+      
       let errorData: { error?: string } = {};
       try {
         errorData = await response.json();

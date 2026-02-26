@@ -9,6 +9,10 @@ import { taskFrequencyService } from '../../services/task-frequency-service';
 const startTaskSchema = z.object({
   taskId: z.string().min(1, 'Task ID is required'),
   tenantId: z.string().min(1, 'Tenant ID is required'),
+  // Optional campaignId for campaign-scoped completions
+  // When provided, the completion is marked as 'campaign' context and scoped to that campaign
+  // This enables re-verification of one-time tasks within campaigns
+  campaignId: z.string().optional(),
 });
 
 const updateProgressSchema = z.object({
@@ -97,12 +101,38 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   // GET /api/task-completions/program/:programId
   // Get all task completions for a specific program
+  // Requires authentication - only returns completions the user has access to
   // ==============================================
-  router.get('/program/:programId', async (req: Request, res: Response) => {
+  router.get('/program/:programId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { programId } = req.params;
-      console.log(`[Task Completions API] Fetching completions for program ${programId}`);
-      const completions = await storage.getTaskCompletionsByProgram(programId);
+      console.log(`[Task Completions API] Fetching completions for program ${programId}, user ${req.user.id}`);
+      
+      // Verify user has access to this program (either as creator/admin or as a fan viewing their own)
+      const program = await storage.getProgram(programId);
+      if (!program) {
+        return res.status(404).json({ error: 'Program not found' });
+      }
+      
+      // Check if user is program owner/admin or just a participant
+      const isOwner = program.creatorId === req.user.id;
+      const membership = await storage.getTenantMembership(req.user.id, program.tenantId || '');
+      const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
+      
+      let completions;
+      if (isOwner || isAdmin) {
+        // Admins/owners can see all completions for the program
+        completions = await storage.getTaskCompletionsByProgram(programId);
+      } else {
+        // Regular users can only see their own completions
+        completions = await storage.getTaskCompletionsByProgram(programId);
+        completions = completions.filter(c => c.userId === req.user!.id);
+      }
+      
       console.log(`[Task Completions API] Returning ${completions.length} completions for program ${programId}`);
       res.json(completions);
     } catch (error) {
@@ -114,23 +144,37 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   // GET /api/task-completions/tenant/:tenantId
   // Get all task completions for a tenant (fallback for tasks without programId)
+  // Requires authentication - only returns completions the user has access to
   // ==============================================
-  router.get('/tenant/:tenantId', async (req: Request, res: Response) => {
+  router.get('/tenant/:tenantId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const { tenantId } = req.params;
-      console.log(`[Task Completions API] Fetching completions for tenant ${tenantId}`);
+      console.log(`[Task Completions API] Fetching completions for tenant ${tenantId}, user ${req.user.id}`);
+      
+      // Verify user has access to this tenant
+      const membership = await storage.getTenantMembership(req.user.id, tenantId);
+      const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
       
       const { db } = await import("../../db");
       const { eq, and, or, desc } = await import("drizzle-orm");
       const { taskCompletions, tasks } = await import("@shared/schema");
       
       // Get completions for tasks belonging to this tenant
-      const rows = await db
+      let rows = await db
         .select({ task_completions: taskCompletions, task: tasks })
         .from(taskCompletions)
         .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
         .where(eq(tasks.tenantId, tenantId))
         .orderBy(desc(taskCompletions.completedAt));
+      
+      // Non-admins can only see their own completions
+      if (!isAdmin) {
+        rows = rows.filter(r => r.task_completions.userId === req.user!.id);
+      }
       
       const completions = rows.map(r => ({
         ...r.task_completions,
@@ -173,6 +217,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   // GET /api/task-completions/check-eligibility/:taskId
   // Check if user can complete a task based on frequency rules
+  // Supports campaign-scoped eligibility checks via campaignId query param
   // ==============================================
   router.get('/check-eligibility/:taskId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -182,11 +227,13 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
       const { taskId } = req.params;
       const tenantId = req.query.tenantId as string | undefined;
+      const campaignId = req.query.campaignId as string | undefined;
 
       const eligibility = await taskFrequencyService.checkEligibility({
         userId: req.user.id,
         taskId,
         tenantId,
+        campaignId, // Campaign-scoped check if provided
       });
 
       // Also get time remaining if not eligible
@@ -202,6 +249,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
       res.json({
         ...eligibility,
         timeRemaining,
+        context: campaignId ? 'campaign' : 'standalone', // Include context in response
       });
     } catch (error: any) {
       console.error('Error checking task eligibility:', error);
@@ -228,7 +276,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         });
       }
 
-      const { taskId, tenantId } = validation.data;
+      const { taskId, tenantId, campaignId } = validation.data;
 
       // Check if task exists
       const task = await storage.getTask(taskId, tenantId);
@@ -236,11 +284,18 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         return res.status(404).json({ error: 'Task not found' });
       }
 
+      // Determine completion context based on whether campaignId is provided
+      // Campaign completions are scoped separately from standalone completions
+      // This enables the re-verification model for one-time tasks within campaigns
+      const completionContext = campaignId ? 'campaign' : 'standalone';
+
       // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
+      // Pass campaignId to scope the eligibility check to the appropriate context
       const frequencyCheck = await taskFrequencyService.checkEligibility({
         userId: req.user.id,
         taskId,
         tenantId,
+        campaignId, // Campaign-scoped check if campaignId provided
       });
 
       if (!frequencyCheck.isEligible) {
@@ -253,8 +308,8 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         });
       }
 
-      // Check if user has already started this task (but not completed)
-      const existingCompletion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);
+      // Check if user has already started this task (but not completed) within the same context
+      const existingCompletion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId, campaignId);
       if (existingCompletion && existingCompletion.status === 'in_progress') {
         return res.json({ 
           completion: existingCompletion,
@@ -262,11 +317,13 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         });
       }
 
-      // Create new task completion
+      // Create new task completion with appropriate context
       const completion = await storage.createTaskCompletion({
         taskId,
         userId: req.user.id,
         tenantId,
+        campaignId: campaignId || undefined, // Set campaignId if provided
+        completionContext, // 'standalone' or 'campaign'
         status: 'in_progress',
         progress: 0,
         completionData: {},

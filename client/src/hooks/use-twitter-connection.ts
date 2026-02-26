@@ -45,22 +45,20 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
     error: null,
   });
 
-  // Stable references for user fields to avoid re-render loops
+  // Stable reference for user ID to avoid re-render loops
   const userIdRef = useRef(user?.id);
-  const dynamicUserIdRef = useRef((user as any)?.dynamicUserId || user?.id);
   userIdRef.current = user?.id;
-  dynamicUserIdRef.current = (user as any)?.dynamicUserId || user?.id;
 
   // Check connection status
   const checkStatus = useCallback(async () => {
     const uid = userIdRef.current;
-    const dynamicUid = dynamicUserIdRef.current;
     if (!uid) return;
 
     try {
+      const { getAuthHeaders } = await import('@/lib/queryClient');
       const response = await fetch('/api/social-connections/twitter', {
         headers: {
-          'x-dynamic-user-id': dynamicUid || uid || '',
+          ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
         credentials: 'include'
@@ -252,16 +250,10 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
     setState(prev => ({ ...prev, isDisconnecting: true }));
 
     try {
-      const response = await fetch('/api/social/twitter', {
-        method: 'DELETE',
-        headers: {
-          'x-dynamic-user-id': (user as any)?.dynamicUserId || user.id || '',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
+      const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
+      const result = await disconnectSocialPlatform('twitter');
 
-      if (response.ok) {
+      if (result.success) {
         setState({
           isConnected: false,
           isConnecting: false,

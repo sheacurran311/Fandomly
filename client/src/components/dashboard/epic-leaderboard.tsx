@@ -45,7 +45,7 @@ export default function EpicLeaderboard({
   limit = 10,
   compact = false,
 }: EpicLeaderboardProps) {
-  const [timePeriod, setTimePeriod] = useState<"this_week" | "this_month" | "all_time">("all_time");
+  const [timePeriod, setTimePeriod] = useState<"week" | "month" | "all-time">("all-time");
 
   // Build API endpoint based on type
   const getEndpoint = () => {
@@ -151,19 +151,19 @@ export default function EpicLeaderboard({
           >
             <TabsList className="bg-white/5 border border-white/10">
               <TabsTrigger
-                value="this_week"
+                value="week"
                 className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
               >
                 This Week
               </TabsTrigger>
               <TabsTrigger
-                value="this_month"
+                value="month"
                 className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
               >
                 This Month
               </TabsTrigger>
               <TabsTrigger
-                value="all_time"
+                value="all-time"
                 className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
               >
                 All Time

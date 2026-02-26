@@ -94,7 +94,6 @@ describe('Data Deletion', () => {
         username: `deleted-${originalUser.id}`,
         profileData: null,
         socialLinks: null,
-        dynamicUserId: null,
       };
       
       expect(anonymized.email).not.toBe(originalUser.email);

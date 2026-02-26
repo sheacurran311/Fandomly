@@ -18,7 +18,10 @@ import { registerAdminPlatformTasksRoutes } from "./tasks/admin-platform-tasks-r
 import { registerPlatformPointsRoutes } from "./points/platform-points-routes";
 import { registerPlatformTaskRoutes } from "./tasks/platform-task-routes";
 import { registerFanDashboardRoutes } from "./user/fan-dashboard-routes";
+import { registerDashboardStatsRoutes } from "./user/dashboard-stats-routes";
 import { registerNotificationRoutes } from "./user/notification-routes";
+import { registerRedemptionRoutes } from "./rewards/redemption-routes";
+import { registerGdprRoutes } from "./user/gdpr-routes";
 import { registerCrossmintRoutes } from "./nft/crossmint-routes";
 import { registerProgramRoutes } from "./programs/program-routes";
 import { registerAnnouncementRoutes } from "./media/announcement-routes";
@@ -310,77 +313,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { dynamicUser, userType } = req.body;
-      
-      if (!dynamicUser) {
-        // Fallback to old format for existing calls
-        const userData = insertUserSchema.parse(req.body);
-        console.log("Registering user with data (legacy):", userData);
-        
-        if (userData.dynamicUserId) {
-          const existingUser = await storage.getUserByDynamicId(userData.dynamicUserId as string);
-          if (existingUser) {
-            console.log("Returning existing user:", existingUser.id);
-            return res.json(existingUser);
-          }
-        }
+      const { userType, username: proposedUsername, email, avatar, walletAddress, walletChain } = req.body;
 
-        const user = await storage.createUser(userData);
-        console.log("Created new user:", user.id);
-        return res.json(user);
+      if (!proposedUsername && !email) {
+        return res.status(400).json({ error: "Username or email is required for registration" });
       }
 
-      // New Dynamic-based registration
-      console.log("Registering user with Dynamic auth:", dynamicUser);
-      
-      const dynamicUserId = dynamicUser.userId || dynamicUser.id;
-      const proposedUsername = dynamicUser.alias || dynamicUser.firstName || "User";
-      const email = dynamicUser.email;
-      
-      // Check if user already exists by Dynamic ID
-      let existingUser = await storage.getUserByDynamicId(dynamicUserId);
-      if (existingUser) {
-        console.log("User found by Dynamic ID, returning:", existingUser.id);
-        return res.json(existingUser);
-      }
-
-      // Check if user exists by email (for admin accounts created via script)
+      // Check if user exists by email
       if (email) {
         const userByEmail = await storage.getUserByEmail(email);
-        
         if (userByEmail) {
-          console.log("User found by email, linking Dynamic ID:", userByEmail.id);
-          // Update existing user with Dynamic ID
-          await storage.updateUser(userByEmail.id, {
-            dynamicUserId,
-            walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || userByEmail.walletAddress || "",
-            walletChain: dynamicUser.verifiedCredentials?.[0]?.chain || userByEmail.walletChain || "",
-            avatar: dynamicUser.avatar || userByEmail.avatar,
-          });
-          
-          const updatedUser = await storage.getUser(userByEmail.id);
-          console.log("Linked existing user to Dynamic account");
-          return res.json(updatedUser);
+          console.log("User found by email, returning:", userByEmail.id);
+          return res.json(userByEmail);
         }
       }
 
       // Check if username is taken, and make it unique if necessary
-      let username = proposedUsername;
+      let username = proposedUsername || "User";
       const existingUsername = await storage.getUserByUsername(username);
       
       if (existingUsername) {
         // Make username unique by appending random suffix
-        username = `${proposedUsername}_${Math.random().toString(36).substring(2, 8)}`;
+        username = `${username}_${Math.random().toString(36).substring(2, 8)}`;
         console.log("Username taken, using unique username:", username);
       }
       
       const userData = {
-        dynamicUserId,
         username,
         email: email || undefined,
-        avatar: dynamicUser.avatar || null,
-        walletAddress: dynamicUser.verifiedCredentials?.[0]?.address || "",
-        walletChain: dynamicUser.verifiedCredentials?.[0]?.chain || "",
+        avatar: avatar || null,
+        walletAddress: walletAddress || "",
+        walletChain: walletChain || "",
         userType: userType === "creator" ? "creator" : "fan",
         role: (userType === "creator" ? "customer_admin" : "customer_end_user") as "customer_admin" | "customer_end_user",
       };
@@ -973,10 +936,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Create Stripe customer
           const customer = await stripe.customers.create({
-            email: user.email || `${user.dynamicUserId}@wallet.user`,
+            email: user.email || `${user.id}@wallet.user`,
             name: displayName || name || 'Creator',
             metadata: {
-              dynamicUserId: user.dynamicUserId || '',
               userId: user.id,
               creatorType: creatorType
             }
@@ -1160,12 +1122,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/user/:dynamicUserId", async (req, res) => {
+  app.get("/api/auth/user/:userId", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      console.log("Fetching user by Dynamic ID:", req.params.dynamicUserId);
-      const user = await storage.getUserByDynamicId(req.params.dynamicUserId);
+      const userId = req.params.userId;
+      console.log("Fetching user by ID:", userId);
+      const user = await storage.getUser(userId);
       if (!user) {
-        console.log("User not found for Dynamic ID:", req.params.dynamicUserId);
+        console.log("User not found for ID:", userId);
         return res.status(404).json({ error: "User not found" });
       }
       console.log("Found user:", user.id, "type:", user.userType);
@@ -1330,8 +1293,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile route to check if user has completed onboarding
   app.get("/api/auth/profile", async (req, res) => {
     try {
-      // For now, return a simple response to avoid auth complexity
-      // This will be enhanced when we implement proper Dynamic auth middleware
+      // For now, return a simple response
+      // This will be enhanced when we implement proper JWT auth middleware on this route
       res.json({
         user: null,
         creator: null,
@@ -3563,14 +3526,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { creatorId } = req.params;
       const period = (req.query.period as string) || 'week';
 
-      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks, pointTransactions } = await import("@shared/schema");
+      const { loyaltyPrograms, fanPrograms, taskCompletions, rewardRedemptions, tasks, pointTransactions, creators } = await import("@shared/schema");
       const { eq, and, gte, lt, sql, inArray, or } = await import("drizzle-orm");
       const db = (await import("../db")).db;
 
-      // Get creator's programs
-      const programs = await db.select()
+      // Get creator's programs - first try by creatorId directly, then by user_id lookup
+      let programs = await db.select()
         .from(loyaltyPrograms)
         .where(eq(loyaltyPrograms.creatorId, creatorId));
+
+      // If no programs found, the creatorId might be a user_id - look up the creator and try again
+      if (programs.length === 0) {
+        const [creator] = await db.select().from(creators).where(eq(creators.userId, creatorId));
+        if (creator) {
+          programs = await db.select()
+            .from(loyaltyPrograms)
+            .where(eq(loyaltyPrograms.creatorId, creator.id));
+        }
+      }
 
       if (programs.length === 0) {
         return res.json({
@@ -3837,10 +3810,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = tenant?.billingInfo?.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
-          email: user.email || `${user.dynamicUserId}@wallet.user`,
+          email: user.email || `${user.id}@wallet.user`,
           name: user.username || 'Creator',
           metadata: {
-            dynamicUserId: user.dynamicUserId,
             userId: user.id,
             tenantId: tenant?.id || ''
           }
@@ -3893,13 +3865,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get subscription status (no custom auth middleware)
-  app.get('/api/subscription-status', async (req: AuthenticatedRequest, res) => {
+  // Get subscription status
+  app.get('/api/subscription-status', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const dynamicUserId = (req.headers['x-dynamic-user-id'] as string) || (req.query?.dynamicUserId as string) || (req.query?.userId as string);
-      if (!dynamicUserId) return res.json({ status: 'no_subscription' });
+      const userId = req.user?.id;
+      if (!userId) return res.json({ status: 'no_subscription' });
 
-      const user = await storage.getUserByDynamicId(dynamicUserId);
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.json({ status: 'no_subscription' });
       }
@@ -3999,6 +3971,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register fan dashboard routes
   registerFanDashboardRoutes(app);
+  
+  // Register aggregated dashboard stats routes (optimized endpoints)
+  registerDashboardStatsRoutes(app);
 
   // Register program routes
   registerProgramRoutes(app);
@@ -4011,6 +3986,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register leaderboard routes (Sprint 8)
   registerLeaderboardRoutes(app);
+  
+  // Register redemption routes (Sprint 6)
+  registerRedemptionRoutes(app);
+  
+  // Register GDPR compliance routes (Sprint 9)
+  registerGdprRoutes(app);
 
   // Register beta signup routes (public - no auth required)
   registerBetaSignupRoutes(app);
@@ -4409,120 +4390,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============================================================================
   // SPRINT 8: LEADERBOARD ENDPOINTS
-  // Real-time calculations only - no mock/hardcoded data
+  // NOTE: Main leaderboard routes are registered in leaderboard-routes.ts
+  // Only admin/utility routes remain here
   // ============================================================================
-
-  // Platform Leaderboard - Global rankings across all fans
-  app.get("/api/leaderboards/platform", async (req, res) => {
-    try {
-      const { sql } = await import("drizzle-orm");
-      const db = (await import("../db")).db;
-
-      const timePeriod = (req.query.period as string) || 'all_time';
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Use the database function for real-time calculation
-      const result = await db.execute(sql`
-        SELECT * FROM get_platform_leaderboard(${timePeriod}, ${limit})
-      `);
-
-      res.json({
-        leaderboard: result.rows.map(row => ({
-          userId: row.user_id,
-          username: row.username,
-          fullName: row.full_name,
-          avatarUrl: row.avatar_url,
-          totalPoints: row.total_points || 0,
-          rank: row.rank || 0
-        })),
-        timePeriod,
-        totalParticipants: result.rows.length
-      });
-    } catch (error) {
-      console.error("Failed to fetch platform leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch platform leaderboard" });
-    }
-  });
-
-  // Campaign Leaderboard - Per-campaign rankings
-  app.get("/api/leaderboards/campaign/:campaignId", async (req, res) => {
-    try {
-      const { sql, eq } = await import("drizzle-orm");
-      const db = (await import("../db")).db;
-      const { campaigns } = await import("@shared/schema");
-
-      const { campaignId } = req.params;
-      const timePeriod = (req.query.period as string) || 'all_time';
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Use the database function for real-time calculation
-      const result = await db.execute(sql`
-        SELECT * FROM get_campaign_leaderboard(${campaignId}, ${timePeriod}, ${limit})
-      `);
-
-      // Get campaign details
-      const campaign = await db.select().from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
-
-      res.json({
-        campaignId,
-        campaignName: campaign[0]?.name || 'Unknown Campaign',
-        leaderboard: result.rows.map(row => ({
-          userId: row.user_id,
-          username: row.username,
-          fullName: row.full_name,
-          avatarUrl: row.avatar_url,
-          totalPoints: row.total_points || 0,
-          participationCount: row.participation_count || 0,
-          rank: row.rank || 0
-        })),
-        timePeriod,
-        totalParticipants: result.rows.length
-      });
-    } catch (error) {
-      console.error("Failed to fetch campaign leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch campaign leaderboard" });
-    }
-  });
-
-  // Program Leaderboard - Per-program rankings
-  app.get("/api/leaderboards/program/:programId", async (req, res) => {
-    try {
-      const { sql, eq } = await import("drizzle-orm");
-      const db = (await import("../db")).db;
-      const { loyaltyPrograms } = await import("@shared/schema");
-
-      const { programId } = req.params;
-      const timePeriod = (req.query.period as string) || 'all_time';
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Use the database function for real-time calculation
-      const result = await db.execute(sql`
-        SELECT * FROM get_program_leaderboard(${programId}, ${timePeriod}, ${limit})
-      `);
-
-      // Get program details
-      const program = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.id, programId)).limit(1);
-
-      res.json({
-        programId,
-        programName: program[0]?.name || 'Unknown Program',
-        leaderboard: result.rows.map(row => ({
-          userId: row.user_id,
-          username: row.username,
-          fullName: row.full_name,
-          avatarUrl: row.avatar_url,
-          totalPoints: row.total_points || 0,
-          currentTier: row.current_tier,
-          rank: row.rank || 0
-        })),
-        timePeriod,
-        totalParticipants: result.rows.length
-      });
-    } catch (error) {
-      console.error("Failed to fetch program leaderboard:", error);
-      res.status(500).json({ error: "Failed to fetch program leaderboard" });
-    }
-  });
 
   // Refresh leaderboard views (admin only)
   app.post("/api/leaderboards/refresh", authenticateUser, async (req: AuthenticatedRequest, res) => {

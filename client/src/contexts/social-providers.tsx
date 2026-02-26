@@ -1,6 +1,4 @@
 import React, { ReactNode } from 'react';
-import { FacebookConnectionProvider } from '@/contexts/facebook-connection-context';
-import { FanFacebookConnectionProvider } from '@/contexts/fan-facebook-context';
 import { InstagramConnectionProvider } from '@/contexts/instagram-connection-context';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -11,33 +9,19 @@ interface SocialProvidersProps {
 export function SocialProviders({ children }: SocialProvidersProps) {
   const { user } = useAuth();
 
-  // Wrap with appropriate providers based on user type
+  // Facebook connection is now handled by the unified useFacebookConnection hook
+  // (from use-social-connection.ts) and no longer needs a context provider.
+  // Only Instagram still uses a context provider.
+
   if (user?.userType === 'creator') {
     return (
-      <FacebookConnectionProvider>
-        <InstagramConnectionProvider>
-          {children}
-        </InstagramConnectionProvider>
-      </FacebookConnectionProvider>
-    );
-  }
-
-  if (user?.userType === 'fan') {
-    return (
-      <FanFacebookConnectionProvider>
+      <InstagramConnectionProvider>
         {children}
-      </FanFacebookConnectionProvider>
+      </InstagramConnectionProvider>
     );
   }
 
-  // For unauthenticated users or unknown user types, provide all contexts
-  return (
-    <FacebookConnectionProvider>
-      <FanFacebookConnectionProvider>
-        <InstagramConnectionProvider>
-          {children}
-        </InstagramConnectionProvider>
-      </FanFacebookConnectionProvider>
-    </FacebookConnectionProvider>
-  );
+  // For fans, unauthenticated users, or unknown types - no special providers needed
+  // Facebook is handled by the factory hook, Instagram context is creator-only
+  return <>{children}</>;
 }

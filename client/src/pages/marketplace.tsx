@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,17 +32,20 @@ export default function Marketplace() {
     initialData: sampleNFTRewards,
   });
 
-  const filteredCreators = creators.filter((creator) => {
+  const filteredCreators = useMemo(() => creators.filter((creator) => {
     const matchesSearch = creator.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          creator.bio?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || creator.category === selectedCategory;
     return matchesSearch && matchesCategory;
-  });
+  }), [creators, searchQuery, selectedCategory]);
 
   // Filter NFT rewards
-  const nftRewards = rewards.filter(reward => reward.rewardType === "nft" && reward.rewardData?.nftMetadata);
+  const nftRewards = useMemo(() => 
+    rewards.filter(reward => reward.rewardType === "nft" && reward.rewardData?.nftMetadata),
+    [rewards]
+  );
 
-  const filteredNFTs = nftRewards.filter((reward) => {
+  const filteredNFTs = useMemo(() => nftRewards.filter((reward) => {
     const nftData = reward.rewardData?.nftMetadata;
     if (!nftData) return false;
 
@@ -55,7 +58,7 @@ export default function Marketplace() {
     const matchesRarity = !rarityFilter || nftData.rarity?.toLowerCase() === rarityFilter.toLowerCase();
 
     return matchesSearch && matchesChain && matchesPrice && matchesRarity;
-  });
+  }), [nftRewards, searchQuery, selectedChains, priceRange, rarityFilter]);
 
   const categories = ["athlete", "musician", "creator"];
   const rarities = ["common", "uncommon", "rare", "epic", "legendary"];

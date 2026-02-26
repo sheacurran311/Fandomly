@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ interface NFTCardProps {
   showClaimButton?: boolean;
 }
 
-export default function NFTCard({ reward, onClaim, showClaimButton = true }: NFTCardProps) {
+function NFTCard({ reward, onClaim, showClaimButton = true }: NFTCardProps) {
   const nftData = reward.rewardData?.nftMetadata;
   
   if (!nftData) return null;
@@ -145,3 +146,5 @@ export default function NFTCard({ reward, onClaim, showClaimButton = true }: NFT
     </Card>
   );
 }
+
+export default memo(NFTCard);
