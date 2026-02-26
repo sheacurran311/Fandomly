@@ -8,6 +8,9 @@ import ErrorBoundary from "@/components/error-boundary";
 import AuthProvider from "@/components/auth/auth-provider";
 import NewAuthRouter from "@/components/auth/new-auth-router";
 import { AuthModalProvider } from "@/hooks/use-auth-modal";
+// Particle Network - Feature-flagged Web3 auth (wraps above AuthProvider)
+import { ParticleProvider } from "@/contexts/particle-provider";
+import ParticleAuthListener from "@/components/auth/particle-auth-listener";
 import { useEffect } from "react";
 import { initTikTokErrorHandler } from "@/lib/tiktok-error-handler";
 import Navigation from "@/components/layout/navigation";
@@ -162,7 +165,7 @@ function Router() {
       <Route path="/creator-showcase" component={CreatorShowcase} />
       <Route path="/meta-graph-debugger" component={MetaGraphDebugger} />
       {/* Deprecated facebook-login routes removed */}
-      
+
       <Route path="/login" component={Login} />
       <Route path="/auth/google/callback" component={GoogleCallback} />
       <Route path="/instagram-callback" component={InstagramCallback} />
@@ -178,7 +181,7 @@ function Router() {
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />
       <Route path="/terms-of-service" component={TermsOfService} />
-      
+
       {/* Admin Dashboard Routes - Must come before creator store catch-all */}
       <Route path="/admin-dashboard" component={AdminDashboard} />
       <Route path="/admin-dashboard/overview" component={AdminOverview} />
@@ -192,16 +195,16 @@ function Router() {
       <Route path="/admin-dashboard/profile" component={AdminProfile} />
       <Route path="/admin-dashboard/nft-management" component={AdminNftManagement} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
-      
+
       {/* Agency Dashboard */}
       <Route path="/agency-dashboard" component={AgencyDashboard} />
-      
+
       {/* Program Public Page */}
       <Route path="/programs/:slug" component={ProgramPublic} />
-      
+
       {/* Creator Public Page - Must be last before 404 to avoid catching other routes */}
       <Route path="/@:creatorUrl" component={CreatorPublic} />
-      
+
       <Route component={NotFound} />
     </Switch>
   );
@@ -209,7 +212,7 @@ function Router() {
 
 function App() {
   const [location] = useLocation();
-  
+
   // Initialize TikTok error handler on app start
   useEffect(() => {
     initTikTokErrorHandler();
@@ -246,29 +249,32 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <AuthModalProvider>
-              <NewAuthRouter>
-                <div className="min-h-screen bg-brand-dark-bg">
-                    {/* Skip to main content link for accessibility */}
-                    <a 
-                      href="#main-content" 
-                      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-md focus:outline-none"
-                    >
-                      Skip to main content
-                    </a>
-                    {!isOnboardingRoute && <Navigation />}
-                    <main id="main-content" tabIndex={-1}>
-                      <Router />
-                    </main>
-                    {isPublicRoute && location !== '/' && <Footer />}
-                </div>
-                <Toaster />
-              </NewAuthRouter>
-            </AuthModalProvider>
-          </TooltipProvider>
-        </AuthProvider>
+        <ParticleProvider>
+          <AuthProvider>
+            <ParticleAuthListener />
+            <TooltipProvider>
+              <AuthModalProvider>
+                <NewAuthRouter>
+                  <div className="min-h-screen bg-brand-dark-bg">
+                      {/* Skip to main content link for accessibility */}
+                      <a
+                        href="#main-content"
+                        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-md focus:outline-none"
+                      >
+                        Skip to main content
+                      </a>
+                      {!isOnboardingRoute && <Navigation />}
+                      <main id="main-content" tabIndex={-1}>
+                        <Router />
+                      </main>
+                      {isPublicRoute && location !== '/' && <Footer />}
+                  </div>
+                  <Toaster />
+                </NewAuthRouter>
+              </AuthModalProvider>
+            </TooltipProvider>
+          </AuthProvider>
+        </ParticleProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

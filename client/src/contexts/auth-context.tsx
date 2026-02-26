@@ -37,14 +37,15 @@ export interface AuthContextType extends AuthState {
   // Actions
   login: (provider: 'google' | string) => Promise<void>;
   loginWithCallback: (provider: string, callbackData: SocialCallbackData) => Promise<AuthResult>;
+  loginWithParticle: (particleToken: string, walletAddress: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   refreshUser: () => Promise<void>; // Reload user data from server
   confirmAccountLink: (pendingLinkId: string, provider: string, callbackData: SocialCallbackData) => Promise<{ success: boolean; user?: any; message?: string }>;
-  
+
   // Getters
   getAccessToken: () => string | null;
-  
+
   // State for account linking flow
   linkRequired: LinkRequiredResponse | null;
   clearLinkRequired: () => void;
@@ -389,6 +390,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [setAccessToken, queryClient]);
 
+  // Login with Particle Connect token (called after Particle modal completes)
+  const loginWithParticle = useCallback(async (
+    particleToken: string,
+    walletAddress: string
+  ): Promise<AuthResult> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/particle/callback`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ particleToken, walletAddress }),
+      });
+
+      const data: AuthResult = await response.json();
+
+      if (!response.ok) {
+        const serverMessage = data.message || data.error || `Server error ${response.status}`;
+        throw new Error(serverMessage);
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || 'Particle authentication failed');
+      }
+
+      // Success - update state (same as loginWithCallback)
+      setAccessToken(data.accessToken || null);
+      setState(prev => ({
+        ...prev,
+        user: data.user || null,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      }));
+
+      queryClient.invalidateQueries();
+      return data;
+    } catch (error: any) {
+      console.error('[Auth] Particle login error:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message || 'Particle authentication failed',
+      }));
+      return { success: false, message: error.message };
+    }
+  }, [setAccessToken, queryClient]);
+
   // Confirm account link — returns the linked user so callers can redirect appropriately
   const confirmAccountLink = useCallback(async (
     pendingLinkId: string,
@@ -531,6 +581,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ...state,
     login,
     loginWithCallback,
+    loginWithParticle,
     logout,
     refreshToken,
     refreshUser,
