@@ -22,7 +22,6 @@ import { registerDashboardStatsRoutes } from "./user/dashboard-stats-routes";
 import { registerNotificationRoutes } from "./user/notification-routes";
 import { registerRedemptionRoutes } from "./rewards/redemption-routes";
 import { registerGdprRoutes } from "./user/gdpr-routes";
-import { registerCrossmintRoutes } from "./nft/crossmint-routes";
 import { registerProgramRoutes } from "./programs/program-routes";
 import { registerAnnouncementRoutes } from "./media/announcement-routes";
 import { registerAgencyRoutes } from "./admin/agency-routes";
@@ -193,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // JWKS endpoint for Crossmint JWT validation
+  // JWKS endpoint for JWT validation
   app.get('/.well-known/jwks.json', (req, res) => {
     try {
       const jwks = getJWKS();
@@ -2375,23 +2374,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    // Validate NFT collections
-    if (campaignData.requiredNftCollectionIds && Array.isArray(campaignData.requiredNftCollectionIds) && campaignData.requiredNftCollectionIds.length > 0) {
-      const { nftCollections } = await import("@shared/schema");
-      const { inArray } = await import("drizzle-orm");
-      
-      const existing = await db.select({ id: nftCollections.id })
-        .from(nftCollections)
-        .where(inArray(nftCollections.id, campaignData.requiredNftCollectionIds));
-      
-      const existingIds = new Set(existing.map(c => c.id));
-      const invalid = campaignData.requiredNftCollectionIds.filter((id: string) => !existingIds.has(id));
-      
-      if (invalid.length > 0) {
-        errors.push(`Invalid NFT collections: ${invalid.join(', ')}`);
-      }
-    }
-
     // Validate badge templates
     if (campaignData.requiredBadgeIds && Array.isArray(campaignData.requiredBadgeIds) && campaignData.requiredBadgeIds.length > 0) {
       const { fandomlyBadgeTemplates } = await import("@shared/schema");
@@ -2510,7 +2492,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prerequisiteCampaigns: campaignData.requirements?.prerequisiteCampaigns || [],
         allTasksRequired: campaignData.requirements?.allTasksRequired ?? true,
         requiredTaskIds: campaignData.requirements?.requiredTaskIds || [],
-        requiredNftCollectionIds: campaignData.requirements?.requiredNftCollectionIds || [],
         requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || []
       };
 
@@ -3990,9 +3971,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register points routes
   registerPointsRoutes(app);
-
-  // Register Crossmint NFT routes
-  registerCrossmintRoutes(app);
 
   // Register notification routes
   registerNotificationRoutes(app);

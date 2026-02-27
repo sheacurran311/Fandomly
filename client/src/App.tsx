@@ -33,7 +33,6 @@ import CreatorRevenue from "@/pages/creator-dashboard/revenue";
 import CreatorRewards from "@/pages/creator-dashboard/rewards";
 import CreatorTasks from "@/pages/creator-dashboard/tasks";
 import CreatorActivity from "@/pages/creator-dashboard/activity";
-import NftCollections from "@/pages/creator-dashboard/nft-collections";
 import CreatorNIL from "@/pages/creator-dashboard/nil";
 import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
 import CreatorSettings from "@/pages/creator-dashboard/settings";
@@ -49,7 +48,6 @@ import FanJoined from "@/pages/fan-dashboard/joined";
 import FanAchievements from "@/pages/fan-dashboard/achievements";
 import FanPoints from "@/pages/fan-dashboard/points";
 import FanNotifications from "@/pages/fan-dashboard/notifications";
-import FanNftCollection from "@/pages/fan-dashboard/nft-collection";
 import FanSettings from "@/pages/fan-dashboard/settings";
 import NILDashboard from "@/pages/nil-dashboard";
 // RBAC Dashboard removed - users now route to type-specific dashboards
@@ -89,7 +87,6 @@ import AdminTasks from "@/pages/admin-dashboard/tasks";
 import AdminPlatformTaskCreate from "@/pages/admin-dashboard/platform-tasks/create";
 import AdminProfile from "@/pages/admin-dashboard/profile";
 import AdminAnalytics from "@/pages/admin-dashboard/analytics";
-import AdminNftManagement from "@/pages/admin-dashboard/nft-management";
 import AgencyDashboard from "@/pages/agency-dashboard";
 
 function Router() {
@@ -127,7 +124,6 @@ function Router() {
       <Route path="/creator-dashboard/growth" component={CreatorGrowth} />
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/rewards" component={CreatorRewards} />
-      <Route path="/creator-dashboard/nft-collections" component={NftCollections} />
       <Route path="/creator-dashboard/tasks" component={CreatorTasks} />
       <Route path="/creator-dashboard/tasks/create" component={TaskBuilder} />
       <Route path="/creator-dashboard/tasks/edit/:id" component={TaskBuilder} />
@@ -148,7 +144,6 @@ function Router() {
           return null;
         }}
       </Route>
-      <Route path="/fan-dashboard/nfts" component={FanNftCollection} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
@@ -190,7 +185,6 @@ function Router() {
       <Route path="/admin-dashboard/platform-tasks/edit/:id" component={AdminPlatformTaskCreate} />
       <Route path="/admin-dashboard/tasks" component={() => { window.location.href = '/admin-dashboard/platform-tasks'; return null; }} />
       <Route path="/admin-dashboard/profile" component={AdminProfile} />
-      <Route path="/admin-dashboard/nft-management" component={AdminNftManagement} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
       
       {/* Agency Dashboard */}

@@ -45,8 +45,6 @@ import {
 import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import CreatorReferralDashboard from "@/components/referrals/CreatorReferralDashboard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import NFTGallery from "@/components/nft/NFTGallery";
-
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -174,10 +172,6 @@ export default function Profile() {
                 <TabsTrigger value="profile" className="data-[state=active]:bg-brand-primary">
                   <User className="h-4 w-4 mr-2" />
                   Profile
-                </TabsTrigger>
-                <TabsTrigger value="nfts" className="data-[state=active]:bg-brand-primary">
-                  <BadgeCheck className="h-4 w-4 mr-2" />
-                  My NFTs
                 </TabsTrigger>
                 <TabsTrigger value="referrals" className="data-[state=active]:bg-brand-primary">
                   <Share2 className="h-4 w-4 mr-2" />
@@ -863,21 +857,6 @@ export default function Profile() {
               </Card>
                   </div>
                 </div>
-              </TabsContent>
-
-              {/* NFT Gallery Tab */}
-              <TabsContent value="nfts" className="space-y-6">
-                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                  <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <BadgeCheck className="h-5 w-5 text-brand-primary" />
-                      My NFT Collection
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <NFTGallery userId={user?.id} showFilters={true} />
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               {/* Referrals Tab */}

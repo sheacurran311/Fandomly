@@ -17,14 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye, Video as VideoIcon, AlertCircle, Image, ExternalLink, Sparkles } from "lucide-react";
+import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye, Video as VideoIcon, AlertCircle, Sparkles } from "lucide-react";
 import type { Reward } from "@shared/schema";
 import { insertRewardSchema } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardCard from "@/components/dashboard/dashboard-card";
 import { VideoUpload } from "@/components/ui/video-upload";
-import { useNftCollections, useNftTemplates, type NftCollection, type NftTemplate } from "@/hooks/useCrossmint";
-import { Link } from "wouter";
 import PlatformRewards from "@/components/rewards/platform-rewards";
 
 // Form schema extending insertRewardSchema with additional validation
@@ -32,7 +30,7 @@ const rewardCreationFormSchema = insertRewardSchema.extend({
   name: z.string().min(1, "Reward name is required").max(100, "Name too long"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   pointsCost: z.number().min(1, "Points cost must be at least 1"),
-  rewardType: z.enum(["raffle", "physical", "custom", "nft", "video"], {
+  rewardType: z.enum(["raffle", "physical", "custom", "video"], {
     required_error: "Please select a reward type"
   }),
   maxRedemptions: z.number().min(1).optional().nullable(),
@@ -48,7 +46,6 @@ const getRewardTypeIcon = (type: string) => {
     case 'physical': return Package;
     case 'video': return VideoIcon;
     case 'custom': return Star;
-    case 'nft': return Gift;
     default: return Gift;
   }
 }
@@ -59,7 +56,6 @@ const getRewardTypeBadgeColor = (type: string) => {
     case 'physical': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
     case 'video': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
     case 'custom': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-    case 'nft': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
     default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   }
 };
@@ -386,11 +382,6 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
             </div>
           )}
           
-          {reward.rewardType === 'nft' && reward.rewardData?.nftData && (
-            <div className="text-xs text-yellow-400 bg-yellow-500/10 p-2 rounded">
-              🎨 Digital NFT • Auto-mint on redemption
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
@@ -401,16 +392,6 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
 function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void; onCancel: () => void }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
-  
-  // Fetch NFT collections for the creator
-  const { data: collectionsData, isLoading: collectionsLoading } = useNftCollections();
-  const nftCollections = collectionsData?.collections || [];
-  
-  // Fetch templates for selected collection
-  const { data: templatesData, isLoading: templatesLoading } = useNftTemplates(selectedCollectionId);
-  const nftTemplates = templatesData?.templates || [];
-  
   const form = useForm<RewardFormData>({
     resolver: zodResolver(rewardCreationFormSchema),
     defaultValues: {
@@ -451,11 +432,6 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           personalizationInstructions: '',
           sampleVideoUrl: ''
         },
-        nftData: {
-          collectionId: '',
-          templateId: '',
-          autoMintOnRedeem: true
-        }
       }
     }
   });
@@ -471,16 +447,11 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                   watchedRewardType === 'physical' ? { physicalData: data.rewardData?.physicalData } :
                   watchedRewardType === 'video' ? { videoData: data.rewardData?.videoData } :
                   watchedRewardType === 'custom' ? { customData: data.rewardData?.customData } :
-                  watchedRewardType === 'nft' ? { nftData: data.rewardData?.nftData } :
                   {}
     };
     onSubmit(processedData);
   };
   
-  // Watch selected NFT template for preview
-  const selectedTemplateId = form.watch('rewardData.nftData.templateId');
-  const selectedTemplate = nftTemplates.find((t: NftTemplate) => t.id === selectedTemplateId);
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6" data-testid="form-reward-creation">
@@ -495,7 +466,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 <FormControl>
                   <Input
                     {...field}
-                    placeholder="e.g., Exclusive Video Call, Limited Edition NFT"
+                    placeholder="e.g., Exclusive Video Call, Limited Edition Merch"
                     className="mt-2 bg-white/10 border-white/20 text-white"
                     data-testid="input-reward-name"
                   />
@@ -542,7 +513,6 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                         <SelectItem value="physical">Physical Item</SelectItem>
                         <SelectItem value="video">Custom Video (Cameo)</SelectItem>
                         <SelectItem value="custom">Custom Service</SelectItem>
-                        <SelectItem value="nft">Digital NFT</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
@@ -933,143 +903,6 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 </FormItem>
               )}
             />
-          </div>
-        )}
-
-        {watchedRewardType === 'nft' && (
-          <div className="space-y-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg" data-testid="section-nft-config">
-            <div className="flex items-center justify-between">
-              <h3 className="text-white font-medium flex items-center gap-2">
-                <Image className="h-5 w-5" />
-                NFT Reward Configuration
-              </h3>
-              <Link href="/creator-dashboard/nft-collections">
-                <Button type="button" variant="outline" size="sm" className="text-xs">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Create Collection
-                </Button>
-              </Link>
-            </div>
-            
-            {collectionsLoading ? (
-              <div className="text-center py-4 text-gray-400">Loading collections...</div>
-            ) : nftCollections.length === 0 ? (
-              <Alert className="bg-blue-500/10 border-blue-500/20">
-                <AlertCircle className="h-4 w-4 text-blue-400" />
-                <AlertDescription className="text-blue-400 text-sm">
-                  You haven't created any NFT collections yet. <Link href="/creator-dashboard/nft-collections" className="underline font-semibold">Create your first collection</Link> to offer NFTs as rewards.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <>
-                <FormField
-                  control={form.control as any}
-                  name="rewardData.nftData.collectionId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Select NFT Collection</FormLabel>
-                      <FormControl>
-                        <Select 
-                          value={field.value} 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            setSelectedCollectionId(value);
-                            form.setValue('rewardData.nftData.templateId', ''); // Reset template selection
-                          }}
-                          data-testid="select-nft-collection"
-                        >
-                          <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
-                            <SelectValue placeholder="Choose a collection" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {nftCollections.map((collection: NftCollection) => (
-                              <SelectItem key={collection.id} value={collection.id}>
-                                {collection.name} ({collection.chain})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage className="text-red-400" />
-                    </FormItem>
-                  )}
-                />
-
-                {selectedCollectionId && (
-                  <FormField
-                    control={form.control as any}
-                    name="rewardData.nftData.templateId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-white">Select NFT Template</FormLabel>
-                        <FormControl>
-                          {templatesLoading ? (
-                            <div className="text-center py-4 text-gray-400">Loading templates...</div>
-                          ) : nftTemplates.length === 0 ? (
-                            <Alert className="bg-blue-500/10 border-blue-500/20">
-                              <AlertCircle className="h-4 w-4 text-blue-400" />
-                              <AlertDescription className="text-blue-400 text-sm">
-                                This collection has no templates yet. <Link href="/creator-dashboard/nft-collections" className="underline font-semibold">Add templates</Link> to your collection first.
-                              </AlertDescription>
-                            </Alert>
-                          ) : (
-                            <Select value={field.value} onValueChange={field.onChange} data-testid="select-nft-template">
-                              <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
-                                <SelectValue placeholder="Choose a template" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {nftTemplates.map((template: NftTemplate) => (
-                                  <SelectItem key={template.id} value={template.id}>
-                                    {template.name} - {template.currentSupply}/{template.maxSupply || '∞'} minted
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </FormControl>
-                        <FormMessage className="text-red-400" />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {selectedTemplate && (
-                  <div className="mt-4 p-4 bg-brand-dark-bg rounded-lg border border-white/10">
-                    <h4 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
-                      <Eye className="h-4 w-4" />
-                      NFT Preview
-                    </h4>
-                    <div className="flex gap-4">
-                      {selectedTemplate.metadata?.image && (
-                        <img 
-                          src={selectedTemplate.metadata.image} 
-                          alt={selectedTemplate.name}
-                          className="w-24 h-24 rounded-lg object-cover border border-white/10"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-white font-medium">{selectedTemplate.name}</p>
-                        <p className="text-gray-400 text-sm mt-1">{selectedTemplate.description}</p>
-                        <div className="flex gap-2 mt-2">
-                          <Badge className="text-xs bg-purple-500/20 text-purple-400">
-                            {selectedTemplate.category}
-                          </Badge>
-                          <Badge className="text-xs bg-blue-500/20 text-blue-400">
-                            {selectedTemplate.currentSupply}/{selectedTemplate.maxSupply || '∞'} minted
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-white/10">
-                  <p className="text-xs text-gray-400">
-                    When a fan redeems this reward, the NFT will be automatically minted and sent to their connected wallet.
-                  </p>
-                </div>
-              </>
-            )}
           </div>
         )}
 
