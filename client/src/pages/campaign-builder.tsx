@@ -1,133 +1,159 @@
-import { useState, useEffect } from "react";
-import { type Task } from "@shared/schema";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
-import { type User, type Creator, type LoyaltyProgram } from "@shared/schema";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  Calendar, Clock, Users, Target, Gift, Zap, 
-  TrendingUp, Heart, Share2, Trophy, Star, Coins,
-  ArrowLeft, ArrowRight, Check, Plus, X, Settings,
-  Facebook, Instagram, Twitter, Youtube, Music, MessageCircle,
-  AlertCircle, Wallet
-} from "lucide-react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from 'react';
+import { type Task } from '@shared/schema';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/use-auth';
+import { type Creator, type LoyaltyProgram } from '@shared/schema';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Clock,
+  Users,
+  Target,
+  Gift,
+  Zap,
+  TrendingUp,
+  Heart,
+  Share2,
+  Trophy,
+  Star,
+  Coins,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Plus,
+  X,
+  Settings,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Music,
+  MessageCircle,
+  AlertCircle,
+  Wallet,
+} from 'lucide-react';
+import { useLocation } from 'wouter';
 
 // OpenLoyalty-style Campaign Templates
 const campaignTemplates = [
   {
-    id: "welcome-bonus",
-    name: "Welcome Bonus",
-    description: "Reward new fans for joining your loyalty program",
-    category: "Direct",
-    trigger: "internal_event", 
+    id: 'welcome-bonus',
+    name: 'Welcome Bonus',
+    description: 'Reward new fans for joining your loyalty program',
+    category: 'Direct',
+    trigger: 'internal_event',
     icon: Heart,
-    color: "from-pink-500 to-rose-500",
-    estimatedEngagement: "High",
+    color: 'from-pink-500 to-rose-500',
+    estimatedEngagement: 'High',
     setup: {
-      trigger: "Member Registration",
-      condition: "New member signup",
-      effect: "Award 100 welcome points",
-      audience: "All new members"
-    }
+      trigger: 'Member Registration',
+      condition: 'New member signup',
+      effect: 'Award 100 welcome points',
+      audience: 'All new members',
+    },
   },
   {
-    id: "social-follow",
-    name: "Social Media Follow",
-    description: "Points for following on Instagram, TikTok, Twitter",
-    category: "Direct",
-    trigger: "custom_event",
+    id: 'social-follow',
+    name: 'Social Media Follow',
+    description: 'Points for following on Instagram, TikTok, Twitter',
+    category: 'Direct',
+    trigger: 'custom_event',
     icon: Share2,
-    color: "from-blue-500 to-cyan-500", 
-    estimatedEngagement: "Very High",
+    color: 'from-blue-500 to-cyan-500',
+    estimatedEngagement: 'Very High',
     setup: {
-      trigger: "Social Media Follow",
-      condition: "Follow on any platform",
-      effect: "Award 50 points per platform",
-      audience: "All members"
-    }
+      trigger: 'Social Media Follow',
+      condition: 'Follow on any platform',
+      effect: 'Award 50 points per platform',
+      audience: 'All members',
+    },
   },
   {
-    id: "birthday-reward",
-    name: "Birthday Celebration",
-    description: "Special birthday rewards for your biggest fans",
-    category: "Automation",
-    trigger: "birthday",
+    id: 'birthday-reward',
+    name: 'Birthday Celebration',
+    description: 'Special birthday rewards for your biggest fans',
+    category: 'Automation',
+    trigger: 'birthday',
     icon: Gift,
-    color: "from-purple-500 to-indigo-500",
-    estimatedEngagement: "High",
+    color: 'from-purple-500 to-indigo-500',
+    estimatedEngagement: 'High',
     setup: {
-      trigger: "Member Birthday",
-      condition: "Birthday month",
-      effect: "Exclusive birthday reward + 200 bonus points",
-      audience: "All members"
-    }
+      trigger: 'Member Birthday',
+      condition: 'Birthday month',
+      effect: 'Exclusive birthday reward + 200 bonus points',
+      audience: 'All members',
+    },
   },
   {
-    id: "purchase-points",
-    name: "Purchase Rewards",
-    description: "Earn points for every dollar spent on merchandise",
-    category: "Direct",
-    trigger: "purchase_transaction",
+    id: 'purchase-points',
+    name: 'Purchase Rewards',
+    description: 'Earn points for every dollar spent on merchandise',
+    category: 'Direct',
+    trigger: 'purchase_transaction',
     icon: Coins,
-    color: "from-yellow-500 to-orange-500",
-    estimatedEngagement: "High",
+    color: 'from-yellow-500 to-orange-500',
+    estimatedEngagement: 'High',
     setup: {
-      trigger: "Purchase Transaction",
-      condition: "Any merchandise purchase",
-      effect: "1 point per $1 spent",
-      audience: "All members"
-    }
+      trigger: 'Purchase Transaction',
+      condition: 'Any merchandise purchase',
+      effect: '1 point per $1 spent',
+      audience: 'All members',
+    },
   },
   {
-    id: "tier-upgrade",
-    name: "VIP Tier Rewards",
-    description: "Exclusive perks when fans reach VIP status",
-    category: "Direct", 
-    trigger: "internal_event",
+    id: 'tier-upgrade',
+    name: 'VIP Tier Rewards',
+    description: 'Exclusive perks when fans reach VIP status',
+    category: 'Direct',
+    trigger: 'internal_event',
     icon: Trophy,
-    color: "from-amber-500 to-yellow-600",
-    estimatedEngagement: "Medium",
+    color: 'from-amber-500 to-yellow-600',
+    estimatedEngagement: 'Medium',
     setup: {
-      trigger: "Tier Upgrade",
-      condition: "Reach VIP tier",
-      effect: "Exclusive VIP welcome package",
-      audience: "VIP tier members"
-    }
+      trigger: 'Tier Upgrade',
+      condition: 'Reach VIP tier',
+      effect: 'Exclusive VIP welcome package',
+      audience: 'VIP tier members',
+    },
   },
   {
-    id: "referral-program",
-    name: "Friend Referral",
-    description: "Reward both referrer and friend for successful referrals",
-    category: "Referral",
-    trigger: "internal_event",
+    id: 'referral-program',
+    name: 'Friend Referral',
+    description: 'Reward both referrer and friend for successful referrals',
+    category: 'Referral',
+    trigger: 'internal_event',
     icon: Users,
-    color: "from-green-500 to-emerald-500",
-    estimatedEngagement: "High",
+    color: 'from-green-500 to-emerald-500',
+    estimatedEngagement: 'High',
     setup: {
-      trigger: "Successful Referral",
-      condition: "Friend joins and makes first purchase",
-      effect: "500 points for referrer, 200 points for friend",
-      audience: "All members"
-    }
-  }
+      trigger: 'Successful Referral',
+      condition: 'Friend joins and makes first purchase',
+      effect: '500 points for referrer, 200 points for friend',
+      audience: 'All members',
+    },
+  },
 ];
 
 const categoryColors = {
-  "Direct": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  "Automation": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300", 
-  "Referral": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+  Direct: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  Automation: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+  Referral: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
 };
 
 // Multi-step Campaign Creation Modal Component
@@ -136,11 +162,11 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const [currentStep, setCurrentStep] = useState(1);
   const [campaignData, setCampaignData] = useState({
     // Step 1: Basics
-    name: "",
-    description: "",
-    type: "campaign", // Simplified: all campaigns are just "campaigns"
-    startDate: "",
-    endDate: "",
+    name: '',
+    description: '',
+    type: 'campaign', // Simplified: all campaigns are just "campaigns"
+    startDate: '',
+    endDate: '',
     isIndefinite: false, // Sprint 6: No end date
 
     // Step 2: Social Platforms
@@ -153,17 +179,17 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       spotify: false,
       appleMusic: false,
       discord: false,
-      telegram: false
+      telegram: false,
     },
 
     // Step 3: Tasks Configuration
-    tasks: {} as Record<string, any[]>,
+    tasks: {} as Record<string, unknown[]>,
 
     // Step 4: Rewards & Points
     rewardStructure: {
-      campaignReward: { type: "points", value: 0 },
+      campaignReward: { type: 'points', value: 0 },
       taskRewards: true, // If false, only campaign reward applies
-      defaultPoints: 50
+      defaultPoints: 50,
     },
 
     // Step 5: Requirements & Hierarchy (Sprint 6 Enhanced)
@@ -171,9 +197,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       allTasksRequired: true,
       prerequisiteCampaigns: [] as string[],
       requiresPaidSubscription: false,
-      requiredSubscriberTier: "",
+      requiredSubscriberTier: '',
       requiredNftCollectionIds: [] as string[],
-      requiredBadgeIds: [] as string[]
+      requiredBadgeIds: [] as string[],
     },
 
     // Step 6: Task Dependencies (Sprint 6)
@@ -182,8 +208,11 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       dependsOn: string[];
       isOptional?: boolean;
     }>,
-    requiredTaskIds: [] as string[] // Specific tasks required (overrides allTasksRequired)
+    requiredTaskIds: [] as string[], // Specific tasks required (overrides allTasksRequired)
   });
+
+  // Validation errors state - must be called before any conditional returns
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Authentication guard - show connect wallet prompt if not authenticated
   if (!isAuthenticated && !isLoading) {
@@ -199,14 +228,13 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <div className="py-6">
             <div className="text-center space-y-4">
               <AlertCircle className="h-12 w-12 text-yellow-400 mx-auto" />
-              <h3 className="text-lg font-semibold text-white">
-                Authentication Required
-              </h3>
+              <h3 className="text-lg font-semibold text-white">Authentication Required</h3>
               <p className="text-gray-300">
-                You need to connect your wallet to create campaigns and manage your loyalty programs.
+                You need to connect your wallet to create campaigns and manage your loyalty
+                programs.
               </p>
               <div className="pt-4">
-                <Button 
+                <Button
                   className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-3 rounded-xl"
                   data-testid="button-sign-in-campaign"
                 >
@@ -235,12 +263,12 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   }
 
   const steps = [
-    { id: 1, title: "Campaign Basics", icon: Target },
-    { id: 2, title: "Social Platforms", icon: Share2 },
-    { id: 3, title: "Rewards & Points", icon: Gift },
-    { id: 4, title: "Requirements", icon: Trophy },
-    { id: 5, title: "Task Dependencies", icon: Settings },
-    { id: 6, title: "Review & Launch", icon: Check }
+    { id: 1, title: 'Campaign Basics', icon: Target },
+    { id: 2, title: 'Social Platforms', icon: Share2 },
+    { id: 3, title: 'Rewards & Points', icon: Gift },
+    { id: 4, title: 'Requirements', icon: Trophy },
+    { id: 5, title: 'Task Dependencies', icon: Settings },
+    { id: 6, title: 'Review & Launch', icon: Check },
   ];
 
   const platformIcons = {
@@ -252,18 +280,34 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     spotify: Music,
     appleMusic: Music,
     discord: MessageCircle,
-    telegram: MessageCircle
+    telegram: MessageCircle,
   };
 
-  const taskTypes = [
-    { id: 'follow', name: 'Follow/Like/Subscribe', platforms: ['facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify'] },
+  const _taskTypes = [
+    {
+      id: 'follow',
+      name: 'Follow/Like/Subscribe',
+      platforms: ['facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify'],
+    },
     { id: 'spotify_playlist', name: 'Follow Playlist', platforms: ['spotify'] },
     { id: 'spotify_album', name: 'Add Album', platforms: ['spotify'] },
     { id: 'discord_join', name: 'Join Server/Group', platforms: ['discord'] },
-    { id: 'like_post', name: 'Like Specific Post', platforms: ['facebook', 'instagram', 'twitter', 'tiktok'] },
-    { id: 'repost', name: 'Repost/Retweet', platforms: ['facebook', 'instagram', 'twitter', 'tiktok'] },
-    { id: 'twitter_hashtag_post', name: 'Post with Hashtag', platforms: ['twitter', 'instagram', 'tiktok'] },
-    { id: 'referral', name: 'Referral (1 point each)', platforms: ['all'] }
+    {
+      id: 'like_post',
+      name: 'Like Specific Post',
+      platforms: ['facebook', 'instagram', 'twitter', 'tiktok'],
+    },
+    {
+      id: 'repost',
+      name: 'Repost/Retweet',
+      platforms: ['facebook', 'instagram', 'twitter', 'tiktok'],
+    },
+    {
+      id: 'twitter_hashtag_post',
+      name: 'Post with Hashtag',
+      platforms: ['twitter', 'instagram', 'tiktok'],
+    },
+    { id: 'referral', name: 'Referral (1 point each)', platforms: ['all'] },
   ];
 
   // Error display component
@@ -277,9 +321,6 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     );
   };
 
-  // Validation errors state
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
   // Validation functions for each step
   const validateStep = (step: number): { isValid: boolean; errors: Record<string, string> } => {
     const errors: Record<string, string> = {};
@@ -287,32 +328,40 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     switch (step) {
       case 1: // Basics
         if (!campaignData.name.trim()) {
-          errors.name = "Campaign name is required";
+          errors.name = 'Campaign name is required';
         }
         if (!campaignData.description.trim()) {
-          errors.description = "Campaign description is required";
+          errors.description = 'Campaign description is required';
         }
         if (!campaignData.startDate.trim()) {
-          errors.startDate = "Campaign start date is required";
+          errors.startDate = 'Campaign start date is required';
         }
         if (!campaignData.isIndefinite && !campaignData.endDate.trim()) {
-          errors.endDate = "Campaign end date is required (or enable indefinite campaign)";
+          errors.endDate = 'Campaign end date is required (or enable indefinite campaign)';
         }
-        if (!campaignData.isIndefinite && campaignData.startDate && campaignData.endDate && new Date(campaignData.startDate) >= new Date(campaignData.endDate)) {
-          errors.endDate = "End date must be after start date";
+        if (
+          !campaignData.isIndefinite &&
+          campaignData.startDate &&
+          campaignData.endDate &&
+          new Date(campaignData.startDate) >= new Date(campaignData.endDate)
+        ) {
+          errors.endDate = 'End date must be after start date';
         }
         break;
 
       case 2: // Platforms
         const selectedPlatforms = Object.values(campaignData.platforms).filter(Boolean);
         if (selectedPlatforms.length === 0) {
-          errors.platforms = "At least one platform must be selected";
+          errors.platforms = 'At least one platform must be selected';
         }
         break;
 
       case 3: // Rewards
-        if (!campaignData.rewardStructure.defaultPoints || campaignData.rewardStructure.defaultPoints <= 0) {
-          errors.defaultPoints = "Default points must be greater than 0";
+        if (
+          !campaignData.rewardStructure.defaultPoints ||
+          campaignData.rewardStructure.defaultPoints <= 0
+        ) {
+          errors.defaultPoints = 'Default points must be greater than 0';
         }
         break;
 
@@ -329,26 +378,26 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setValidationErrors(validation.errors);
 
     if (validation.isValid) {
-      setCurrentStep(prev => Math.min(prev + 1, 7));
+      setCurrentStep((prev) => Math.min(prev + 1, 7));
     }
   };
 
   const prevStep = () => {
     setValidationErrors({}); // Clear errors when going back
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const updateCampaignData = (path: string, value: any) => {
-    setCampaignData(prev => {
+  const updateCampaignData = (path: string, value: unknown) => {
+    setCampaignData((prev) => {
       const keys = path.split('.');
       const newData = { ...prev };
-      let current = newData as any;
-      
+      let current = newData as Record<string, unknown>;
+
       for (let i = 0; i < keys.length - 1; i++) {
         current = current[keys[i]];
       }
       current[keys[keys.length - 1]] = value;
-      
+
       return newData;
     });
   };
@@ -359,7 +408,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         return (
           <div className="space-y-6">
             <div>
-              <Label htmlFor="campaign-name" className="text-white">Campaign Name</Label>
+              <Label htmlFor="campaign-name" className="text-white">
+                Campaign Name
+              </Label>
               <Input
                 id="campaign-name"
                 data-testid="input-campaign-name"
@@ -370,9 +421,11 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               />
               <ErrorMessage error={validationErrors.name} />
             </div>
-            
+
             <div>
-              <Label htmlFor="campaign-description" className="text-white">Description</Label>
+              <Label htmlFor="campaign-description" className="text-white">
+                Description
+              </Label>
               <Textarea
                 id="campaign-description"
                 data-testid="input-campaign-description"
@@ -389,13 +442,17 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <Label className="text-white">Campaign Type</Label>
               <div className="mt-2 p-3 bg-white/10 border border-white/20 rounded-md">
                 <p className="text-white">Points-Based Campaign</p>
-                <p className="text-sm text-gray-400">Fans earn points by completing tasks, then convert points to rewards</p>
+                <p className="text-sm text-gray-400">
+                  Fans earn points by completing tasks, then convert points to rewards
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start-date" className="text-white">Start Date & Time</Label>
+                <Label htmlFor="start-date" className="text-white">
+                  Start Date & Time
+                </Label>
                 <Input
                   id="start-date"
                   data-testid="input-start-date"
@@ -407,7 +464,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <ErrorMessage error={validationErrors.startDate} />
               </div>
               <div>
-                <Label htmlFor="end-date" className="text-white">End Date & Time</Label>
+                <Label htmlFor="end-date" className="text-white">
+                  End Date & Time
+                </Label>
                 <Input
                   id="end-date"
                   data-testid="input-end-date"
@@ -447,20 +506,25 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <h3 className="text-xl font-semibold text-white mb-4">Select Social Platforms</h3>
               <div className="grid grid-cols-3 gap-4">
                 {Object.entries(platformIcons).map(([platform, Icon]) => {
-                  const isSelected = campaignData.platforms[platform as keyof typeof campaignData.platforms];
+                  const isSelected =
+                    campaignData.platforms[platform as keyof typeof campaignData.platforms];
                   return (
                     <div
                       key={platform}
                       data-testid={`platform-${platform}`}
                       className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        isSelected 
-                          ? 'bg-brand-primary/20 border-brand-primary' 
+                        isSelected
+                          ? 'bg-brand-primary/20 border-brand-primary'
                           : 'bg-white/5 border-white/20 hover:border-white/40'
                       }`}
                       onClick={() => updateCampaignData(`platforms.${platform}`, !isSelected)}
                     >
-                      <Icon className={`h-8 w-8 mx-auto mb-2 ${isSelected ? 'text-brand-primary' : 'text-gray-400'}`} />
-                      <p className={`text-center text-sm capitalize ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+                      <Icon
+                        className={`h-8 w-8 mx-auto mb-2 ${isSelected ? 'text-brand-primary' : 'text-gray-400'}`}
+                      />
+                      <p
+                        className={`text-center text-sm capitalize ${isSelected ? 'text-white' : 'text-gray-400'}`}
+                      >
                         {platform === 'appleMusic' ? 'Apple Music' : platform}
                       </p>
                     </div>
@@ -476,7 +540,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Rewards & Points Structure</h3>
-            
+
             <Card className="bg-white/5 border-white/20">
               <CardHeader>
                 <CardTitle className="text-white">Reward Strategy</CardTitle>
@@ -485,12 +549,16 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-white">Task-based Rewards</Label>
-                    <p className="text-sm text-gray-400">Give points for individual task completion</p>
+                    <p className="text-sm text-gray-400">
+                      Give points for individual task completion
+                    </p>
                   </div>
                   <Switch
                     data-testid="switch-task-rewards"
                     checked={campaignData.rewardStructure.taskRewards}
-                    onCheckedChange={(checked) => updateCampaignData('rewardStructure.taskRewards', checked)}
+                    onCheckedChange={(checked) =>
+                      updateCampaignData('rewardStructure.taskRewards', checked)
+                    }
                   />
                 </div>
 
@@ -507,7 +575,12 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                       type="number"
                       placeholder="Bonus Points"
                       value={campaignData.rewardStructure.campaignReward.value}
-                      onChange={(e) => updateCampaignData('rewardStructure.campaignReward.value', parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        updateCampaignData(
+                          'rewardStructure.campaignReward.value',
+                          parseInt(e.target.value) || 0
+                        )
+                      }
                       className="bg-white/10 border-white/20 text-white"
                     />
                   </div>
@@ -531,12 +604,16 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-white">All Tasks Required</Label>
-                    <p className="text-sm text-gray-400">Fans must complete ALL tasks to be eligible for rewards</p>
+                    <p className="text-sm text-gray-400">
+                      Fans must complete ALL tasks to be eligible for rewards
+                    </p>
                   </div>
                   <Switch
                     data-testid="switch-all-tasks-required"
                     checked={campaignData.requirements.allTasksRequired}
-                    onCheckedChange={(checked) => updateCampaignData('requirements.allTasksRequired', checked)}
+                    onCheckedChange={(checked) =>
+                      updateCampaignData('requirements.allTasksRequired', checked)
+                    }
                   />
                 </div>
 
@@ -544,13 +621,18 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
                 <div>
                   <Label className="text-white">Prerequisite Campaigns</Label>
-                  <p className="text-sm text-gray-400 mb-2">Campaigns that must be completed before this one</p>
+                  <p className="text-sm text-gray-400 mb-2">
+                    Campaigns that must be completed before this one
+                  </p>
                   <Input
                     data-testid="input-prerequisite-campaigns"
                     placeholder="e.g., Fan Season 1, Welcome Campaign"
                     className="bg-white/10 border-white/20 text-white"
                     onChange={(e) => {
-                      const campaigns = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      const campaigns = e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       updateCampaignData('requirements.prerequisiteCampaigns', campaigns);
                     }}
                   />
@@ -571,7 +653,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   <Switch
                     data-testid="switch-requires-paid-subscription"
                     checked={campaignData.requirements.requiresPaidSubscription}
-                    onCheckedChange={(checked) => updateCampaignData('requirements.requiresPaidSubscription', checked)}
+                    onCheckedChange={(checked) =>
+                      updateCampaignData('requirements.requiresPaidSubscription', checked)
+                    }
                   />
                 </div>
 
@@ -584,10 +668,14 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                         data-testid="input-required-subscriber-tier"
                         placeholder="e.g., premium, vip, platinum"
                         value={campaignData.requirements.requiredSubscriberTier}
-                        onChange={(e) => updateCampaignData('requirements.requiredSubscriberTier', e.target.value)}
+                        onChange={(e) =>
+                          updateCampaignData('requirements.requiredSubscriberTier', e.target.value)
+                        }
                         className="mt-2 bg-white/10 border-white/20 text-white"
                       />
-                      <p className="text-xs text-gray-400 mt-1">Leave empty to allow any paid subscription tier</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Leave empty to allow any paid subscription tier
+                      </p>
                     </div>
                   </>
                 )}
@@ -601,13 +689,18 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <CardContent className="space-y-4">
                 <div>
                   <Label className="text-white">Required NFT Collections</Label>
-                  <p className="text-sm text-gray-400 mb-2">Fans must own NFTs from these collections</p>
+                  <p className="text-sm text-gray-400 mb-2">
+                    Fans must own NFTs from these collections
+                  </p>
                   <Input
                     data-testid="input-required-nft-collections"
                     placeholder="Collection IDs (comma-separated)"
                     className="bg-white/10 border-white/20 text-white"
                     onChange={(e) => {
-                      const collections = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      const collections = e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       updateCampaignData('requirements.requiredNftCollectionIds', collections);
                     }}
                   />
@@ -623,7 +716,10 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                     placeholder="Badge IDs (comma-separated)"
                     className="bg-white/10 border-white/20 text-white"
                     onChange={(e) => {
-                      const badges = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      const badges = e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       updateCampaignData('requirements.requiredBadgeIds', badges);
                     }}
                   />
@@ -646,14 +742,18 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <div>
                   <Label className="text-white">Specific Required Tasks</Label>
                   <p className="text-sm text-gray-400 mb-2">
-                    Override "All Tasks Required" by specifying exactly which tasks must be completed
+                    Override &ldquo;All Tasks Required&rdquo; by specifying exactly which tasks must
+                    be completed
                   </p>
                   <Input
                     data-testid="input-required-tasks"
                     placeholder="Task IDs (comma-separated, leave empty to require all tasks)"
                     className="bg-white/10 border-white/20 text-white"
                     onChange={(e) => {
-                      const tasks = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      const tasks = e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       updateCampaignData('requiredTaskIds', tasks);
                     }}
                   />
@@ -661,8 +761,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                     {campaignData.requiredTaskIds.length > 0
                       ? `${campaignData.requiredTaskIds.length} specific task(s) required`
                       : campaignData.requirements.allTasksRequired
-                        ? "All tasks required by default"
-                        : "No specific tasks required"}
+                        ? 'All tasks required by default'
+                        : 'No specific tasks required'}
                   </p>
                 </div>
               </CardContent>
@@ -671,7 +771,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             <Card className="bg-white/5 border-white/20">
               <CardHeader>
                 <CardTitle className="text-white">Task Dependencies</CardTitle>
-                <p className="text-sm text-gray-400">Define the order in which tasks must be completed</p>
+                <p className="text-sm text-gray-400">
+                  Define the order in which tasks must be completed
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
@@ -687,7 +789,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
                 <div className="text-center py-6 text-gray-400">
                   <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">Task dependency configuration available after campaign creation</p>
+                  <p className="text-sm">
+                    Task dependency configuration available after campaign creation
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -698,7 +802,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         return (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white mb-4">Review & Launch</h3>
-            
+
             <Card className="bg-white/5 border-white/20">
               <CardHeader>
                 <CardTitle className="text-white">Campaign Summary</CardTitle>
@@ -707,7 +811,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-400">Name:</span>
-                    <p className="text-white font-medium">{campaignData.name || 'Untitled Campaign'}</p>
+                    <p className="text-white font-medium">
+                      {campaignData.name || 'Untitled Campaign'}
+                    </p>
                   </div>
                   <div>
                     <span className="text-gray-400">Type:</span>
@@ -716,7 +822,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   <div>
                     <span className="text-gray-400">Duration:</span>
                     <p className="text-white font-medium">
-                      {campaignData.isIndefinite ? 'Indefinite' : `${campaignData.startDate || 'Not set'} → ${campaignData.endDate || 'Not set'}`}
+                      {campaignData.isIndefinite
+                        ? 'Indefinite'
+                        : `${campaignData.startDate || 'Not set'} → ${campaignData.endDate || 'Not set'}`}
                     </p>
                   </div>
                   <div>
@@ -806,7 +914,8 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <p className="text-blue-200 text-sm">
-                    <strong>Campaign Setup:</strong> Your campaign will be created in "Pending Tasks" status. Assign tasks from the Tasks page before publishing to fans.
+                    <strong>Campaign Setup:</strong> Your campaign will be created in &ldquo;Pending
+                    Tasks&rdquo; status. Assign tasks from the Tasks page before publishing to fans.
                   </p>
                 </div>
               </CardContent>
@@ -832,21 +941,19 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             const Icon = step.icon;
             const isActive = currentStep === step.id;
             const isCompleted = currentStep > step.id;
-            
+
             return (
               <div key={step.id} className="flex items-center">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                  isActive 
-                    ? 'bg-brand-primary border-brand-primary text-white' 
-                    : isCompleted
-                    ? 'bg-green-500 border-green-500 text-white'
-                    : 'border-gray-600 text-gray-400'
-                }`}>
-                  {isCompleted ? (
-                    <Check className="h-5 w-5" />
-                  ) : (
-                    <Icon className="h-5 w-5" />
-                  )}
+                <div
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                    isActive
+                      ? 'bg-brand-primary border-brand-primary text-white'
+                      : isCompleted
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : 'border-gray-600 text-gray-400'
+                  }`}
+                >
+                  {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
                 </div>
                 <div className="ml-2 hidden sm:block">
                   <p className={`text-sm font-medium ${isActive ? 'text-white' : 'text-gray-400'}`}>
@@ -854,7 +961,9 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                   </p>
                 </div>
                 {index < steps.length - 1 && (
-                  <div className={`w-8 h-0.5 mx-4 ${isCompleted ? 'bg-green-500' : 'bg-gray-600'}`} />
+                  <div
+                    className={`w-8 h-0.5 mx-4 ${isCompleted ? 'bg-green-500' : 'bg-gray-600'}`}
+                  />
                 )}
               </div>
             );
@@ -862,9 +971,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 overflow-y-auto mb-4">
-          {renderStepContent()}
-        </div>
+        <div className="flex-1 overflow-y-auto mb-4">{renderStepContent()}</div>
 
         {/* Navigation */}
         <div className="flex justify-between py-4 border-t border-white/10 bg-brand-dark-bg">
@@ -878,7 +985,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             <ArrowLeft className="h-4 w-4 mr-2" />
             Previous
           </Button>
-          
+
           <div className="flex space-x-3">
             {currentStep < 6 ? (
               <Button
@@ -901,7 +1008,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                       name: campaignData.name,
                       description: campaignData.description,
                       startDate: campaignData.startDate || new Date().toISOString(),
-                      endDate: campaignData.isIndefinite ? null : (campaignData.endDate || null),
+                      endDate: campaignData.isIndefinite ? null : campaignData.endDate || null,
                       status: 'pending_tasks',
                       platforms: campaignData.platforms,
                       rewardStructure: campaignData.rewardStructure,
@@ -910,17 +1017,22 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                       allTasksRequired: campaignData.requirements.allTasksRequired,
                       prerequisiteCampaigns: campaignData.requirements.prerequisiteCampaigns,
                       requiresPaidSubscription: campaignData.requirements.requiresPaidSubscription,
-                      requiredSubscriberTier: campaignData.requirements.requiredSubscriberTier || null,
+                      requiredSubscriberTier:
+                        campaignData.requirements.requiredSubscriberTier || null,
                       requiredNftCollectionIds: campaignData.requirements.requiredNftCollectionIds,
                       requiredBadgeIds: campaignData.requirements.requiredBadgeIds,
                       requiredTaskIds: campaignData.requiredTaskIds,
                       taskDependencies: campaignData.taskDependencies,
 
-                      creatorId: user?.id
+                      creatorId: user?.id,
                     };
 
                     // Call campaign creation API with Sprint 6 fields
-                    const response = await apiRequest("POST", "/api/campaigns", sprint6CampaignData);
+                    const response = await apiRequest(
+                      'POST',
+                      '/api/campaigns',
+                      sprint6CampaignData
+                    );
 
                     if (response.ok) {
                       const result = await response.json();
@@ -929,12 +1041,14 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                       // Invalidate campaigns cache to refresh the list
                       if (user?.creator?.id) {
                         await queryClient.invalidateQueries({
-                          queryKey: ["/api/campaigns/creator", user.creator.id]
+                          queryKey: ['/api/campaigns/creator', user.creator.id],
                         });
                       }
 
                       // Show success message and close modal
-                      alert(`🎉 Campaign "${campaignData.name}" created successfully with Sprint 6 features! Assign tasks from the Tasks page before publishing.`);
+                      alert(
+                        `🎉 Campaign "${campaignData.name}" created successfully with Sprint 6 features! Assign tasks from the Tasks page before publishing.`
+                      );
                       onClose();
                     } else {
                       throw new Error('Failed to create campaign');
@@ -957,22 +1071,29 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 }
 
 // Export the modal component separately for use in other pages
-export function CampaignBuilderModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  return (
-    <CreateCampaignModal isOpen={isOpen} onClose={onClose} />
-  );
+export function CampaignBuilderModal({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  return <CreateCampaignModal isOpen={isOpen} onClose={onClose} />;
 }
 
 export default function CampaignBuilder() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
+
   // Task assignment modal state
   const [showTaskAssignModal, setShowTaskAssignModal] = useState(false);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const { user: userData } = useAuth();
-  const { data: creator } = useQuery<Creator>({ queryKey: ["/api/creators/user", userData?.id], enabled: !!userData?.id });
+  const { data: creator } = useQuery<Creator>({
+    queryKey: ['/api/creators/user', userData?.id],
+    enabled: !!userData?.id,
+  });
 
   const [followX, setFollowX] = useState(false);
   const [followInstagram, setFollowInstagram] = useState(false);
@@ -980,12 +1101,12 @@ export default function CampaignBuilder() {
   const [likePost, setLikePost] = useState(false);
   const [retweet, setRetweet] = useState(false);
   const [points, setPoints] = useState(50);
-  const [selectedProgramId, setSelectedProgramId] = useState<string>("");
+  const [selectedProgramId, setSelectedProgramId] = useState<string>('');
   const [, setLocation] = useLocation();
 
   // Fetch programs for the creator
   const { data: programsData, isLoading: programsLoading } = useQuery({
-    queryKey: ["/api/programs"],
+    queryKey: ['/api/programs'],
     enabled: !!userData?.id,
   });
   const programs: LoyaltyProgram[] = Array.isArray(programsData) ? programsData : [];
@@ -994,12 +1115,16 @@ export default function CampaignBuilder() {
   useEffect(() => {
     if (programs.length > 0 && !selectedProgramId) {
       // Sort by createdAt DESC and select the most recent
-      const sortedPrograms = [...programs].sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      const sortedPrograms = [...programs].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      setSelectedProgramId(sortedPrograms[0].id);
+      // Use setTimeout to avoid calling setState synchronously in effect
+      setTimeout(() => {
+        setSelectedProgramId(sortedPrograms[0].id);
+      }, 0);
     }
-  }, [programs, selectedProgramId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programs.length]);
 
   // Fetch available tasks for assignment
   const { data: availableTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
@@ -1013,55 +1138,59 @@ export default function CampaignBuilder() {
 
   const createCampaign = useMutation({
     mutationFn: async () => {
-      if (!creator) throw new Error("Creator profile not found");
-      
+      if (!creator) throw new Error('Creator profile not found');
+
       // REQUIRED: All campaigns must belong to a program
       if (!selectedProgramId) {
-        throw new Error("All campaigns must be associated with a program. Please select a program.");
+        throw new Error(
+          'All campaigns must be associated with a program. Please select a program.'
+        );
       }
-      
+
       const now = new Date().toISOString();
-      const newCampaignRes = await apiRequest("POST", "/api/campaigns", {
+      const newCampaignRes = await apiRequest('POST', '/api/campaigns', {
         tenantId: creator.tenantId,
         creatorId: creator.id,
         programId: selectedProgramId, // Required
-        name: "Social Engagement",
-        description: "Earn points for social actions",
-        campaignType: "direct",
-        trigger: "custom_event",
+        name: 'Social Engagement',
+        description: 'Earn points for social actions',
+        campaignType: 'direct',
+        trigger: 'custom_event',
         startDate: now,
-        status: "pending_tasks", // Use new workflow: Create -> Assign Tasks -> Publish
+        status: 'pending_tasks', // Use new workflow: Create -> Assign Tasks -> Publish
       });
       const campaign = await newCampaignRes.json();
 
       // Store selected social actions for task assignment
       const selectedActions = [];
       if (followX) selectedActions.push('Follow on X');
-      if (followInstagram) selectedActions.push('Follow on Instagram');  
+      if (followInstagram) selectedActions.push('Follow on Instagram');
       if (followFacebook) selectedActions.push('Follow on Facebook');
       if (likePost) selectedActions.push('Like Post');
       if (retweet) selectedActions.push('Retweet');
 
-      console.log(`🎯 Quick Social Campaign created! Selected actions: ${selectedActions.join(', ')}. Points: ${points} each. Assign tasks from the Tasks page to publish.`);
-      
+      console.log(
+        `🎯 Quick Social Campaign created! Selected actions: ${selectedActions.join(', ')}. Points: ${points} each. Assign tasks from the Tasks page to publish.`
+      );
+
       return campaign;
     },
     onSuccess: (campaign) => {
       // Show success message with guidance
       const selectedActions = [];
       if (followX) selectedActions.push('Follow on X');
-      if (followInstagram) selectedActions.push('Follow on Instagram');  
+      if (followInstagram) selectedActions.push('Follow on Instagram');
       if (followFacebook) selectedActions.push('Follow on Facebook');
       if (likePost) selectedActions.push('Like Post');
       if (retweet) selectedActions.push('Retweet');
 
-      // Show task assignment modal for bidirectional workflow  
+      // Show task assignment modal for bidirectional workflow
       setCreatedCampaignId(campaign.id);
       setShowTaskAssignModal(true);
-      
+
       // Invalidate campaigns cache to refresh list
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
-      
+
       // Reset form
       setFollowX(false);
       setFollowInstagram(false);
@@ -1076,8 +1205,8 @@ export default function CampaignBuilder() {
     mutationFn: async ({ campaignId, taskIds }: { campaignId: string; taskIds: string[] }) => {
       // Assign each selected task to the campaign
       const assignments = await Promise.all(
-        taskIds.map(taskId => 
-          apiRequest(`/api/tasks/${taskId}/assign`, 'POST', { campaignId }).then(r => r.json())
+        taskIds.map((taskId) =>
+          apiRequest(`/api/tasks/${taskId}/assign`, 'POST', { campaignId }).then((r) => r.json())
         )
       );
       return assignments;
@@ -1115,19 +1244,17 @@ export default function CampaignBuilder() {
               Program Required
             </AlertTitle>
             <AlertDescription className="text-gray-300 mb-4">
-              You must create a loyalty program before adding campaigns. Campaigns are always associated with a program to help organize your fan engagement strategy.
+              You must create a loyalty program before adding campaigns. Campaigns are always
+              associated with a program to help organize your fan engagement strategy.
             </AlertDescription>
             <div className="flex gap-3 mt-4">
-              <Button 
-                onClick={() => setLocation("/creator-dashboard/program-builder")}
+              <Button
+                onClick={() => setLocation('/creator-dashboard/program-builder')}
                 className="bg-brand-primary hover:bg-brand-primary/80"
               >
                 Create Program
               </Button>
-              <Button 
-                onClick={() => setLocation("/creator-dashboard/campaigns")}
-                variant="outline"
-              >
+              <Button onClick={() => setLocation('/creator-dashboard/campaigns')} variant="outline">
                 Back to Campaigns
               </Button>
             </div>
@@ -1142,12 +1269,10 @@ export default function CampaignBuilder() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-4">
-            Campaign Builder
-          </h1>
+          <h1 className="text-4xl font-bold gradient-text mb-4">Campaign Builder</h1>
           <p className="text-gray-300 text-lg max-w-3xl">
-            Create OpenLoyalty-style campaigns to engage your fans and grow your community. 
-            Choose from proven templates or build custom campaigns with triggers, conditions, and effects.
+            Create OpenLoyalty-style campaigns to engage your fans and grow your community. Choose
+            from proven templates or build custom campaigns with triggers, conditions, and effects.
           </p>
         </div>
 
@@ -1164,7 +1289,7 @@ export default function CampaignBuilder() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-white/10 border-white/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -1176,7 +1301,7 @@ export default function CampaignBuilder() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-white/10 border-white/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -1188,7 +1313,7 @@ export default function CampaignBuilder() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-white/10 border-white/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -1211,14 +1336,23 @@ export default function CampaignBuilder() {
             <CardContent className="space-y-4">
               {/* Program Selector */}
               <div>
-                <Label className="text-white mb-2 block">Select Program <span className="text-red-400">*</span></Label>
-                <Select value={selectedProgramId} onValueChange={(value) => setSelectedProgramId(value)}>
+                <Label className="text-white mb-2 block">
+                  Select Program <span className="text-red-400">*</span>
+                </Label>
+                <Select
+                  value={selectedProgramId}
+                  onValueChange={(value) => setSelectedProgramId(value)}
+                >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white">
                     <SelectValue placeholder="Select a program (required)" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-white/10">
-                    {programs.map((program: any) => (
-                      <SelectItem key={program.id} value={program.id} className="text-white hover:bg-white/10">
+                    {programs.map((program: LoyaltyProgram) => (
+                      <SelectItem
+                        key={program.id}
+                        value={program.id}
+                        className="text-white hover:bg-white/10"
+                      >
                         {program.name}
                       </SelectItem>
                     ))}
@@ -1230,26 +1364,55 @@ export default function CampaignBuilder() {
               </div>
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <Button variant={followX ? 'default' : 'outline'} onClick={() => setFollowX(v => !v)} className={followX ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                <Button
+                  variant={followX ? 'default' : 'outline'}
+                  onClick={() => setFollowX((v) => !v)}
+                  className={followX ? 'bg-brand-primary' : 'border-white/20 text-white'}
+                >
                   Follow on X
                 </Button>
-                <Button variant={followInstagram ? 'default' : 'outline'} onClick={() => setFollowInstagram(v => !v)} className={followInstagram ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                <Button
+                  variant={followInstagram ? 'default' : 'outline'}
+                  onClick={() => setFollowInstagram((v) => !v)}
+                  className={followInstagram ? 'bg-brand-primary' : 'border-white/20 text-white'}
+                >
                   Follow on Instagram
                 </Button>
-                <Button variant={followFacebook ? 'default' : 'outline'} onClick={() => setFollowFacebook(v => !v)} className={followFacebook ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                <Button
+                  variant={followFacebook ? 'default' : 'outline'}
+                  onClick={() => setFollowFacebook((v) => !v)}
+                  className={followFacebook ? 'bg-brand-primary' : 'border-white/20 text-white'}
+                >
                   Follow on Facebook
                 </Button>
-                <Button variant={likePost ? 'default' : 'outline'} onClick={() => setLikePost(v => !v)} className={likePost ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                <Button
+                  variant={likePost ? 'default' : 'outline'}
+                  onClick={() => setLikePost((v) => !v)}
+                  className={likePost ? 'bg-brand-primary' : 'border-white/20 text-white'}
+                >
                   Like Post
                 </Button>
-                <Button variant={retweet ? 'default' : 'outline'} onClick={() => setRetweet(v => !v)} className={retweet ? 'bg-brand-primary' : 'border-white/20 text-white'}>
+                <Button
+                  variant={retweet ? 'default' : 'outline'}
+                  onClick={() => setRetweet((v) => !v)}
+                  className={retweet ? 'bg-brand-primary' : 'border-white/20 text-white'}
+                >
                   Retweet
                 </Button>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-gray-300">Points per action</span>
-                <input type="number" className="w-24 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white" value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} />
-                <Button className="ml-auto bg-brand-primary" disabled={createCampaign.isPending} onClick={() => createCampaign.mutate()}>
+                <input
+                  type="number"
+                  className="w-24 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
+                  value={points}
+                  onChange={(e) => setPoints(Number(e.target.value) || 0)}
+                />
+                <Button
+                  className="ml-auto bg-brand-primary"
+                  disabled={createCampaign.isPending}
+                  onClick={() => createCampaign.mutate()}
+                >
                   {createCampaign.isPending ? 'Creating...' : 'Create Campaign'}
                 </Button>
               </div>
@@ -1261,15 +1424,17 @@ export default function CampaignBuilder() {
         <Dialog open={showTaskAssignModal} onOpenChange={setShowTaskAssignModal}>
           <DialogContent className="w-[95vw] max-w-4xl bg-brand-dark-bg border-white/20">
             <DialogHeader>
-              <DialogTitle className="text-white text-xl">Assign Tasks & Publish Campaign</DialogTitle>
+              <DialogTitle className="text-white text-xl">
+                Assign Tasks & Publish Campaign
+              </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-6">
               <div>
                 <p className="text-gray-300 mb-4">
                   Select tasks to assign to your campaign. You need at least 1 task to publish.
                 </p>
-                
+
                 {tasksLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
@@ -1279,22 +1444,24 @@ export default function CampaignBuilder() {
                   <div className="text-center py-8">
                     <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-300 mb-2">No tasks available</p>
-                    <p className="text-gray-400 text-sm">Create tasks first, then assign them to campaigns</p>
+                    <p className="text-gray-400 text-sm">
+                      Create tasks first, then assign them to campaigns
+                    </p>
                   </div>
                 ) : (
                   <div className="grid gap-3 max-h-96 overflow-y-auto">
                     {availableTasks.map((task) => (
-                      <Card 
+                      <Card
                         key={task.id}
                         className={`cursor-pointer transition-all border ${
-                          selectedTaskIds.includes(task.id) 
-                            ? 'bg-brand-primary/20 border-brand-primary' 
+                          selectedTaskIds.includes(task.id)
+                            ? 'bg-brand-primary/20 border-brand-primary'
                             : 'bg-white/10 border-white/20 hover:border-brand-primary/50'
                         }`}
                         onClick={() => {
-                          setSelectedTaskIds(prev => 
+                          setSelectedTaskIds((prev) =>
                             prev.includes(task.id)
-                              ? prev.filter(id => id !== task.id)
+                              ? prev.filter((id) => id !== task.id)
                               : [...prev, task.id]
                           );
                         }}
@@ -1307,7 +1474,9 @@ export default function CampaignBuilder() {
                               <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                                 <span>Type: {task.taskType}</span>
                                 <span>Completions: {task.totalCompletions || 0}</span>
-                                <span className={`px-2 py-1 rounded ${task.isActive ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'}`}>
+                                <span
+                                  className={`px-2 py-1 rounded ${task.isActive ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'}`}
+                                >
                                   {task.isActive ? 'Active' : 'Inactive'}
                                 </span>
                               </div>
@@ -1322,7 +1491,7 @@ export default function CampaignBuilder() {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex justify-between items-center pt-4 border-t border-white/10">
                 <div className="text-sm text-gray-400">
                   {selectedTaskIds.length} task{selectedTaskIds.length !== 1 ? 's' : ''} selected
@@ -1330,16 +1499,16 @@ export default function CampaignBuilder() {
                     <span className="text-green-400 ml-2">✓ Ready to publish</span>
                   )}
                 </div>
-                
+
                 <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setShowTaskAssignModal(false)}
                     className="border-white/20 text-white"
                   >
                     Skip for Now
                   </Button>
-                  
+
                   {selectedTaskIds.length > 0 && (
                     <>
                       <Button
@@ -1347,35 +1516,40 @@ export default function CampaignBuilder() {
                           if (createdCampaignId) {
                             await assignTasksMutation.mutateAsync({
                               campaignId: createdCampaignId,
-                              taskIds: selectedTaskIds
+                              taskIds: selectedTaskIds,
                             });
-                            alert(`✅ ${selectedTaskIds.length} task${selectedTaskIds.length !== 1 ? 's' : ''} assigned successfully!`);
+                            alert(
+                              `✅ ${selectedTaskIds.length} task${selectedTaskIds.length !== 1 ? 's' : ''} assigned successfully!`
+                            );
                           }
                         }}
                         disabled={assignTasksMutation.isPending}
                         className="bg-brand-secondary hover:bg-brand-secondary/80"
                       >
-                        {assignTasksMutation.isPending ? 'Assigning...' : `Assign ${selectedTaskIds.length} Task${selectedTaskIds.length !== 1 ? 's' : ''}`}
+                        {assignTasksMutation.isPending
+                          ? 'Assigning...'
+                          : `Assign ${selectedTaskIds.length} Task${selectedTaskIds.length !== 1 ? 's' : ''}`}
                       </Button>
-                      
+
                       <Button
                         onClick={async () => {
                           if (createdCampaignId) {
                             // First assign tasks, then publish
                             await assignTasksMutation.mutateAsync({
                               campaignId: createdCampaignId,
-                              taskIds: selectedTaskIds
+                              taskIds: selectedTaskIds,
                             });
                             await publishCampaignMutation.mutateAsync(createdCampaignId);
                           }
                         }}
-                        disabled={assignTasksMutation.isPending || publishCampaignMutation.isPending}
+                        disabled={
+                          assignTasksMutation.isPending || publishCampaignMutation.isPending
+                        }
                         className="bg-brand-primary hover:bg-brand-primary/80"
                       >
-                        {assignTasksMutation.isPending || publishCampaignMutation.isPending 
-                          ? 'Publishing...' 
-                          : 'Assign & Publish Campaign'
-                        }
+                        {assignTasksMutation.isPending || publishCampaignMutation.isPending
+                          ? 'Publishing...'
+                          : 'Assign & Publish Campaign'}
                       </Button>
                     </>
                   )}
@@ -1389,9 +1563,9 @@ export default function CampaignBuilder() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Campaign Templates</h2>
-            <Button 
+            <Button
               data-testid="button-create-custom-campaign"
-              variant="outline" 
+              variant="outline"
               className="border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white"
               onClick={() => setShowCreateModal(true)}
             >
@@ -1403,32 +1577,36 @@ export default function CampaignBuilder() {
             {campaignTemplates.map((template) => {
               const Icon = template.icon;
               const isSelected = selectedTemplate === template.id;
-              
+
               return (
-                <Card 
+                <Card
                   key={template.id}
                   className={`cursor-pointer transition-all duration-300 hover:scale-105 ${
-                    isSelected 
-                      ? "bg-white/20 border-brand-primary shadow-xl" 
-                      : "bg-white/10 border-white/20 hover:border-brand-primary/50"
+                    isSelected
+                      ? 'bg-white/20 border-brand-primary shadow-xl'
+                      : 'bg-white/10 border-white/20 hover:border-brand-primary/50'
                   }`}
                   onClick={() => setSelectedTemplate(template.id)}
                 >
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${template.color} flex items-center justify-center mb-4`}>
+                      <div
+                        className={`w-12 h-12 rounded-xl bg-gradient-to-br ${template.color} flex items-center justify-center mb-4`}
+                      >
                         <Icon className="h-6 w-6 text-white" />
                       </div>
-                      <Badge className={categoryColors[template.category as keyof typeof categoryColors]}>
+                      <Badge
+                        className={categoryColors[template.category as keyof typeof categoryColors]}
+                      >
                         {template.category}
                       </Badge>
                     </div>
                     <CardTitle className="text-white text-xl">{template.name}</CardTitle>
                   </CardHeader>
-                  
+
                   <CardContent className="space-y-4">
                     <p className="text-gray-300 text-sm">{template.description}</p>
-                    
+
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Trigger:</span>
@@ -1445,8 +1623,8 @@ export default function CampaignBuilder() {
                         </Badge>
                       </div>
                     </div>
-                    
-                    <Button 
+
+                    <Button
                       className="w-full gradient-primary text-[#101636] font-bold"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1504,7 +1682,9 @@ export default function CampaignBuilder() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-brand-primary rounded-full" />
-                  <span className="text-gray-300">Time-based triggers (daily, weekly, monthly)</span>
+                  <span className="text-gray-300">
+                    Time-based triggers (daily, weekly, monthly)
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-brand-secondary rounded-full" />
@@ -1524,10 +1704,7 @@ export default function CampaignBuilder() {
         </div>
 
         {/* Create Campaign Modal */}
-        <CreateCampaignModal 
-          isOpen={showCreateModal} 
-          onClose={() => setShowCreateModal(false)} 
-        />
+        <CreateCampaignModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
       </div>
     </div>
   );

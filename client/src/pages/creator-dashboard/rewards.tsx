@@ -1,37 +1,69 @@
-import { useState } from 'react';
+import { useState, useMemo, createElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
-import { Plus, Gift, Ticket, Package, Star, Coins, Users, Calendar, Edit, Trash2, Eye, Video as VideoIcon, AlertCircle, Sparkles } from "lucide-react";
-import type { Reward } from "@shared/schema";
-import { insertRewardSchema } from "@shared/schema";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import DashboardCard from "@/components/dashboard/dashboard-card";
-import { VideoUpload } from "@/components/ui/video-upload";
-import PlatformRewards from "@/components/rewards/platform-rewards";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { apiRequest } from '@/lib/queryClient';
+import {
+  Plus,
+  Gift,
+  Ticket,
+  Package,
+  Star,
+  Coins,
+  Users,
+  Edit,
+  Eye,
+  Video as VideoIcon,
+  AlertCircle,
+  Sparkles,
+} from 'lucide-react';
+import type { Reward } from '@shared/schema';
+import { insertRewardSchema } from '@shared/schema';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import DashboardCard from '@/components/dashboard/dashboard-card';
+import { VideoUpload } from '@/components/ui/video-upload';
+import PlatformRewards from '@/components/rewards/platform-rewards';
 
 // Form schema extending insertRewardSchema with additional validation
 const rewardCreationFormSchema = insertRewardSchema.extend({
-  name: z.string().min(1, "Reward name is required").max(100, "Name too long"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
-  pointsCost: z.number().min(1, "Points cost must be at least 1"),
-  rewardType: z.enum(["raffle", "physical", "custom", "video"], {
-    required_error: "Please select a reward type"
+  name: z.string().min(1, 'Reward name is required').max(100, 'Name too long'),
+  description: z.string().min(10, 'Description must be at least 10 characters'),
+  pointsCost: z.number().min(1, 'Points cost must be at least 1'),
+  rewardType: z.enum(['raffle', 'physical', 'custom', 'video'], {
+    required_error: 'Please select a reward type',
   }),
   maxRedemptions: z.number().min(1).optional().nullable(),
   // Type-specific validation handled dynamically
@@ -42,21 +74,31 @@ type RewardFormData = z.infer<typeof rewardCreationFormSchema>;
 // Utility functions for reward type icons and colors
 const getRewardTypeIcon = (type: string) => {
   switch (type) {
-    case 'raffle': return Ticket;
-    case 'physical': return Package;
-    case 'video': return VideoIcon;
-    case 'custom': return Star;
-    default: return Gift;
+    case 'raffle':
+      return Ticket;
+    case 'physical':
+      return Package;
+    case 'video':
+      return VideoIcon;
+    case 'custom':
+      return Star;
+    default:
+      return Gift;
   }
-}
+};
 
 const getRewardTypeBadgeColor = (type: string) => {
   switch (type) {
-    case 'raffle': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-    case 'physical': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-    case 'video': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
-    case 'custom': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-    default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    case 'raffle':
+      return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    case 'physical':
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    case 'video':
+      return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
+    case 'custom':
+      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    default:
+      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   }
 };
 
@@ -64,11 +106,15 @@ export default function RewardsManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [selectedRewardType, setSelectedRewardType] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<string>("your-rewards");
+  const [_selectedRewardType, _setSelectedRewardType] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>('your-rewards');
 
   // Fetch creator's rewards
-  const { data: rewards = [], isLoading: rewardsLoading, refetch } = useQuery({
+  const {
+    data: rewards = [],
+    isLoading: rewardsLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['/api/rewards', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -82,32 +128,37 @@ export default function RewardsManagement() {
   const rewardStats = {
     totalRewards: rewards.length,
     activeRewards: rewards.filter((r: Reward) => r.isActive).length,
-    totalRedemptions: rewards.reduce((sum: number, r: Reward) => sum + (r.currentRedemptions || 0), 0),
-    pointsAllocated: rewards.reduce((sum: number, r: Reward) => sum + (r.pointsCost * (r.currentRedemptions || 0)), 0),
+    totalRedemptions: rewards.reduce(
+      (sum: number, r: Reward) => sum + (r.currentRedemptions || 0),
+      0
+    ),
+    pointsAllocated: rewards.reduce(
+      (sum: number, r: Reward) => sum + r.pointsCost * (r.currentRedemptions || 0),
+      0
+    ),
   };
 
-
-  const handleCreateReward = async (rewardData: any) => {
+  const handleCreateReward = async (rewardData: Record<string, unknown>) => {
     try {
       await apiRequest('POST', '/api/rewards', {
         ...rewardData,
         creatorId: user?.id,
       });
-      
+
       toast({
-        title: "Reward Created",
-        description: "Your new reward has been created successfully!",
-        duration: 3000
+        title: 'Reward Created',
+        description: 'Your new reward has been created successfully!',
+        duration: 3000,
       });
-      
+
       setCreateModalOpen(false);
       refetch();
-    } catch (error) {
+    } catch {
       toast({
-        title: "Error",
-        description: "Failed to create reward. Please try again.",
-        variant: "destructive",
-        duration: 3000
+        title: 'Error',
+        description: 'Failed to create reward. Please try again.',
+        variant: 'destructive',
+        duration: 3000,
       });
     }
   };
@@ -115,131 +166,135 @@ export default function RewardsManagement() {
   return (
     <DashboardLayout userType="creator">
       <div className="p-6">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Rewards
-            </h1>
-            <p className="text-gray-400">
-              Manage your fan rewards and view your platform points
-            </p>
-          </div>
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-white mb-2">Rewards</h1>
+          <p className="text-gray-400">Manage your fan rewards and view your platform points</p>
+        </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-white/5 border border-white/10 mb-6">
-              <TabsTrigger 
-                value="your-rewards" 
-                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-              >
-                <Gift className="h-4 w-4 mr-2" />
-                Your Rewards
-              </TabsTrigger>
-              <TabsTrigger 
-                value="platform" 
-                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Platform Points
-              </TabsTrigger>
-            </TabsList>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="bg-white/5 border border-white/10 mb-6">
+            <TabsTrigger
+              value="your-rewards"
+              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              Your Rewards
+            </TabsTrigger>
+            <TabsTrigger
+              value="platform"
+              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Platform Points
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="your-rewards" className="mt-0">
-              {/* Create Reward Button */}
-              <div className="flex justify-end mb-6">
-                <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-brand-primary hover:bg-brand-primary/80">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Reward
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-2xl bg-brand-dark-bg border-white/10 max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle className="text-white">Create New Reward</DialogTitle>
-                    </DialogHeader>
-                    <RewardCreationForm onSubmit={handleCreateReward} onCancel={() => setCreateModalOpen(false)} />
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <DashboardCard
-              title="Total Rewards"
-              value={rewardStats.totalRewards.toString()}
-              icon={<Gift className="h-5 w-5" />}
-              gradient
-            />
-            <DashboardCard
-              title="Active Rewards"
-              value={rewardStats.activeRewards.toString()}
-              icon={<Star className="h-5 w-5" />}
-            />
-            <DashboardCard
-              title="Total Redemptions"
-              value={rewardStats.totalRedemptions.toString()}
-              icon={<Users className="h-5 w-5" />}
-            />
-            <DashboardCard
-              title="Points Spent"
-              value={rewardStats.pointsAllocated.toLocaleString()}
-              icon={<Coins className="h-5 w-5" />}
-            />
-          </div>
-
-          {/* Rewards List */}
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Your Rewards</h2>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">
-                  Points-Based Redemption System
-                </Badge>
-              </div>
+          <TabsContent value="your-rewards" className="mt-0">
+            {/* Create Reward Button */}
+            <div className="flex justify-end mb-6">
+              <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-brand-primary hover:bg-brand-primary/80">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Reward
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-2xl bg-brand-dark-bg border-white/10 max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-white">Create New Reward</DialogTitle>
+                  </DialogHeader>
+                  <RewardCreationForm
+                    onSubmit={handleCreateReward}
+                    onCancel={() => setCreateModalOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
             </div>
 
-            {rewardsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Card key={i} className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
-                      <div className="animate-pulse">
-                        <div className="h-4 bg-gray-700 rounded mb-4"></div>
-                        <div className="h-8 bg-gray-700 rounded mb-2"></div>
-                        <div className="h-4 bg-gray-700 rounded"></div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : rewards.length === 0 ? (
-              <Card className="bg-white/5 border-white/10">
-                <CardContent className="p-12 text-center">
-                  <Gift className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No Rewards Yet</h3>
-                  <p className="text-gray-400 mb-6">Create your first reward to engage your fans with points-based redemption!</p>
-                  <Button onClick={() => setCreateModalOpen(true)} className="bg-brand-primary hover:bg-brand-primary/80">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Reward
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {rewards.map((reward: Reward) => (
-                  <RewardCard key={reward.id} reward={reward} onUpdate={refetch} />
-                ))}
-              </div>
-            )}
-          </div>
-            </TabsContent>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <DashboardCard
+                title="Total Rewards"
+                value={rewardStats.totalRewards.toString()}
+                icon={<Gift className="h-5 w-5" />}
+                gradient
+              />
+              <DashboardCard
+                title="Active Rewards"
+                value={rewardStats.activeRewards.toString()}
+                icon={<Star className="h-5 w-5" />}
+              />
+              <DashboardCard
+                title="Total Redemptions"
+                value={rewardStats.totalRedemptions.toString()}
+                icon={<Users className="h-5 w-5" />}
+              />
+              <DashboardCard
+                title="Points Spent"
+                value={rewardStats.pointsAllocated.toLocaleString()}
+                icon={<Coins className="h-5 w-5" />}
+              />
+            </div>
 
-            <TabsContent value="platform" className="mt-0">
-              <PlatformRewards />
-            </TabsContent>
-          </Tabs>
-        </div>
+            {/* Rewards List */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-white">Your Rewards</h2>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">
+                    Points-Based Redemption System
+                  </Badge>
+                </div>
+              </div>
+
+              {rewardsLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Card key={i} className="bg-white/5 border-white/10">
+                      <CardContent className="p-6">
+                        <div className="animate-pulse">
+                          <div className="h-4 bg-gray-700 rounded mb-4"></div>
+                          <div className="h-8 bg-gray-700 rounded mb-2"></div>
+                          <div className="h-4 bg-gray-700 rounded"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : rewards.length === 0 ? (
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-12 text-center">
+                    <Gift className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">No Rewards Yet</h3>
+                    <p className="text-gray-400 mb-6">
+                      Create your first reward to engage your fans with points-based redemption!
+                    </p>
+                    <Button
+                      onClick={() => setCreateModalOpen(true)}
+                      className="bg-brand-primary hover:bg-brand-primary/80"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Reward
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {rewards.map((reward: Reward) => (
+                    <RewardCard key={reward.id} reward={reward} onUpdate={refetch} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="platform" className="mt-0">
+            <PlatformRewards />
+          </TabsContent>
+        </Tabs>
+      </div>
     </DashboardLayout>
   );
 }
@@ -247,41 +302,41 @@ export default function RewardsManagement() {
 // Reward Card Component
 function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void }) {
   const { toast } = useToast();
-  const [showDetails, setShowDetails] = useState(false);
+  const [_showDetails, _setShowDetails] = useState(false);
+  const RewardIcon = useMemo(() => getRewardTypeIcon(reward.rewardType), [reward.rewardType]);
 
   const toggleRewardStatus = async () => {
     try {
       await apiRequest('PUT', `/api/rewards/${reward.id}`, {
-        isActive: !reward.isActive
+        isActive: !reward.isActive,
       });
-      
+
       toast({
-        title: reward.isActive ? "Reward Deactivated" : "Reward Activated",
+        title: reward.isActive ? 'Reward Deactivated' : 'Reward Activated',
         description: `${reward.name} has been ${reward.isActive ? 'deactivated' : 'activated'}.`,
-        duration: 3000
+        duration: 3000,
       });
-      
+
       onUpdate();
-    } catch (error) {
+    } catch {
       toast({
-        title: "Error",
-        description: "Failed to update reward status.",
-        variant: "destructive",
-        duration: 3000
+        title: 'Error',
+        description: 'Failed to update reward status.',
+        variant: 'destructive',
+        duration: 3000,
       });
     }
   };
 
   return (
-    <Card className={`bg-white/5 border-white/10 transition-all hover:border-brand-primary/30 ${!reward.isActive ? 'opacity-60' : ''}`}>
+    <Card
+      className={`bg-white/5 border-white/10 transition-all hover:border-brand-primary/30 ${!reward.isActive ? 'opacity-60' : ''}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-2">
             <div className="p-2 bg-brand-primary/20 rounded-lg">
-              {(() => {
-                const Icon = getRewardTypeIcon(reward.rewardType);
-                return <Icon className="h-5 w-5" />;
-              })()}
+              {createElement(RewardIcon, { className: 'h-5 w-5' })}
             </div>
             <div>
               <CardTitle className="text-white text-lg">{reward.name}</CardTitle>
@@ -289,22 +344,24 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
                 <Badge className={`text-xs ${getRewardTypeBadgeColor(reward.rewardType)}`}>
                   {reward.rewardType.charAt(0).toUpperCase() + reward.rewardType.slice(1)}
                 </Badge>
-                {reward.rewardType === 'physical' && reward.rewardData?.physicalData?.approvalStatus && (
-                  <Badge 
-                    variant="outline"
-                    className={
-                      reward.rewardData.physicalData.approvalStatus === 'approved'
-                        ? 'border-green-500/30 text-green-400'
-                        : reward.rewardData.physicalData.approvalStatus === 'rejected'
-                        ? 'border-red-500/30 text-red-400'
-                        : 'border-yellow-500/30 text-yellow-400'
-                    }
-                  >
-                    {reward.rewardData.physicalData.approvalStatus === 'approved' && '✓ Approved'}
-                    {reward.rewardData.physicalData.approvalStatus === 'rejected' && '✗ Rejected'}
-                    {reward.rewardData.physicalData.approvalStatus === 'pending' && '⏳ Pending Review'}
-                  </Badge>
-                )}
+                {reward.rewardType === 'physical' &&
+                  reward.rewardData?.physicalData?.approvalStatus && (
+                    <Badge
+                      variant="outline"
+                      className={
+                        reward.rewardData.physicalData.approvalStatus === 'approved'
+                          ? 'border-green-500/30 text-green-400'
+                          : reward.rewardData.physicalData.approvalStatus === 'rejected'
+                            ? 'border-red-500/30 text-red-400'
+                            : 'border-yellow-500/30 text-yellow-400'
+                      }
+                    >
+                      {reward.rewardData.physicalData.approvalStatus === 'approved' && '✓ Approved'}
+                      {reward.rewardData.physicalData.approvalStatus === 'rejected' && '✗ Rejected'}
+                      {reward.rewardData.physicalData.approvalStatus === 'pending' &&
+                        '⏳ Pending Review'}
+                    </Badge>
+                  )}
               </div>
             </div>
           </div>
@@ -328,17 +385,17 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <div className="space-y-3">
           <p className="text-gray-300 text-sm line-clamp-2">{reward.description}</p>
-          
+
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-1 text-emerald-400">
               <Coins className="h-4 w-4" />
               <span className="font-medium">{reward.pointsCost} points</span>
             </div>
-            
+
             <div className="text-gray-400">
               {reward.currentRedemptions}/{reward.maxRedemptions || '∞'} redeemed
             </div>
@@ -350,38 +407,42 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
               Prize: {reward.rewardData.raffleData.prizeDescription}
             </div>
           )}
-          
+
           {reward.rewardType === 'physical' && reward.rewardData?.physicalData && (
             <div className="space-y-2">
               <div className="text-xs text-blue-400 bg-blue-500/10 p-2 rounded">
-                {reward.rewardData.physicalData.shippingRequired ? '📦 Ships worldwide' : '📍 Local pickup'} • 
-                Condition: {reward.rewardData.physicalData.condition}
+                {reward.rewardData.physicalData.shippingRequired
+                  ? '📦 Ships worldwide'
+                  : '📍 Local pickup'}{' '}
+                • Condition: {reward.rewardData.physicalData.condition}
               </div>
               {reward.rewardData.physicalData.approvalStatus === 'pending' && (
                 <div className="text-xs text-yellow-400 bg-yellow-500/10 p-2 rounded">
                   ⏳ Awaiting admin approval - item must be sent to P.O. Box for inspection
                 </div>
               )}
-              {reward.rewardData.physicalData.approvalStatus === 'rejected' && reward.rewardData.physicalData.adminNotes && (
-                <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded">
-                  ✗ Rejected: {reward.rewardData.physicalData.adminNotes}
-                </div>
-              )}
+              {reward.rewardData.physicalData.approvalStatus === 'rejected' &&
+                reward.rewardData.physicalData.adminNotes && (
+                  <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded">
+                    ✗ Rejected: {reward.rewardData.physicalData.adminNotes}
+                  </div>
+                )}
             </div>
           )}
-          
+
           {reward.rewardType === 'video' && reward.rewardData?.videoData && (
             <div className="text-xs text-pink-400 bg-pink-500/10 p-2 rounded">
-              🎥 {reward.rewardData.videoData.maxVideoDuration}s max • {reward.rewardData.videoData.turnaroundDays} day turnaround
+              🎥 {reward.rewardData.videoData.maxVideoDuration}s max •{' '}
+              {reward.rewardData.videoData.turnaroundDays} day turnaround
             </div>
           )}
-          
+
           {reward.rewardType === 'custom' && reward.rewardData?.customData && (
             <div className="text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded">
-              {reward.rewardData.customData.serviceName} via {reward.rewardData.customData.deliveryMethod}
+              {reward.rewardData.customData.serviceName} via{' '}
+              {reward.rewardData.customData.deliveryMethod}
             </div>
           )}
-          
         </div>
       </CardContent>
     </Card>
@@ -389,8 +450,14 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
 }
 
 // Reward Creation Form Component with react-hook-form + zodResolver
-function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void; onCancel: () => void }) {
-  const { user } = useAuth();
+function RewardCreationForm({
+  onSubmit,
+  onCancel,
+}: {
+  onSubmit: (data: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const _user = useAuth().user;
   const { toast } = useToast();
   const form = useForm<RewardFormData>({
     resolver: zodResolver(rewardCreationFormSchema),
@@ -406,7 +473,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           prizeValue: 0,
           entryPointsCost: 1,
           drawDate: '',
-          winnerSelectionMethod: 'random'
+          winnerSelectionMethod: 'random',
         },
         physicalData: {
           itemName: '',
@@ -416,13 +483,13 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           condition: 'new',
           quantity: 1,
           photos: [],
-          approvalStatus: 'pending'
+          approvalStatus: 'pending',
         },
         customData: {
           serviceName: '',
           serviceDescription: '',
           deliveryMethod: 'email',
-          requiresPersonalization: false
+          requiresPersonalization: false,
         },
         videoData: {
           maxVideoDuration: 60,
@@ -430,12 +497,13 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
           turnaroundDays: 7,
           requiresPersonalization: true,
           personalizationInstructions: '',
-          sampleVideoUrl: ''
+          sampleVideoUrl: '',
         },
-      }
-    }
+      },
+    },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedRewardType = form.watch('rewardType');
 
   const handleFormSubmit = (data: RewardFormData) => {
@@ -443,18 +511,28 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
     const processedData = {
       ...data,
       // Ensure proper type-specific data structure
-      rewardData: watchedRewardType === 'raffle' ? { raffleData: data.rewardData?.raffleData } :
-                  watchedRewardType === 'physical' ? { physicalData: data.rewardData?.physicalData } :
-                  watchedRewardType === 'video' ? { videoData: data.rewardData?.videoData } :
-                  watchedRewardType === 'custom' ? { customData: data.rewardData?.customData } :
-                  {}
+      rewardData:
+        watchedRewardType === 'raffle'
+          ? { raffleData: data.rewardData?.raffleData }
+          : watchedRewardType === 'physical'
+            ? { physicalData: data.rewardData?.physicalData }
+            : watchedRewardType === 'video'
+              ? { videoData: data.rewardData?.videoData }
+              : watchedRewardType === 'custom'
+                ? { customData: data.rewardData?.customData }
+                : {},
     };
     onSubmit(processedData);
   };
-  
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6" data-testid="form-reward-creation">
+      {/* eslint-disable @typescript-eslint/no-explicit-any */}
+      <form
+        onSubmit={form.handleSubmit(handleFormSubmit)}
+        className="space-y-6"
+        data-testid="form-reward-creation"
+      >
         {/* Basic Info */}
         <div className="space-y-4">
           <FormField
@@ -475,7 +553,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control as any}
             name="description"
@@ -504,7 +582,11 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 <FormItem>
                   <FormLabel className="text-white">Reward Type</FormLabel>
                   <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange} data-testid="select-reward-type">
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      data-testid="select-reward-type"
+                    >
                       <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
                         <SelectValue placeholder="Select reward type" />
                       </SelectTrigger>
@@ -520,7 +602,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control as any}
               name="pointsCost"
@@ -558,7 +640,9 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                     min="1"
                     placeholder="Leave empty for unlimited"
                     value={field.value || ''}
-                    onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                    onChange={(e) =>
+                      field.onChange(e.target.value ? parseInt(e.target.value) : null)
+                    }
                     className="mt-2 bg-white/10 border-white/20 text-white"
                     data-testid="input-max-redemptions"
                   />
@@ -571,7 +655,10 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
 
         {/* Type-Specific Configuration */}
         {watchedRewardType === 'raffle' && (
-          <div className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg" data-testid="section-raffle-config">
+          <div
+            className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg"
+            data-testid="section-raffle-config"
+          >
             <h3 className="text-white font-medium">Raffle Configuration</h3>
             <FormField
               control={form.control as any}
@@ -614,17 +701,21 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
         )}
 
         {watchedRewardType === 'physical' && (
-          <div className="space-y-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg" data-testid="section-physical-config">
+          <div
+            className="space-y-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+            data-testid="section-physical-config"
+          >
             <h3 className="text-white font-medium">Physical Item Configuration</h3>
-            
+
             {/* Important Notice about Approval Process */}
             <Alert className="bg-yellow-500/10 border-yellow-500/20">
               <AlertCircle className="h-4 w-4 text-yellow-400" />
               <AlertDescription className="text-yellow-400 text-sm">
-                <strong>Approval Process:</strong> Physical items require admin approval. You must send the item to our P.O. Box for inspection before it can be offered as a reward.
+                <strong>Approval Process:</strong> Physical items require admin approval. You must
+                send the item to our P.O. Box for inspection before it can be offered as a reward.
               </AlertDescription>
             </Alert>
-            
+
             <FormField
               control={form.control as any}
               name="rewardData.physicalData.itemName"
@@ -643,7 +734,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control as any}
               name="rewardData.physicalData.itemDescription"
@@ -720,8 +811,10 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 After creating this listing, please send the physical item to:
               </p>
               <div className="p-3 bg-white/5 rounded border border-brand-primary/30 font-mono text-sm text-brand-primary">
-                Fandomly Physical Rewards<br />
-                P.O. Box [TO BE ASSIGNED]<br />
+                Fandomly Physical Rewards
+                <br />
+                P.O. Box [TO BE ASSIGNED]
+                <br />
                 [City, State ZIP]
               </div>
               <p className="text-xs text-gray-400">
@@ -734,7 +827,8 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
               <Label className="text-white">Item Photos (coming soon)</Label>
               <div className="p-8 border-2 border-dashed border-gray-600 rounded-lg text-center">
                 <p className="text-sm text-gray-400">
-                  Photo upload for physical items coming soon. For now, item will be reviewed when received at our P.O. Box.
+                  Photo upload for physical items coming soon. For now, item will be reviewed when
+                  received at our P.O. Box.
                 </p>
               </div>
             </div>
@@ -742,12 +836,15 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
         )}
 
         {watchedRewardType === 'video' && (
-          <div className="space-y-4 p-4 bg-pink-500/10 border border-pink-500/20 rounded-lg" data-testid="section-video-config">
+          <div
+            className="space-y-4 p-4 bg-pink-500/10 border border-pink-500/20 rounded-lg"
+            data-testid="section-video-config"
+          >
             <h3 className="text-white font-medium flex items-center gap-2">
               <VideoIcon className="h-5 w-5" />
               Custom Video (Cameo) Configuration
             </h3>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control as any}
@@ -772,7 +869,7 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control as any}
                 name="rewardData.videoData.turnaroundDays"
@@ -841,14 +938,15 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
             <div className="pt-4 border-t border-white/10">
               <Label className="text-white mb-3 block">Sample Video (Optional)</Label>
               <p className="text-xs text-gray-400 mb-3">
-                Upload a sample video to show fans what to expect. This helps set expectations for quality and style.
+                Upload a sample video to show fans what to expect. This helps set expectations for
+                quality and style.
               </p>
               <VideoUpload
                 onUploadSuccess={(url) => {
                   form.setValue('rewardData.videoData.sampleVideoUrl', url);
                   toast({
-                    title: "Sample Video Uploaded",
-                    description: "Your sample video has been saved.",
+                    title: 'Sample Video Uploaded',
+                    description: 'Your sample video has been saved.',
                   });
                 }}
                 currentVideoUrl={form.watch('rewardData.videoData.sampleVideoUrl')}
@@ -860,7 +958,10 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
         )}
 
         {watchedRewardType === 'custom' && (
-          <div className="space-y-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg" data-testid="section-custom-config">
+          <div
+            className="space-y-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg"
+            data-testid="section-custom-config"
+          >
             <h3 className="text-white font-medium">Custom Service Configuration</h3>
             <FormField
               control={form.control as any}
@@ -887,7 +988,11 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
                 <FormItem>
                   <FormLabel className="text-white">Delivery Method</FormLabel>
                   <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange} data-testid="select-custom-delivery">
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      data-testid="select-custom-delivery"
+                    >
                       <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
                         <SelectValue />
                       </SelectTrigger>
@@ -908,15 +1013,15 @@ function RewardCreationForm({ onSubmit, onCancel }: { onSubmit: (data: any) => v
 
         {/* Actions */}
         <div className="flex justify-end space-x-3 pt-4">
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={onCancel}
             data-testid="button-cancel-reward"
           >
             Cancel
           </Button>
-          <Button 
+          <Button
             type="submit"
             disabled={form.formState.isSubmitting || !form.formState.isValid}
             className="bg-brand-primary hover:bg-brand-primary/80"
