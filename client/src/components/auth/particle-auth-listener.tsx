@@ -14,36 +14,65 @@
  *         <App />
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import {
+  useAccount,
+  useDisconnect,
+  useParticleAuth,
+} from '@particle-network/connectkit';
 
 /**
- * This component is rendered lazily only when Particle is enabled.
- * It uses Particle's React hooks which require ConnectKitProvider in the tree.
+ * This component is rendered inside ConnectKitProvider.
+ * It uses Particle's React hooks to detect login/logout events and
+ * bridges them to Fandomly's JWT auth system automatically.
  */
 function ParticleAuthListenerInner() {
-  // These hooks come from @particle-network/connectkit
-  // They're only available inside ConnectKitProvider
-  // We use dynamic imports in the lazy wrapper below
-  const { loginWithParticle, isAuthenticated: isFandomlyAuthed } = useAuth();
+  const { loginWithParticle, logout: fandomlyLogout, isAuthenticated: isFandomlyAuthed } = useAuth();
+  const { address, isConnected } = useAccount();
+  const { getUserInfo } = useParticleAuth();
+  const { disconnect } = useDisconnect();
   const bridgingRef = useRef(false);
 
+  const bridgeAuth = useCallback(async () => {
+    if (bridgingRef.current || isFandomlyAuthed || !isConnected || !address) return;
+    bridgingRef.current = true;
+
+    try {
+      const userInfo = await getUserInfo();
+      const token = (userInfo as any)?.token;
+      if (!token) {
+        console.warn('[Particle Auth Listener] No token from Particle, skipping bridge');
+        return;
+      }
+
+      const result = await loginWithParticle(token, address);
+      if (!result.success) {
+        console.error('[Particle Auth Listener] Bridge failed:', result.message);
+        disconnect();
+      }
+    } catch (error) {
+      console.error('[Particle Auth Listener] Error bridging auth:', error);
+    } finally {
+      bridgingRef.current = false;
+    }
+  }, [isConnected, address, isFandomlyAuthed, getUserInfo, loginWithParticle, disconnect]);
+
+  // Bridge when Particle connects and Fandomly is not yet authenticated
   useEffect(() => {
-    // The actual Particle event subscription will be set up here
-    // once the SDK is installed. For now, the bridge is triggered
-    // by the ConnectButton's onConnected callback or by calling
-    // bridgeParticleToFandomly() from the login page.
-    //
-    // When @particle-network/connectkit is installed, we'll use:
-    //   useAccount() - to get wallet address
-    //   useParticleAuth() - to get the auth token
-    //   These fire automatically when the user completes the modal.
+    if (isConnected && address && !isFandomlyAuthed) {
+      bridgeAuth();
+    }
+  }, [isConnected, address, isFandomlyAuthed, bridgeAuth]);
 
-    console.log('[Particle Auth Listener] Active, waiting for Particle events');
-  }, [loginWithParticle, isFandomlyAuthed]);
+  // Handle Particle disconnect → log out of Fandomly too
+  useEffect(() => {
+    if (!isConnected && isFandomlyAuthed) {
+      fandomlyLogout();
+    }
+  }, [isConnected, isFandomlyAuthed, fandomlyLogout]);
 
-  // This component doesn't render anything visible
   return null;
 }
 

@@ -32,7 +32,7 @@ const fandomlyChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://nodes-prod.18.182.4.86.sslip.io/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc'],
+      http: ['https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc'],
     },
   },
   blockExplorers: {
@@ -168,7 +168,7 @@ async function main() {
       CreatorTokenFactory: factoryAddress,
       FanStaking: stakingAddress,
     },
-    rpcUrl: 'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
+    rpcUrl: 'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
   };
 
   const deploymentPath = resolve(__dirname, '../deployment.json');
