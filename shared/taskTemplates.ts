@@ -218,6 +218,107 @@ export const spotifyTaskSchema = z.discriminatedUnion("taskType", [
   }),
 ]);
 
+export const discordTaskSchema = z.discriminatedUnion("taskType", [
+  z.object({
+    taskType: z.literal("discord_join"),
+    serverId: z.string().min(1, "Discord server ID is required"),
+    serverInvite: z.string().url("Valid Discord invite URL is required").optional(),
+    points: z.number().min(1).default(75),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("discord_role"),
+    serverId: z.string().min(1, "Discord server ID is required"),
+    roleId: z.string().min(1, "Discord role ID is required"),
+    roleName: z.string().optional(),
+    points: z.number().min(1).default(50),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("discord_react"),
+    serverId: z.string().min(1, "Discord server ID is required"),
+    channelId: z.string().min(1, "Discord channel ID is required"),
+    messageId: z.string().min(1, "Discord message ID is required"),
+    emoji: z.string().min(1, "Emoji is required"),
+    points: z.number().min(1).default(25),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("discord_message_code"),
+    serverId: z.string().min(1, "Discord server ID is required"),
+    channelId: z.string().min(1, "Discord channel ID is required"),
+    points: z.number().min(1).default(40),
+    verificationMethod: z.literal("automatic"),
+  }),
+]);
+
+export const twitchTaskSchema = z.discriminatedUnion("taskType", [
+  z.object({
+    taskType: z.literal("twitch_follow"),
+    channelName: z.string().min(1, "Twitch channel name is required"),
+    points: z.number().min(1).default(50),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("twitch_subscribe"),
+    channelName: z.string().min(1, "Twitch channel name is required"),
+    points: z.number().min(1).default(200),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("twitch_chat_code"),
+    channelName: z.string().min(1, "Twitch channel name is required"),
+    points: z.number().min(1).default(40),
+    verificationMethod: z.literal("automatic"),
+  }),
+]);
+
+export const kickTaskSchema = z.discriminatedUnion("taskType", [
+  z.object({
+    taskType: z.literal("kick_follow"),
+    channelSlug: z.string().min(1, "Kick channel slug is required"),
+    points: z.number().min(1).default(50),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("kick_subscribe"),
+    channelSlug: z.string().min(1, "Kick channel slug is required"),
+    points: z.number().min(1).default(200),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("kick_chat_code"),
+    channelSlug: z.string().min(1, "Kick channel slug is required"),
+    points: z.number().min(1).default(40),
+    verificationMethod: z.literal("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("kick_redeem_reward"),
+    channelSlug: z.string().min(1, "Kick channel slug is required"),
+    rewardId: z.string().min(1, "Kick reward ID is required"),
+    rewardName: z.string().optional(),
+    points: z.number().min(1).default(75),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+]);
+
+export const patreonTaskSchema = z.discriminatedUnion("taskType", [
+  z.object({
+    taskType: z.literal("patreon_support"),
+    creatorUrl: z.string().url("Valid Patreon creator URL is required").optional(),
+    points: z.number().min(1).default(200),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+  z.object({
+    taskType: z.literal("patreon_tier_check"),
+    tierId: z.string().min(1, "Patreon tier ID is required").optional(),
+    tierName: z.string().optional(),
+    minAmountCents: z.number().optional(),
+    points: z.number().min(1).default(150),
+    verificationMethod: z.enum(["manual", "automatic"]).default("automatic"),
+  }),
+]);
+
 // Core task template catalog - Global templates available to all creators
 // Each template now includes verification tier (T1/T2/T3) and method
 export const CORE_TASK_TEMPLATES = [
@@ -486,6 +587,26 @@ export const CORE_TASK_TEMPLATES = [
       verificationMethod: "api" as const,
     },
     defaultPoints: 200,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Twitter Hashtag Post (T2 — can verify via API search for hashtag + code)
+  {
+    id: "twitter-hashtag-post",
+    name: "Post with Hashtag",
+    description: "Fans post a tweet with a specific hashtag",
+    platform: "twitter" as const,
+    taskType: "twitter_hashtag_post" as const,
+    category: "code_verification",
+    verificationTier: "T2" as const,
+    verificationMethod: "code_repost" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 85,
+      verificationMethod: "code_repost" as const,
+    },
+    defaultPoints: 85,
     isGlobal: true,
     isActive: true,
   },
@@ -770,6 +891,44 @@ export const CORE_TASK_TEMPLATES = [
     isActive: true,
   },
 
+  // Twitter Profile Tasks (T3 — manual verification, profile changes)
+  {
+    id: "twitter-include-name",
+    name: "Include Text in Name",
+    description: "Fans include specific text in their X/Twitter display name",
+    platform: "twitter" as const,
+    taskType: "twitter_include_name" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "twitter-include-bio",
+    name: "Include Text in Bio",
+    description: "Fans include specific text in their X/Twitter bio",
+    platform: "twitter" as const,
+    taskType: "twitter_include_bio" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
+    isGlobal: true,
+    isActive: true,
+  },
+
   // Facebook Starter Pack (T3)
   {
     id: "facebook-like-page",
@@ -808,6 +967,24 @@ export const CORE_TASK_TEMPLATES = [
     isActive: true,
   },
   {
+    id: "facebook-like-photo",
+    name: "Like Facebook Photo",
+    description: "Fans like a specific Facebook photo",
+    platform: "facebook" as const,
+    taskType: "facebook_like_photo" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 15,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 15,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
     id: "facebook-share-post",
     name: "Share Facebook Post",
     description: "Fans share a specific Facebook post",
@@ -822,6 +999,24 @@ export const CORE_TASK_TEMPLATES = [
       verificationMethod: "manual" as const,
     },
     defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: "facebook-share-page",
+    name: "Share Facebook Page",
+    description: "Fans share the creator's Facebook page",
+    platform: "facebook" as const,
+    taskType: "facebook_share_page" as const,
+    category: "starter_pack",
+    verificationTier: "T3" as const,
+    verificationMethod: "manual" as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 25,
+      verificationMethod: "manual" as const,
+    },
+    defaultPoints: 25,
     isGlobal: true,
     isActive: true,
   },
@@ -972,25 +1167,27 @@ export const CORE_TASK_TEMPLATES = [
 ] as const;
 
 // Platform-to-task-types mapping for UI
+// All values use canonical names (platform_action) for consistency with
+// TASK_TYPE_VERIFICATION and CORE_TASK_TEMPLATES.
 export const PLATFORM_TASK_TYPES = {
   twitter: [
-    { value: "follow", label: "Follow Account", icon: "UserPlus" },
-    { value: "mention", label: "Mention in Post", icon: "AtSign" },
-    { value: "retweet", label: "Retweet", icon: "Repeat" },
-    { value: "like", label: "Like Tweet", icon: "Heart" },
-    { value: "quote_tweet", label: "Quote Tweet", icon: "Quote" },
-    { value: "include_in_name", label: "Include in Name", icon: "User" },
-    { value: "include_in_bio", label: "Include in Bio", icon: "FileText" },
-    { value: "hashtag_post", label: "Post with Hashtag", icon: "Hash" },
+    { value: "twitter_follow", label: "Follow Account", icon: "UserPlus" },
+    { value: "twitter_mention", label: "Mention in Post", icon: "AtSign" },
+    { value: "twitter_retweet", label: "Retweet", icon: "Repeat" },
+    { value: "twitter_like", label: "Like Tweet", icon: "Heart" },
+    { value: "twitter_quote_tweet", label: "Quote Tweet", icon: "Quote" },
+    { value: "twitter_include_name", label: "Include in Name", icon: "User" },
+    { value: "twitter_include_bio", label: "Include in Bio", icon: "FileText" },
+    { value: "twitter_hashtag_post", label: "Post with Hashtag", icon: "Hash" },
   ],
   facebook: [
-    { value: "like_page", label: "Like Page", icon: "ThumbsUp" },
-    { value: "like_photo", label: "Like Photo", icon: "Image" },
-    { value: "like_post", label: "Like Post", icon: "ThumbsUp" },
-    { value: "share_post", label: "Share Post", icon: "Share" },
-    { value: "share_page", label: "Share Page", icon: "Share2" },
-    { value: "comment_post", label: "Comment on Post", icon: "MessageCircle" },
-    { value: "comment_photo", label: "Comment on Photo", icon: "MessageSquare" },
+    { value: "facebook_like_page", label: "Like Page", icon: "ThumbsUp" },
+    { value: "facebook_like_photo", label: "Like Photo", icon: "Image" },
+    { value: "facebook_like_post", label: "Like Post", icon: "ThumbsUp" },
+    { value: "facebook_share_post", label: "Share Post", icon: "Share" },
+    { value: "facebook_share_page", label: "Share Page", icon: "Share2" },
+    { value: "facebook_comment_post", label: "Comment on Post", icon: "MessageCircle" },
+    { value: "facebook_comment_photo", label: "Comment on Photo", icon: "MessageSquare" },
   ],
   instagram: [
     { value: "instagram_follow", label: "Follow Account", icon: "UserPlus" },
@@ -1013,8 +1210,8 @@ export const PLATFORM_TASK_TYPES = {
   ],
   spotify: [
     { value: "spotify_follow", label: "Follow Artist", icon: "UserPlus" },
-    { value: "playlist", label: "Follow Playlist", icon: "Music" },
-    { value: "album", label: "Save Album", icon: "Disc" },
+    { value: "spotify_playlist", label: "Follow Playlist", icon: "Music" },
+    { value: "spotify_album", label: "Save Album", icon: "Disc" },
   ],
   kick: [
     { value: "kick_follow", label: "Follow Channel", icon: "UserPlus" },
@@ -1045,6 +1242,10 @@ export type InstagramTaskConfig = z.infer<typeof instagramTaskSchema>;
 export type YouTubeTaskConfig = z.infer<typeof youtubeTaskSchema>;
 export type TikTokTaskConfig = z.infer<typeof tiktokTaskSchema>;
 export type SpotifyTaskConfig = z.infer<typeof spotifyTaskSchema>;
+export type DiscordTaskConfig = z.infer<typeof discordTaskSchema>;
+export type TwitchTaskConfig = z.infer<typeof twitchTaskSchema>;
+export type KickTaskConfig = z.infer<typeof kickTaskSchema>;
+export type PatreonTaskConfig = z.infer<typeof patreonTaskSchema>;
 
 // Union type for all platform configs
 export type PlatformTaskConfig = 
@@ -1053,7 +1254,11 @@ export type PlatformTaskConfig =
   | InstagramTaskConfig 
   | YouTubeTaskConfig 
   | TikTokTaskConfig 
-  | SpotifyTaskConfig;
+  | SpotifyTaskConfig
+  | DiscordTaskConfig
+  | TwitchTaskConfig
+  | KickTaskConfig
+  | PatreonTaskConfig;
 
 // ============================================================================
 // VERIFICATION TIER SYSTEM
@@ -1204,6 +1409,9 @@ export const TASK_TYPE_VERIFICATION: Record<string, {
   'twitter_like': { tier: 'T1', method: 'api' },
   'twitter_retweet': { tier: 'T1', method: 'api' },
   'twitter_mention': { tier: 'T1', method: 'api' },
+  'twitter_include_name': { tier: 'T3', method: 'manual' },
+  'twitter_include_bio': { tier: 'T3', method: 'manual' },
+  'twitter_hashtag_post': { tier: 'T2', method: 'code_repost' },
   
   // Kick (new platform - T1 API access)
   'kick_follow': { tier: 'T1', method: 'api' },
@@ -1273,7 +1481,9 @@ export const TASK_TYPE_VERIFICATION: Record<string, {
   'facebook_like_page': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
   'starter_facebook_like': { tier: 'T3', method: 'starter_pack', isStarterPack: true },
   'facebook_like_post': { tier: 'T3', method: 'manual' },
+  'facebook_like_photo': { tier: 'T3', method: 'manual' },
   'facebook_share_post': { tier: 'T3', method: 'manual' },
+  'facebook_share_page': { tier: 'T3', method: 'manual' },
   
   // YouTube (likes/shares are T3 - no per-user API)
   'youtube_like': { tier: 'T3', method: 'manual' },
@@ -1320,6 +1530,8 @@ export function getTaskVerificationInfo(taskType: string): {
 // ============================================================================
 
 // Add Discord and Twitch to PLATFORM_TASK_TYPES
+// EXTENDED_PLATFORM_TASK_TYPES now matches PLATFORM_TASK_TYPES (which already
+// includes discord and twitch with canonical names). Kept for backward compat.
 export const EXTENDED_PLATFORM_TASK_TYPES = {
   ...PLATFORM_TASK_TYPES,
   discord: [

@@ -36,7 +36,6 @@ import CreatorRevenue from '@/pages/creator-dashboard/revenue';
 import CreatorRewards from '@/pages/creator-dashboard/rewards';
 import CreatorTasks from '@/pages/creator-dashboard/tasks';
 import CreatorActivity from '@/pages/creator-dashboard/activity';
-import NftCollections from '@/pages/creator-dashboard/nft-collections';
 import CreatorNIL from '@/pages/creator-dashboard/nil';
 import CreatorCampaigns from '@/pages/creator-dashboard/campaigns';
 import CreatorSettings from '@/pages/creator-dashboard/settings';
@@ -53,9 +52,7 @@ import FanAchievements from '@/pages/fan-dashboard/achievements';
 import FanPoints from '@/pages/fan-dashboard/points';
 import FanNotifications from '@/pages/fan-dashboard/notifications';
 import FanCampaignDetail from '@/pages/fan-dashboard/campaign-detail';
-import FanNftCollection from '@/pages/fan-dashboard/nft-collection';
 import FanSettings from '@/pages/fan-dashboard/settings';
-import _NILDashboard from '@/pages/nil-dashboard';
 // RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from '@/pages/fan-onboarding-profile';
 import FanChooseCreators from '@/pages/fan-choose-creators';
@@ -93,7 +90,6 @@ import AdminTasks from '@/pages/admin-dashboard/tasks';
 import AdminPlatformTaskCreate from '@/pages/admin-dashboard/platform-tasks/create';
 import AdminProfile from '@/pages/admin-dashboard/profile';
 import AdminAnalytics from '@/pages/admin-dashboard/analytics';
-import AdminNftManagement from '@/pages/admin-dashboard/nft-management';
 import AgencyDashboard from '@/pages/agency-dashboard';
 
 function RedirectTo({ href }: { href: string }) {
@@ -141,7 +137,6 @@ function Router() {
       <Route path="/creator-dashboard/growth" component={CreatorGrowth} />
       <Route path="/creator-dashboard/revenue" component={CreatorRevenue} />
       <Route path="/creator-dashboard/rewards" component={CreatorRewards} />
-      <Route path="/creator-dashboard/nft-collections" component={NftCollections} />
       <Route path="/creator-dashboard/tasks" component={CreatorTasks} />
       <Route path="/creator-dashboard/tasks/create" component={TaskBuilder} />
       <Route path="/creator-dashboard/tasks/edit/:id" component={TaskBuilder} />
@@ -161,7 +156,6 @@ function Router() {
         path="/fan-dashboard/following"
         component={() => <RedirectTo href="/fan-dashboard/joined" />}
       />
-      <Route path="/fan-dashboard/nfts" component={FanNftCollection} />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
@@ -206,7 +200,6 @@ function Router() {
         component={() => <RedirectTo href="/admin-dashboard/platform-tasks" />}
       />
       <Route path="/admin-dashboard/profile" component={AdminProfile} />
-      <Route path="/admin-dashboard/nft-management" component={AdminNftManagement} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
 
       {/* Agency Dashboard */}

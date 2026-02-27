@@ -4,8 +4,6 @@ import helmet from "helmet";
 import { doubleCsrf } from "csrf-csrf";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeCrossmintService } from "./services/nft/crossmint-service";
-import { initializeWalletService } from "./services/wallet/wallet-service";
 import { syncScheduler } from "./services/analytics/sync/sync-scheduler";
 import { groupGoalPoller } from "./services/verification/group-goals/group-goal-poller";
 import { pointExpirationJob } from "./jobs/point-expiration-job";
@@ -81,8 +79,7 @@ app.get("/api/csrf-token", (req, res) => {
 app.use((req, res, next) => {
   // Skip CSRF for webhooks (they use signature verification instead)
   if (req.path.startsWith('/api/webhooks/') || 
-      req.path.startsWith('/api/stripe/webhook') ||
-      req.path.startsWith('/api/crossmint/webhook')) {
+      req.path.startsWith('/api/stripe/webhook')) {
     return next();
   }
   // Skip CSRF for auth callback routes (OAuth redirects)
@@ -142,12 +139,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize Crossmint service
-  initializeCrossmintService();
-  
-  // Initialize Wallet service for lazy wallet creation
-  initializeWalletService();
-  
   const server = await registerRoutes(app);
 
   // Use standardized error handling middleware

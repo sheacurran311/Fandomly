@@ -51,6 +51,11 @@ The app uses `@neondatabase/serverless` which connects to PostgreSQL via WebSock
 - `npm run build` — production build (Vite frontend + esbuild server bundle).
 - `npm run check` — TypeScript type checking.
 
+### Architecture notes
+
+- **NFT/Marketplace → own L1 blockchain**: Crossmint integration was removed, but the NFT DB tables (`nft_collections`, `nft_templates`, `nft_mints`, `nft_deliveries`) and reward type `"nft"` are being kept — they'll be repurposed for the Fandomly L1 blockchain with three smart contracts: Staking, Token Factory (creators), and ReputationRegistry. See `feat/landing-page-redesign` PR for contract details.
+- **Auth migration**: Dynamic Labs wallet auth is being replaced with Particle Network. The JWT auth system (`jwt-service.ts`, `rbac.ts`) stays unchanged — only the wallet connection provider changes.
+
 ### Gotchas
 
 - The Neon serverless driver connects via WebSocket, not TCP. Without `dev-ws-proxy.mjs` + `dev-preload.mjs`, database queries will fail with `ECONNREFUSED` on `wss://localhost/v2`.

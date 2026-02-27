@@ -16,6 +16,9 @@ export default function Navigation() {
   
   // Use new auth context
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+
+  // Landing page has its own minimal footer with logo — no nav bar needed
+  if (location === '/') return null;
   const { openAuthModal } = useAuthModal();
 
   const handleLogout = async () => {

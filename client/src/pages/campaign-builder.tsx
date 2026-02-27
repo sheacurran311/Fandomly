@@ -22,7 +22,6 @@ import {
   Facebook, Instagram, Twitter, Youtube, Music, MessageCircle,
   AlertCircle, Wallet
 } from "lucide-react";
-import ConnectWalletButton from "@/components/auth/connect-wallet-button";
 import { useLocation } from "wouter";
 
 // OpenLoyalty-style Campaign Templates
@@ -207,16 +206,13 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 You need to connect your wallet to create campaigns and manage your loyalty programs.
               </p>
               <div className="pt-4">
-                <ConnectWalletButton 
+                <Button 
                   className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-3 rounded-xl"
-                  data-testid="button-connect-wallet-campaign"
+                  data-testid="button-sign-in-campaign"
                 >
-                  Connect Wallet to Continue
-                </ConnectWalletButton>
+                  Sign In to Continue
+                </Button>
               </div>
-              <p className="text-xs text-gray-400">
-                Secure wallet connection powered by Dynamic
-              </p>
             </div>
           </div>
         </DialogContent>
@@ -261,12 +257,12 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
   const taskTypes = [
     { id: 'follow', name: 'Follow/Like/Subscribe', platforms: ['facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify'] },
-    { id: 'playlist', name: 'Follow Playlist', platforms: ['spotify'] },
-    { id: 'album', name: 'Add Album', platforms: ['appleMusic'] },
-    { id: 'join', name: 'Join Server/Group', platforms: ['discord', 'telegram'] },
+    { id: 'spotify_playlist', name: 'Follow Playlist', platforms: ['spotify'] },
+    { id: 'spotify_album', name: 'Add Album', platforms: ['spotify'] },
+    { id: 'discord_join', name: 'Join Server/Group', platforms: ['discord'] },
     { id: 'like_post', name: 'Like Specific Post', platforms: ['facebook', 'instagram', 'twitter', 'tiktok'] },
     { id: 'repost', name: 'Repost/Retweet', platforms: ['facebook', 'instagram', 'twitter', 'tiktok'] },
-    { id: 'hashtag_post', name: 'Post with Hashtag', platforms: ['twitter', 'instagram', 'tiktok'] },
+    { id: 'twitter_hashtag_post', name: 'Post with Hashtag', platforms: ['twitter', 'instagram', 'tiktok'] },
     { id: 'referral', name: 'Referral (1 point each)', platforms: ['all'] }
   ];
 

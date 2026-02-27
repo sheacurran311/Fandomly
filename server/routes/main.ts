@@ -4,57 +4,50 @@ import express from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from '../core/storage';
 import { db } from '../db';
-import { registerSocialRoutes } from './social/social-routes';
-import { registerKickOAuthRoutes } from './social/kick-oauth-routes';
-import { registerPatreonOAuthRoutes } from './social/patreon-oauth-routes';
-import { registerTenantRoutes } from './user/tenant-routes';
-import { registerGoogleAuthRoutes } from './auth/google-routes';
-import { registerAuthRoutes } from './auth/auth-routes';
-import { registerAdminRoutes } from './admin/admin-routes';
-import { registerDynamicAnalyticsRoutes } from './media/dynamic-analytics-routes';
-import { registerTwitterVerificationRoutes } from './social/twitter-verification-routes';
-import { registerReferralRoutes } from './points/referral-routes';
-import { registerPointsRoutes } from './points/points-routes';
-import { registerAdminPlatformTasksRoutes } from './tasks/admin-platform-tasks-routes';
-import { registerPlatformPointsRoutes } from './points/platform-points-routes';
-import { registerPlatformTaskRoutes } from './tasks/platform-task-routes';
-import { registerFanDashboardRoutes } from './user/fan-dashboard-routes';
-import { registerDashboardStatsRoutes } from './user/dashboard-stats-routes';
-import { registerNotificationRoutes } from './user/notification-routes';
-import { registerRedemptionRoutes } from './rewards/redemption-routes';
-import { registerGdprRoutes } from './user/gdpr-routes';
-import { registerCrossmintRoutes } from './nft/crossmint-routes';
-import { registerNFTRoutes } from './nft/nft-routes';
-import { registerProgramRoutes } from './programs/program-routes';
-import { registerAnnouncementRoutes } from './media/announcement-routes';
-import { registerAgencyRoutes } from './admin/agency-routes';
-import { registerFacebookWebhooks } from '../webhooks/facebook-webhooks';
-import { registerInstagramWebhooks } from '../webhooks/instagram-webhooks';
-import { registerInstagramTaskRoutes } from './tasks/instagram-task-routes';
-import { registerTwitterTaskRoutes } from './tasks/twitter-task-routes';
-import { registerYouTubeTaskRoutes } from './tasks/youtube-task-routes';
-import { registerSpotifyTaskRoutes } from './tasks/spotify-task-routes';
-import { registerTikTokTaskRoutes } from './tasks/tiktok-task-routes';
-import { registerLeaderboardRoutes } from './programs/leaderboard-routes';
-import { registerBetaSignupRoutes } from './beta-signup-routes';
-import { registerVerificationAnalyticsRoutes } from './analytics/verification-analytics-routes';
-import { registerSyncPreferencesRoutes } from './analytics/sync-preferences-routes';
-import { registerCreatorAnalyticsRoutes } from './analytics/creator-analytics-routes';
-import { registerHealthRoutes } from './health/health-routes';
-import { registerParticleAuthRoutes } from './auth/particle-routes';
-import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
+/* eslint-disable */
+import { registerSocialRoutes } from "./social/social-routes";
+import { registerKickOAuthRoutes } from "./social/kick-oauth-routes";
+import { registerPatreonOAuthRoutes } from "./social/patreon-oauth-routes";
+import { registerTenantRoutes } from "./user/tenant-routes";
+import { registerGoogleAuthRoutes } from "./auth/google-routes";
+import { registerAuthRoutes } from "./auth/auth-routes";
+import { registerAdminRoutes } from "./admin/admin-routes";
+import { registerDynamicAnalyticsRoutes } from "./media/dynamic-analytics-routes";
+import { registerTwitterVerificationRoutes } from "./social/twitter-verification-routes";
+import { registerReferralRoutes } from "./points/referral-routes";
+import { registerPointsRoutes } from "./points/points-routes";
+import { registerAdminPlatformTasksRoutes } from "./tasks/admin-platform-tasks-routes";
+import { registerPlatformPointsRoutes } from "./points/platform-points-routes";
+import { registerPlatformTaskRoutes } from "./tasks/platform-task-routes";
+import { registerFanDashboardRoutes } from "./user/fan-dashboard-routes";
+import { registerDashboardStatsRoutes } from "./user/dashboard-stats-routes";
+import { registerNotificationRoutes } from "./user/notification-routes";
+import { registerRedemptionRoutes } from "./rewards/redemption-routes";
+import { registerGdprRoutes } from "./user/gdpr-routes";
+import { registerProgramRoutes } from "./programs/program-routes";
+import { registerAnnouncementRoutes } from "./media/announcement-routes";
+import { registerAgencyRoutes } from "./admin/agency-routes";
+import { registerFacebookWebhooks } from "../webhooks/facebook-webhooks";
+import { registerInstagramWebhooks } from "../webhooks/instagram-webhooks";
+import { registerInstagramTaskRoutes } from "./tasks/instagram-task-routes";
+import { registerTwitterTaskRoutes } from "./tasks/twitter-task-routes";
+import { registerYouTubeTaskRoutes } from "./tasks/youtube-task-routes";
+import { registerSpotifyTaskRoutes } from "./tasks/spotify-task-routes";
+import { registerTikTokTaskRoutes } from "./tasks/tiktok-task-routes";
+import { registerLeaderboardRoutes } from "./programs/leaderboard-routes";
+import { registerBetaSignupRoutes } from "./beta-signup-routes";
+import { registerVerificationAnalyticsRoutes } from "./analytics/verification-analytics-routes";
+import { registerSyncPreferencesRoutes } from "./analytics/sync-preferences-routes";
+import { registerCreatorAnalyticsRoutes } from "./analytics/creator-analytics-routes";
+import { registerHealthRoutes } from "./health/health-routes";
+import { registerParticleAuthRoutes } from "./auth/particle-routes";
+import { registerCampaignV2Routes } from "./campaigns/campaign-routes-v2";
 import {
-  insertUserSchema,
-  insertCreatorSchema,
-  insertLoyaltyProgramSchema,
-  insertRewardSchema,
-  insertFanProgramSchema,
-  insertCampaignSchema,
-  insertCampaignRuleSchema,
-  insertTaskSchema,
-  insertTaskAssignmentSchema,
-  insertTaskTemplateSchema,
-} from '@shared/schema';
+  insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema,
+  insertRewardSchema, insertFanProgramSchema,
+  insertCampaignSchema, insertCampaignRuleSchema,
+  insertTaskSchema, insertTaskAssignmentSchema, insertTaskTemplateSchema
+} from "@shared/schema";
 import {
   CORE_TASK_TEMPLATES,
   PLATFORM_TASK_TYPES,
@@ -217,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // JWKS endpoint for Crossmint JWT validation
+  // JWKS endpoint for JWT validation
   app.get('/.well-known/jwks.json', (req, res) => {
     try {
       const jwks = getJWKS();
@@ -2514,30 +2507,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    // Validate NFT collections
-    if (
-      campaignData.requiredNftCollectionIds &&
-      Array.isArray(campaignData.requiredNftCollectionIds) &&
-      campaignData.requiredNftCollectionIds.length > 0
-    ) {
-      const { nftCollections } = await import('@shared/schema');
-      const { inArray } = await import('drizzle-orm');
-
-      const existing = await db
-        .select({ id: nftCollections.id })
-        .from(nftCollections)
-        .where(inArray(nftCollections.id, campaignData.requiredNftCollectionIds));
-
-      const existingIds = new Set(existing.map((c) => c.id));
-      const invalid = campaignData.requiredNftCollectionIds.filter(
-        (id: string) => !existingIds.has(id)
-      );
-
-      if (invalid.length > 0) {
-        errors.push(`Invalid NFT collections: ${invalid.join(', ')}`);
-      }
-    }
-
     // Validate badge templates
     if (
       campaignData.requiredBadgeIds &&
@@ -2663,8 +2632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prerequisiteCampaigns: campaignData.requirements?.prerequisiteCampaigns || [],
         allTasksRequired: campaignData.requirements?.allTasksRequired ?? true,
         requiredTaskIds: campaignData.requirements?.requiredTaskIds || [],
-        requiredNftCollectionIds: campaignData.requirements?.requiredNftCollectionIds || [],
-        requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || [],
+        requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || []
       };
 
       // Validate JSONB references before creation
@@ -2867,17 +2835,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to get points for social actions
   function getActionPoints(actionType: string): number {
-    const pointMap: Record<string, number> = {
-      follow_facebook: 50,
-      follow_instagram: 50,
-      follow_x: 50,
-      like_post: 50,
-      share_post: 200,
-      comment_post: 100,
-      retweet: 100,
-      default: 50,
+    // Normalize legacy campaign action types to canonical format
+    const legacyMap: Record<string, string> = {
+      'follow_facebook': 'facebook_like_page',
+      'follow_instagram': 'instagram_follow',
+      'follow_x': 'twitter_follow',
+      'like_post': 'facebook_like_post',
+      'share_post': 'facebook_share_post',
+      'comment_post': 'facebook_comment_post',
+      'retweet': 'twitter_retweet',
     };
-    return pointMap[actionType] || pointMap['default'];
+    const canonical = legacyMap[actionType] || actionType;
+
+    // Canonical task template names (platform_action format)
+    const pointMap: Record<string, number> = {
+      'twitter_follow': 50,
+      'twitter_like': 25,
+      'twitter_retweet': 100,
+      'twitter_mention': 75,
+      'twitter_quote_tweet': 85,
+      'twitter_hashtag_post': 85,
+      'twitter_include_name': 25,
+      'twitter_include_bio': 25,
+      'instagram_follow': 50,
+      'instagram_like_post': 25,
+      'facebook_like_page': 50,
+      'facebook_like_post': 50,
+      'facebook_like_photo': 25,
+      'facebook_share_post': 200,
+      'facebook_share_page': 75,
+      'facebook_comment_post': 100,
+      'facebook_comment_photo': 100,
+      'youtube_subscribe': 100,
+      'youtube_like': 25,
+      'youtube_comment': 40,
+      'tiktok_follow': 50,
+      'tiktok_like': 25,
+      'tiktok_comment': 40,
+      'spotify_follow': 50,
+      'spotify_playlist': 40,
+      'spotify_album': 30,
+      'discord_join': 75,
+      'discord_role': 50,
+      'discord_react': 25,
+      'twitch_follow': 50,
+      'twitch_subscribe': 200,
+      'kick_follow': 50,
+      'kick_subscribe': 200,
+      'patreon_support': 200,
+      'patreon_tier_check': 150,
+      'default': 50
+    };
+    return pointMap[canonical] || pointMap['default'];
   }
 
   // Creator Facebook Pages: import and fetch
@@ -4289,12 +4298,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register points routes
   registerPointsRoutes(app);
-
-  // Register Crossmint NFT routes (legacy)
-  registerCrossmintRoutes(app);
-
-  // Register on-chain NFT routes (Fandomly Chain L1 — replaces Crossmint)
-  registerNFTRoutes(app);
 
   // Register notification routes
   registerNotificationRoutes(app);
