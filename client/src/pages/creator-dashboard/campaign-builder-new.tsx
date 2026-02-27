@@ -1,357 +1,454 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { fetchApi, queryClient } from "@/lib/queryClient";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { fetchApi, queryClient } from '@/lib/queryClient';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Slider } from '@/components/ui/slider';
 import {
-  ArrowLeft, ArrowRight, Check, Save, Rocket, AlertCircle, Plus, X,
-  Calendar, Clock, Trophy, Gift, Ticket, Coins, Target, Users,
-  CheckSquare, Lock, Image as ImageIcon, Award, Loader2
-} from "lucide-react";
-import { useLocation } from "wouter";
-import type { Task, Campaign } from "@shared/schema";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Rocket,
+  AlertCircle,
+  Plus,
+  X,
+  Calendar,
+  Clock,
+  Trophy,
+  Gift,
+  Target,
+  Users,
+  CheckSquare,
+  Lock,
+  Award,
+  Loader2,
+  GripVertical,
+  Zap,
+  Eye,
+  Shield,
+  Hash,
+} from 'lucide-react';
+import { useLocation } from 'wouter';
+import {
+  useCreateCampaign,
+  useUpdateCampaign,
+  usePublishCampaign,
+  useCampaignBuilderData,
+  useAddSponsor,
+  useRemoveSponsor,
+  useCampaignSponsors,
+} from '@/hooks/useCampaignBuilder';
+import type { Task, Campaign } from '@shared/schema';
 
-// Step indicator component
-function StepIndicator({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
-  const steps = [
-    { number: 1, label: "Basics" },
-    { number: 2, label: "Rewards" },
-    { number: 3, label: "Requirements" },
-    { number: 4, label: "Tasks" },
-  ];
+const STEPS = [
+  { number: 1, label: 'Basics', icon: Calendar },
+  { number: 2, label: 'Sponsors', icon: Users },
+  { number: 3, label: 'Tasks', icon: CheckSquare },
+  { number: 4, label: 'Task Flow', icon: Target },
+  { number: 5, label: 'Rewards', icon: Gift },
+  { number: 6, label: 'Gating', icon: Lock },
+  { number: 7, label: 'Review', icon: Eye },
+];
 
+const PLATFORMS = [
+  { key: 'twitter', label: 'X (Twitter)', placeholder: '@handle' },
+  { key: 'instagram', label: 'Instagram', placeholder: '@handle' },
+  { key: 'tiktok', label: 'TikTok', placeholder: '@handle' },
+  { key: 'youtube', label: 'YouTube', placeholder: '@channel' },
+  { key: 'facebook', label: 'Facebook', placeholder: 'Page name' },
+  { key: 'twitch', label: 'Twitch', placeholder: '@handle' },
+  { key: 'discord', label: 'Discord', placeholder: 'Server invite' },
+  { key: 'kick', label: 'Kick', placeholder: '@handle' },
+];
+
+function StepIndicator({ currentStep }: { currentStep: number }) {
   return (
-    <div className="flex items-center justify-between mb-8">
-      {steps.map((step, index) => (
-        <div key={step.number} className="flex items-center">
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
-            currentStep >= step.number
-              ? "bg-brand-primary border-brand-primary text-white"
-              : "border-gray-600 text-gray-400"
-          }`}>
-            {currentStep > step.number ? (
-              <Check className="h-5 w-5" />
-            ) : (
-              <span className="font-semibold">{step.number}</span>
+    <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
+      {STEPS.map((step, index) => {
+        const Icon = step.icon;
+        return (
+          <div key={step.number} className="flex items-center flex-shrink-0">
+            <div
+              className={`flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors ${
+                currentStep >= step.number
+                  ? 'bg-brand-primary border-brand-primary text-white'
+                  : 'border-gray-600 text-gray-400'
+              }`}
+            >
+              {currentStep > step.number ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Icon className="h-4 w-4" />
+              )}
+            </div>
+            <span
+              className={`ml-1.5 text-xs font-medium hidden sm:inline ${
+                currentStep >= step.number ? 'text-white' : 'text-gray-400'
+              }`}
+            >
+              {step.label}
+            </span>
+            {index < STEPS.length - 1 && (
+              <div
+                className={`w-6 lg:w-10 h-0.5 mx-2 ${
+                  currentStep > step.number ? 'bg-brand-primary' : 'bg-gray-600'
+                }`}
+              />
             )}
           </div>
-          <span className={`ml-2 text-sm font-medium ${
-            currentStep >= step.number ? "text-white" : "text-gray-400"
-          }`}>
-            {step.label}
-          </span>
-          {index < steps.length - 1 && (
-            <div className={`w-12 h-0.5 mx-4 ${
-              currentStep > step.number ? "bg-brand-primary" : "bg-gray-600"
-            }`} />
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 export default function CampaignBuilderNew() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
-  const [isSaving, setIsSaving] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  // Campaign data state
+  const [basics, setBasics] = useState({
+    name: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    isIndefinite: false,
+    bannerImageUrl: '',
+    accentColor: '#8B5CF6',
+  });
+
+  const [sponsors, setSponsors] = useState<
+    Array<{
+      id?: string;
+      name: string;
+      logoUrl: string;
+      websiteUrl: string;
+      socialHandles: Record<string, string>;
+      showInCampaignBanner: boolean;
+    }>
+  >([]);
+
+  const [assignedTaskIds, setAssignedTaskIds] = useState<string[]>([]);
+
+  const [taskFlow, setTaskFlow] = useState({
+    enforceSequentialTasks: false,
+  });
+
+  const [rewards, setRewards] = useState({
+    campaignMultiplier: 1,
+    completionBonusPoints: 0,
+  });
+
+  const [gating, setGating] = useState({
+    accessCodeEnabled: false,
+    accessCode: '',
+    minimumReputationScore: 0,
+    requiredPreviousCampaigns: [] as string[],
+    requiredBadgeIds: [] as string[],
+    requiredNftCollectionIds: [] as string[],
+  });
+
+  const [verificationMode, setVerificationMode] = useState<'immediate' | 'deferred'>('immediate');
+
+  // Mutations
+  const createCampaign = useCreateCampaign();
+  const updateCampaign = useUpdateCampaign();
+  const publishCampaign = usePublishCampaign();
+  const addSponsorMutation = useAddSponsor();
+  const removeSponsorMutation = useRemoveSponsor();
+
+  // Queries
+  const { data: builderData } = useCampaignBuilderData(campaignId);
+  const { data: savedSponsors = [] } = useCampaignSponsors(campaignId);
+
+  const { data: availableTasks = [] } = useQuery<Task[]>({
+    queryKey: ['/api/tasks'],
+    queryFn: () => fetchApi<Task[]>('/api/tasks'),
+    enabled: !!user?.creator?.id,
+  });
+
+  const { data: previousCampaigns = [] } = useQuery<Campaign[]>({
+    queryKey: ['/api/campaigns/creator', user?.creator?.id],
+    queryFn: () => fetchApi<Campaign[]>(`/api/campaigns/creator/${user?.creator?.id}`),
+    enabled: !!user?.creator?.id,
+  });
+
+  // Task assignment mutations
+  const assignTaskMutation = useMutation({
+    mutationFn: ({ taskId, campaignId }: { taskId: string; campaignId: string }) =>
+      fetchApi(`/api/tasks/${taskId}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ campaignId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-builder', campaignId] });
+    },
+  });
+
+  const unassignTaskMutation = useMutation({
+    mutationFn: ({ taskId, campaignId }: { taskId: string; campaignId: string }) =>
+      fetchApi(`/api/tasks/${taskId}/unassign`, {
+        method: 'DELETE',
+        body: JSON.stringify({ campaignId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-builder', campaignId] });
+    },
+  });
+
+  // Create task inline
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTaskData, setNewTaskData] = useState({
-    name: "",
-    description: "",
-    taskType: "twitter_follow",
+    name: '',
+    description: '',
+    taskType: 'twitter_follow',
     points: 100,
-    targetUrl: "",
-    targetUsername: "",
+    targetUrl: '',
+    targetUsername: '',
   });
 
-  // Campaign form state
-  const [campaignData, setCampaignData] = useState({
-    // Step 1: Basics
-    name: "",
-    description: "",
-    campaignType: "time_based", // time_based, ongoing
-    startDate: "",
-    endDate: "",
-    isIndefinite: false,
-
-    // Step 2: Reward Strategy
-    rewardType: "points", // points, raffle
-    pointsPerTask: 100,
-    raffleEntryPerTask: 1,
-    rafflePrize: "",
-    raffleDrawDate: "",
-
-    // Step 3: Requirements
-    requireAllTasks: true,
-    requiredPreviousCampaigns: [] as string[],
-    requiredNftCollectionIds: [] as string[],
-    requiredBadgeIds: [] as string[],
-
-    // Step 4: Tasks (assigned after soft-save)
-    assignedTaskIds: [] as string[],
-  });
-
-  // Fetch creator's previous campaigns for prerequisite selection
-  const { data: previousCampaigns = [] } = useQuery<Campaign[]>({
-    queryKey: ["/api/campaigns/creator", user?.creator?.id],
-    queryFn: async () => {
-      return await fetchApi(`/api/campaigns/creator/${user?.creator?.id}`);
-    },
-    enabled: !!user?.creator?.id,
-  });
-
-  // Fetch available tasks (all creator's tasks)
-  const { data: availableTasks = [], refetch: refetchTasks } = useQuery<Task[]>({
-    queryKey: ["/api/tasks/available", campaignId],
-    queryFn: async () => {
-      return await fetchApi("/api/tasks");
-    },
-    enabled: !!user?.creator?.id,
-  });
-
-  // Fetch existing task assignments for the campaign
-  const { data: taskAssignmentsData } = useQuery<{ taskIds: string[] }>({
-    queryKey: ["/api/campaigns/task-assignments", campaignId],
-    queryFn: async () => {
-      return await fetchApi(`/api/campaigns/${campaignId}/task-assignments`);
-    },
-    enabled: !!campaignId,
-  });
-
-  // Load existing task assignments when campaign data is fetched
-  useEffect(() => {
-    if (taskAssignmentsData?.taskIds && taskAssignmentsData.taskIds.length > 0) {
-      setCampaignData(prev => ({
-        ...prev,
-        assignedTaskIds: taskAssignmentsData.taskIds
-      }));
-    }
-  }, [taskAssignmentsData]);
-
-  // Soft-save campaign mutation (creates draft in DB)
-  const softSaveMutation = useMutation({
-    mutationFn: async (data: Record<string, any>) => {
-      const endpoint = campaignId
-        ? `/api/campaigns/${campaignId}`
-        : "/api/campaigns/draft";
-      const method = campaignId ? "PUT" : "POST";
-      
-      // Build clean payload - the server will add creatorId from auth
-      const payload = {
-        ...data,
-        status: "draft",
-      };
-      
-      console.log(`[Campaign Builder] ${method} ${endpoint}`, payload);
-      
-      // fetchApi already returns parsed JSON, no need to call .json()
-      return await fetchApi(endpoint, {
-        method,
-        body: JSON.stringify(payload),
-      });
-    },
-    onSuccess: (result) => {
-      if (!campaignId && result.id) {
-        setCampaignId(result.id);
-      }
-      // Invalidate all campaign-related queries
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/creator"] });
-    },
-    onError: (error) => {
-      console.error('[Campaign Builder] Save failed:', error);
-    },
-  });
-
-  // Assign task to campaign mutation
-  const assignTaskMutation = useMutation({
-    mutationFn: async ({ taskId, campaignId }: { taskId: string; campaignId: string }) => {
-      return await fetchApi(`/api/tasks/${taskId}/assign`, {
-        method: "POST",
-        body: JSON.stringify({ campaignId }),
-      });
-    },
-    onSuccess: () => {
-      refetchTasks();
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-    },
-  });
-
-  // Unassign task from campaign mutation
-  const unassignTaskMutation = useMutation({
-    mutationFn: async ({ taskId, campaignId }: { taskId: string; campaignId: string }) => {
-      return await fetchApi(`/api/tasks/${taskId}/unassign`, {
-        method: "DELETE",
-        body: JSON.stringify({ campaignId }),
-      });
-    },
-    onSuccess: () => {
-      refetchTasks();
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-    },
-  });
-
-  // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (taskData: any) => {
-      return await fetchApi("/api/tasks", {
-        method: "POST",
-        body: JSON.stringify(taskData),
-      });
-    },
-    onSuccess: async (newTask) => {
-      // Auto-assign to current campaign if we have one
+    mutationFn: (taskData: Record<string, unknown>) =>
+      fetchApi('/api/tasks', { method: 'POST', body: JSON.stringify(taskData) }),
+    onSuccess: async (newTask: Record<string, unknown>) => {
       if (campaignId && newTask.id) {
-        await assignTaskMutation.mutateAsync({ taskId: newTask.id, campaignId });
-        updateData("assignedTaskIds", [...campaignData.assignedTaskIds, newTask.id]);
+        await assignTaskMutation.mutateAsync({ taskId: newTask.id as string, campaignId });
+        setAssignedTaskIds((prev) => [...prev, newTask.id as string]);
       }
-      refetchTasks();
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       setIsTaskModalOpen(false);
-      // Reset form
       setNewTaskData({
-        name: "",
-        description: "",
-        taskType: "twitter_follow",
+        name: '',
+        description: '',
+        taskType: 'twitter_follow',
         points: 100,
-        targetUrl: "",
-        targetUsername: "",
+        targetUrl: '',
+        targetUsername: '',
       });
     },
   });
 
-  // Publish campaign mutation
-  const publishMutation = useMutation({
-    mutationFn: async () => {
-      if (!campaignId) throw new Error("Campaign not saved");
-      return await fetchApi(`/api/campaigns/${campaignId}/publish`, {
-        method: "POST",
-      });
-    },
-    onSuccess: () => {
-      // Invalidate all campaign-related queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/creator"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/active"] });
-      setLocation("/creator-dashboard/campaigns");
-    },
+  // Sponsor management
+  const [sponsorModalOpen, setSponsorModalOpen] = useState(false);
+  const [sponsorForm, setSponsorForm] = useState({
+    name: '',
+    logoUrl: '',
+    websiteUrl: '',
+    socialHandles: {} as Record<string, string>,
+    showInCampaignBanner: true,
   });
 
-  // Helper to safely parse date
+  const handleAddSponsor = async () => {
+    if (!sponsorForm.name) return;
+    if (campaignId) {
+      await addSponsorMutation.mutateAsync({
+        campaignId,
+        data: { ...sponsorForm },
+      });
+    } else {
+      setSponsors((prev) => [...prev, { ...sponsorForm }]);
+    }
+    setSponsorForm({
+      name: '',
+      logoUrl: '',
+      websiteUrl: '',
+      socialHandles: {},
+      showInCampaignBanner: true,
+    });
+    setSponsorModalOpen(false);
+  };
+
+  const handleRemoveSponsor = async (index: number) => {
+    const sponsor = campaignId ? savedSponsors[index] : sponsors[index];
+    if (campaignId && sponsor?.id) {
+      await removeSponsorMutation.mutateAsync(sponsor.id);
+    } else {
+      setSponsors((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const displaySponsors = campaignId ? savedSponsors : sponsors;
+
+  // Load builder data into state
+  const builderDataJson = builderData ? JSON.stringify(builderData.campaign.id) : null;
+  useEffect(() => {
+    if (!builderData) return;
+    const c = builderData.campaign;
+    const campaignAny = c as Record<string, unknown>;
+    const reqAny = (c.requirements || {}) as Record<string, unknown>;
+    setBasics({
+      name: c.name || '',
+      description: c.description || '',
+      startDate: c.startDate ? new Date(c.startDate).toISOString().slice(0, 16) : '',
+      endDate: c.endDate ? new Date(c.endDate).toISOString().slice(0, 16) : '',
+      isIndefinite: !c.endDate,
+      bannerImageUrl: (campaignAny.bannerImageUrl as string) || '',
+      accentColor: (campaignAny.accentColor as string) || '#8B5CF6',
+    });
+    setTaskFlow({
+      enforceSequentialTasks: (campaignAny.enforceSequentialTasks as boolean) || false,
+    });
+    setRewards({
+      campaignMultiplier: Number(campaignAny.campaignMultiplier) || 1,
+      completionBonusPoints: (campaignAny.completionBonusPoints as number) || 0,
+    });
+    setGating({
+      accessCodeEnabled: (campaignAny.accessCodeEnabled as boolean) || false,
+      accessCode: (campaignAny.accessCode as string) || '',
+      minimumReputationScore: (campaignAny.minimumReputationScore as number) || 0,
+      requiredPreviousCampaigns: (reqAny.requiredPreviousCampaigns as string[]) || [],
+      requiredBadgeIds: (reqAny.requiredBadgeIds as string[]) || [],
+      requiredNftCollectionIds: (reqAny.requiredNftCollectionIds as string[]) || [],
+    });
+    setVerificationMode((campaignAny.verificationMode as 'immediate' | 'deferred') || 'immediate');
+    if (builderData.taskAssignments) {
+      setAssignedTaskIds(builderData.taskAssignments.map((ta) => ta.taskId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builderDataJson]);
+
+  // Parse date helper
   const safeParseDate = (dateStr: string): string | null => {
-    if (!dateStr || dateStr === '') return null;
+    if (!dateStr) return null;
     try {
       const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return null;
-      return date.toISOString();
+      return isNaN(date.getTime()) ? null : date.toISOString();
     } catch {
       return null;
     }
   };
 
-  // State for validation errors
-  const [dateError, setDateError] = useState<string | null>(null);
+  // Save campaign (create or update)
+  const saveCampaign = async () => {
+    const payload: Record<string, unknown> = {
+      name: basics.name?.trim() || 'Untitled Campaign',
+      description: basics.description?.trim() || undefined,
+      bannerImageUrl: basics.bannerImageUrl || undefined,
+      accentColor: basics.accentColor,
+      campaignMultiplier: rewards.campaignMultiplier,
+      completionBonusPoints: rewards.completionBonusPoints,
+      verificationMode,
+      enforceSequentialTasks: taskFlow.enforceSequentialTasks,
+      accessCodeEnabled: gating.accessCodeEnabled,
+      accessCode: gating.accessCodeEnabled ? gating.accessCode : undefined,
+      minimumReputationScore: gating.minimumReputationScore || undefined,
+    };
 
-  // Handle step navigation
+    const parsedStart = safeParseDate(basics.startDate);
+    if (parsedStart) payload.startDate = parsedStart;
+    if (basics.isIndefinite) {
+      payload.endDate = null;
+    } else {
+      const parsedEnd = safeParseDate(basics.endDate);
+      if (parsedEnd) payload.endDate = parsedEnd;
+    }
+
+    // Merge gating into requirements
+    if (
+      gating.requiredPreviousCampaigns.length > 0 ||
+      gating.requiredBadgeIds.length > 0 ||
+      gating.requiredNftCollectionIds.length > 0
+    ) {
+      payload.requirements = {
+        requiredPreviousCampaigns: gating.requiredPreviousCampaigns,
+        requiredBadgeIds: gating.requiredBadgeIds,
+        requiredNftCollectionIds: gating.requiredNftCollectionIds,
+      };
+    }
+
+    if (campaignId) {
+      await updateCampaign.mutateAsync({ campaignId, data: payload });
+    } else {
+      const result = await createCampaign.mutateAsync(payload);
+      if (result.id) {
+        setCampaignId(result.id);
+        // Save sponsors that were added before campaign was created
+        for (const s of sponsors) {
+          await addSponsorMutation.mutateAsync({ campaignId: result.id, data: s });
+        }
+        setSponsors([]);
+      }
+    }
+  };
+
+  // Navigation
   const handleNext = async () => {
     if (currentStep === 1) {
       setDateError(null);
-
-      // Validate dates before saving
+      if (!basics.name.trim()) return;
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
-      const parsedStartDate = safeParseDate(campaignData.startDate);
-      const parsedEndDate = campaignData.isIndefinite ? null : safeParseDate(campaignData.endDate);
+      const parsedStart = safeParseDate(basics.startDate);
+      const parsedEnd = basics.isIndefinite ? null : safeParseDate(basics.endDate);
 
-      // Validate: Start date must be today or in the future
-      if (parsedStartDate) {
-        const startDateObj = new Date(parsedStartDate);
-        if (startDateObj < today) {
-          setDateError("Start date cannot be in the past");
-          return;
-        }
+      if (parsedStart && new Date(parsedStart) < today) {
+        setDateError('Start date cannot be in the past');
+        return;
       }
-
-      // Validate: End date must be after start date
-      if (parsedStartDate && parsedEndDate) {
-        const startDateObj = new Date(parsedStartDate);
-        const endDateObj = new Date(parsedEndDate);
-        if (endDateObj <= startDateObj) {
-          setDateError("End date must be after start date");
-          return;
-        }
+      if (parsedStart && parsedEnd && new Date(parsedEnd) <= new Date(parsedStart)) {
+        setDateError('End date must be after start date');
+        return;
       }
-
-      // Prepare data for soft-save - only include valid, non-empty values
-      const saveData: Record<string, any> = {
-        name: campaignData.name?.trim() || 'Untitled Campaign',
-        campaignTypes: [campaignData.rewardType || 'points'],
-      };
-
-      // Only add description if non-empty
-      if (campaignData.description?.trim()) {
-        saveData.description = campaignData.description.trim();
-      }
-
-      // Handle startDate - let backend default if we can't parse
-      if (parsedStartDate) {
-        saveData.startDate = parsedStartDate;
-      }
-
-      // Handle endDate
-      if (campaignData.isIndefinite) {
-        saveData.endDate = null;
-      } else if (parsedEndDate) {
-        saveData.endDate = parsedEndDate;
-      }
-
-      console.log('[Campaign Builder] Saving draft with data:', saveData);
-      await softSaveMutation.mutateAsync(saveData);
+      await saveCampaign();
     }
-    setCurrentStep((prev) => Math.min(prev + 1, 4));
+    if (currentStep === 5 || currentStep === 6) {
+      await saveCampaign();
+    }
+    setCurrentStep((prev) => Math.min(prev + 1, 7));
   };
 
-  const handleBack = () => {
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
-  };
+  const handleBack = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   const handlePublish = async () => {
-    await publishMutation.mutateAsync();
-  };
-
-  const updateData = (field: string, value: any) => {
-    setCampaignData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const toggleTaskAssignment = async (taskId: string) => {
     if (!campaignId) return;
+    await saveCampaign();
+    await publishCampaign.mutateAsync(campaignId);
+    setLocation('/creator-dashboard/campaigns');
+  };
 
-    const isAssigned = campaignData.assignedTaskIds.includes(taskId);
-    if (isAssigned) {
-      // Unassign task via API
+  const toggleTask = async (taskId: string) => {
+    if (!campaignId) return;
+    if (assignedTaskIds.includes(taskId)) {
       await unassignTaskMutation.mutateAsync({ taskId, campaignId });
-      updateData("assignedTaskIds", campaignData.assignedTaskIds.filter(id => id !== taskId));
+      setAssignedTaskIds((prev) => prev.filter((id) => id !== taskId));
     } else {
-      // Assign task via API
       await assignTaskMutation.mutateAsync({ taskId, campaignId });
-      updateData("assignedTaskIds", [...campaignData.assignedTaskIds, taskId]);
+      setAssignedTaskIds((prev) => [...prev, taskId]);
     }
   };
+
+  const isSaving = createCampaign.isPending || updateCampaign.isPending;
+  const isPublishing = publishCampaign.isPending;
 
   return (
     <DashboardLayout userType="creator">
@@ -360,55 +457,66 @@ export default function CampaignBuilderNew() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Campaign Builder</h1>
-            <p className="text-gray-400">Create engaging campaigns for your fans</p>
+            <p className="text-gray-400">Create powerful, multi-task campaigns for your fans</p>
           </div>
           <Button
             variant="outline"
-            onClick={() => setLocation("/creator-dashboard/campaigns")}
+            onClick={() => setLocation('/creator-dashboard/campaigns')}
             className="border-white/20 text-white hover:bg-white/10"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Campaigns
+            Back
           </Button>
         </div>
 
-        {/* Step Indicator */}
-        <StepIndicator currentStep={currentStep} totalSteps={4} />
+        <StepIndicator currentStep={currentStep} />
 
         {/* Step Content */}
         <Card className="bg-white/5 backdrop-blur-lg border-white/10">
           <CardContent className="p-6">
-            {/* Step 1: Campaign Basics */}
+            {/* ========== STEP 1: BASICS ========== */}
             {currentStep === 1 && (
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-brand-primary" />
-                    Campaign Basics
-                  </h2>
-                </div>
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-brand-primary" />
+                  Campaign Basics
+                </h2>
 
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="name" className="text-white">Campaign Name *</Label>
+                    <Label className="text-white">Campaign Name *</Label>
                     <Input
-                      id="name"
-                      value={campaignData.name}
-                      onChange={(e) => updateData("name", e.target.value)}
-                      placeholder="e.g., Summer Fan Challenge"
+                      value={basics.name}
+                      onChange={(e) => setBasics((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g., Summer Fan Challenge 2026"
                       className="mt-1 bg-white/5 border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-white">Description</Label>
+                    <Textarea
+                      value={basics.description}
+                      onChange={(e) => setBasics((p) => ({ ...p, description: e.target.value }))}
+                      placeholder="Describe what fans will do and earn..."
+                      className="mt-1 bg-white/5 border-white/20 text-white min-h-[100px]"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="description" className="text-white">Campaign Summary</Label>
-                    <Textarea
-                      id="description"
-                      value={campaignData.description}
-                      onChange={(e) => updateData("description", e.target.value)}
-                      placeholder="Describe what fans will do and earn..."
-                      className="mt-1 bg-white/5 border-white/20 text-white min-h-[100px]"
-                    />
+                    <Label className="text-white">Accent Color</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <input
+                        type="color"
+                        value={basics.accentColor}
+                        onChange={(e) => setBasics((p) => ({ ...p, accentColor: e.target.value }))}
+                        className="w-10 h-10 rounded border border-white/20 cursor-pointer"
+                      />
+                      <Input
+                        value={basics.accentColor}
+                        onChange={(e) => setBasics((p) => ({ ...p, accentColor: e.target.value }))}
+                        className="w-32 bg-white/5 border-white/20 text-white"
+                      />
+                    </div>
                   </div>
 
                   <Separator className="bg-white/10" />
@@ -416,272 +524,159 @@ export default function CampaignBuilderNew() {
                   <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
                     <div>
                       <Label className="text-white">Indefinite Campaign</Label>
-                      <p className="text-sm text-gray-400">Campaign runs continuously with no end date</p>
+                      <p className="text-sm text-gray-400">No end date</p>
                     </div>
                     <Switch
-                      checked={campaignData.isIndefinite}
+                      checked={basics.isIndefinite}
                       onCheckedChange={(checked) => {
-                        updateData("isIndefinite", checked);
-                        if (checked) updateData("endDate", "");
+                        setBasics((p) => ({
+                          ...p,
+                          isIndefinite: checked,
+                          endDate: checked ? '' : p.endDate,
+                        }));
                       }}
                     />
                   </div>
 
-                  {!campaignData.isIndefinite && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="startDate" className="text-white">Start Date</Label>
-                          <Input
-                            id="startDate"
-                            type="datetime-local"
-                            value={campaignData.startDate}
-                            onChange={(e) => {
-                              updateData("startDate", e.target.value);
-                              setDateError(null);
-                            }}
-                            min={new Date().toISOString().slice(0, 16)}
-                            className="mt-1 bg-white/5 border-white/20 text-white"
-                          />
-                          <p className="text-xs text-gray-400 mt-1">Must be today or in the future</p>
-                        </div>
-                        <div>
-                          <Label htmlFor="endDate" className="text-white">End Date</Label>
-                          <Input
-                            id="endDate"
-                            type="datetime-local"
-                            value={campaignData.endDate}
-                            onChange={(e) => {
-                              updateData("endDate", e.target.value);
-                              setDateError(null);
-                            }}
-                            min={campaignData.startDate || new Date().toISOString().slice(0, 16)}
-                            className="mt-1 bg-white/5 border-white/20 text-white"
-                          />
-                          <p className="text-xs text-gray-400 mt-1">Must be after start date</p>
-                        </div>
+                  {!basics.isIndefinite && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-white">Start Date</Label>
+                        <Input
+                          type="datetime-local"
+                          value={basics.startDate}
+                          onChange={(e) => {
+                            setBasics((p) => ({ ...p, startDate: e.target.value }));
+                            setDateError(null);
+                          }}
+                          className="mt-1 bg-white/5 border-white/20 text-white"
+                        />
                       </div>
-                      {dateError && (
-                        <Alert className="bg-red-500/10 border-red-500/30">
-                          <AlertCircle className="h-4 w-4 text-red-400" />
-                          <AlertDescription className="text-red-200">
-                            {dateError}
-                          </AlertDescription>
-                        </Alert>
-                      )}
+                      <div>
+                        <Label className="text-white">End Date</Label>
+                        <Input
+                          type="datetime-local"
+                          value={basics.endDate}
+                          onChange={(e) => {
+                            setBasics((p) => ({ ...p, endDate: e.target.value }));
+                            setDateError(null);
+                          }}
+                          className="mt-1 bg-white/5 border-white/20 text-white"
+                        />
+                      </div>
                     </div>
+                  )}
+                  {dateError && (
+                    <Alert className="bg-red-500/10 border-red-500/30">
+                      <AlertCircle className="h-4 w-4 text-red-400" />
+                      <AlertDescription className="text-red-200">{dateError}</AlertDescription>
+                    </Alert>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Step 2: Reward Strategy */}
+            {/* ========== STEP 2: SPONSORS ========== */}
             {currentStep === 2 && (
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                    <Gift className="h-5 w-5 text-brand-primary" />
-                    Reward Strategy
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                    <Users className="h-5 w-5 text-brand-primary" />
+                    Campaign Sponsors
                   </h2>
-                  <p className="text-gray-400">Choose how fans will be rewarded</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Points Option */}
-                  <Card
-                    className={`cursor-pointer transition-all ${
-                      campaignData.rewardType === "points"
-                        ? "bg-brand-primary/20 border-brand-primary"
-                        : "bg-white/5 border-white/10 hover:border-white/30"
-                    }`}
-                    onClick={() => updateData("rewardType", "points")}
+                  <Button
+                    onClick={() => {
+                      setSponsorForm({
+                        name: '',
+                        logoUrl: '',
+                        websiteUrl: '',
+                        socialHandles: {},
+                        showInCampaignBanner: true,
+                      });
+                      setSponsorModalOpen(true);
+                    }}
+                    className="bg-brand-primary hover:bg-brand-primary/80"
                   >
-                    <CardContent className="p-6 text-center">
-                      <Coins className="h-12 w-12 mx-auto mb-4 text-yellow-400" />
-                      <h3 className="text-white font-semibold mb-2">Points</h3>
-                      <p className="text-sm text-gray-400">
-                        Award points for each task completion
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  {/* Raffle Option */}
-                  <Card
-                    className={`cursor-pointer transition-all ${
-                      campaignData.rewardType === "raffle"
-                        ? "bg-brand-primary/20 border-brand-primary"
-                        : "bg-white/5 border-white/10 hover:border-white/30"
-                    }`}
-                    onClick={() => updateData("rewardType", "raffle")}
-                  >
-                    <CardContent className="p-6 text-center">
-                      <Ticket className="h-12 w-12 mx-auto mb-4 text-purple-400" />
-                      <h3 className="text-white font-semibold mb-2">Raffle Entry</h3>
-                      <p className="text-sm text-gray-400">
-                        Each task = entry ticket for prize draw
-                      </p>
-                    </CardContent>
-                  </Card>
+                    <Plus className="h-4 w-4 mr-2" /> Add Sponsor
+                  </Button>
                 </div>
+                <p className="text-gray-400 text-sm">
+                  Add sponsors whose social accounts can be used in task verification (e.g.,
+                  &ldquo;Follow @Nike on Twitter&rdquo;).
+                </p>
 
-                {/* Points Configuration */}
-                {campaignData.rewardType === "points" && (
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <Label className="text-white">Points Per Task Completion</Label>
-                    <Input
-                      type="number"
-                      value={campaignData.pointsPerTask}
-                      onChange={(e) => updateData("pointsPerTask", parseInt(e.target.value) || 0)}
-                      className="mt-2 bg-white/5 border-white/20 text-white w-32"
-                    />
+                {displaySponsors.length === 0 ? (
+                  <div className="text-center py-12 bg-white/5 rounded-lg border border-dashed border-white/20">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-gray-500" />
+                    <p className="text-gray-400">No sponsors added yet</p>
+                    <p className="text-sm text-gray-500">Sponsors are optional</p>
                   </div>
-                )}
-
-                {/* Raffle Configuration */}
-                {campaignData.rewardType === "raffle" && (
-                  <div className="space-y-4 p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div>
-                      <Label className="text-white">Entries Per Task Completion</Label>
-                      <Input
-                        type="number"
-                        value={campaignData.raffleEntryPerTask}
-                        onChange={(e) => updateData("raffleEntryPerTask", parseInt(e.target.value) || 1)}
-                        className="mt-2 bg-white/5 border-white/20 text-white w-32"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-white">Prize Description</Label>
-                      <Input
-                        value={campaignData.rafflePrize}
-                        onChange={(e) => updateData("rafflePrize", e.target.value)}
-                        placeholder="e.g., Signed merchandise, VIP meet & greet"
-                        className="mt-2 bg-white/5 border-white/20 text-white"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-white">Draw Date</Label>
-                      <Input
-                        type="datetime-local"
-                        value={campaignData.raffleDrawDate}
-                        onChange={(e) => updateData("raffleDrawDate", e.target.value)}
-                        className="mt-2 bg-white/5 border-white/20 text-white"
-                      />
-                    </div>
+                ) : (
+                  <div className="space-y-3">
+                    {displaySponsors.map((sponsor, index) => (
+                      <div
+                        key={sponsor.id || index}
+                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
+                      >
+                        <div className="flex items-center gap-3">
+                          {sponsor.logoUrl ? (
+                            <img
+                              src={sponsor.logoUrl}
+                              alt={sponsor.name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-brand-primary/20 flex items-center justify-center">
+                              <span className="text-brand-primary font-bold">
+                                {sponsor.name[0]}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-white font-medium">{sponsor.name}</p>
+                            <div className="flex gap-2 mt-1">
+                              {Object.entries(sponsor.socialHandles || {})
+                                .filter(([, v]) => v)
+                                .map(([platform, handle]) => (
+                                  <Badge
+                                    key={platform}
+                                    variant="outline"
+                                    className="text-xs border-white/20 text-gray-300"
+                                  >
+                                    {platform}: {handle as string}
+                                  </Badge>
+                                ))}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSponsor(index)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Step 3: Requirements */}
+            {/* ========== STEP 3: TASKS ========== */}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                    <Lock className="h-5 w-5 text-brand-primary" />
-                    Campaign Requirements
-                  </h2>
-                  <p className="text-gray-400">Set prerequisites for participation</p>
-                </div>
-
-                {/* All Tasks Required */}
-                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div>
-                    <Label className="text-white">Require All Tasks</Label>
-                    <p className="text-sm text-gray-400">Fans must complete all tasks to earn rewards</p>
-                  </div>
-                  <Switch
-                    checked={campaignData.requireAllTasks}
-                    onCheckedChange={(checked) => updateData("requireAllTasks", checked)}
-                  />
-                </div>
-
-                {/* Previous Campaign Requirement */}
-                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                  <Label className="text-white mb-3 block">Previous Campaign Completion</Label>
-                  <p className="text-sm text-gray-400 mb-3">
-                    Require fans to have completed specific campaigns first
-                  </p>
-                  {previousCampaigns.length > 0 ? (
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {previousCampaigns
-                        .filter(c => c.id !== campaignId && c.status === 'active')
-                        .map((campaign) => (
-                          <div key={campaign.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`camp-${campaign.id}`}
-                              checked={campaignData.requiredPreviousCampaigns.includes(campaign.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  updateData("requiredPreviousCampaigns", [...campaignData.requiredPreviousCampaigns, campaign.id]);
-                                } else {
-                                  updateData("requiredPreviousCampaigns", campaignData.requiredPreviousCampaigns.filter(id => id !== campaign.id));
-                                }
-                              }}
-                            />
-                            <label htmlFor={`camp-${campaign.id}`} className="text-white text-sm">
-                              {campaign.name}
-                            </label>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No previous campaigns available</p>
-                  )}
-                </div>
-
-                {/* NFT Requirement */}
-                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                  <Label className="text-white mb-3 block flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4" />
-                    Hold an NFT
-                  </Label>
-                  <p className="text-sm text-gray-400 mb-3">
-                    Require fans to hold specific NFT collections
-                  </p>
-                  <Input
-                    placeholder="Enter NFT collection ID (coming soon)"
-                    className="bg-white/5 border-white/20 text-white"
-                    disabled
-                  />
-                  <p className="text-xs text-gray-500 mt-2">NFT gating coming soon</p>
-                </div>
-
-                {/* Badge Requirement */}
-                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                  <Label className="text-white mb-3 block flex items-center gap-2">
-                    <Award className="h-4 w-4" />
-                    Hold a Specific Badge
-                  </Label>
-                  <p className="text-sm text-gray-400 mb-3">
-                    Require fans to have earned specific badges
-                  </p>
-                  <Input
-                    placeholder="Enter badge ID (coming soon)"
-                    className="bg-white/5 border-white/20 text-white"
-                    disabled
-                  />
-                  <p className="text-xs text-gray-500 mt-2">Badge gating coming soon</p>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Task Assignment */}
-            {currentStep === 4 && (
-              <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-white mb-1 flex items-center gap-2">
-                      <CheckSquare className="h-5 w-5 text-brand-primary" />
-                      Campaign Tasks
-                    </h2>
-                    <p className="text-gray-400">Assign existing tasks or create new ones</p>
-                  </div>
+                  <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                    <CheckSquare className="h-5 w-5 text-brand-primary" />
+                    Campaign Tasks
+                  </h2>
                   <Button
                     onClick={() => setIsTaskModalOpen(true)}
                     className="bg-brand-primary hover:bg-brand-primary/80"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Task
+                    <Plus className="h-4 w-4 mr-2" /> Create Task
                   </Button>
                 </div>
 
@@ -689,36 +684,50 @@ export default function CampaignBuilderNew() {
                   <Alert className="bg-yellow-500/10 border-yellow-500/30">
                     <AlertCircle className="h-4 w-4 text-yellow-400" />
                     <AlertDescription className="text-yellow-200">
-                      Campaign will be saved as draft when you proceed to this step
+                      Complete Step 1 first to save the campaign draft.
                     </AlertDescription>
                   </Alert>
                 ) : (
                   <>
-                    {/* Assigned Tasks */}
                     <div>
                       <h3 className="text-white font-medium mb-3">
-                        Assigned Tasks ({campaignData.assignedTaskIds.length})
+                        Assigned Tasks ({assignedTaskIds.length})
                       </h3>
-                      {campaignData.assignedTaskIds.length === 0 ? (
+                      {assignedTaskIds.length === 0 ? (
                         <div className="text-center py-8 bg-white/5 rounded-lg border border-dashed border-white/20">
                           <Target className="h-8 w-8 mx-auto mb-2 text-gray-500" />
                           <p className="text-gray-400">No tasks assigned yet</p>
-                          <p className="text-sm text-gray-500">Select from available tasks below</p>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           {availableTasks
-                            .filter(t => campaignData.assignedTaskIds.includes(t.id))
+                            .filter((t) => assignedTaskIds.includes(t.id))
                             .map((task) => (
-                              <div key={task.id} className="flex items-center justify-between p-3 bg-brand-primary/10 rounded-lg border border-brand-primary/30">
+                              <div
+                                key={task.id}
+                                className="flex items-center justify-between p-3 bg-brand-primary/10 rounded-lg border border-brand-primary/30"
+                              >
                                 <div>
                                   <p className="text-white font-medium">{task.name}</p>
-                                  <p className="text-sm text-gray-400">{task.taskType}</p>
+                                  <div className="flex gap-2 mt-1">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs border-white/20 text-gray-300"
+                                    >
+                                      {task.taskType}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs border-yellow-500/30 text-yellow-300"
+                                    >
+                                      {task.pointsToReward} pts
+                                    </Badge>
+                                  </div>
                                 </div>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => toggleTaskAssignment(task.id)}
+                                  onClick={() => toggleTask(task.id)}
                                   className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                 >
                                   <X className="h-4 w-4" />
@@ -729,29 +738,40 @@ export default function CampaignBuilderNew() {
                       )}
                     </div>
 
-                    {/* Available Tasks */}
+                    <Separator className="bg-white/10" />
+
                     <div>
                       <h3 className="text-white font-medium mb-3">Available Tasks</h3>
-                      {availableTasks.filter(t => !campaignData.assignedTaskIds.includes(t.id)).length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">No available tasks. Create a new one above.</p>
+                      {availableTasks.filter((t) => !assignedTaskIds.includes(t.id)).length ===
+                      0 ? (
+                        <p className="text-sm text-gray-500 italic">
+                          No more tasks available. Create new ones above.
+                        </p>
                       ) : (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                           {availableTasks
-                            .filter(t => !campaignData.assignedTaskIds.includes(t.id))
+                            .filter((t) => !assignedTaskIds.includes(t.id))
                             .map((task) => (
-                              <div key={task.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/30 transition-colors">
+                              <div
+                                key={task.id}
+                                className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/30 transition-colors"
+                              >
                                 <div>
                                   <p className="text-white font-medium">{task.name}</p>
-                                  <p className="text-sm text-gray-400">{task.taskType}</p>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs border-white/20 text-gray-300"
+                                  >
+                                    {task.taskType}
+                                  </Badge>
                                 </div>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => toggleTaskAssignment(task.id)}
+                                  onClick={() => toggleTask(task.id)}
                                   className="border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white"
                                 >
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Add
+                                  <Plus className="h-4 w-4 mr-1" /> Add
                                 </Button>
                               </div>
                             ))}
@@ -759,6 +779,450 @@ export default function CampaignBuilderNew() {
                       )}
                     </div>
                   </>
+                )}
+              </div>
+            )}
+
+            {/* ========== STEP 4: TASK FLOW ========== */}
+            {currentStep === 4 && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Target className="h-5 w-5 text-brand-primary" />
+                  Task Flow & Ordering
+                </h2>
+                <p className="text-gray-400 text-sm">
+                  Control the order in which fans must complete tasks.
+                </p>
+
+                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div>
+                    <Label className="text-white">Enforce Sequential Order</Label>
+                    <p className="text-sm text-gray-400">
+                      Fans must complete tasks in the order listed below
+                    </p>
+                  </div>
+                  <Switch
+                    checked={taskFlow.enforceSequentialTasks}
+                    onCheckedChange={(checked) =>
+                      setTaskFlow((p) => ({ ...p, enforceSequentialTasks: checked }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div>
+                    <Label className="text-white">Verification Timing</Label>
+                    <p className="text-sm text-gray-400">When should tasks be verified?</p>
+                  </div>
+                  <Select
+                    value={verificationMode}
+                    onValueChange={(v: string) =>
+                      setVerificationMode(v as 'immediate' | 'deferred')
+                    }
+                  >
+                    <SelectTrigger className="w-48 bg-white/5 border-white/20 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-white/20">
+                      <SelectItem value="immediate">Immediate</SelectItem>
+                      <SelectItem value="deferred">At Campaign End</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {verificationMode === 'deferred' && (
+                  <Alert className="bg-blue-500/10 border-blue-500/30">
+                    <Clock className="h-4 w-4 text-blue-400" />
+                    <AlertDescription className="text-blue-200">
+                      Tasks will be verified in a single batch when the campaign ends. Fans will see
+                      &ldquo;Pending verification&rdquo; status until then.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div>
+                  <h3 className="text-white font-medium mb-3">Task Order</h3>
+                  {assignedTaskIds.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">Add tasks in Step 3 first.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableTasks
+                        .filter((t) => assignedTaskIds.includes(t.id))
+                        .map((task, index) => (
+                          <div
+                            key={task.id}
+                            className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10"
+                          >
+                            <GripVertical className="h-4 w-4 text-gray-500" />
+                            <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-sm">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-white font-medium">{task.name}</p>
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-white/20 text-gray-300"
+                              >
+                                {task.taskType}
+                              </Badge>
+                            </div>
+                            {taskFlow.enforceSequentialTasks && index > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-yellow-500/30 text-yellow-300"
+                              >
+                                <Lock className="h-3 w-3 mr-1" /> After #{index}
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ========== STEP 5: REWARDS ========== */}
+            {currentStep === 5 && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-brand-primary" />
+                  Rewards & Multipliers
+                </h2>
+
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10 space-y-4">
+                  <div>
+                    <Label className="text-white">Campaign Multiplier</Label>
+                    <p className="text-sm text-gray-400 mb-3">
+                      Multiply all task point rewards in this campaign (1x = normal, 5x = 5 times
+                      the points)
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <Slider
+                        value={[rewards.campaignMultiplier]}
+                        onValueChange={([v]) =>
+                          setRewards((p) => ({ ...p, campaignMultiplier: v }))
+                        }
+                        min={1}
+                        max={5}
+                        step={0.25}
+                        className="flex-1"
+                      />
+                      <span className="text-white font-bold text-lg w-16 text-right">
+                        {rewards.campaignMultiplier}x
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <Label className="text-white">Completion Bonus Points</Label>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Extra points awarded when a fan completes ALL required tasks
+                  </p>
+                  <Input
+                    type="number"
+                    value={rewards.completionBonusPoints}
+                    onChange={(e) =>
+                      setRewards((p) => ({
+                        ...p,
+                        completionBonusPoints: parseInt(e.target.value) || 0,
+                      }))
+                    }
+                    className="w-40 bg-white/5 border-white/20 text-white"
+                  />
+                </div>
+
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <h3 className="text-white font-medium mb-2">Task Point Summary</h3>
+                  <div className="space-y-2">
+                    {availableTasks
+                      .filter((t) => assignedTaskIds.includes(t.id))
+                      .map((task) => (
+                        <div key={task.id} className="flex justify-between text-sm">
+                          <span className="text-gray-300">{task.name}</span>
+                          <span className="text-white font-medium">
+                            {task.pointsToReward} x {rewards.campaignMultiplier} ={' '}
+                            {Math.round(task.pointsToReward * rewards.campaignMultiplier)} pts
+                          </span>
+                        </div>
+                      ))}
+                    {rewards.completionBonusPoints > 0 && (
+                      <>
+                        <Separator className="bg-white/10" />
+                        <div className="flex justify-between text-sm">
+                          <span className="text-yellow-300 font-medium">Completion Bonus</span>
+                          <span className="text-yellow-300 font-bold">
+                            +{rewards.completionBonusPoints} pts
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========== STEP 6: ACCESS & GATING ========== */}
+            {currentStep === 6 && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-brand-primary" />
+                  Access & Gating
+                </h2>
+                <p className="text-gray-400 text-sm">Control who can join this campaign.</p>
+
+                {/* Access Code */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <Label className="text-white flex items-center gap-2">
+                        <Hash className="h-4 w-4" /> Access Code
+                      </Label>
+                      <p className="text-sm text-gray-400">Require a code to join</p>
+                    </div>
+                    <Switch
+                      checked={gating.accessCodeEnabled}
+                      onCheckedChange={(checked) =>
+                        setGating((p) => ({ ...p, accessCodeEnabled: checked }))
+                      }
+                    />
+                  </div>
+                  {gating.accessCodeEnabled && (
+                    <Input
+                      value={gating.accessCode}
+                      onChange={(e) => setGating((p) => ({ ...p, accessCode: e.target.value }))}
+                      placeholder="Enter access code"
+                      className="bg-white/5 border-white/20 text-white"
+                    />
+                  )}
+                </div>
+
+                {/* Reputation Minimum */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <Label className="text-white flex items-center gap-2">
+                    <Zap className="h-4 w-4" /> Minimum Reputation Score
+                  </Label>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Fan must have earned this many total points
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <Slider
+                      value={[gating.minimumReputationScore]}
+                      onValueChange={([v]) =>
+                        setGating((p) => ({ ...p, minimumReputationScore: v }))
+                      }
+                      min={0}
+                      max={10000}
+                      step={100}
+                      className="flex-1"
+                    />
+                    <span className="text-white font-bold w-20 text-right">
+                      {gating.minimumReputationScore}
+                    </span>
+                  </div>
+                </div>
+
+                {/* NFT Gating */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <Label className="text-white flex items-center gap-2">
+                    <Award className="h-4 w-4" /> NFT Requirement
+                  </Label>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Fan must own an NFT from your collection
+                  </p>
+                  <Input
+                    placeholder="Enter NFT collection address"
+                    value={gating.requiredNftCollectionIds[0] || ''}
+                    onChange={(e) =>
+                      setGating((p) => ({
+                        ...p,
+                        requiredNftCollectionIds: e.target.value ? [e.target.value] : [],
+                      }))
+                    }
+                    className="bg-white/5 border-white/20 text-white"
+                  />
+                </div>
+
+                {/* Badge Gating */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <Label className="text-white flex items-center gap-2">
+                    <Award className="h-4 w-4" /> Badge Requirement
+                  </Label>
+                  <p className="text-sm text-gray-400 mb-3">Fan must hold a specific badge</p>
+                  <Input
+                    placeholder="Enter badge ID"
+                    value={gating.requiredBadgeIds[0] || ''}
+                    onChange={(e) =>
+                      setGating((p) => ({
+                        ...p,
+                        requiredBadgeIds: e.target.value ? [e.target.value] : [],
+                      }))
+                    }
+                    className="bg-white/5 border-white/20 text-white"
+                  />
+                </div>
+
+                {/* Prerequisite Campaigns */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <Label className="text-white flex items-center gap-2">
+                    <Trophy className="h-4 w-4" /> Prerequisite Campaigns
+                  </Label>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Fan must have completed these campaigns
+                  </p>
+                  {previousCampaigns.filter((c) => c.id !== campaignId && c.status === 'active')
+                    .length > 0 ? (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {previousCampaigns
+                        .filter((c) => c.id !== campaignId && c.status === 'active')
+                        .map((campaign) => (
+                          <label
+                            key={campaign.id}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={gating.requiredPreviousCampaigns.includes(campaign.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setGating((p) => ({
+                                    ...p,
+                                    requiredPreviousCampaigns: [
+                                      ...p.requiredPreviousCampaigns,
+                                      campaign.id,
+                                    ],
+                                  }));
+                                } else {
+                                  setGating((p) => ({
+                                    ...p,
+                                    requiredPreviousCampaigns: p.requiredPreviousCampaigns.filter(
+                                      (id) => id !== campaign.id
+                                    ),
+                                  }));
+                                }
+                              }}
+                              className="rounded border-white/20"
+                            />
+                            <span className="text-white text-sm">{campaign.name}</span>
+                          </label>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No previous campaigns available</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ========== STEP 7: REVIEW & PUBLISH ========== */}
+            {currentStep === 7 && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-brand-primary" />
+                  Review & Publish
+                </h2>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Campaign</p>
+                    <p className="text-white font-semibold mt-1">{basics.name || 'Untitled'}</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {basics.isIndefinite
+                        ? 'No end date'
+                        : basics.endDate
+                          ? `Ends ${new Date(basics.endDate).toLocaleDateString()}`
+                          : 'No dates set'}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Tasks</p>
+                    <p className="text-white font-semibold mt-1">
+                      {assignedTaskIds.length} tasks assigned
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {taskFlow.enforceSequentialTasks ? 'Sequential order' : 'Any order'}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Rewards</p>
+                    <p className="text-white font-semibold mt-1">
+                      {rewards.campaignMultiplier}x multiplier
+                    </p>
+                    {rewards.completionBonusPoints > 0 && (
+                      <p className="text-sm text-yellow-300 mt-1">
+                        +{rewards.completionBonusPoints} bonus pts
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Sponsors</p>
+                    <p className="text-white font-semibold mt-1">
+                      {displaySponsors.length} sponsor{displaySponsors.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Gating Summary */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                    Access Requirements
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {gating.accessCodeEnabled && (
+                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                        Access Code
+                      </Badge>
+                    )}
+                    {gating.minimumReputationScore > 0 && (
+                      <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                        Min Reputation: {gating.minimumReputationScore}
+                      </Badge>
+                    )}
+                    {gating.requiredNftCollectionIds.length > 0 && (
+                      <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                        NFT Required
+                      </Badge>
+                    )}
+                    {gating.requiredBadgeIds.length > 0 && (
+                      <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                        Badge Required
+                      </Badge>
+                    )}
+                    {gating.requiredPreviousCampaigns.length > 0 && (
+                      <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30">
+                        Prerequisite Campaigns
+                      </Badge>
+                    )}
+                    {!gating.accessCodeEnabled &&
+                      gating.minimumReputationScore === 0 &&
+                      gating.requiredNftCollectionIds.length === 0 &&
+                      gating.requiredBadgeIds.length === 0 &&
+                      gating.requiredPreviousCampaigns.length === 0 && (
+                        <span className="text-gray-400 text-sm">Open to all fans</span>
+                      )}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                    Verification
+                  </p>
+                  <p className="text-white">
+                    {verificationMode === 'immediate'
+                      ? 'Immediate verification'
+                      : 'Deferred (batch at campaign end)'}
+                  </p>
+                </div>
+
+                {assignedTaskIds.length === 0 && (
+                  <Alert className="bg-red-500/10 border-red-500/30">
+                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <AlertDescription className="text-red-200">
+                      You need at least one task assigned to publish.
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
             )}
@@ -773,31 +1237,30 @@ export default function CampaignBuilderNew() {
             disabled={currentStep === 1}
             className="border-white/20 text-white hover:bg-white/10"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
 
           <div className="flex gap-3">
-            {currentStep < 4 ? (
+            {currentStep < 7 ? (
               <Button
                 onClick={handleNext}
-                disabled={currentStep === 1 && !campaignData.name}
+                disabled={(currentStep === 1 && !basics.name.trim()) || isSaving}
                 className="bg-brand-primary hover:bg-brand-primary/80"
               >
-                {softSaveMutation.isPending ? (
+                {isSaving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <ArrowRight className="h-4 w-4 mr-2" />
                 )}
-                {currentStep === 1 ? "Save & Continue" : "Continue"}
+                {currentStep === 1 ? 'Save & Continue' : 'Continue'}
               </Button>
             ) : (
               <Button
                 onClick={handlePublish}
-                disabled={campaignData.assignedTaskIds.length === 0 || publishMutation.isPending}
+                disabled={assignedTaskIds.length === 0 || isPublishing}
                 className="bg-green-600 hover:bg-green-700"
               >
-                {publishMutation.isPending ? (
+                {isPublishing ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Rocket className="h-4 w-4 mr-2" />
@@ -808,7 +1271,94 @@ export default function CampaignBuilderNew() {
           </div>
         </div>
 
-        {/* Task Creation Modal */}
+        {/* ========== SPONSOR MODAL ========== */}
+        <Dialog open={sponsorModalOpen} onOpenChange={setSponsorModalOpen}>
+          <DialogContent className="bg-gray-900 border-white/10 max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">Add Sponsor</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-white">Sponsor Name *</Label>
+                <Input
+                  value={sponsorForm.name}
+                  onChange={(e) => setSponsorForm((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="e.g., Nike Basketball"
+                  className="mt-1 bg-white/5 border-white/20 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-white">Website URL</Label>
+                <Input
+                  value={sponsorForm.websiteUrl}
+                  onChange={(e) => setSponsorForm((p) => ({ ...p, websiteUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="mt-1 bg-white/5 border-white/20 text-white"
+                />
+              </div>
+              <Separator className="bg-white/10" />
+              <div>
+                <Label className="text-white mb-2 block">Social Handles</Label>
+                <p className="text-sm text-gray-400 mb-3">
+                  These handles can be used in task verification (e.g., &ldquo;Follow @Nike on
+                  Twitter&rdquo;)
+                </p>
+                <div className="space-y-3">
+                  {PLATFORMS.map((platform) => (
+                    <div key={platform.key} className="flex items-center gap-3">
+                      <span className="text-gray-300 text-sm w-24 flex-shrink-0">
+                        {platform.label}
+                      </span>
+                      <Input
+                        value={sponsorForm.socialHandles[platform.key] || ''}
+                        onChange={(e) =>
+                          setSponsorForm((p) => ({
+                            ...p,
+                            socialHandles: { ...p.socialHandles, [platform.key]: e.target.value },
+                          }))
+                        }
+                        placeholder={platform.placeholder}
+                        className="bg-white/5 border-white/20 text-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-white">Show in campaign banner</Label>
+                <Switch
+                  checked={sponsorForm.showInCampaignBanner}
+                  onCheckedChange={(checked) =>
+                    setSponsorForm((p) => ({ ...p, showInCampaignBanner: checked }))
+                  }
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setSponsorModalOpen(false)}
+                className="border-white/20 text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddSponsor}
+                disabled={!sponsorForm.name || addSponsorMutation.isPending}
+                className="bg-brand-primary hover:bg-brand-primary/80"
+              >
+                {addSponsorMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                Add Sponsor
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ========== CREATE TASK MODAL ========== */}
         <Dialog open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
           <DialogContent className="bg-gray-900 border-white/10 max-w-lg">
             <DialogHeader>
@@ -819,27 +1369,25 @@ export default function CampaignBuilderNew() {
                 <Label className="text-white">Task Name *</Label>
                 <Input
                   value={newTaskData.name}
-                  onChange={(e) => setNewTaskData({ ...newTaskData, name: e.target.value })}
+                  onChange={(e) => setNewTaskData((p) => ({ ...p, name: e.target.value }))}
                   placeholder="e.g., Follow on Twitter"
                   className="mt-1 bg-white/5 border-white/20 text-white"
                 />
               </div>
-
               <div>
                 <Label className="text-white">Description</Label>
                 <Textarea
                   value={newTaskData.description}
-                  onChange={(e) => setNewTaskData({ ...newTaskData, description: e.target.value })}
+                  onChange={(e) => setNewTaskData((p) => ({ ...p, description: e.target.value }))}
                   placeholder="Describe what fans need to do..."
                   className="mt-1 bg-white/5 border-white/20 text-white min-h-[80px]"
                 />
               </div>
-
               <div>
                 <Label className="text-white">Task Type</Label>
                 <Select
                   value={newTaskData.taskType}
-                  onValueChange={(value) => setNewTaskData({ ...newTaskData, taskType: value })}
+                  onValueChange={(v) => setNewTaskData((p) => ({ ...p, taskType: v }))}
                 >
                   <SelectTrigger className="mt-1 bg-white/5 border-white/20 text-white">
                     <SelectValue />
@@ -860,14 +1408,15 @@ export default function CampaignBuilderNew() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-white">Points Reward</Label>
                   <Input
                     type="number"
                     value={newTaskData.points}
-                    onChange={(e) => setNewTaskData({ ...newTaskData, points: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setNewTaskData((p) => ({ ...p, points: parseInt(e.target.value) || 0 }))
+                    }
                     className="mt-1 bg-white/5 border-white/20 text-white"
                   />
                 </div>
@@ -875,18 +1424,19 @@ export default function CampaignBuilderNew() {
                   <Label className="text-white">Target Username</Label>
                   <Input
                     value={newTaskData.targetUsername}
-                    onChange={(e) => setNewTaskData({ ...newTaskData, targetUsername: e.target.value })}
+                    onChange={(e) =>
+                      setNewTaskData((p) => ({ ...p, targetUsername: e.target.value }))
+                    }
                     placeholder="@username"
                     className="mt-1 bg-white/5 border-white/20 text-white"
                   />
                 </div>
               </div>
-
               <div>
                 <Label className="text-white">Target URL (optional)</Label>
                 <Input
                   value={newTaskData.targetUrl}
-                  onChange={(e) => setNewTaskData({ ...newTaskData, targetUrl: e.target.value })}
+                  onChange={(e) => setNewTaskData((p) => ({ ...p, targetUrl: e.target.value }))}
                   placeholder="https://..."
                   className="mt-1 bg-white/5 border-white/20 text-white"
                 />
@@ -901,7 +1451,7 @@ export default function CampaignBuilderNew() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
+                onClick={() =>
                   createTaskMutation.mutate({
                     name: newTaskData.name,
                     description: newTaskData.description,
@@ -911,9 +1461,9 @@ export default function CampaignBuilderNew() {
                       targetUrl: newTaskData.targetUrl,
                       targetUsername: newTaskData.targetUsername,
                     },
-                    campaignId: campaignId,
-                  });
-                }}
+                    campaignId,
+                  })
+                }
                 disabled={!newTaskData.name || createTaskMutation.isPending}
                 className="bg-brand-primary hover:bg-brand-primary/80"
               >

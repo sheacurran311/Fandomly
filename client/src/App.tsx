@@ -1,96 +1,103 @@
-import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import ErrorBoundary from "@/components/error-boundary";
+import { Switch, Route, useLocation } from 'wouter';
+import { queryClient } from './lib/queryClient';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import ErrorBoundary from '@/components/error-boundary';
 // New Auth System - JWT-based with Google + Social Logins
-import AuthProvider from "@/components/auth/auth-provider";
-import NewAuthRouter from "@/components/auth/new-auth-router";
-import { AuthModalProvider } from "@/hooks/use-auth-modal";
+import AuthProvider from '@/components/auth/auth-provider';
+import NewAuthRouter from '@/components/auth/new-auth-router';
+import { AuthModalProvider } from '@/hooks/use-auth-modal';
 // Particle Network - Feature-flagged Web3 auth (wraps above AuthProvider)
-import { ParticleProvider } from "@/contexts/particle-provider";
-import ParticleAuthListener from "@/components/auth/particle-auth-listener";
-import { useEffect } from "react";
-import { initTikTokErrorHandler } from "@/lib/tiktok-error-handler";
-import Navigation from "@/components/layout/navigation";
-import Footer from "@/components/layout/footer";
-import Home from "@/pages/home";
-import Marketplace from "@/pages/marketplace";
-import FindCreators from "@/pages/find-creators";
-import UserTypeSelection from "@/pages/user-type-selection";
-import CreatorTypeSelection from "@/pages/creator-type-selection";
-import BrandTypeSelection from "@/pages/brand-type-selection";
-import BrandOnboarding from "@/pages/brand-onboarding";
+import { ParticleProvider } from '@/contexts/particle-provider';
+import ParticleAuthListener from '@/components/auth/particle-auth-listener';
+import { useEffect } from 'react';
+import { initTikTokErrorHandler } from '@/lib/tiktok-error-handler';
+import Navigation from '@/components/layout/navigation';
+import Footer from '@/components/layout/footer';
+import Home from '@/pages/home';
+import Marketplace from '@/pages/marketplace';
+import FindCreators from '@/pages/find-creators';
+import UserTypeSelection from '@/pages/user-type-selection';
+import CreatorTypeSelection from '@/pages/creator-type-selection';
+import BrandTypeSelection from '@/pages/brand-type-selection';
+import BrandOnboarding from '@/pages/brand-onboarding';
 // CreatorOnboarding is deprecated - replaced by program builder with setup checklist
 // Old route redirects to creator-dashboard via auth router
-import CampaignBuilder from "@/pages/campaign-builder";
-import TenantSetup from "@/pages/tenant-setup";
-import BrandingStudio from "@/pages/branding-studio";
-import CreatorDashboard from "@/pages/creator-dashboard";
-import CreatorAnalytics from "@/pages/creator-dashboard/analytics";
-import CreatorSocial from "@/pages/creator-dashboard/social";
-import CreatorFans from "@/pages/creator-dashboard/fans";
-import CreatorGrowth from "@/pages/creator-dashboard/growth";
-import CreatorRevenue from "@/pages/creator-dashboard/revenue";
-import CreatorRewards from "@/pages/creator-dashboard/rewards";
-import CreatorTasks from "@/pages/creator-dashboard/tasks";
-import CreatorActivity from "@/pages/creator-dashboard/activity";
-import CreatorNIL from "@/pages/creator-dashboard/nil";
-import CreatorCampaigns from "@/pages/creator-dashboard/campaigns";
-import CreatorSettings from "@/pages/creator-dashboard/settings";
-import ProgramBuilder from "@/pages/creator-dashboard/program-builder";
-import CampaignBuilderNew from "@/pages/creator-dashboard/campaign-builder-new";
-import ProgramPublic from "@/pages/program-public";
-import BillingPage from "@/pages/billing";
-import FanDashboard from "@/pages/fan-dashboard";
-import FanCampaigns from "@/pages/fan-dashboard/campaigns";
-import FanTasks from "@/pages/fan-dashboard/tasks";
-import FanSocial from "@/pages/fan-dashboard/social";
-import FanJoined from "@/pages/fan-dashboard/joined";
-import FanAchievements from "@/pages/fan-dashboard/achievements";
-import FanPoints from "@/pages/fan-dashboard/points";
-import FanNotifications from "@/pages/fan-dashboard/notifications";
-import FanSettings from "@/pages/fan-dashboard/settings";
-import NILDashboard from "@/pages/nil-dashboard";
+import CampaignBuilder from '@/pages/campaign-builder';
+import TenantSetup from '@/pages/tenant-setup';
+import BrandingStudio from '@/pages/branding-studio';
+import CreatorDashboard from '@/pages/creator-dashboard';
+import CreatorAnalytics from '@/pages/creator-dashboard/analytics';
+import CreatorSocial from '@/pages/creator-dashboard/social';
+import CreatorFans from '@/pages/creator-dashboard/fans';
+import CreatorGrowth from '@/pages/creator-dashboard/growth';
+import CreatorRevenue from '@/pages/creator-dashboard/revenue';
+import CreatorRewards from '@/pages/creator-dashboard/rewards';
+import CreatorTasks from '@/pages/creator-dashboard/tasks';
+import CreatorActivity from '@/pages/creator-dashboard/activity';
+import CreatorNIL from '@/pages/creator-dashboard/nil';
+import CreatorCampaigns from '@/pages/creator-dashboard/campaigns';
+import CreatorSettings from '@/pages/creator-dashboard/settings';
+import ProgramBuilder from '@/pages/creator-dashboard/program-builder';
+import CampaignBuilderNew from '@/pages/creator-dashboard/campaign-builder-new';
+import ProgramPublic from '@/pages/program-public';
+import BillingPage from '@/pages/billing';
+import FanDashboard from '@/pages/fan-dashboard';
+import FanCampaigns from '@/pages/fan-dashboard/campaigns';
+import FanTasks from '@/pages/fan-dashboard/tasks';
+import FanSocial from '@/pages/fan-dashboard/social';
+import FanJoined from '@/pages/fan-dashboard/joined';
+import FanAchievements from '@/pages/fan-dashboard/achievements';
+import FanPoints from '@/pages/fan-dashboard/points';
+import FanNotifications from '@/pages/fan-dashboard/notifications';
+import FanCampaignDetail from '@/pages/fan-dashboard/campaign-detail';
+import FanSettings from '@/pages/fan-dashboard/settings';
 // RBAC Dashboard removed - users now route to type-specific dashboards
-import FanOnboardingProfile from "@/pages/fan-onboarding-profile";
-import FanChooseCreators from "@/pages/fan-choose-creators";
-import Profile from "@/pages/profile";
-import FanProfile from "@/pages/fan-profile";
-import FacebookLikeCampaign from "@/pages/facebook-like-campaign";
-import CreatorShowcase from "@/pages/creator-showcase";
-import MetaGraphDebugger from "@/pages/meta-graph-debugger";
+import FanOnboardingProfile from '@/pages/fan-onboarding-profile';
+import FanChooseCreators from '@/pages/fan-choose-creators';
+import Profile from '@/pages/profile';
+import FanProfile from '@/pages/fan-profile';
+import FacebookLikeCampaign from '@/pages/facebook-like-campaign';
+import CreatorShowcase from '@/pages/creator-showcase';
+import MetaGraphDebugger from '@/pages/meta-graph-debugger';
 // Removed obsolete Facebook test login pages
 
-import PrivacyPolicy from "@/pages/privacy-policy";
-import DataDeletion from "@/pages/data-deletion";
-import DataDeletionInfo from "@/pages/privacy/data-deletion";
-import TermsOfService from "@/pages/terms-of-service";
-import NotFound from "@/pages/not-found";
-import InstagramCallback from "@/pages/instagram-callback";
-import TikTokCallback from "@/pages/tiktok-callback";
-import XCallback from "@/pages/x-callback";
-import YouTubeCallback from "@/pages/youtube-callback";
-import SpotifyCallback from "@/pages/spotify-callback";
-import DiscordCallback from "@/pages/discord-callback";
-import TwitchCallback from "@/pages/twitch-callback";
-import KickCallback from "@/pages/kick-callback";
-import PatreonCallback from "@/pages/patreon-callback";
-import Login from "@/pages/login";
-import GoogleCallback from "@/pages/auth/google-callback";
-import CreatorPublic from "@/pages/creator-public";
-import TaskBuilder from "@/pages/creator-dashboard/task-builder";
-import AdminDashboard from "@/pages/admin-dashboard";
-import AdminOverview from "@/pages/admin-dashboard/overview";
-import AdminUsers from "@/pages/admin-dashboard/users";
-import AdminCreators from "@/pages/admin-dashboard/creators";
-import AdminAgencies from "@/pages/admin-dashboard/agencies";
-import AdminTasks from "@/pages/admin-dashboard/tasks";
-import AdminPlatformTaskCreate from "@/pages/admin-dashboard/platform-tasks/create";
-import AdminProfile from "@/pages/admin-dashboard/profile";
-import AdminAnalytics from "@/pages/admin-dashboard/analytics";
-import AgencyDashboard from "@/pages/agency-dashboard";
+import PrivacyPolicy from '@/pages/privacy-policy';
+import DataDeletion from '@/pages/data-deletion';
+import DataDeletionInfo from '@/pages/privacy/data-deletion';
+import TermsOfService from '@/pages/terms-of-service';
+import NotFound from '@/pages/not-found';
+import InstagramCallback from '@/pages/instagram-callback';
+import TikTokCallback from '@/pages/tiktok-callback';
+import XCallback from '@/pages/x-callback';
+import YouTubeCallback from '@/pages/youtube-callback';
+import SpotifyCallback from '@/pages/spotify-callback';
+import DiscordCallback from '@/pages/discord-callback';
+import TwitchCallback from '@/pages/twitch-callback';
+import KickCallback from '@/pages/kick-callback';
+import PatreonCallback from '@/pages/patreon-callback';
+import Login from '@/pages/login';
+import GoogleCallback from '@/pages/auth/google-callback';
+import CreatorPublic from '@/pages/creator-public';
+import TaskBuilder from '@/pages/creator-dashboard/task-builder';
+import AdminDashboard from '@/pages/admin-dashboard';
+import AdminOverview from '@/pages/admin-dashboard/overview';
+import AdminUsers from '@/pages/admin-dashboard/users';
+import AdminCreators from '@/pages/admin-dashboard/creators';
+import AdminAgencies from '@/pages/admin-dashboard/agencies';
+import AdminTasks from '@/pages/admin-dashboard/tasks';
+import AdminPlatformTaskCreate from '@/pages/admin-dashboard/platform-tasks/create';
+import AdminProfile from '@/pages/admin-dashboard/profile';
+import AdminAnalytics from '@/pages/admin-dashboard/analytics';
+import AgencyDashboard from '@/pages/agency-dashboard';
+
+function RedirectTo({ href }: { href: string }) {
+  useEffect(() => {
+    window.location.href = href;
+  }, [href]);
+  return null;
+}
 
 function Router() {
   return (
@@ -102,8 +109,11 @@ function Router() {
       <Route path="/creator-type-selection" component={CreatorTypeSelection} />
       <Route path="/brand-type-selection" component={BrandTypeSelection} />
       <Route path="/brand-onboarding" component={BrandOnboarding} />
-      {/* /creator-onboarding is deprecated - auth router redirects to /creator-dashboard */}
-      <Route path="/creator-onboarding">{() => { window.location.href = '/creator-dashboard'; return null; }}</Route>
+      {/* /creator-onboarding is deprecated - redirects to /creator-dashboard */}
+      <Route
+        path="/creator-onboarding"
+        component={() => <RedirectTo href="/creator-dashboard" />}
+      />
       <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />
       <Route path="/branding-studio" component={BrandingStudio} />
@@ -137,16 +147,15 @@ function Router() {
       <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
+      <Route path="/fan-dashboard/campaigns/:id" component={FanCampaignDetail} />
       <Route path="/fan-dashboard/tasks" component={FanTasks} />
       <Route path="/fan-dashboard/social" component={FanSocial} />
       <Route path="/fan-dashboard/joined" component={FanJoined} />
       {/* Redirect old route to new route */}
-      <Route path="/fan-dashboard/following">
-        {() => {
-          window.location.href = "/fan-dashboard/joined";
-          return null;
-        }}
-      </Route>
+      <Route
+        path="/fan-dashboard/following"
+        component={() => <RedirectTo href="/fan-dashboard/joined" />}
+      />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
@@ -186,7 +195,10 @@ function Router() {
       <Route path="/admin-dashboard/platform-tasks" component={AdminTasks} />
       <Route path="/admin-dashboard/platform-tasks/create" component={AdminPlatformTaskCreate} />
       <Route path="/admin-dashboard/platform-tasks/edit/:id" component={AdminPlatformTaskCreate} />
-      <Route path="/admin-dashboard/tasks" component={() => { window.location.href = '/admin-dashboard/platform-tasks'; return null; }} />
+      <Route
+        path="/admin-dashboard/tasks"
+        component={() => <RedirectTo href="/admin-dashboard/platform-tasks" />}
+      />
       <Route path="/admin-dashboard/profile" component={AdminProfile} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
 
@@ -237,8 +249,8 @@ function App() {
   ];
 
   // Check if current route is public or onboarding
-  const isPublicRoute = publicRoutes.some(route => location === route);
-  const isOnboardingRoute = onboardingRoutes.some(route => location === route);
+  const isPublicRoute = publicRoutes.some((route) => location === route);
+  const isOnboardingRoute = onboardingRoutes.some((route) => location === route);
 
   return (
     <ErrorBoundary>
@@ -250,18 +262,18 @@ function App() {
               <AuthModalProvider>
                 <NewAuthRouter>
                   <div className="min-h-screen bg-brand-dark-bg">
-                      {/* Skip to main content link for accessibility */}
-                      <a
-                        href="#main-content"
-                        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-md focus:outline-none"
-                      >
-                        Skip to main content
-                      </a>
-                      {!isOnboardingRoute && <Navigation />}
-                      <main id="main-content" tabIndex={-1}>
-                        <Router />
-                      </main>
-                      {isPublicRoute && location !== '/' && <Footer />}
+                    {/* Skip to main content link for accessibility */}
+                    <a
+                      href="#main-content"
+                      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-md focus:outline-none"
+                    >
+                      Skip to main content
+                    </a>
+                    {!isOnboardingRoute && <Navigation />}
+                    <main id="main-content" tabIndex={-1}>
+                      <Router />
+                    </main>
+                    {isPublicRoute && location !== '/' && <Footer />}
                   </div>
                   <Toaster />
                 </NewAuthRouter>
@@ -290,7 +302,7 @@ function LandingOnlyApp() {
 }
 
 export default function AppEntry() {
-  if (import.meta.env.VITE_LANDING_ONLY === "true") {
+  if (import.meta.env.VITE_LANDING_ONLY === 'true') {
     return <LandingOnlyApp />;
   }
   return <App />;
