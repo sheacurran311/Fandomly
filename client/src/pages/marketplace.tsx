@@ -1,31 +1,35 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Users, Trophy, Coins, Lock } from "lucide-react";
-import CreatorCard from "@/components/creator/creator-card";
-import { type Creator } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Search, Users, Trophy, Coins, Lock } from 'lucide-react';
+import CreatorCard from '@/components/creator/creator-card';
+import { type Creator } from '@shared/schema';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function Marketplace() {
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   const { data: creators = [], isLoading: creatorsLoading } = useQuery<Creator[]>({
-    queryKey: ["/api/creators"],
+    queryKey: ['/api/creators'],
   });
 
-  const filteredCreators = useMemo(() => creators.filter((creator) => {
-    const matchesSearch = creator.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         creator.bio?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = !selectedCategory || creator.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  }), [creators, searchQuery, selectedCategory]);
+  const filteredCreators = useMemo(
+    () =>
+      creators.filter((creator) => {
+        const matchesSearch =
+          creator.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          creator.bio?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = !selectedCategory || creator.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      }),
+    [creators, searchQuery, selectedCategory]
+  );
 
-  const categories = ["athlete", "musician", "creator"];
+  const categories = ['athlete', 'musician', 'creator'];
 
   // Route protection: Only authenticated users can access Rewards Store
   if (!user) {
@@ -37,7 +41,8 @@ export default function Marketplace() {
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">Rewards Store Access</h2>
           <p className="text-gray-300 mb-8">
-            Please sign in to access the Rewards Store and browse exclusive rewards from your favorite creators.
+            Please sign in to access the Rewards Store and browse exclusive rewards from your
+            favorite creators.
           </p>
           <Button className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-8 py-3 rounded-xl transition-all duration-200 hover:scale-105">
             Sign In to Continue
@@ -64,9 +69,7 @@ export default function Marketplace() {
       <section className="bg-gradient-to-b from-brand-dark-purple/50 to-brand-dark-bg py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h1 className="text-4xl lg:text-6xl font-bold mb-6 gradient-text">
-              Rewards Store
-            </h1>
+            <h1 className="text-4xl lg:text-6xl font-bold mb-6 gradient-text">Rewards Store</h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
               Redeem your points for exclusive rewards from your favorite creators.
             </p>
@@ -86,18 +89,24 @@ export default function Marketplace() {
               </div>
               <div className="flex gap-2">
                 <Button
-                  variant={selectedCategory === "" ? "default" : "outline"}
-                  onClick={() => setSelectedCategory("")}
-                  className={selectedCategory === "" ? "bg-brand-primary" : "border-white/20 text-gray-300"}
+                  variant={selectedCategory === '' ? 'default' : 'outline'}
+                  onClick={() => setSelectedCategory('')}
+                  className={
+                    selectedCategory === '' ? 'bg-brand-primary' : 'border-white/20 text-gray-300'
+                  }
                 >
                   All
                 </Button>
                 {categories.map((category) => (
                   <Button
                     key={category}
-                    variant={selectedCategory === category ? "default" : "outline"}
+                    variant={selectedCategory === category ? 'default' : 'outline'}
                     onClick={() => setSelectedCategory(category)}
-                    className={selectedCategory === category ? "bg-brand-primary" : "border-white/20 text-gray-300"}
+                    className={
+                      selectedCategory === category
+                        ? 'bg-brand-primary'
+                        : 'border-white/20 text-gray-300'
+                    }
                   >
                     {category.charAt(0).toUpperCase() + category.slice(1)}
                   </Button>
@@ -141,9 +150,9 @@ export default function Marketplace() {
               <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-2xl font-bold text-gray-300 mb-2">No creators found</h3>
               <p className="text-gray-400">
-                {searchQuery || selectedCategory 
-                  ? "Try adjusting your search or filter criteria."
-                  : "No creators have joined the marketplace yet."}
+                {searchQuery || selectedCategory
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'No creators have joined the marketplace yet.'}
               </p>
             </div>
           ) : (

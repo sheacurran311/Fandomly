@@ -1,23 +1,36 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ArrowLeft, ArrowRight, Twitter, Facebook, Instagram, Youtube, Music2, Zap, Shield, ShieldCheck, ShieldAlert, AlertTriangle, Info } from "lucide-react";
-import { SiTiktok, SiSpotify, SiDiscord, SiTwitch } from "react-icons/si";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { useSocialConnections } from "@/hooks/use-social-connections";
-import { TaskConfigurationForm } from "@/components/templates/TaskConfigurationForm";
-import { PLATFORM_TASK_TYPES, TASK_TYPE_VERIFICATION, TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+  ArrowLeft,
+  ArrowRight,
+  Twitter,
+  Facebook,
+  Instagram,
+  Youtube,
+  Music2,
+  Zap,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
+  Info,
+} from 'lucide-react';
+import { SiTiktok, SiSpotify, SiDiscord, SiTwitch } from 'react-icons/si';
+import { useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { useSocialConnections } from '@/hooks/use-social-connections';
+import { TaskConfigurationForm } from '@/components/templates/TaskConfigurationForm';
+import {
+  PLATFORM_TASK_TYPES,
+  TASK_TYPE_VERIFICATION,
+  TIER_GUIDANCE,
+  type VerificationTier,
+} from '@shared/taskTemplates';
 
 interface TemplatePickerProps {
   open: boolean;
@@ -26,8 +39,18 @@ interface TemplatePickerProps {
   onTaskCreated?: () => void;
 }
 
-type Platform = "twitter" | "facebook" | "instagram" | "youtube" | "tiktok" | "spotify" | "discord" | "twitch" | "kick" | "patreon";
-type Step = "platform" | "taskType" | "configuration";
+type Platform =
+  | 'twitter'
+  | 'facebook'
+  | 'instagram'
+  | 'youtube'
+  | 'tiktok'
+  | 'spotify'
+  | 'discord'
+  | 'twitch'
+  | 'kick'
+  | 'patreon';
+type Step = 'platform' | 'taskType' | 'configuration';
 
 interface TaskType {
   value: string;
@@ -41,30 +64,30 @@ interface TaskType {
 // Get tier badge component with tooltip showing trust level and points guidance
 function TierBadge({ tier }: { tier?: VerificationTier }) {
   if (!tier) return null;
-  
+
   const config = {
-    'T1': { 
-      icon: ShieldCheck, 
-      label: 'API Verified', 
-      className: 'bg-green-500/20 text-green-400 border-green-500/30' 
+    T1: {
+      icon: ShieldCheck,
+      label: 'API Verified',
+      className: 'bg-green-500/20 text-green-400 border-green-500/30',
     },
-    'T2': { 
-      icon: Shield, 
-      label: 'Code Verified', 
-      className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
+    T2: {
+      icon: Shield,
+      label: 'Code Verified',
+      className: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     },
-    'T3': { 
-      icon: ShieldAlert, 
-      label: 'Honor System', 
-      className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
+    T3: {
+      icon: ShieldAlert,
+      label: 'Honor System',
+      className: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     },
   }[tier];
-  
+
   if (!config) return null;
-  
+
   const IconComponent = config.icon;
   const guidance = TIER_GUIDANCE[tier];
-  
+
   return (
     <TooltipProvider>
       <Tooltip>
@@ -87,9 +110,7 @@ function TierBadge({ tier }: { tier?: VerificationTier }) {
               <Info className="h-3 w-3 text-primary" />
               <span className="font-medium">Recommended: {guidance.pointsRange}</span>
             </div>
-            {guidance.tip && (
-              <p className="text-xs text-green-400 italic">{guidance.tip}</p>
-            )}
+            {guidance.tip && <p className="text-xs text-green-400 italic">{guidance.tip}</p>}
             {guidance.warning && (
               <div className="flex items-start gap-1.5 text-xs text-amber-400">
                 <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
@@ -105,132 +126,132 @@ function TierBadge({ tier }: { tier?: VerificationTier }) {
 
 const PLATFORM_CONFIG = {
   twitter: {
-    name: "X (Twitter)",
+    name: 'X (Twitter)',
     icon: Twitter,
-    color: "bg-blue-500",
-    description: "Grow your X/Twitter following and engagement",
+    color: 'bg-blue-500',
+    description: 'Grow your X/Twitter following and engagement',
     tier1Available: true,
   },
   facebook: {
-    name: "Facebook", 
+    name: 'Facebook',
     icon: Facebook,
-    color: "bg-blue-600",
-    description: "Increase Facebook page likes and engagement",
+    color: 'bg-blue-600',
+    description: 'Increase Facebook page likes and engagement',
     tier1Available: false,
   },
   instagram: {
-    name: "Instagram",
+    name: 'Instagram',
     icon: Instagram,
-    color: "bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500",
-    description: "Boost Instagram followers and post engagement",
+    color: 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500',
+    description: 'Boost Instagram followers and post engagement',
     tier1Available: false,
   },
   youtube: {
-    name: "YouTube",
+    name: 'YouTube',
     icon: Youtube,
-    color: "bg-red-600",
-    description: "Grow YouTube subscribers and video engagement",
+    color: 'bg-red-600',
+    description: 'Grow YouTube subscribers and video engagement',
     tier1Available: true,
   },
   tiktok: {
-    name: "TikTok",
+    name: 'TikTok',
     icon: SiTiktok,
-    color: "bg-black",
-    description: "Increase TikTok followers and video engagement",
+    color: 'bg-black',
+    description: 'Increase TikTok followers and video engagement',
     tier1Available: false,
   },
   spotify: {
-    name: "Spotify",
+    name: 'Spotify',
     icon: SiSpotify,
-    color: "bg-green-500",
-    description: "Grow Spotify followers and playlist engagement",
+    color: 'bg-green-500',
+    description: 'Grow Spotify followers and playlist engagement',
     tier1Available: true,
   },
   discord: {
-    name: "Discord",
+    name: 'Discord',
     icon: SiDiscord,
-    color: "bg-indigo-500",
-    description: "Build your Discord community engagement",
+    color: 'bg-indigo-500',
+    description: 'Build your Discord community engagement',
     tier1Available: true,
   },
   twitch: {
-    name: "Twitch",
+    name: 'Twitch',
     icon: SiTwitch,
-    color: "bg-purple-500",
-    description: "Grow your Twitch channel followers and subs",
+    color: 'bg-purple-500',
+    description: 'Grow your Twitch channel followers and subs',
     tier1Available: true,
   },
   kick: {
-    name: "Kick",
+    name: 'Kick',
     icon: Zap,
-    color: "bg-green-400",
-    description: "Build your Kick streaming community",
+    color: 'bg-green-400',
+    description: 'Build your Kick streaming community',
     tier1Available: true,
   },
   patreon: {
-    name: "Patreon",
+    name: 'Patreon',
     icon: Music2,
-    color: "bg-orange-500",
-    description: "Grow your Patreon supporter base",
+    color: 'bg-orange-500',
+    description: 'Grow your Patreon supporter base',
     tier1Available: true,
   },
 } as const;
 
-export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }: TemplatePickerProps) {
-  const [currentStep, setCurrentStep] = useState<Step>("platform");
+export function TemplatePicker({ open, onOpenChange, onTaskCreated }: TemplatePickerProps) {
+  const [currentStep, setCurrentStep] = useState<Step>('platform');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [selectedTaskType, setSelectedTaskType] = useState<TaskType | null>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
   const { isPlatformConnected: checkPlatformConnected } = useSocialConnections();
 
   // Use local platform task types (like Snag - no API needed)
   // All PLATFORM_TASK_TYPES values are now canonical names, so direct lookup works.
-  const taskTypes = selectedPlatform && currentStep === "taskType" 
-    ? PLATFORM_TASK_TYPES[selectedPlatform]?.map(taskType => {
-        // Look up verification tier info — values are already canonical
-        const tierInfo = TASK_TYPE_VERIFICATION[taskType.value];
-        const tier = tierInfo?.tier || 'T3';
-        
-        // Adjust default points based on verification tier
-        let defaultPoints = 50;
-        if (taskType.value.includes('follow')) {
-          defaultPoints = tier === 'T1' ? 50 : tier === 'T2' ? 40 : 25;
-        } else if (taskType.value.includes('like')) {
-          defaultPoints = tier === 'T1' ? 25 : tier === 'T2' ? 20 : 15;
-        } else if (taskType.value.includes('share') || taskType.value.includes('retweet')) {
-          defaultPoints = tier === 'T1' ? 100 : tier === 'T2' ? 85 : 50;
-        } else if (taskType.value.includes('comment') || taskType.value.includes('code')) {
-          defaultPoints = tier === 'T2' ? 40 : 30;
-        } else if (taskType.value.includes('subscribe')) {
-          defaultPoints = tier === 'T1' ? 100 : 50;
-        } else {
-          defaultPoints = tier === 'T1' ? 75 : tier === 'T2' ? 60 : 40;
-        }
-        
-        return {
-          value: taskType.value,
-          label: taskType.label,
-          description: `Fans ${taskType.label.toLowerCase()} to earn points`,
-          points: defaultPoints,
-          icon: taskType.icon,
-          verificationTier: tier,
-        };
-      }) || []
-    : [];
+  const taskTypes =
+    selectedPlatform && currentStep === 'taskType'
+      ? PLATFORM_TASK_TYPES[selectedPlatform]?.map((taskType) => {
+          // Look up verification tier info — values are already canonical
+          const tierInfo = TASK_TYPE_VERIFICATION[taskType.value];
+          const tier = tierInfo?.tier || 'T3';
+
+          // Adjust default points based on verification tier
+          let defaultPoints = 50;
+          if (taskType.value.includes('follow')) {
+            defaultPoints = tier === 'T1' ? 50 : tier === 'T2' ? 40 : 25;
+          } else if (taskType.value.includes('like')) {
+            defaultPoints = tier === 'T1' ? 25 : tier === 'T2' ? 20 : 15;
+          } else if (taskType.value.includes('share') || taskType.value.includes('retweet')) {
+            defaultPoints = tier === 'T1' ? 100 : tier === 'T2' ? 85 : 50;
+          } else if (taskType.value.includes('comment') || taskType.value.includes('code')) {
+            defaultPoints = tier === 'T2' ? 40 : 30;
+          } else if (taskType.value.includes('subscribe')) {
+            defaultPoints = tier === 'T1' ? 100 : 50;
+          } else {
+            defaultPoints = tier === 'T1' ? 75 : tier === 'T2' ? 60 : 40;
+          }
+
+          return {
+            value: taskType.value,
+            label: taskType.label,
+            description: `Fans ${taskType.label.toLowerCase()} to earn points`,
+            points: defaultPoints,
+            icon: taskType.icon,
+            verificationTier: tier,
+          };
+        }) || []
+      : [];
   const taskTypesLoading = false;
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (taskData: any) => {
-      const response = await apiRequest("POST", "/api/tasks", taskData);
+    mutationFn: async (taskData: Record<string, unknown>) => {
+      const response = await apiRequest('POST', '/api/tasks', taskData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
       toast({
-        title: "Task Created",
+        title: 'Task Created',
         description: `Successfully created ${selectedTaskType?.label} task for ${PLATFORM_CONFIG[selectedPlatform!].name}`,
       });
       handleClose();
@@ -238,15 +259,15 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
     },
     onError: (error) => {
       toast({
-        variant: "destructive", 
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create task"
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create task',
       });
-    }
+    },
   });
 
   const handleClose = () => {
-    setCurrentStep("platform");
+    setCurrentStep('platform');
     setSelectedPlatform(null);
     setSelectedTaskType(null);
     onOpenChange(false);
@@ -254,25 +275,25 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
 
   const handlePlatformSelect = (platform: Platform) => {
     setSelectedPlatform(platform);
-    setCurrentStep("taskType");
+    setCurrentStep('taskType');
   };
 
   const handleTaskTypeSelect = (taskType: TaskType) => {
     setSelectedTaskType(taskType);
-    setCurrentStep("configuration");
+    setCurrentStep('configuration');
   };
 
   const handleBack = () => {
-    if (currentStep === "taskType") {
-      setCurrentStep("platform");
+    if (currentStep === 'taskType') {
+      setCurrentStep('platform');
       setSelectedPlatform(null);
-    } else if (currentStep === "configuration") {
-      setCurrentStep("taskType");
+    } else if (currentStep === 'configuration') {
+      setCurrentStep('taskType');
       setSelectedTaskType(null);
     }
   };
 
-  const handleConfigurationSubmit = (config: any) => {
+  const handleConfigurationSubmit = (config: Record<string, unknown>) => {
     if (!selectedPlatform || !selectedTaskType) return;
 
     const platform = selectedPlatform;
@@ -312,7 +333,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
 
     if (!connected) {
       toast({
-        title: "Task saved in Pending",
+        title: 'Task saved in Pending',
         description: `Connect your ${PLATFORM_CONFIG[platform].name} account to publish this task.`,
       });
     }
@@ -325,33 +346,36 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            {currentStep !== "platform" && (
+            {currentStep !== 'platform' && (
               <Button variant="ghost" size="sm" onClick={handleBack} data-testid="button-back">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
             <span className="text-[#101636]">
-              {currentStep === "platform" && "Choose Platform"}
-              {currentStep === "taskType" && `Select ${PLATFORM_CONFIG[selectedPlatform!]?.name} Task`}
-              {currentStep === "configuration" && `Configure ${selectedTaskType?.label} Task`}
+              {currentStep === 'platform' && 'Choose Platform'}
+              {currentStep === 'taskType' &&
+                `Select ${PLATFORM_CONFIG[selectedPlatform!]?.name} Task`}
+              {currentStep === 'configuration' && `Configure ${selectedTaskType?.label} Task`}
             </span>
           </DialogTitle>
         </DialogHeader>
 
         {/* Platform Selection Step */}
-        {currentStep === "platform" && (
+        {currentStep === 'platform' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
             {Object.entries(PLATFORM_CONFIG).map(([key, platform]) => {
               const IconComponent = platform.icon;
               return (
-                <Card 
+                <Card
                   key={key}
                   className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-primary"
                   onClick={() => handlePlatformSelect(key as Platform)}
                   data-testid={`card-platform-${key}`}
                 >
                   <CardContent className="p-6 text-center">
-                    <div className={`w-16 h-16 rounded-full ${platform.color} flex items-center justify-center mx-auto mb-4`}>
+                    <div
+                      className={`w-16 h-16 rounded-full ${platform.color} flex items-center justify-center mx-auto mb-4`}
+                    >
                       <IconComponent className="h-8 w-8 text-white" />
                     </div>
                     <CardTitle className="text-lg mb-2 text-white">{platform.name}</CardTitle>
@@ -366,7 +390,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
         )}
 
         {/* Task Type Selection Step */}
-        {currentStep === "taskType" && selectedPlatform && (
+        {currentStep === 'taskType' && selectedPlatform && (
           <div className="p-6 space-y-6">
             {taskTypesLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -377,7 +401,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {taskTypes?.map((taskType) => (
-                    <Card 
+                    <Card
                       key={taskType.value}
                       className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-primary"
                       onClick={() => handleTaskTypeSelect(taskType)}
@@ -388,13 +412,13 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <Zap className="h-4 w-4 text-primary" />
-                              <CardTitle className="text-base text-white">{taskType.label}</CardTitle>
+                              <CardTitle className="text-base text-white">
+                                {taskType.label}
+                              </CardTitle>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
                               <TierBadge tier={taskType.verificationTier} />
-                              <Badge variant="secondary">
-                                {taskType.points} pts
-                              </Badge>
+                              <Badge variant="secondary">{taskType.points} pts</Badge>
                             </div>
                             <CardDescription className="text-sm text-white">
                               {taskType.description}
@@ -417,7 +441,9 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
                 <div className="border-t border-white/10 pt-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Info className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Verification Tiers Guide</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Verification Tiers Guide
+                    </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                     <div className="flex items-start gap-2 p-2 rounded bg-green-500/5 border border-green-500/20">
@@ -449,7 +475,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
         )}
 
         {/* Configuration Step */}
-        {currentStep === "configuration" && selectedPlatform && selectedTaskType && (
+        {currentStep === 'configuration' && selectedPlatform && selectedTaskType && (
           <div className="p-6">
             <TaskConfigurationForm
               platform={selectedPlatform}
