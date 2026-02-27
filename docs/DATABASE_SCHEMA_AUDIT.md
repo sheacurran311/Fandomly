@@ -49,11 +49,11 @@
 | 37 | `creator_referrals` | Creator→Creator referral tracking (revenue share) | **Active** | 28+ refs in referral-service | — |
 | 38 | `fan_referrals` | Fan→Fan referral tracking (platform rewards) | **Active** | 29+ refs in referral-service | — |
 | 39 | `creator_task_referrals` | Creator task/campaign referrals | **Active** | 35+ refs in referral-service | — |
-| 40 | `nft_collections` | Creator/platform NFT collections | **Deprecated** | 23+ refs in crossmint-routes; **NFT/Crossmint being removed** per task description | Part of NFT subsystem |
-| 41 | `fandomly_badge_templates` | Platform badge credential templates | **Deprecated** | 5+ refs in badge-rewards-service; **NFT/Crossmint dependency** | Part of NFT subsystem |
-| 42 | `nft_templates` | Creator NFT templates per collection | **Deprecated** | 24 refs in crossmint-routes; **NFT/Crossmint being removed** | Part of NFT subsystem |
-| 43 | `nft_mints` | NFT minting operation log | **Deprecated** | 14+ refs in crossmint-routes; **NFT/Crossmint being removed** | Part of NFT subsystem |
-| 44 | `nft_deliveries` | NFT delivery tracking to users | **Deprecated** | 7 refs in crossmint-routes; **NFT/Crossmint being removed** | Part of NFT subsystem |
+| 40 | `nft_collections` | Creator/platform NFT collections | **Keep — repurpose** | Crossmint integration removed, but table will be repurposed for Fandomly L1 blockchain NFT/token system | Part of NFT subsystem → L1 |
+| 41 | `fandomly_badge_templates` | Platform badge credential templates | **Keep — repurpose** | Crossmint removed; badge system will be rebuilt on Fandomly L1 ReputationRegistry contract | Part of NFT subsystem → L1 |
+| 42 | `nft_templates` | Creator NFT templates per collection | **Keep — repurpose** | Crossmint removed; will be repurposed for Fandomly L1 token/NFT system | Part of NFT subsystem → L1 |
+| 43 | `nft_mints` | NFT minting operation log | **Keep — repurpose** | Crossmint removed; will be repurposed for Fandomly L1 mint tracking | Part of NFT subsystem → L1 |
+| 44 | `nft_deliveries` | NFT delivery tracking to users | **Keep — repurpose** | Crossmint removed; will be repurposed for Fandomly L1 delivery tracking | Part of NFT subsystem → L1 |
 | 45 | `audit_log` | Comprehensive audit trail | **Active** | 11+ refs in storage.ts, audit-logging middleware | — |
 | 46 | `verification_codes` | Unique per-fan-per-task verification codes | **Active** | 23+ refs in code-service, youtube/kick verification | — |
 | 47 | `group_goals` | Community group goals with collective rewards | **Active** | 26+ refs in group-goal-poller, group-goal-service | — |
