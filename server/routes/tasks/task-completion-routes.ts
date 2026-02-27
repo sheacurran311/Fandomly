@@ -709,12 +709,15 @@ export function createTaskCompletionRoutes(storage: IStorage) {
       switch (platform) {
         case 'twitter':
           switch (taskType) {
+            case 'twitter_follow':
             case 'follow':
               result = await verifyTwitterFollow(req.user.id, targetData.creatorTwitterId);
               break;
+            case 'twitter_like':
             case 'like':
               result = await verifyTwitterLike(req.user.id, targetData.tweetId);
               break;
+            case 'twitter_retweet':
             case 'retweet':
               result = await verifyTwitterRetweet(req.user.id, targetData.tweetId);
               break;
@@ -725,12 +728,15 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         case 'youtube':
           switch (taskType) {
+            case 'youtube_subscribe':
             case 'subscribe':
               result = await verifyYouTubeSubscription(req.user.id, targetData.channelId);
               break;
+            case 'youtube_like':
             case 'like':
               result = await verifyYouTubeLike(req.user.id, targetData.videoId);
               break;
+            case 'youtube_comment':
             case 'comment':
               result = await verifyYouTubeComment(req.user.id, targetData.videoId);
               break;
@@ -741,9 +747,11 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         case 'spotify':
           switch (taskType) {
+            case 'spotify_follow':
             case 'follow_artist':
               result = await verifySpotifyFollowArtist(req.user.id, targetData.artistId);
               break;
+            case 'spotify_playlist':
             case 'follow_playlist':
               result = await verifySpotifyFollowPlaylist(req.user.id, targetData.playlistId);
               break;
@@ -754,12 +762,15 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         case 'tiktok':
           switch (taskType) {
+            case 'tiktok_follow':
             case 'follow':
               result = await verifyTikTokFollow(req.user.id, targetData.creatorTikTokId);
               break;
+            case 'tiktok_like':
             case 'like':
               result = await verifyTikTokLike(req.user.id, targetData.videoId);
               break;
+            case 'tiktok_comment':
             case 'comment':
               result = await verifyTikTokComment(req.user.id, targetData.videoId);
               break;
@@ -784,9 +795,14 @@ export function createTaskCompletionRoutes(storage: IStorage) {
             case 'comment':
               result = await verifyFacebookComment(req.user.id, targetData.postId);
               break;
+            case 'facebook_share_post':
+            case 'facebook_share_page':
             case 'facebook_share':
             case 'share':
               result = await verifyFacebookShare(req.user.id, targetData.postId);
+              break;
+            case 'facebook_like_photo':
+              result = await verifyFacebookPostLike(req.user.id, targetData.postId);
               break;
             default:
               return res.status(400).json({ error: 'Invalid Facebook task type' });

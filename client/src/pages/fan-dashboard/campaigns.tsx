@@ -148,36 +148,46 @@ export default function FanCampaigns() {
     return (
       <div className="space-y-2">
         {effects.map((effect, index) => {
-          const actionType = effect.notificationTemplate;
+          const rawAction = effect.notificationTemplate;
+          const legacyToCanonical: Record<string, string> = {
+            'follow_facebook': 'facebook_like_page',
+            'follow_instagram': 'instagram_follow',
+            'follow_x': 'twitter_follow',
+            'like_post': 'facebook_like_post',
+            'share_post': 'facebook_share_post',
+            'comment_post': 'facebook_comment_post',
+            'retweet': 'twitter_retweet',
+          };
+          const actionType = legacyToCanonical[rawAction] || rawAction;
           let icon, text, bgColor;
           
           switch(actionType) {
-            case 'follow_facebook':
+            case 'facebook_like_page':
               icon = <Facebook className="h-4 w-4" />;
               text = 'Follow on Facebook';
               bgColor = 'bg-blue-600 hover:bg-blue-700';
               break;
-            case 'follow_instagram':
+            case 'instagram_follow':
               icon = <Instagram className="h-4 w-4" />;
               text = 'Follow on Instagram';
               bgColor = 'bg-pink-600 hover:bg-pink-700';
               break;
-            case 'follow_x':
+            case 'twitter_follow':
               icon = <Twitter className="h-4 w-4" />;
               text = 'Follow on X';
               bgColor = 'bg-gray-800 hover:bg-gray-900';
               break;
-            case 'like_post':
+            case 'facebook_like_post':
               icon = <Heart className="h-4 w-4" />;
               text = 'Like Post';
               bgColor = 'bg-red-600 hover:bg-red-700';
               break;
-            case 'share_post':
+            case 'facebook_share_post':
               icon = <Share2 className="h-4 w-4" />;
               text = 'Share Post';
               bgColor = 'bg-green-600 hover:bg-green-700';
               break;
-            case 'comment_post':
+            case 'facebook_comment_post':
               icon = <MessageCircle className="h-4 w-4" />;
               text = 'Comment on Post';
               bgColor = 'bg-purple-600 hover:bg-purple-700';

@@ -22,7 +22,6 @@ import { registerDashboardStatsRoutes } from "./user/dashboard-stats-routes";
 import { registerNotificationRoutes } from "./user/notification-routes";
 import { registerRedemptionRoutes } from "./rewards/redemption-routes";
 import { registerGdprRoutes } from "./user/gdpr-routes";
-import { registerCrossmintRoutes } from "./nft/crossmint-routes";
 import { registerProgramRoutes } from "./programs/program-routes";
 import { registerAnnouncementRoutes } from "./media/announcement-routes";
 import { registerAgencyRoutes } from "./admin/agency-routes";
@@ -194,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // JWKS endpoint for Crossmint JWT validation
+  // JWKS endpoint for JWT validation
   app.get('/.well-known/jwks.json', (req, res) => {
     try {
       const jwks = getJWKS();
@@ -2376,23 +2375,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    // Validate NFT collections
-    if (campaignData.requiredNftCollectionIds && Array.isArray(campaignData.requiredNftCollectionIds) && campaignData.requiredNftCollectionIds.length > 0) {
-      const { nftCollections } = await import("@shared/schema");
-      const { inArray } = await import("drizzle-orm");
-      
-      const existing = await db.select({ id: nftCollections.id })
-        .from(nftCollections)
-        .where(inArray(nftCollections.id, campaignData.requiredNftCollectionIds));
-      
-      const existingIds = new Set(existing.map(c => c.id));
-      const invalid = campaignData.requiredNftCollectionIds.filter((id: string) => !existingIds.has(id));
-      
-      if (invalid.length > 0) {
-        errors.push(`Invalid NFT collections: ${invalid.join(', ')}`);
-      }
-    }
-
     // Validate badge templates
     if (campaignData.requiredBadgeIds && Array.isArray(campaignData.requiredBadgeIds) && campaignData.requiredBadgeIds.length > 0) {
       const { fandomlyBadgeTemplates } = await import("@shared/schema");
@@ -2511,7 +2493,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prerequisiteCampaigns: campaignData.requirements?.prerequisiteCampaigns || [],
         allTasksRequired: campaignData.requirements?.allTasksRequired ?? true,
         requiredTaskIds: campaignData.requirements?.requiredTaskIds || [],
-        requiredNftCollectionIds: campaignData.requirements?.requiredNftCollectionIds || [],
         requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || []
       };
 
@@ -2694,17 +2675,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to get points for social actions
   function getActionPoints(actionType: string): number {
+    // Normalize legacy campaign action types to canonical format
+    const legacyMap: Record<string, string> = {
+      'follow_facebook': 'facebook_like_page',
+      'follow_instagram': 'instagram_follow',
+      'follow_x': 'twitter_follow',
+      'like_post': 'facebook_like_post',
+      'share_post': 'facebook_share_post',
+      'comment_post': 'facebook_comment_post',
+      'retweet': 'twitter_retweet',
+    };
+    const canonical = legacyMap[actionType] || actionType;
+
+    // Canonical task template names (platform_action format)
     const pointMap: Record<string, number> = {
-      'follow_facebook': 50,
-      'follow_instagram': 50, 
-      'follow_x': 50,
-      'like_post': 50,
-      'share_post': 200,
-      'comment_post': 100,
-      'retweet': 100,
+      'twitter_follow': 50,
+      'twitter_like': 25,
+      'twitter_retweet': 100,
+      'twitter_mention': 75,
+      'twitter_quote_tweet': 85,
+      'twitter_hashtag_post': 85,
+      'twitter_include_name': 25,
+      'twitter_include_bio': 25,
+      'instagram_follow': 50,
+      'instagram_like_post': 25,
+      'facebook_like_page': 50,
+      'facebook_like_post': 50,
+      'facebook_like_photo': 25,
+      'facebook_share_post': 200,
+      'facebook_share_page': 75,
+      'facebook_comment_post': 100,
+      'facebook_comment_photo': 100,
+      'youtube_subscribe': 100,
+      'youtube_like': 25,
+      'youtube_comment': 40,
+      'tiktok_follow': 50,
+      'tiktok_like': 25,
+      'tiktok_comment': 40,
+      'spotify_follow': 50,
+      'spotify_playlist': 40,
+      'spotify_album': 30,
+      'discord_join': 75,
+      'discord_role': 50,
+      'discord_react': 25,
+      'twitch_follow': 50,
+      'twitch_subscribe': 200,
+      'kick_follow': 50,
+      'kick_subscribe': 200,
+      'patreon_support': 200,
+      'patreon_tier_check': 150,
       'default': 50
     };
-    return pointMap[actionType] || pointMap['default'];
+    return pointMap[canonical] || pointMap['default'];
   }
 
   // Creator Facebook Pages: import and fetch
@@ -3953,9 +3975,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register points routes
   registerPointsRoutes(app);
-
-  // Register Crossmint NFT routes
-  registerCrossmintRoutes(app);
 
   // Register notification routes
   registerNotificationRoutes(app);
