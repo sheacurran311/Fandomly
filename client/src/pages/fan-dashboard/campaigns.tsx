@@ -167,16 +167,19 @@ export default function FanCampaigns() {
               text = 'Follow on X';
               bgColor = 'bg-gray-800 hover:bg-gray-900';
               break;
+            case 'facebook_like_post':
             case 'like_post':
               icon = <Heart className="h-4 w-4" />;
               text = 'Like Post';
               bgColor = 'bg-red-600 hover:bg-red-700';
               break;
+            case 'facebook_share_post':
             case 'share_post':
               icon = <Share2 className="h-4 w-4" />;
               text = 'Share Post';
               bgColor = 'bg-green-600 hover:bg-green-700';
               break;
+            case 'facebook_comment_post':
             case 'comment_post':
               icon = <MessageCircle className="h-4 w-4" />;
               text = 'Comment on Post';

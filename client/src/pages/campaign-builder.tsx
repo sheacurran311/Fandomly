@@ -261,12 +261,12 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
   const taskTypes = [
     { id: 'follow', name: 'Follow/Like/Subscribe', platforms: ['facebook', 'instagram', 'twitter', 'tiktok', 'youtube', 'spotify'] },
-    { id: 'playlist', name: 'Follow Playlist', platforms: ['spotify'] },
-    { id: 'album', name: 'Add Album', platforms: ['appleMusic'] },
-    { id: 'join', name: 'Join Server/Group', platforms: ['discord', 'telegram'] },
+    { id: 'spotify_playlist', name: 'Follow Playlist', platforms: ['spotify'] },
+    { id: 'spotify_album', name: 'Add Album', platforms: ['spotify'] },
+    { id: 'discord_join', name: 'Join Server/Group', platforms: ['discord'] },
     { id: 'like_post', name: 'Like Specific Post', platforms: ['facebook', 'instagram', 'twitter', 'tiktok'] },
     { id: 'repost', name: 'Repost/Retweet', platforms: ['facebook', 'instagram', 'twitter', 'tiktok'] },
-    { id: 'hashtag_post', name: 'Post with Hashtag', platforms: ['twitter', 'instagram', 'tiktok'] },
+    { id: 'twitter_hashtag_post', name: 'Post with Hashtag', platforms: ['twitter', 'instagram', 'tiktok'] },
     { id: 'referral', name: 'Referral (1 point each)', platforms: ['all'] }
   ];
 

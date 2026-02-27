@@ -185,16 +185,11 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
   const { isPlatformConnected: checkPlatformConnected } = useSocialConnections();
 
   // Use local platform task types (like Snag - no API needed)
-  // Now includes verification tier info for each task type
+  // All PLATFORM_TASK_TYPES values are now canonical names, so direct lookup works.
   const taskTypes = selectedPlatform && currentStep === "taskType" 
     ? PLATFORM_TASK_TYPES[selectedPlatform]?.map(taskType => {
-        // Build the canonical task type for tier lookup
-        const canonicalType = taskType.value.includes('_') 
-          ? taskType.value 
-          : `${selectedPlatform}_${taskType.value}`;
-        
-        // Look up verification tier info
-        const tierInfo = TASK_TYPE_VERIFICATION[canonicalType] || TASK_TYPE_VERIFICATION[taskType.value];
+        // Look up verification tier info — values are already canonical
+        const tierInfo = TASK_TYPE_VERIFICATION[taskType.value];
         const tier = tierInfo?.tier || 'T3';
         
         // Adjust default points based on verification tier
@@ -281,10 +276,7 @@ export function TemplatePicker({ open, onOpenChange, campaignId, onTaskCreated }
     if (!selectedPlatform || !selectedTaskType) return;
 
     const platform = selectedPlatform;
-    const rawTaskType = selectedTaskType.value as string;
-    const canonicalTaskType = rawTaskType.includes('_') && rawTaskType.startsWith(platform)
-      ? rawTaskType
-      : `${platform}_${rawTaskType}`;
+    const canonicalTaskType = selectedTaskType.value as string;
 
     // Connectivity gate: determine if this platform is connected (unified check)
     const connected = checkPlatformConnected(platform);

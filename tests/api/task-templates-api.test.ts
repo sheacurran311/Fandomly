@@ -144,8 +144,8 @@ describe('Task Template Catalog', () => {
     );
   });
 
-  it('should have 38+ core task templates', () => {
-    expect(CORE_TASK_TEMPLATES.length).toBeGreaterThanOrEqual(38);
+  it('should have 43+ core task templates (all platforms fully wired)', () => {
+    expect(CORE_TASK_TEMPLATES.length).toBeGreaterThanOrEqual(43);
   });
 
   it('every core template should have verification tier info', () => {
