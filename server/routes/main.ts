@@ -2693,12 +2693,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to get points for social actions
   function getActionPoints(actionType: string): number {
+    // Normalize legacy campaign action types to canonical format
+    const legacyMap: Record<string, string> = {
+      'follow_facebook': 'facebook_like_page',
+      'follow_instagram': 'instagram_follow',
+      'follow_x': 'twitter_follow',
+      'like_post': 'facebook_like_post',
+      'share_post': 'facebook_share_post',
+      'comment_post': 'facebook_comment_post',
+      'retweet': 'twitter_retweet',
+    };
+    const canonical = legacyMap[actionType] || actionType;
+
+    // Canonical task template names (platform_action format)
     const pointMap: Record<string, number> = {
-      'follow_facebook': 50,
-      'follow_instagram': 50, 
-      'follow_x': 50,
       'twitter_follow': 50,
+      'twitter_like': 25,
+      'twitter_retweet': 100,
+      'twitter_mention': 75,
+      'twitter_quote_tweet': 85,
+      'twitter_hashtag_post': 85,
+      'twitter_include_name': 25,
+      'twitter_include_bio': 25,
       'instagram_follow': 50,
+      'instagram_like_post': 25,
       'facebook_like_page': 50,
       'facebook_like_post': 50,
       'facebook_like_photo': 25,
@@ -2706,15 +2724,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'facebook_share_page': 75,
       'facebook_comment_post': 100,
       'facebook_comment_photo': 100,
-      'twitter_retweet': 100,
-      'twitter_like': 25,
-      'like_post': 50,
-      'share_post': 200,
-      'comment_post': 100,
-      'retweet': 100,
+      'youtube_subscribe': 100,
+      'youtube_like': 25,
+      'youtube_comment': 40,
+      'tiktok_follow': 50,
+      'tiktok_like': 25,
+      'tiktok_comment': 40,
+      'spotify_follow': 50,
+      'spotify_playlist': 40,
+      'spotify_album': 30,
+      'discord_join': 75,
+      'discord_role': 50,
+      'discord_react': 25,
+      'twitch_follow': 50,
+      'twitch_subscribe': 200,
+      'kick_follow': 50,
+      'kick_subscribe': 200,
+      'patreon_support': 200,
+      'patreon_tier_check': 150,
       'default': 50
     };
-    return pointMap[actionType] || pointMap['default'];
+    return pointMap[canonical] || pointMap['default'];
   }
 
   // Creator Facebook Pages: import and fetch
