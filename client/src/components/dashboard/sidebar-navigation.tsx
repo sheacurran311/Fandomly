@@ -1,118 +1,72 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { FacebookSDKManager, FacebookPage } from "@/lib/facebook";
-import { useFacebookConnection } from "@/hooks/use-social-connection";
-import { getNavigationItems, type NavigationItem } from "@/config/navigation";
-import { 
+import { useState } from 'react';
+import { Link, useLocation } from 'wouter';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/hooks/use-auth';
+import { useQuery } from '@tanstack/react-query';
+import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { getNavigationItems } from '@/config/navigation';
+import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  MoreHorizontal,
-  User,
-} from "lucide-react";
+  Plus,
+  Target,
+  Megaphone,
+} from 'lucide-react';
 
 interface SidebarNavigationProps {
-  userType: "creator" | "fan";
+  userType: 'creator' | 'fan';
   className?: string;
   isNILAthlete?: boolean;
 }
 
-export default function SidebarNavigation({ userType, className, isNILAthlete = false }: SidebarNavigationProps) {
-  const [location] = useLocation();
+export default function SidebarNavigation({
+  userType,
+  className,
+  isNILAthlete = false,
+}: SidebarNavigationProps) {
+  const [location, setLocation] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>([]); // Collapse parent menus by default
-  const { toast } = useToast();
-  
-  // Facebook connection via unified hook
-  const {
-    isConnected: facebookConnected,
-    isLoading: isLoadingFacebook,
-  } = useFacebookConnection();
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
 
-  // Facebook page state for page selection display
-  const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
-  const [activePage, setActivePage] = useState<FacebookPage | null>(null);
-  const [showPageModal, setShowPageModal] = useState(false);
-  
+  const { user, isAuthenticated } = useAuth();
+  const particleEnabled = isParticleAuthEnabled();
+
+  // Fetch creator's program for sidebar profile photo
+  const { data: programs = [] } = useQuery<Array<{ pageConfig?: { logo?: string } }>>({
+    queryKey: ['/api/programs'],
+    enabled: isAuthenticated && userType === 'creator',
+    staleTime: 30000,
+  });
+  const program = programs[0];
+  const programLogo = program?.pageConfig?.logo;
+
   const items = getNavigationItems(userType, isNILAthlete);
-  
+
   const toggleSubmenu = (label: string) => {
-    setExpandedMenus(prev => 
-      prev.includes(label) 
-        ? prev.filter(item => item !== label)
-        : [...prev, label]
+    setExpandedMenus((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
     );
   };
 
-  // Load Facebook pages when connection status becomes connected
-  useEffect(() => {
-    if (userType === 'creator' && facebookConnected) {
-      loadFacebookPages();
-    } else if (!facebookConnected) {
-      setFacebookPages([]);
-      setActivePage(null);
-    }
-  }, [userType, facebookConnected]);
-
-  const loadFacebookPages = async () => {
-    try {
-      // Try live SDK pages first
-      let pages: FacebookPage[] = [];
-      try {
-        await FacebookSDKManager.ensureFBReady('creator');
-        const status = await FacebookSDKManager.getLoginStatus();
-        if (status.isLoggedIn) {
-          pages = await FacebookSDKManager.getUserPages();
-        }
-      } catch {
-        // SDK not available
-      }
-
-      // Fall back to stored pages from database
-      if (pages.length === 0) {
-        const { getSocialConnection } = await import('@/lib/social-connection-api');
-        const { connection } = await getSocialConnection('facebook');
-        if (connection?.profileData?.pages?.length) {
-          pages = connection.profileData.pages;
-        }
-      }
-
-      setFacebookPages(pages);
-      
-      if (pages.length > 0) {
-        const savedActivePageId = localStorage.getItem('fandomly_active_facebook_page_id');
-        const pageToSet = pages.find(page => page.id === savedActivePageId) || pages[0];
-        setActivePage(pageToSet);
-        if (!savedActivePageId && pageToSet) {
-          localStorage.setItem('fandomly_active_facebook_page_id', pageToSet.id);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading Facebook pages in sidebar:', error);
-      setFacebookPages([]);
-      setActivePage(null);
-    }
-  };
-
   return (
-    <div className={cn(
-      "flex flex-col bg-brand-dark-purple/30 backdrop-blur-lg border-r border-white/10 transition-all duration-300 fixed top-0 left-0 h-screen",
-      isCollapsed ? "w-16" : "w-64",
-      className
-    )}>
+    <div
+      className={cn(
+        'flex flex-col bg-brand-dark-purple/30 backdrop-blur-lg border-r border-white/10 transition-all duration-300 fixed top-0 left-0 h-screen',
+        isCollapsed ? 'w-16' : 'w-64',
+        className
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
         {!isCollapsed && (
           <div>
             <h2 className="text-lg font-bold text-white">
-              {userType === "creator" ? "Creator Hub" : "Fan Zone"}
+              {userType === 'creator' ? 'Creator Hub' : 'Fan Zone'}
             </h2>
             <p className="text-sm text-gray-400 capitalize">{userType} Dashboard</p>
           </div>
@@ -132,9 +86,11 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
         {items.map((item) => {
           const hasSubmenu = item.submenu && item.submenu.length > 0;
           const isExpanded = expandedMenus.includes(item.label);
-          const isActive = location === item.href || (item.href !== `/${userType}-dashboard` && location.startsWith(item.href));
+          const isActive =
+            location === item.href ||
+            (item.href !== `/${userType}-dashboard` && location.startsWith(item.href));
           const Icon = item.icon;
-          
+
           return (
             <div key={item.href}>
               {hasSubmenu ? (
@@ -142,17 +98,17 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
                   <div
                     onClick={() => !isCollapsed && toggleSubmenu(item.label)}
                     className={cn(
-                      "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer",
-                      "text-gray-300 hover:text-white hover:bg-brand-primary/60",
-                      isCollapsed && "justify-center"
+                      'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer',
+                      'text-gray-300 hover:text-white hover:bg-brand-primary/60',
+                      isCollapsed && 'justify-center'
                     )}
                   >
-                    <Icon 
+                    <Icon
                       className={cn(
-                        "flex-shrink-0 h-5 w-5",
-                        item.color || "text-gray-400",
-                        !isCollapsed && "mr-3"
-                      )} 
+                        'flex-shrink-0 h-5 w-5',
+                        item.color || 'text-gray-400',
+                        !isCollapsed && 'mr-3'
+                      )}
                     />
                     {!isCollapsed && (
                       <>
@@ -174,17 +130,17 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
                           <Link key={subItem.href} href={subItem.href}>
                             <div
                               className={cn(
-                                "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
+                                'flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer',
                                 subIsActive
-                                  ? "bg-brand-primary text-white shadow-lg"
-                                  : "text-gray-400 hover:text-white hover:bg-brand-primary/60"
+                                  ? 'bg-brand-primary text-white shadow-lg'
+                                  : 'text-gray-400 hover:text-white hover:bg-brand-primary/60'
                               )}
                             >
-                              <SubIcon 
+                              <SubIcon
                                 className={cn(
-                                  "flex-shrink-0 h-4 w-4 mr-3",
-                                  subIsActive ? "text-white" : (subItem.color || "text-gray-400")
-                                )} 
+                                  'flex-shrink-0 h-4 w-4 mr-3',
+                                  subIsActive ? 'text-white' : subItem.color || 'text-gray-400'
+                                )}
                               />
                               <span className="flex-1">{subItem.label}</span>
                             </div>
@@ -198,19 +154,19 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
                 <Link href={item.href}>
                   <div
                     className={cn(
-                      "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer",
+                      'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer',
                       isActive
-                        ? "bg-brand-primary text-white shadow-lg"
-                        : "text-gray-300 hover:text-white hover:bg-brand-primary/60",
-                      isCollapsed && "justify-center"
+                        ? 'bg-brand-primary text-white shadow-lg'
+                        : 'text-gray-300 hover:text-white hover:bg-brand-primary/60',
+                      isCollapsed && 'justify-center'
                     )}
                   >
-                    <Icon 
+                    <Icon
                       className={cn(
-                        "flex-shrink-0 h-5 w-5",
-                        isActive ? "text-white" : (item.color || "text-gray-400"),
-                        !isCollapsed && "mr-3"
-                      )} 
+                        'flex-shrink-0 h-5 w-5',
+                        isActive ? 'text-white' : item.color || 'text-gray-400',
+                        !isCollapsed && 'mr-3'
+                      )}
                     />
                     {!isCollapsed && (
                       <>
@@ -230,147 +186,136 @@ export default function SidebarNavigation({ userType, className, isNILAthlete = 
         })}
       </nav>
 
-      {/* Bottom container: Active Facebook Page + User Section */}
+      {/* Bottom container: Create Button + Profile */}
       <div className="mx-2 mb-2 mt-auto space-y-2">
-        {userType === 'creator' && facebookConnected && activePage && !isCollapsed && (
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-medium text-blue-400 uppercase tracking-wider">
-                Active Page
+        {/* + Create Button (creators only) */}
+        {userType === 'creator' && (
+          <div className="relative">
+            <button
+              onClick={() =>
+                isCollapsed
+                  ? setLocation('/creator-dashboard/tasks/create')
+                  : setShowCreateMenu((prev) => !prev)
+              }
+              className={cn(
+                'w-full flex items-center gap-2 rounded-lg font-semibold transition-all duration-200',
+                'bg-gradient-to-r from-brand-primary to-brand-accent text-white',
+                'hover:shadow-lg hover:shadow-brand-primary/30 hover:brightness-110',
+                'active:scale-[0.98]',
+                isCollapsed ? 'justify-center p-2.5' : 'px-4 py-2.5'
+              )}
+              data-testid="sidebar-create-button"
+            >
+              <Plus
+                className={cn(
+                  'h-5 w-5 transition-transform duration-200',
+                  showCreateMenu && !isCollapsed && 'rotate-45'
+                )}
+              />
+              {!isCollapsed && <span>Create</span>}
+            </button>
+
+            {/* Create Menu Dropdown */}
+            {showCreateMenu && !isCollapsed && (
+              <div className="mt-1 space-y-1 animate-in slide-in-from-top-1 duration-150">
+                <button
+                  onClick={() => {
+                    setShowCreateMenu(false);
+                    setLocation('/creator-dashboard/tasks/create');
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-brand-primary/20 transition-colors"
+                  data-testid="sidebar-create-task"
+                >
+                  <div className="w-7 h-7 rounded-md bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                    <Target className="h-3.5 w-3.5 text-indigo-400" />
+                  </div>
+                  <span>New Task</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreateMenu(false);
+                    setLocation('/creator-dashboard/campaign-builder');
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-brand-primary/20 transition-colors"
+                  data-testid="sidebar-create-campaign"
+                >
+                  <div className="w-7 h-7 rounded-md bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                    <Megaphone className="h-3.5 w-3.5 text-orange-400" />
+                  </div>
+                  <span>New Campaign</span>
+                </button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
-                onClick={() => setShowPageModal(true)}
-                data-testid="button-sidebar-switch-page"
-              >
-                <MoreHorizontal className="h-3 w-3" />
-              </Button>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={activePage.picture?.data?.url} alt={activePage.name} />
-                <AvatarFallback className="bg-blue-500/20 text-blue-400 text-xs">
-                  {activePage.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white truncate">
-                  {activePage.name}
-                </div>
-                <div className="text-xs text-blue-400">
-                  {activePage.followers_count?.toLocaleString() || 0} followers
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
-        <div className="p-4 border border-white/10 rounded-lg bg-white/5">
+        {/* Profile Section */}
+        <div className="p-3 border border-white/10 rounded-lg bg-white/5">
           {!isCollapsed ? (
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-white" />
+              <div className="relative">
+                <Avatar className="h-9 w-9 border border-white/10">
+                  {programLogo ? (
+                    <AvatarImage src={programLogo} alt={user?.username || 'Profile'} />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
+                    {(user?.username || 'U').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Particle Network / Fandomly Chain status dot */}
+                {userType === 'creator' && (
+                  <div
+                    className={cn(
+                      'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-dark-bg',
+                      particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
+                    )}
+                    title={
+                      particleEnabled
+                        ? 'Connected to Fandomly Chain'
+                        : 'Fandomly Chain not connected'
+                    }
+                  />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">
-                  Your Account
+                  {user?.username || 'Your Account'}
                 </p>
-                <p className="text-xs text-gray-400 truncate capitalize">
-                  {userType}
+                <p className="text-xs truncate">
+                  {userType === 'creator' && particleEnabled ? (
+                    <span className="text-emerald-400">Chain connected</span>
+                  ) : userType === 'creator' ? (
+                    <span className="text-gray-500">Chain offline</span>
+                  ) : (
+                    <span className="text-gray-400 capitalize">{userType}</span>
+                  )}
                 </p>
               </div>
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-white" />
+              <div className="relative">
+                <Avatar className="h-8 w-8 border border-white/10">
+                  {programLogo ? (
+                    <AvatarImage src={programLogo} alt={user?.username || 'Profile'} />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
+                    {(user?.username || 'U').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {userType === 'creator' && (
+                  <div
+                    className={cn(
+                      'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-dark-bg',
+                      particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
+                    )}
+                  />
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Facebook Page Selection Modal */}
-      <Dialog open={showPageModal} onOpenChange={setShowPageModal}>
-        <DialogContent className="sm:max-w-md bg-brand-dark-bg border-white/10">
-          <DialogHeader>
-            <DialogTitle className="text-white">Switch Active Page</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="text-sm text-gray-400 mb-4">
-              Select which Facebook page to use for your campaigns.
-            </div>
-            
-            {facebookPages.length > 0 ? (
-              <div className="space-y-3">
-                {facebookPages.map((page, index) => (
-                  <div 
-                    key={page.id} 
-                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      activePage?.id === page.id 
-                        ? 'border-brand-primary bg-brand-primary/10' 
-                        : 'border-white/20 hover:border-white/30 bg-white/5'
-                    }`}
-                    onClick={() => {
-                      setActivePage(page);
-                      localStorage.setItem('fandomly_active_facebook_page_id', page.id);
-                      toast({
-                        title: "Active Page Changed",
-                        description: `"${page.name}" is now your active Facebook page.`,
-                        duration: 3000
-                      });
-                      setShowPageModal(false);
-                    }}
-                    data-testid={`sidebar-facebook-page-${index}`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={page.picture?.data?.url} alt={page.name} />
-                        <AvatarFallback className="bg-blue-500/20 text-blue-400">
-                          {page.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <div className="text-white font-medium">{page.name}</div>
-                          {activePage?.id === page.id && (
-                            <Badge className="bg-brand-primary/20 text-brand-primary text-xs">
-                              Active
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          {page.category} • {page.followers_count?.toLocaleString() || 0} followers
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-400">
-                No Facebook pages found.
-              </div>
-            )}
-            
-            <div className="flex gap-2 pt-4">
-              <Button 
-                onClick={() => setShowPageModal(false)}
-                className="flex-1 bg-brand-primary hover:bg-brand-primary/80"
-                data-testid="button-close-sidebar-page-modal"
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

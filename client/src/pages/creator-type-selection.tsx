@@ -1,253 +1,892 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
-import { useAuth as useAuthContext } from "@/contexts/auth-context";
-import { useMutation } from "@tanstack/react-query";
-import { fetchApi } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { 
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useLocation } from 'wouter';
+import { useAuth } from '@/hooks/use-auth';
+import { useAuth as useAuthContext } from '@/contexts/auth-context';
+import { useMutation } from '@tanstack/react-query';
+import { fetchApi } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { THEME_TEMPLATES, type ThemeTemplate } from '@shared/theme-templates';
+import {
+  CREATOR_TEMPLATES,
+  type CreatorType,
+} from '@/components/program/creator-program-templates';
+import {
   Trophy,
   Music,
-  User,
+  Video,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
-  Loader2
-} from "lucide-react";
+  Loader2,
+  Check,
+  Palette,
+  Type,
+  Camera,
+  Star,
+  Zap,
+  Globe,
+  Instagram,
+  Youtube,
+} from 'lucide-react';
 
-const creatorTypes = [
+// ─── Types ────────────────────────────────────────────────────────
+
+interface CreatorTypeOption {
+  id: CreatorType;
+  title: string;
+  subtitle: string;
+  icon: typeof Trophy;
+  gradient: string;
+  iconBg: string;
+  features: string[];
+}
+
+interface OnboardingState {
+  creatorType: CreatorType | null;
+  programName: string;
+  programDescription: string;
+  pointsName: string;
+  themeId: string;
+  logoUrl: string | null;
+}
+
+// ─── Constants ────────────────────────────────────────────────────
+
+const STEPS = [
+  { id: 'type', label: 'Creator Type', icon: Star },
+  { id: 'basics', label: 'Program Info', icon: Type },
+  { id: 'theme', label: 'Style', icon: Palette },
+  { id: 'photo', label: 'Photo', icon: Camera },
+] as const;
+
+const CREATOR_TYPES: CreatorTypeOption[] = [
   {
     id: 'athlete',
     title: 'Athlete',
+    subtitle: 'College, Olympic, or professional athletes',
     icon: Trophy,
-    description: 'Perfect for college athletes, Olympians, and professional sports figures',
-    examples: 'Football players, Basketball stars, Olympic medalists',
+    gradient: 'from-sky-500 to-blue-600',
+    iconBg: 'bg-sky-500/15 border-sky-500/30',
     features: [
-      'Proprietary NIL Valuation Calculator',
-      'Access to Sponsor Directory',
-      'Physical & NFT / Digital Collectibles Support',
-      'Performance tracking',
-      'Fan engagement campaigns'
+      'NIL Valuation Calculator',
+      'Sponsor Directory Access',
+      'NFT & Digital Collectibles',
+      'Fan Engagement Campaigns',
     ],
-    color: 'from-blue-500 to-blue-600',
-    popular: true
   },
   {
     id: 'musician',
     title: 'Musician',
+    subtitle: 'Artists, bands, and music producers',
     icon: Music,
-    description: 'For independent artists, bands, and music creators building their fanbase',
-    examples: 'Solo artists, Bands, Music producers',
+    gradient: 'from-violet-500 to-purple-600',
+    iconBg: 'bg-violet-500/15 border-violet-500/30',
     features: [
-      'Music catalog integrations (Spotify, Apple Music, SoundCloud)',
-      'Streaming platform sync across all major platforms',
-      'Token-Gated Fan Experiences',
-      'Ticket Marketplace Integrations (Ticketmaster Affiliate)',
-      'Physical & NFT / Digital Collectibles'
+      'Streaming Platform Sync',
+      'Token-Gated Experiences',
+      'Ticket Marketplace Integrations',
+      'Fan Loyalty Rewards',
     ],
-    color: 'from-purple-500 to-purple-600',
-    popular: false
   },
   {
     id: 'content_creator',
     title: 'Content Creator',
-    icon: User,
-    description: 'For influencers, podcasters, and digital content creators',
-    examples: 'YouTubers, TikTokers, Podcasters, Influencers',
+    subtitle: 'YouTubers, TikTokers, streamers, and influencers',
+    icon: Video,
+    gradient: 'from-emerald-500 to-green-600',
+    iconBg: 'bg-emerald-500/15 border-emerald-500/30',
     features: [
-      'Multi-platform analytics dashboard',
-      'Content performance & engagement tracking',
-      'Brand partnership management tools',
-      'Advanced audience segmentation',
-      'Creator monetization & revenue tracking'
+      'Multi-Platform Analytics',
+      'Brand Partnership Tools',
+      'Audience Segmentation',
+      'Creator Monetization',
     ],
-    color: 'from-green-500 to-green-600',
-    popular: false
-  }
+  },
 ];
+
+const DEFAULT_POINTS_NAMES: Record<CreatorType, string[]> = {
+  athlete: ['Fan Points', 'MVP Points', 'Team Points', 'Loyalty Points'],
+  musician: ['Fan Credits', 'Backstage Points', 'Superfan Points', 'Music Points'],
+  content_creator: ['Community Points', 'VIP Points', 'Creator Points', 'Subscriber Points'],
+};
+
+// ─── Component ────────────────────────────────────────────────────
 
 export default function CreatorTypeSelection() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useAuth();
   const { refreshUser } = useAuthContext();
-  const [selectedType, setSelectedType] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Mutation to call the new set-creator-type endpoint
-  // This atomically creates tenant + creator + draft program
-  const setCreatorTypeMutation = useMutation({
-    mutationFn: async (creatorType: string) => {
-      return fetchApi('/api/auth/set-creator-type', {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [state, setState] = useState<OnboardingState>({
+    creatorType: null,
+    programName: '',
+    programDescription: '',
+    pointsName: '',
+    themeId: '',
+    logoUrl: null,
+  });
+
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Scroll form panel to top on step change
+  useEffect(() => {
+    formRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
+
+  // Set smart defaults when creator type changes
+  const selectCreatorType = useCallback(
+    (type: CreatorType) => {
+      const template = CREATOR_TEMPLATES[type];
+      const displayName =
+        (user?.profileData as Record<string, string>)?.name || user?.username || 'Creator';
+      setState((prev) => ({
+        ...prev,
+        creatorType: type,
+        programName: prev.programName || `${displayName}'s Program`,
+        pointsName: prev.pointsName || template.pointsNameSuggestion,
+        themeId: prev.themeId || template.defaultTheme,
+      }));
+    },
+    [user]
+  );
+
+  // API: create creator + tenant + program, then update program with user choices
+  const finishMutation = useMutation({
+    mutationFn: async () => {
+      if (!state.creatorType) throw new Error('No creator type selected');
+
+      // Step 1: Atomic scaffold (tenant + creator + draft program)
+      const result = await fetchApi('/api/auth/set-creator-type', {
         method: 'POST',
-        body: JSON.stringify({ creatorType }),
+        body: JSON.stringify({ creatorType: state.creatorType }),
       });
+
+      const program = (result as Record<string, unknown>).program as
+        | Record<string, unknown>
+        | undefined;
+      const programId = program?.id as string | undefined;
+
+      // Step 2: Patch program with onboarding choices
+      if (programId) {
+        const themeTemplate = THEME_TEMPLATES[state.themeId];
+        const updatePayload: Record<string, unknown> = {
+          name: state.programName.trim() || undefined,
+          description: state.programDescription.trim() || undefined,
+          pointsName: state.pointsName || undefined,
+        };
+
+        // Build pageConfig updates
+        const pageConfig: Record<string, unknown> = {};
+
+        if (state.logoUrl) {
+          pageConfig.logo = state.logoUrl;
+        }
+
+        if (themeTemplate) {
+          pageConfig.brandColors = {
+            primary: themeTemplate.colors.primary,
+            secondary: themeTemplate.colors.secondary,
+            accent: themeTemplate.colors.accent,
+          };
+          pageConfig.theme = {
+            ...themeTemplate,
+            mode: themeTemplate.mode ?? 'dark',
+          };
+        }
+
+        if (Object.keys(pageConfig).length > 0) {
+          updatePayload.pageConfig = pageConfig;
+        }
+
+        await fetchApi(`/api/programs/${programId}`, {
+          method: 'PUT',
+          body: JSON.stringify(updatePayload),
+        });
+      }
+
+      return result;
     },
     onSuccess: async () => {
-      // Refresh the auth-context user data BEFORE navigating.
-      // This is critical: the auth-router checks onboardingState.isCompleted
-      // to decide if the creator should be on the dashboard. Without refreshing,
-      // the stale state would redirect back to this page in a loop.
       await refreshUser();
-      // Navigate to dashboard — onboarding is already complete
       setLocation('/creator-dashboard');
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to set up your creator account. Please try again.",
-        variant: "destructive",
+        title: 'Setup Failed',
+        description: error.message || 'Something went wrong. Please try again.',
+        variant: 'destructive',
       });
-      setSelectedType(null);
     },
   });
 
-  // Show loading state while checking authentication
+  // Navigation helpers
+  const canAdvance = () => {
+    if (currentStep === 0) return !!state.creatorType;
+    if (currentStep === 1) return state.programName.trim().length > 0;
+    return true;
+  };
+
+  const goNext = () => {
+    if (currentStep < STEPS.length - 1 && canAdvance()) {
+      setCurrentStep((s) => s + 1);
+    }
+  };
+
+  const goBack = () => {
+    if (currentStep > 0) setCurrentStep((s) => s - 1);
+  };
+
+  const handleFinish = () => {
+    if (!finishMutation.isPending) finishMutation.mutate();
+  };
+
+  // Get active theme for preview
+  const activeTheme: ThemeTemplate | null = state.themeId
+    ? THEME_TEMPLATES[state.themeId] || null
+    : null;
+
+  // Get recommended themes for selected creator type
+  const recommendedThemeIds = state.creatorType
+    ? CREATOR_TEMPLATES[state.creatorType].recommendedThemes
+    : [];
+
+  // ─── Loading / Auth Guards ────────────────────────────────────
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
-          <CardContent className="text-center p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Loading...</h2>
-            <p className="text-gray-300">Please wait while we load your profile.</p>
-          </CardContent>
-        </Card>
+        <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
       </div>
     );
   }
 
-  // Check for authenticated user
   if (!user) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <Card className="bg-white/5 backdrop-blur-lg border-white/10 max-w-md w-full mx-4">
-          <CardContent className="text-center p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Authentication Required</h2>
-            <p className="text-gray-300 mb-4">Please sign in to continue.</p>
-            <Button onClick={() => setLocation("/")} className="bg-brand-primary hover:bg-brand-primary/80">
-              Go Home
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center">
+          <p className="text-white text-lg mb-4">Authentication required</p>
+          <Button onClick={() => setLocation('/')} variant="neon">
+            Go Home
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const handleTypeSelection = (creatorType: string) => {
-    if (setCreatorTypeMutation.isPending) return;
-    setSelectedType(creatorType);
-    // Call the new endpoint that atomically scaffolds everything
-    setCreatorTypeMutation.mutate(creatorType);
-  };
+  // ─── Render ────────────────────────────────────────────────────
 
   return (
-    <div className="relative min-h-screen bg-brand-dark-bg overflow-hidden">
-      {/* Background: layered radials and subtle gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(225,6,152,0.18),transparent_60%),radial-gradient(40%_40%_at_80%_20%,rgba(20,254,238,0.15),transparent_60%),radial-gradient(30%_35%_at_10%_70%,rgba(20,254,238,0.08),transparent_60%)]" />
-      <div className="absolute inset-0 gradient-primary opacity-[0.05]" />
-      <img src="/fandomly-logo-with-text.png" alt="" className="absolute -bottom-10 -right-10 w-[520px] opacity-[0.06] pointer-events-none select-none" />
-
-      <div className="relative z-10 container mx-auto px-4 py-12">
-        <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-brand-primary/10 px-4 py-2 rounded-full border border-brand-primary/20 mb-6">
-              <Sparkles className="h-5 w-5 text-brand-primary" />
-              <span className="text-brand-primary font-medium">Creator Onboarding</span>
-            </div>
-            
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              What type of creator are you?
-            </h1>
-            
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Choose your category to unlock personalized features, reward templates, and fan engagement tools
-            </p>
+    <div className="min-h-screen bg-brand-dark-bg flex flex-col lg:flex-row">
+      {/* ═══ LEFT: Form Panel ═══ */}
+      <div
+        ref={formRef}
+        className="w-full lg:w-[48%] xl:w-[45%] min-h-screen flex flex-col overflow-y-auto"
+      >
+        {/* Top bar with logo + progress */}
+        <div className="sticky top-0 z-20 bg-brand-dark-bg/95 backdrop-blur-md border-b border-white/5 px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <img src="/fandomly2.png" alt="Fandomly" className="h-10 w-auto" />
+            <span className="text-sm text-gray-400 tabular-nums">
+              Step {currentStep + 1} of {STEPS.length}
+            </span>
           </div>
 
-          {/* Creator Type Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {creatorTypes.map((type) => {
-              const Icon = type.icon;
+          {/* Progress bar */}
+          <div className="flex gap-1.5">
+            {STEPS.map((step, i) => (
+              <div key={step.id} className="flex-1 h-1 rounded-full overflow-hidden bg-white/10">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    i < currentStep
+                      ? 'bg-brand-primary w-full'
+                      : i === currentStep
+                        ? 'bg-brand-primary w-1/2 animate-pulse'
+                        : 'w-0'
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Step labels */}
+          <div className="flex gap-1.5 mt-2">
+            {STEPS.map((step, i) => {
+              const Icon = step.icon;
               return (
-                <Card 
-                  key={type.id}
-                  className={`bg-white/5 backdrop-blur-lg border-white/10 cursor-pointer transition-all duration-300 hover:bg-white/10 hover:border-brand-primary/50 hover:transform hover:scale-105 ${
-                    selectedType === type.id ? "border-brand-primary bg-brand-primary/10" : ""
-                  } relative`}
-                  onClick={() => handleTypeSelection(type.id)}
+                <button
+                  key={step.id}
+                  onClick={() => i < currentStep && setCurrentStep(i)}
+                  disabled={i > currentStep}
+                  className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1 rounded transition-colors ${
+                    i === currentStep
+                      ? 'text-brand-primary font-medium'
+                      : i < currentStep
+                        ? 'text-gray-400 hover:text-gray-300 cursor-pointer'
+                        : 'text-gray-600 cursor-default'
+                  }`}
                 >
-                  {type.popular && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-brand-primary text-white px-3 py-1">
-                        Most Popular
-                      </Badge>
-                    </div>
+                  {i < currentStep ? (
+                    <Check className="h-3 w-3 text-brand-primary" />
+                  ) : (
+                    <Icon className="h-3 w-3" />
                   )}
-                  
-                  <CardHeader className="text-center pb-4">
-                    <div className={`mx-auto w-16 h-16 bg-gradient-to-br ${type.color} rounded-xl flex items-center justify-center mb-4`}>
-                      <Icon className="h-8 w-8 text-white" />
-                    </div>
-                    <CardTitle className="text-2xl text-white">
-                      {type.title}
-                    </CardTitle>
-                    <CardDescription className="text-gray-300 text-sm">
-                      {type.description}
-                    </CardDescription>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4">
-                    <div className="text-center">
-                      <p className="text-brand-primary text-sm font-medium mb-3">
-                        Examples: {type.examples}
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {type.features.map((feature, index) => (
-                        <div key={index} className="flex items-center gap-2 text-gray-300 text-sm">
-                          <div className="w-1.5 h-1.5 bg-brand-primary rounded-full flex-shrink-0" />
-                          {feature}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <Button 
-                      variant="neon"
-                      className="w-full mt-4"
-                      disabled={setCreatorTypeMutation.isPending}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTypeSelection(type.id);
-                      }}
-                    >
-                      {setCreatorTypeMutation.isPending && selectedType === type.id ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Setting up...
-                        </>
-                      ) : (
-                        <>
-                          Choose {type.title}
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
+                  <span className="hidden sm:inline">{step.label}</span>
+                </button>
               );
             })}
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="text-center">
-            <p className="text-gray-400 text-sm">
-              Don't worry - you can always change your creator type later in your settings
-            </p>
+        {/* Form content */}
+        <div className="flex-1 px-6 sm:px-10 lg:px-12 py-8 lg:py-12">
+          {/* Step 0: Creator Type Selection */}
+          {currentStep === 0 && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                What kind of creator are you?
+              </h1>
+              <p className="text-gray-400 mb-8 text-lg">
+                {"We'll customize your experience with the right tools and templates."}
+              </p>
+
+              <div className="space-y-3">
+                {CREATOR_TYPES.map((type) => {
+                  const Icon = type.icon;
+                  const isSelected = state.creatorType === type.id;
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => selectCreatorType(type.id)}
+                      className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 group ${
+                        isSelected
+                          ? 'border-brand-primary bg-brand-primary/8 ring-1 ring-brand-primary/30'
+                          : 'border-white/8 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div
+                          className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected ? 'bg-brand-primary/20 border-brand-primary/40' : type.iconBg
+                          }`}
+                        >
+                          <Icon
+                            className={`h-6 w-6 ${isSelected ? 'text-brand-primary' : 'text-white/70'}`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-white font-semibold text-lg">{type.title}</span>
+                            {isSelected && <Check className="h-4 w-4 text-brand-primary" />}
+                          </div>
+                          <p className="text-gray-400 text-sm mb-3">{type.subtitle}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {type.features.map((f) => (
+                              <span
+                                key={f}
+                                className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-gray-300 border border-white/8"
+                              >
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Step 1: Program Basics */}
+          {currentStep === 1 && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                Name your program
+              </h1>
+              <p className="text-gray-400 mb-8 text-lg">
+                This is what fans will see when they find your page. You can always change it later.
+              </p>
+
+              <div className="space-y-6">
+                {/* Program Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Program Name
+                  </label>
+                  <Input
+                    value={state.programName}
+                    onChange={(e) => setState((s) => ({ ...s, programName: e.target.value }))}
+                    placeholder="e.g. Thunder Nation Rewards"
+                    maxLength={80}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base focus:border-brand-primary/60 focus:ring-brand-primary/20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {state.programName.length}/80 characters
+                  </p>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Description <span className="text-gray-500 font-normal">(optional)</span>
+                  </label>
+                  <Textarea
+                    value={state.programDescription}
+                    onChange={(e) =>
+                      setState((s) => ({
+                        ...s,
+                        programDescription: e.target.value,
+                      }))
+                    }
+                    placeholder="Tell fans what your program is about..."
+                    maxLength={300}
+                    rows={3}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 text-base resize-none focus:border-brand-primary/60 focus:ring-brand-primary/20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {state.programDescription.length}/300 characters
+                  </p>
+                </div>
+
+                {/* Points Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Points Currency Name
+                  </label>
+                  <Input
+                    value={state.pointsName}
+                    onChange={(e) => setState((s) => ({ ...s, pointsName: e.target.value }))}
+                    placeholder="e.g. Fan Points"
+                    maxLength={30}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base focus:border-brand-primary/60 focus:ring-brand-primary/20"
+                  />
+                  {state.creatorType && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {DEFAULT_POINTS_NAMES[state.creatorType].map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => setState((s) => ({ ...s, pointsName: name }))}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            state.pointsName === name
+                              ? 'border-brand-primary/50 bg-brand-primary/15 text-brand-primary'
+                              : 'border-white/10 bg-white/5 text-gray-400 hover:text-gray-300 hover:border-white/20'
+                          }`}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Theme Selection */}
+          {currentStep === 2 && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                Pick a style
+              </h1>
+              <p className="text-gray-400 mb-8 text-lg">
+                Choose a theme for your program page. You can customize colors later.
+              </p>
+
+              {/* Recommended themes */}
+              {recommendedThemeIds.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">
+                    Recommended for you
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {recommendedThemeIds.map((tid) => {
+                      const theme = THEME_TEMPLATES[tid];
+                      if (!theme) return null;
+                      return (
+                        <ThemeCard
+                          key={tid}
+                          theme={theme}
+                          selected={state.themeId === tid}
+                          onSelect={() => setState((s) => ({ ...s, themeId: tid }))}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* All themes */}
+              <div>
+                <p className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">
+                  All themes
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {Object.entries(THEME_TEMPLATES)
+                    .filter(([tid]) => !recommendedThemeIds.includes(tid))
+                    .map(([tid, theme]) => (
+                      <ThemeCard
+                        key={tid}
+                        theme={theme}
+                        selected={state.themeId === tid}
+                        onSelect={() => setState((s) => ({ ...s, themeId: tid }))}
+                      />
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Photo Upload */}
+          {currentStep === 3 && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                Add your photo
+              </h1>
+              <p className="text-gray-400 mb-8 text-lg">
+                Upload a profile photo or logo for your program. You can skip this and add one
+                later.
+              </p>
+
+              <div className="max-w-xs">
+                <ImageUpload
+                  type="avatar"
+                  currentImageUrl={state.logoUrl || undefined}
+                  onUploadSuccess={(url) => setState((s) => ({ ...s, logoUrl: url }))}
+                  onRemove={() => setState((s) => ({ ...s, logoUrl: null }))}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom navigation */}
+        <div className="sticky bottom-0 bg-brand-dark-bg/95 backdrop-blur-md border-t border-white/5 px-6 sm:px-10 lg:px-12 py-5">
+          <div className="flex items-center justify-between">
+            {currentStep > 0 ? (
+              <Button variant="ghost" onClick={goBack} className="text-gray-400 hover:text-white">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            {currentStep < STEPS.length - 1 ? (
+              <Button
+                onClick={goNext}
+                disabled={!canAdvance()}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Continue
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <div className="flex items-center gap-3">
+                {!state.logoUrl && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleFinish}
+                    disabled={finishMutation.isPending}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    Skip for now
+                  </Button>
+                )}
+                <Button
+                  onClick={handleFinish}
+                  disabled={finishMutation.isPending}
+                  className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold"
+                >
+                  {finishMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Finish Setup
+                      <Sparkles className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* ═══ RIGHT: Live Preview ═══ */}
+      <div className="hidden lg:flex w-[52%] xl:w-[55%] min-h-screen items-center justify-center p-8 xl:p-12 relative overflow-hidden">
+        {/* Subtle background gradient */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(225,6,152,0.08),transparent_70%)]" />
+
+        <div className="relative w-full max-w-lg">
+          <ProgramPreview state={state} theme={activeTheme} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Theme Card ─────────────────────────────────────────────────
+
+function ThemeCard({
+  theme,
+  selected,
+  onSelect,
+}: {
+  theme: ThemeTemplate;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className={`relative rounded-xl overflow-hidden border-2 transition-all duration-200 group ${
+        selected
+          ? 'border-brand-primary ring-1 ring-brand-primary/30 scale-[1.02]'
+          : 'border-white/8 hover:border-white/20'
+      }`}
+    >
+      {/* Color swatch */}
+      <div className="h-20 w-full relative" style={{ backgroundColor: theme.colors.background }}>
+        {/* Surface card mock */}
+        <div
+          className="absolute bottom-2 left-2 right-2 h-10 rounded-md"
+          style={{ backgroundColor: theme.colors.surface }}
+        >
+          <div className="flex items-center gap-1.5 px-2 pt-2">
+            <div
+              className="w-5 h-5 rounded-full"
+              style={{ backgroundColor: theme.colors.primary }}
+            />
+            <div className="flex-1 space-y-1">
+              <div
+                className="h-1.5 w-3/4 rounded-full"
+                style={{ backgroundColor: theme.colors.text.primary, opacity: 0.6 }}
+              />
+              <div
+                className="h-1 w-1/2 rounded-full"
+                style={{ backgroundColor: theme.colors.text.secondary, opacity: 0.4 }}
+              />
+            </div>
+          </div>
+        </div>
+        {/* Accent dot */}
+        <div
+          className="absolute top-2 right-2 w-3 h-3 rounded-full"
+          style={{ backgroundColor: theme.colors.accent }}
+        />
+      </div>
+
+      {/* Label */}
+      <div className="bg-white/[0.03] px-3 py-2.5">
+        <p className="text-xs text-white font-medium truncate">{theme.name}</p>
+        <p className="text-[10px] text-gray-500 truncate">
+          {theme.mode === 'dark' ? 'Dark' : theme.mode === 'light' ? 'Light' : 'Custom'}
+        </p>
+      </div>
+
+      {/* Selected check */}
+      {selected && (
+        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-brand-primary flex items-center justify-center">
+          <Check className="h-3 w-3 text-white" />
+        </div>
+      )}
+    </button>
+  );
+}
+
+// ─── Live Preview ───────────────────────────────────────────────
+
+function ProgramPreview({ state, theme }: { state: OnboardingState; theme: ThemeTemplate | null }) {
+  const bg = theme?.colors.background || '#0f172a';
+  const surface = theme?.colors.surface || '#1e293b';
+  const primary = theme?.colors.primary || '#e10698';
+  const accent = theme?.colors.accent || '#14feee';
+  const textPrimary = theme?.colors.text.primary || '#f1f5f9';
+  const textSecondary = theme?.colors.text.secondary || '#94a3b8';
+  const border = theme?.colors.border || '#334155';
+
+  const displayName = state.programName || 'Your Program';
+  const description = state.programDescription || 'Your fan engagement program lives here.';
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden shadow-2xl border transition-all duration-500"
+      style={{ backgroundColor: bg, borderColor: border + '40' }}
+    >
+      {/* Banner */}
+      <div
+        className="h-28 relative"
+        style={{
+          background: `linear-gradient(135deg, ${primary}30, ${accent}20, ${primary}15)`,
+        }}
+      >
+        {/* Subtle pattern */}
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `radial-gradient(circle at 20% 50%, ${primary}40 0%, transparent 50%), radial-gradient(circle at 80% 30%, ${accent}30 0%, transparent 40%)`,
+          }}
+        />
+      </div>
+
+      {/* Profile section */}
+      <div className="px-6 -mt-10 relative z-10">
+        {/* Avatar */}
+        <div
+          className="w-20 h-20 rounded-2xl border-4 overflow-hidden flex items-center justify-center"
+          style={{
+            borderColor: bg,
+            backgroundColor: surface,
+          }}
+        >
+          {state.logoUrl ? (
+            <img src={state.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center"
+              style={{ background: `linear-gradient(135deg, ${primary}40, ${accent}30)` }}
+            >
+              <span className="text-2xl font-bold" style={{ color: textPrimary }}>
+                {displayName[0]?.toUpperCase() || 'F'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Name + description */}
+        <div className="mt-4 mb-5">
+          <h3
+            className="text-xl font-bold transition-all duration-300"
+            style={{ color: textPrimary }}
+          >
+            {displayName}
+          </h3>
+          <p
+            className="text-sm mt-1 transition-all duration-300 line-clamp-2"
+            style={{ color: textSecondary }}
+          >
+            {description}
+          </p>
+
+          {state.pointsName && (
+            <div className="flex items-center gap-2 mt-3">
+              <div
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: primary + '18',
+                  color: primary,
+                  border: `1px solid ${primary}30`,
+                }}
+              >
+                <Star className="h-3 w-3" />
+                {state.pointsName}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mock nav tabs */}
+        <div className="flex gap-4 text-xs border-b pb-3" style={{ borderColor: border + '60' }}>
+          {['Dashboard', 'Tasks', 'Rewards', 'Leaderboard'].map((tab, i) => (
+            <span
+              key={tab}
+              className="transition-colors"
+              style={{
+                color: i === 0 ? primary : textSecondary,
+                fontWeight: i === 0 ? 600 : 400,
+              }}
+            >
+              {tab}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Mock content cards */}
+      <div className="px-6 py-5 space-y-3">
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Fans', value: '0' },
+            { label: 'Tasks', value: '0' },
+            { label: 'Rewards', value: '0' },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-lg p-3 text-center"
+              style={{ backgroundColor: surface }}
+            >
+              <p className="text-lg font-bold" style={{ color: textPrimary }}>
+                {stat.value}
+              </p>
+              <p className="text-[10px]" style={{ color: textSecondary }}>
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Mock task card */}
+        <div className="rounded-lg p-3" style={{ backgroundColor: surface }}>
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: primary + '20' }}
+            >
+              <Zap className="h-4 w-4" style={{ color: primary }} />
+            </div>
+            <div className="flex-1">
+              <div
+                className="h-2.5 w-32 rounded-full"
+                style={{ backgroundColor: textPrimary, opacity: 0.15 }}
+              />
+              <div
+                className="h-2 w-20 rounded-full mt-1.5"
+                style={{ backgroundColor: textSecondary, opacity: 0.15 }}
+              />
+            </div>
+            <div
+              className="text-xs font-medium px-2 py-0.5 rounded"
+              style={{ backgroundColor: accent + '20', color: accent }}
+            >
+              +50
+            </div>
+          </div>
+        </div>
+
+        {/* Mock social links */}
+        <div className="flex items-center gap-2 pt-1">
+          {[Instagram, Youtube, Globe].map((Icon, i) => (
+            <div
+              key={i}
+              className="w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: surface }}
+            >
+              <Icon className="h-3.5 w-3.5" style={{ color: textSecondary }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Powered by footer */}
+      <div
+        className="px-6 py-3 border-t flex items-center justify-center gap-1.5"
+        style={{ borderColor: border + '40' }}
+      >
+        <span className="text-[10px]" style={{ color: textSecondary + '80' }}>
+          Powered by
+        </span>
+        <img src="/fandomly2.png" alt="Fandomly" className="h-4 opacity-40" />
       </div>
     </div>
   );

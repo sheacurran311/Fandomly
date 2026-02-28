@@ -25,7 +25,10 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'process.env': {}
+    'process.env': {},
+    // Use non-VITE prefix so Replit prod-only secrets aren't stripped.
+    // Set LANDING_ONLY=true in Replit production secrets.
+    __LANDING_ONLY__: JSON.stringify(process.env.LANDING_ONLY === 'true'),
   },
   optimizeDeps: {
     include: ['buffer']
