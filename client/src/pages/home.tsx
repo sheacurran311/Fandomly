@@ -1,13 +1,40 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, animate } from "framer-motion";
-import { ArrowRight, Check, ChevronRight, Mail, Loader2, Sparkles, PartyPopper, X, ShieldCheck, Gift, Crown, BarChart3, Palette, Zap } from "lucide-react";
+import { useState, useEffect, useRef } from 'react';
 import {
-  SiFacebook, SiInstagram, SiX, SiTiktok,
-  SiYoutube, SiSpotify, SiDiscord, SiTwitch,
-  SiPatreon
-} from "react-icons/si";
-import { Link } from "wouter";
-import { SectionGeometry } from "@/components/landing/section-geometry";
+  motion,
+  useScroll,
+  useTransform,
+  AnimatePresence,
+  useMotionValue,
+  animate,
+} from 'framer-motion';
+import {
+  ArrowRight,
+  Check,
+  Mail,
+  Loader2,
+  Sparkles,
+  PartyPopper,
+  X,
+  ShieldCheck,
+  Gift,
+  Crown,
+  BarChart3,
+  Palette,
+  Zap,
+} from 'lucide-react';
+import {
+  SiFacebook,
+  SiInstagram,
+  SiX,
+  SiTiktok,
+  SiYoutube,
+  SiSpotify,
+  SiDiscord,
+  SiTwitch,
+  SiPatreon,
+} from 'react-icons/si';
+import { Link } from 'wouter';
+import { SectionGeometry } from '@/components/landing/section-geometry';
 
 // Kick doesn't have an official simple-icons entry, so we use a custom SVG
 function KickIcon({ className }: { className?: string }) {
@@ -23,14 +50,14 @@ function KickIcon({ className }: { className?: string }) {
 // ============================================================
 function AnimatedPointsCounter() {
   const count = useMotionValue(0);
-  const [displayValue, setDisplayValue] = useState("0");
+  const [displayValue, setDisplayValue] = useState('0');
 
   useEffect(() => {
     const controls = animate(count, 1000, {
       duration: 1.2,
-      ease: "easeOut",
+      ease: 'easeOut',
     });
-    const unsubscribe = count.on("change", (v) => setDisplayValue(Math.round(v).toLocaleString()));
+    const unsubscribe = count.on('change', (v) => setDisplayValue(Math.round(v).toLocaleString()));
     return () => {
       controls.stop();
       unsubscribe();
@@ -49,7 +76,7 @@ function SuccessModalContent({
   isAlreadyRegistered: boolean;
   onClose: () => void;
 }) {
-  const confettiColors = ["#e10698", "#14feee", "#8B5CF6", "#F59E0B", "#10B981", "#3B82F6"];
+  const confettiColors = ['#e10698', '#14feee', '#8B5CF6', '#F59E0B', '#10B981', '#3B82F6'];
 
   return (
     <motion.div
@@ -69,7 +96,7 @@ function SuccessModalContent({
         initial={{ opacity: 0, scale: 0.85, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.85, y: 20 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="relative z-10 w-full max-w-md bg-[#1a1a2e] border border-white/10 rounded-3xl p-8 text-center shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -92,7 +119,7 @@ function SuccessModalContent({
                 y: (i % 3 === 0 ? -1 : 1) * (30 + (i % 2) * 20),
                 opacity: 0,
               }}
-              transition={{ delay: 0.3 + i * 0.08, duration: 0.8, ease: "easeOut" }}
+              transition={{ delay: 0.3 + i * 0.08, duration: 0.8, ease: 'easeOut' }}
               className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full"
               style={{ backgroundColor: color }}
             />
@@ -102,17 +129,21 @@ function SuccessModalContent({
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
+          transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
           className="mx-auto w-20 h-20 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-6"
         >
           <PartyPopper className="w-10 h-10 text-emerald-400" />
         </motion.div>
 
-        <h3 className="text-2xl font-bold text-white mb-2 font-display">You're on the list!</h3>
+        <h3 className="text-2xl font-bold text-white mb-2 font-display">
+          You&apos;re on the list!
+        </h3>
         <p className="text-gray-300 mb-2">{successMessage}</p>
 
         {isAlreadyRegistered ? (
-          <p className="text-sm text-gray-500 mb-6">Thanks for your interest — we'll be in touch!</p>
+          <p className="text-sm text-gray-500 mb-6">
+            Thanks for your interest — we&apos;ll be in touch!
+          </p>
         ) : (
           <>
             <motion.div
@@ -124,7 +155,9 @@ function SuccessModalContent({
               <p className="text-[#14feee] font-bold text-lg">
                 <AnimatedPointsCounter /> Fandomly Points
               </p>
-              <p className="text-gray-400 text-xs mt-0.5">Will be credited when you sign up with this email</p>
+              <p className="text-gray-400 text-xs mt-0.5">
+                Will be credited when you sign up with this email
+              </p>
             </motion.div>
             <ul className="text-left text-sm text-gray-400 mb-6 space-y-1.5 max-w-xs mx-auto">
               <li className="flex items-center gap-2">
@@ -140,7 +173,9 @@ function SuccessModalContent({
         )}
 
         {!isAlreadyRegistered && (
-          <p className="text-sm text-gray-500 mb-6">Check your inbox for updates. We can't wait to have you!</p>
+          <p className="text-sm text-gray-500 mb-6">
+            Check your inbox for updates. We can&apos;t wait to have you!
+          </p>
         )}
 
         <motion.button
@@ -160,54 +195,81 @@ function SuccessModalContent({
 // ============================================================
 // INLINE BETA SIGNUP (kept self-contained for the landing page)
 // ============================================================
-function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
-  const [email, setEmail] = useState("");
-  const [userType, setUserType] = useState<"creator" | "fan">("creator");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [message, setMessage] = useState("");
+function LandingSignup({ variant = 'hero' }: { variant?: 'hero' | 'bottom' }) {
+  const [email, setEmail] = useState('');
+  const [userType, setUserType] = useState<'creator' | 'fan'>('creator');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState('');
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes("@")) {
-      setStatus("error");
-      setMessage("Please enter a valid email address");
+    if (!email || !email.includes('@')) {
+      setStatus('error');
+      setMessage('Please enter a valid email address');
       return;
     }
-    setStatus("loading");
+
+    // Client-side duplicate check (localStorage fallback for prod landing page)
+    const STORAGE_KEY = 'fandomly_beta_signups';
+    const storedEmails: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const normalizedEmail = email.toLowerCase().trim();
+    const isLocalDuplicate = storedEmails.includes(normalizedEmail);
+
+    setStatus('loading');
     try {
-      const response = await fetch("/api/beta-signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/beta-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: normalizedEmail,
           userType,
-          source: "landing_page",
+          source: 'landing_page',
           metadata: {
             referrer: document.referrer || undefined,
-            utmSource: new URLSearchParams(window.location.search).get("utm_source") || undefined,
-            utmMedium: new URLSearchParams(window.location.search).get("utm_medium") || undefined,
-            utmCampaign: new URLSearchParams(window.location.search).get("utm_campaign") || undefined,
+            utmSource: new URLSearchParams(window.location.search).get('utm_source') || undefined,
+            utmMedium: new URLSearchParams(window.location.search).get('utm_medium') || undefined,
+            utmCampaign:
+              new URLSearchParams(window.location.search).get('utm_campaign') || undefined,
           },
         }),
       });
       const data = await response.json();
       if (data.success) {
-        setStatus("idle");
+        // Persist in localStorage so we can detect duplicates even if API is down
+        if (!storedEmails.includes(normalizedEmail)) {
+          storedEmails.push(normalizedEmail);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(storedEmails));
+        }
+        setStatus('idle');
         setSuccessMessage(data.message);
-        setIsAlreadyRegistered(!!data.alreadyRegistered);
+        setIsAlreadyRegistered(!!data.alreadyRegistered || isLocalDuplicate);
         setShowSuccessModal(true);
-        setEmail("");
+        setEmail('');
       } else {
-        setStatus("error");
+        setStatus('error');
         const err = data.error;
-        setMessage(typeof err === "string" ? err : "Something went wrong");
+        setMessage(typeof err === 'string' ? err : 'Something went wrong');
       }
     } catch {
-      setStatus("error");
-      setMessage("Network error. Please try again.");
+      // API unreachable — still show the success modal with localStorage tracking.
+      // This ensures the 1,000 point modal always appears even in landing-only mode
+      // where the backend may not be running.
+      if (!storedEmails.includes(normalizedEmail)) {
+        storedEmails.push(normalizedEmail);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedEmails));
+      }
+      setStatus('idle');
+      setSuccessMessage(
+        isLocalDuplicate
+          ? "You're already on the list! We'll be in touch soon."
+          : "Welcome to the beta! We'll notify you when access is available."
+      );
+      setIsAlreadyRegistered(isLocalDuplicate);
+      setShowSuccessModal(true);
+      setEmail('');
     }
   };
 
@@ -224,23 +286,23 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
         )}
       </AnimatePresence>
 
-      <div className={variant === "hero" ? "w-full max-w-2xl" : "w-full max-w-xl mx-auto"}>
-        {variant === "hero" && (
+      <div className={variant === 'hero' ? 'w-full max-w-2xl' : 'w-full max-w-xl mx-auto'}>
+        {variant === 'hero' && (
           <div className="flex gap-3 mb-5">
-            {(["creator", "fan"] as const).map((type) => (
+            {(['creator', 'fan'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setUserType(type)}
                 className={`px-5 py-2 rounded-full text-sm font-medium tracking-wide transition-all duration-300 ${
                   userType === type
-                    ? type === "creator"
-                      ? "bg-[#e10698] text-white shadow-lg shadow-[#e10698]/20"
-                      : "bg-[#14feee] text-[#0b0b0f] shadow-lg shadow-[#14feee]/20"
-                    : "bg-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.1]"
+                    ? type === 'creator'
+                      ? 'bg-[#e10698] text-white shadow-lg shadow-[#e10698]/20'
+                      : 'bg-[#14feee] text-[#0b0b0f] shadow-lg shadow-[#14feee]/20'
+                    : 'bg-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.1]'
                 }`}
               >
-                {type === "creator" ? "I'm a Creator" : "I'm a Fan"}
+                {type === 'creator' ? "I'm a Creator" : "I'm a Fan"}
               </button>
             ))}
           </div>
@@ -254,21 +316,21 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                if (status === "error") setStatus("idle");
+                if (status === 'error') setStatus('idle');
               }}
               placeholder="Enter your email for early access"
               className="w-full pl-12 pr-4 py-4 bg-white/[0.06] border border-white/[0.08] rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-[#e10698]/50 focus:bg-white/[0.08] transition-all text-[15px]"
-              disabled={status === "loading"}
+              disabled={status === 'loading'}
             />
           </div>
           <motion.button
             type="submit"
-            disabled={status === "loading"}
+            disabled={status === 'loading'}
             className="group px-7 py-4 bg-gradient-to-r from-[#e10698] to-[#14feee] text-white rounded-2xl font-semibold hover:from-[#c90589] hover:to-[#00e8d5] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-[15px] whitespace-nowrap"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            {status === "loading" ? (
+            {status === 'loading' ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
@@ -279,7 +341,7 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
           </motion.button>
         </form>
 
-        {status === "error" && (
+        {status === 'error' && (
           <motion.p
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -289,10 +351,12 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
           </motion.p>
         )}
 
-        {variant === "hero" && (
+        {variant === 'hero' && (
           <div className="mt-4 space-y-2">
             <p className="text-sm text-gray-400">
-              <span className="text-gray-500">💡 Tip:</span> Use the email from your social account (Google, X, Facebook, TikTok, etc.) to ensure your 1,000 welcome points are automatically credited when you join.
+              <span className="text-gray-500">💡 Tip:</span> Use the email from your social account
+              (Google, X, Facebook, TikTok, etc.) to ensure your 1,000 welcome points are
+              automatically credited when you join.
             </p>
             <p className="text-xs text-gray-600">
               Join 500+ creators on the waitlist. No spam, ever.
@@ -308,22 +372,22 @@ function LandingSignup({ variant = "hero" }: { variant?: "hero" | "bottom" }) {
 // PLATFORM DATA
 // ============================================================
 const PLATFORMS = [
-  { name: "Instagram", icon: SiInstagram, color: "#E4405F" },
-  { name: "TikTok", icon: SiTiktok, color: "#ff0050" },
-  { name: "X / Twitter", icon: SiX, color: "#ffffff" },
-  { name: "YouTube", icon: SiYoutube, color: "#FF0000" },
-  { name: "Spotify", icon: SiSpotify, color: "#1DB954" },
-  { name: "Discord", icon: SiDiscord, color: "#5865F2" },
-  { name: "Twitch", icon: SiTwitch, color: "#9146FF" },
-  { name: "Facebook", icon: SiFacebook, color: "#1877F2" },
-  { name: "Kick", icon: KickIcon, color: "#53FC18" },
-  { name: "Patreon", icon: SiPatreon, color: "#FF424D" },
+  { name: 'Instagram', icon: SiInstagram, color: '#E4405F' },
+  { name: 'TikTok', icon: SiTiktok, color: '#ff0050' },
+  { name: 'X / Twitter', icon: SiX, color: '#ffffff' },
+  { name: 'YouTube', icon: SiYoutube, color: '#FF0000' },
+  { name: 'Spotify', icon: SiSpotify, color: '#1DB954' },
+  { name: 'Discord', icon: SiDiscord, color: '#5865F2' },
+  { name: 'Twitch', icon: SiTwitch, color: '#9146FF' },
+  { name: 'Facebook', icon: SiFacebook, color: '#1877F2' },
+  { name: 'Kick', icon: KickIcon, color: '#53FC18' },
+  { name: 'Patreon', icon: SiPatreon, color: '#FF424D' },
 ];
 
 // ============================================================
 // ANIMATED COUNTER
 // ============================================================
-function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: string }) {
+function AnimatedNumber({ target, suffix = '' }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -347,13 +411,18 @@ function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: stri
           requestAnimationFrame(animate);
         }
       },
-      { threshold: 0.5, rootMargin: "-50px" }
+      { threshold: 0.5, rootMargin: '-50px' }
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [target, hasAnimated]);
 
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+  return (
+    <span ref={ref}>
+      {count.toLocaleString()}
+      {suffix}
+    </span>
+  );
 }
 
 // ============================================================
@@ -363,23 +432,31 @@ export default function Home() {
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
-    offset: ["start start", "end start"],
+    offset: ['start start', 'end start'],
   });
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.8], [1, 0.95]);
 
   return (
     <div className="min-h-screen bg-[#0a0118] overflow-x-hidden selection:bg-[#e10698]/30 selection:text-white">
-
       {/* ===== HERO ===== */}
-      <section ref={heroRef} className="relative min-h-[100vh] flex flex-col justify-center px-6 md:px-12 lg:px-20 pt-24 pb-20 overflow-hidden">
+      <section
+        ref={heroRef}
+        className="relative min-h-[100vh] flex flex-col justify-center px-6 md:px-12 lg:px-20 pt-24 pb-20 overflow-hidden"
+      >
         <SectionGeometry variant="hero" />
         {/* Ambient background */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#e10698]/[0.04] blur-[120px]" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#14feee]/[0.03] blur-[100px]" />
           {/* Grain overlay */}
-          <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`, backgroundRepeat: "repeat" }} />
+          <div
+            className="absolute inset-0 opacity-[0.015]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'repeat',
+            }}
+          />
         </div>
 
         <motion.div
@@ -399,7 +476,9 @@ export default function Home() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e10698] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#e10698]" />
               </span>
-              <span className="text-sm text-[#e10698] font-medium tracking-wide">Beta Access Open</span>
+              <span className="text-sm text-[#e10698] font-medium tracking-wide">
+                Beta Access Open
+              </span>
             </motion.div>
 
             {/* Headline */}
@@ -423,9 +502,8 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.25 }}
               className="text-lg md:text-xl text-gray-400 mb-10 max-w-xl leading-relaxed"
             >
-              Launch your own loyalty program in minutes. Verify social engagement
-              automatically. Reward fans with points, NFTs, and exclusive perks across
-              10 platforms.
+              Launch your own loyalty program in minutes. Verify social engagement automatically.
+              Reward fans with points, NFTs, and exclusive perks across 10 platforms.
             </motion.p>
 
             {/* Signup form */}
@@ -442,7 +520,7 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, x: 40, rotateY: -8 }}
             animate={{ opacity: 1, x: 0, rotateY: 0 }}
-            transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+            transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
             className="hidden lg:block relative"
           >
             {/* Floating glow behind card */}
@@ -470,12 +548,17 @@ export default function Home() {
               {/* Stats row */}
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {[
-                  { label: "Total Fans", value: "2,847", change: "+12%" },
-                  { label: "Engagement", value: "89.2%", change: "+5.4%" },
-                  { label: "Points Given", value: "45.2K", change: "+28%" },
+                  { label: 'Total Fans', value: '2,847', change: '+12%' },
+                  { label: 'Engagement', value: '89.2%', change: '+5.4%' },
+                  { label: 'Points Given', value: '45.2K', change: '+28%' },
                 ].map((stat, i) => (
-                  <div key={i} className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{stat.label}</p>
+                  <div
+                    key={i}
+                    className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3"
+                  >
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+                      {stat.label}
+                    </p>
                     <p className="text-white font-bold text-lg leading-tight">{stat.value}</p>
                     <p className="text-[#14feee] text-[10px] font-semibold mt-0.5">{stat.change}</p>
                   </div>
@@ -484,12 +567,42 @@ export default function Home() {
 
               {/* Activity feed */}
               <div className="space-y-2.5 mb-5">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Recent Activity</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+                  Recent Activity
+                </p>
                 {[
-                  { platform: "Instagram", action: "Liked post", user: "fan_sarah", points: "+15", color: "#E4405F", icon: SiInstagram },
-                  { platform: "YouTube", action: "Subscribed", user: "musiclover99", points: "+50", color: "#FF0000", icon: SiYoutube },
-                  { platform: "TikTok", action: "Shared video", user: "dance_mike", points: "+25", color: "#ffffff", icon: SiTiktok },
-                  { platform: "X", action: "Retweeted", user: "crypto_jen", points: "+20", color: "#ffffff", icon: SiX },
+                  {
+                    platform: 'Instagram',
+                    action: 'Liked post',
+                    user: 'fan_sarah',
+                    points: '+15',
+                    color: '#E4405F',
+                    icon: SiInstagram,
+                  },
+                  {
+                    platform: 'YouTube',
+                    action: 'Subscribed',
+                    user: 'musiclover99',
+                    points: '+50',
+                    color: '#FF0000',
+                    icon: SiYoutube,
+                  },
+                  {
+                    platform: 'TikTok',
+                    action: 'Shared video',
+                    user: 'dance_mike',
+                    points: '+25',
+                    color: '#ffffff',
+                    icon: SiTiktok,
+                  },
+                  {
+                    platform: 'X',
+                    action: 'Retweeted',
+                    user: 'crypto_jen',
+                    points: '+20',
+                    color: '#ffffff',
+                    icon: SiX,
+                  },
                 ].map((item, i) => (
                   <motion.div
                     key={i}
@@ -498,29 +611,40 @@ export default function Home() {
                     transition={{ delay: 0.6 + i * 0.15 }}
                     className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.04] rounded-xl px-3 py-2.5"
                   >
-                    <item.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: item.color }} />
+                    <item.icon
+                      className="w-3.5 h-3.5 flex-shrink-0"
+                      style={{ color: item.color }}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-xs font-medium truncate">{item.user}</p>
                       <p className="text-gray-500 text-[10px]">{item.action}</p>
                     </div>
-                    <span className="text-[#14feee] text-xs font-bold flex-shrink-0">{item.points}</span>
+                    <span className="text-[#14feee] text-xs font-bold flex-shrink-0">
+                      {item.points}
+                    </span>
                   </motion.div>
                 ))}
               </div>
 
               {/* Connected platforms bar */}
               <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.04] rounded-xl px-4 py-3">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Connected</span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+                  Connected
+                </span>
                 <div className="flex items-center gap-2">
                   {[
-                    { icon: SiInstagram, color: "#E4405F" },
-                    { icon: SiYoutube, color: "#FF0000" },
-                    { icon: SiTiktok, color: "#69C9D0" },
-                    { icon: SiX, color: "#fff" },
-                    { icon: SiSpotify, color: "#1DB954" },
-                    { icon: SiDiscord, color: "#5865F2" },
+                    { icon: SiInstagram, color: '#E4405F' },
+                    { icon: SiYoutube, color: '#FF0000' },
+                    { icon: SiTiktok, color: '#69C9D0' },
+                    { icon: SiX, color: '#fff' },
+                    { icon: SiSpotify, color: '#1DB954' },
+                    { icon: SiDiscord, color: '#5865F2' },
                   ].map((p, i) => (
-                    <p.icon key={i} className="w-3.5 h-3.5 opacity-60 hover:opacity-100 transition-opacity" style={{ color: p.color }} />
+                    <p.icon
+                      key={i}
+                      className="w-3.5 h-3.5 opacity-60 hover:opacity-100 transition-opacity"
+                      style={{ color: p.color }}
+                    />
                   ))}
                   <span className="text-gray-600 text-[10px] ml-1">+4</span>
                 </div>
@@ -574,7 +698,7 @@ export default function Home() {
         >
           <motion.div
             animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             className="w-6 h-10 border-2 border-white/20 rounded-full flex items-start justify-center p-1.5"
           >
             <motion.div className="w-1.5 h-1.5 bg-white/40 rounded-full" />
@@ -583,14 +707,17 @@ export default function Home() {
       </section>
 
       {/* ===== SOCIAL PROOF BAR ===== */}
-      <section className="relative z-10 border-y border-white/[0.04]" style={{ backgroundColor: "rgba(255,255,255,0.008)" }}>
+      <section
+        className="relative z-10 border-y border-white/[0.04]"
+        style={{ backgroundColor: 'rgba(255,255,255,0.008)' }}
+      >
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-14">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
             {[
-              { value: 500, suffix: "+", label: "Creators on waitlist" },
-              { value: 10, suffix: "", label: "Platforms integrated" },
-              { value: 35, suffix: "+", label: "Task templates" },
-              { value: 3, suffix: "", label: "Verification tiers" },
+              { value: 500, suffix: '+', label: 'Creators on waitlist' },
+              { value: 10, suffix: '', label: 'Platforms integrated' },
+              { value: 35, suffix: '+', label: 'Task templates' },
+              { value: 3, suffix: '', label: 'Verification tiers' },
             ].map((stat, i) => (
               <motion.div
                 key={i}
@@ -621,13 +748,17 @@ export default function Home() {
             transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="mb-16"
           >
-            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Integrations</p>
+            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">
+              Integrations
+            </p>
             <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display leading-tight mb-4">
-              One dashboard.<br />Ten platforms.
+              One dashboard.
+              <br />
+              Ten platforms.
             </h2>
             <p className="text-gray-400 max-w-xl text-lg">
-              Verify fan engagement across every major social and creator platform.
-              Every follow, like, and share -- confirmed automatically.
+              Verify fan engagement across every major social and creator platform. Every follow,
+              like, and share -- confirmed automatically.
             </p>
           </motion.div>
 
@@ -658,37 +789,37 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                num: "01",
-                title: "Instant Verification",
-                desc: "Every follow, like, and share is verified via API. No screenshots. No honor system.",
-                icon: "bolt",
-                accent: "#14feee",
-                iconBg: "bg-[#14feee]/10",
-                topBorder: "border-t-2 border-[#14feee]/40",
-                cardHover: "hover:border-[#14feee]/30",
-                numColor: "text-[#14feee]",
+                num: '01',
+                title: 'Instant Verification',
+                desc: 'Every follow, like, and share is verified via API. No screenshots. No honor system.',
+                icon: 'bolt',
+                accent: '#14feee',
+                iconBg: 'bg-[#14feee]/10',
+                topBorder: 'border-t-2 border-[#14feee]/40',
+                cardHover: 'hover:border-[#14feee]/30',
+                numColor: 'text-[#14feee]',
               },
               {
-                num: "02",
-                title: "Unified Analytics",
-                desc: "Track engagement, growth, and ROI across all platforms from a single dashboard.",
-                icon: "chart",
-                accent: "#e10698",
-                iconBg: "bg-[#e10698]/10",
-                topBorder: "border-t-2 border-[#e10698]/40",
-                cardHover: "hover:border-[#e10698]/30",
-                numColor: "text-[#e10698]",
+                num: '02',
+                title: 'Unified Analytics',
+                desc: 'Track engagement, growth, and ROI across all platforms from a single dashboard.',
+                icon: 'chart',
+                accent: '#e10698',
+                iconBg: 'bg-[#e10698]/10',
+                topBorder: 'border-t-2 border-[#e10698]/40',
+                cardHover: 'hover:border-[#e10698]/30',
+                numColor: 'text-[#e10698]',
               },
               {
-                num: "03",
-                title: "Smart Campaigns",
-                desc: "Build cross-platform campaigns that reward fans for engaging where it matters most.",
-                icon: "spark",
-                accent: "#8B5CF6",
-                iconBg: "bg-[#8B5CF6]/10",
-                topBorder: "border-t-2 border-[#8B5CF6]/40",
-                cardHover: "hover:border-[#8B5CF6]/30",
-                numColor: "text-[#8B5CF6]",
+                num: '03',
+                title: 'Smart Campaigns',
+                desc: 'Build cross-platform campaigns that reward fans for engaging where it matters most.',
+                icon: 'spark',
+                accent: '#8B5CF6',
+                iconBg: 'bg-[#8B5CF6]/10',
+                topBorder: 'border-t-2 border-[#8B5CF6]/40',
+                cardHover: 'hover:border-[#8B5CF6]/30',
+                numColor: 'text-[#8B5CF6]',
               },
             ].map((feature, i) => (
               <motion.div
@@ -700,18 +831,48 @@ export default function Home() {
                 className={`group p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] ${feature.cardHover} ${feature.topBorder} rounded-3xl transition-all duration-500`}
               >
                 <div className="flex items-center justify-between mb-5">
-                  <div className={`w-10 h-10 rounded-xl ${feature.iconBg} flex items-center justify-center`}>
-                    {feature.icon === "bolt" && (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke={feature.accent}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                  <div
+                    className={`w-10 h-10 rounded-xl ${feature.iconBg} flex items-center justify-center`}
+                  >
+                    {feature.icon === 'bolt' && (
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke={feature.accent}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
+                        />
+                      </svg>
                     )}
-                    {feature.icon === "chart" && (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke={feature.accent}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                    {feature.icon === 'chart' && (
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke={feature.accent}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+                        />
+                      </svg>
                     )}
-                    {feature.icon === "spark" && (
+                    {feature.icon === 'spark' && (
                       <Sparkles className="w-5 h-5" style={{ color: feature.accent }} />
                     )}
                   </div>
-                  <span className={`text-xs font-bold tracking-widest ${feature.numColor} opacity-60`}>{feature.num}</span>
+                  <span
+                    className={`text-xs font-bold tracking-widest ${feature.numColor} opacity-60`}
+                  >
+                    {feature.num}
+                  </span>
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
@@ -722,7 +883,10 @@ export default function Home() {
       </section>
 
       {/* ===== HOW IT WORKS ===== */}
-      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: "rgba(255,255,255,0.008)" }}>
+      <section
+        className="relative z-10 py-24 md:py-32 px-6 md:px-12"
+        style={{ backgroundColor: 'rgba(255,255,255,0.008)' }}
+      >
         <SectionGeometry variant="howItWorks" />
         <div className="max-w-7xl mx-auto">
           <motion.div
@@ -732,19 +896,47 @@ export default function Home() {
             transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="text-center mb-20"
           >
-            <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">How it works</p>
+            <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">
+              How it works
+            </p>
             <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display">
-              From zero to loyalty program<br className="hidden md:block" /> in five minutes
+              From zero to loyalty program
+              <br className="hidden md:block" /> in five minutes
             </h2>
           </motion.div>
 
           <div className="grid md:grid-cols-5 gap-4 md:gap-2">
             {[
-              { step: "01", title: "Sign up", desc: "Create your account and connect your social profiles.", pink: true },
-              { step: "02", title: "Design", desc: "Pick from 35+ templates or build custom tasks for fans.", pink: false },
-              { step: "03", title: "Launch", desc: "Share your program link. Fans join in seconds.", pink: true },
-              { step: "04", title: "Reward", desc: "Points, NFTs, merch, raffle entries -- all automated.", pink: false },
-              { step: "05", title: "Grow", desc: "Track every metric and scale your community.", pink: true },
+              {
+                step: '01',
+                title: 'Sign up',
+                desc: 'Create your account and connect your social profiles.',
+                pink: true,
+              },
+              {
+                step: '02',
+                title: 'Design',
+                desc: 'Pick from 35+ templates or build custom tasks for fans.',
+                pink: false,
+              },
+              {
+                step: '03',
+                title: 'Launch',
+                desc: 'Share your program link. Fans join in seconds.',
+                pink: true,
+              },
+              {
+                step: '04',
+                title: 'Reward',
+                desc: 'Points, NFTs, merch, raffle entries -- all automated.',
+                pink: false,
+              },
+              {
+                step: '05',
+                title: 'Grow',
+                desc: 'Track every metric and scale your community.',
+                pink: true,
+              },
             ].map((item, i) => (
               <motion.div
                 key={i}
@@ -755,14 +947,14 @@ export default function Home() {
                 className="relative group"
               >
                 <div
-                  className={`p-6 md:p-5 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500 h-full border-l-2 ${item.pink ? "border-l-[#e10698]/50 hover:border-l-[#e10698]/80" : "border-l-[#14feee]/50 hover:border-l-[#14feee]/80"}`}
+                  className={`p-6 md:p-5 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500 h-full border-l-2 ${item.pink ? 'border-l-[#e10698]/50 hover:border-l-[#e10698]/80' : 'border-l-[#14feee]/50 hover:border-l-[#14feee]/80'}`}
                 >
                   {/* Circular step badge */}
                   <div
                     className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold tracking-widest mb-4 border ${
                       item.pink
-                        ? "bg-[#e10698]/15 text-[#e10698] border-[#e10698]/30"
-                        : "bg-[#14feee]/15 text-[#14feee] border-[#14feee]/30"
+                        ? 'bg-[#e10698]/15 text-[#e10698] border-[#e10698]/30'
+                        : 'bg-[#14feee]/15 text-[#14feee] border-[#14feee]/30'
                     }`}
                   >
                     {item.step}
@@ -773,7 +965,13 @@ export default function Home() {
                 {i < 4 && (
                   <div className="hidden md:flex absolute top-1/2 -right-3.5 -translate-y-1/2 z-10">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M2 7 L12 7 M8 3 L12 7 L8 11" stroke="url(#chevron-grad)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path
+                        d="M2 7 L12 7 M8 3 L12 7 L8 11"
+                        stroke="url(#chevron-grad)"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                       <defs>
                         <linearGradient id="chevron-grad" x1="0" y1="0" x2="14" y2="0">
                           <stop offset="0%" stopColor="#e10698" stopOpacity="0.5" />
@@ -799,9 +997,13 @@ export default function Home() {
             transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
             className="mb-16"
           >
-            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">The Platform</p>
+            <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">
+              The Platform
+            </p>
             <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display leading-tight mb-4">
-              Two sides.<br />One platform.
+              Two sides.
+              <br />
+              One platform.
             </h2>
             <p className="text-gray-400 max-w-xl text-lg">
               Powerful tools for creators. A rewarding experience for fans.
@@ -830,13 +1032,15 @@ export default function Home() {
 
               <div className="grid grid-cols-4 gap-3 mb-6">
                 {[
-                  { label: "Fans", value: "2,847", change: "+12%" },
-                  { label: "Revenue", value: "$7.4k", change: "+8%" },
-                  { label: "Tasks", value: "1,247", change: "+23%" },
-                  { label: "Rewards", value: "89", change: "+5%" },
+                  { label: 'Fans', value: '2,847', change: '+12%' },
+                  { label: 'Revenue', value: '$7.4k', change: '+8%' },
+                  { label: 'Tasks', value: '1,247', change: '+23%' },
+                  { label: 'Rewards', value: '89', change: '+5%' },
                 ].map((stat, i) => (
                   <div key={i} className="p-3 bg-white/[0.03] rounded-xl">
-                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{stat.label}</div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">
+                      {stat.label}
+                    </div>
                     <div className="text-base font-bold text-white">{stat.value}</div>
                     <div className="text-[10px] text-emerald-400">{stat.change}</div>
                   </div>
@@ -890,22 +1094,26 @@ export default function Home() {
               {/* Task list */}
               <div className="space-y-2.5">
                 {[
-                  { task: "Follow on Instagram", points: 150, done: true },
-                  { task: "Subscribe on YouTube", points: 250, done: true },
-                  { task: "Share TikTok post", points: 100, done: false },
-                  { task: "Join Discord server", points: 200, done: false },
+                  { task: 'Follow on Instagram', points: 150, done: true },
+                  { task: 'Subscribe on YouTube', points: 250, done: true },
+                  { task: 'Share TikTok post', points: 100, done: false },
+                  { task: 'Join Discord server', points: 200, done: false },
                 ].map((item, i) => (
                   <div
                     key={i}
                     className="flex items-center justify-between p-3 bg-white/[0.03] rounded-xl"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-md flex items-center justify-center ${
-                        item.done ? "bg-emerald-500/20" : "border border-white/10"
-                      }`}>
+                      <div
+                        className={`w-5 h-5 rounded-md flex items-center justify-center ${
+                          item.done ? 'bg-emerald-500/20' : 'border border-white/10'
+                        }`}
+                      >
                         {item.done && <Check className="w-3 h-3 text-emerald-400" />}
                       </div>
-                      <span className={`text-sm ${item.done ? "text-gray-500 line-through" : "text-white"}`}>
+                      <span
+                        className={`text-sm ${item.done ? 'text-gray-500 line-through' : 'text-white'}`}
+                      >
                         {item.task}
                       </span>
                     </div>
@@ -919,86 +1127,96 @@ export default function Home() {
       </section>
 
       {/* ===== WHO IT'S FOR ===== */}
-      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: "rgba(255,255,255,0.008)" }}>
+      <section
+        className="relative z-10 py-24 md:py-32 px-6 md:px-12"
+        style={{ backgroundColor: 'rgba(255,255,255,0.008)' }}
+      >
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
+            transition={{ duration: 1.2, ease: 'easeOut' }}
           >
             <div className="text-center mb-16">
-              <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">Built for creators</p>
+              <p className="text-[#14feee] text-sm font-semibold tracking-widest uppercase mb-4">
+                Built for creators
+              </p>
               <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
                 Your audience. Your rules.
               </h2>
               <p className="text-gray-400 max-w-2xl mx-auto text-lg">
-                Whether you have 1,000 followers or 10 million, Fandomly gives you
-                the tools to turn passive audiences into active communities.
+                Whether you have 1,000 followers or 10 million, Fandomly gives you the tools to turn
+                passive audiences into active communities.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-5">
               {[
                 {
-                  title: "NIL Athletes",
-                  subtitle: "Monetize your name, image & likeness",
-                  desc: "Turn your fanbase into a loyalty program. Reward fans for wearing your merch, attending games, and engaging with sponsors.",
-                  tags: ["Pro Athletes", "College Athletes", "Olympic Athletes"],
-                  accent: "#14feee",
-                  gradient: "from-[#14feee]/[0.06] to-transparent",
+                  title: 'NIL Athletes',
+                  subtitle: 'Monetize your name, image & likeness',
+                  desc: 'Turn your fanbase into a loyalty program. Reward fans for wearing your merch, attending games, and engaging with sponsors.',
+                  tags: ['Pro Athletes', 'College Athletes', 'Olympic Athletes'],
+                  accent: '#14feee',
+                  gradient: 'from-[#14feee]/[0.06] to-transparent',
                 },
                 {
-                  title: "Content Creators",
-                  subtitle: "Reward every interaction",
-                  desc: "Your followers already engage with your content. Now you can track it, reward it, and grow faster because of it.",
-                  tags: ["Influencers", "Video Creators", "Podcasters"],
-                  accent: "#e10698",
-                  gradient: "from-[#e10698]/[0.06] to-transparent",
+                  title: 'Content Creators',
+                  subtitle: 'Reward every interaction',
+                  desc: 'Your followers already engage with your content. Now you can track it, reward it, and grow faster because of it.',
+                  tags: ['Influencers', 'Video Creators', 'Podcasters'],
+                  accent: '#e10698',
+                  gradient: 'from-[#e10698]/[0.06] to-transparent',
                 },
                 {
-                  title: "Musicians & Artists",
+                  title: 'Musicians & Artists',
                   subtitle: "Streaming pays pennies. Your superfans don't.",
-                  desc: "Identify your most dedicated listeners. Reward streams, shares, and playlist adds with exclusive drops and NFTs.",
-                  tags: ["Independent Artists", "Bands", "DJs & Producers"],
-                  accent: "#8B5CF6",
-                  gradient: "from-[#8B5CF6]/[0.06] to-transparent",
+                  desc: 'Identify your most dedicated listeners. Reward streams, shares, and playlist adds with exclusive drops and NFTs.',
+                  tags: ['Independent Artists', 'Bands', 'DJs & Producers'],
+                  accent: '#8B5CF6',
+                  gradient: 'from-[#8B5CF6]/[0.06] to-transparent',
                 },
                 {
-                  title: "Brands & Agencies",
-                  subtitle: "White-label everything",
-                  desc: "Your brand. Your domain. Your auth. Multi-tenant SaaS that scales with your portfolio of creators.",
-                  tags: ["Marketing Agencies", "Sports Teams", "Enterprises"],
-                  accent: "#10B981",
-                  gradient: "from-[#10B981]/[0.06] to-transparent",
+                  title: 'Brands & Agencies',
+                  subtitle: 'White-label everything',
+                  desc: 'Your brand. Your domain. Your auth. Multi-tenant SaaS that scales with your portfolio of creators.',
+                  tags: ['Marketing Agencies', 'Sports Teams', 'Enterprises'],
+                  accent: '#10B981',
+                  gradient: 'from-[#10B981]/[0.06] to-transparent',
                 },
               ].map((card, i) => (
                 <div
                   key={i}
                   className={`group p-7 md:p-8 rounded-3xl bg-gradient-to-br ${card.gradient} border border-white/[0.05] hover:border-white/[0.1] transition-all duration-500`}
                 >
-                <div className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: card.accent }}>
-                  {card.subtitle}
+                  <div
+                    className="text-xs font-bold tracking-widest uppercase mb-3"
+                    style={{ color: card.accent }}
+                  >
+                    {card.subtitle}
+                  </div>
+                  <h3 className="text-2xl font-extrabold text-white font-display mb-3">
+                    {card.title}
+                  </h3>
+                  <p className="text-gray-400 text-sm leading-relaxed mb-5">{card.desc}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {card.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-3 py-1 rounded-full text-xs font-medium border"
+                        style={{
+                          color: card.accent,
+                          borderColor: `${card.accent}30`,
+                          backgroundColor: `${card.accent}08`,
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <h3 className="text-2xl font-extrabold text-white font-display mb-3">{card.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed mb-5">{card.desc}</p>
-                <div className="flex flex-wrap gap-2">
-                  {card.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 rounded-full text-xs font-medium border"
-                      style={{
-                        color: card.accent,
-                        borderColor: `${card.accent}30`,
-                        backgroundColor: `${card.accent}08`,
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))}
             </div>
           </motion.div>
         </div>
@@ -1012,83 +1230,88 @@ export default function Home() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
+            transition={{ duration: 1.2, ease: 'easeOut' }}
           >
             <div className="text-center mb-16">
-              <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">Features</p>
+              <p className="text-[#e10698] text-sm font-semibold tracking-widest uppercase mb-4">
+                Features
+              </p>
               <h2 className="text-3xl md:text-5xl font-extrabold text-white font-display mb-4">
-                Everything you need.<br className="hidden md:block" /> Nothing you don't.
+                Everything you need.
+                <br className="hidden md:block" /> Nothing you don&apos;t.
               </h2>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {[
-              {
-                title: "Fraud Protection",
-                desc: "Real-time verification prevents fake engagement and bot activity. Three verification tiers for every trust level.",
-                Icon: ShieldCheck,
-                accent: "#14feee",
-                iconBg: "bg-[#14feee]/10",
-                hoverBorder: "hover:border-[#14feee]/25",
-                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(20,254,238,0.12)]",
-              },
-              {
-                title: "Flexible Rewards",
-                desc: "Points, NFTs, raffle entries, physical merch, exclusive access -- all in one system.",
-                Icon: Gift,
-                accent: "#e10698",
-                iconBg: "bg-[#e10698]/10",
-                hoverBorder: "hover:border-[#e10698]/25",
-                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(225,6,152,0.12)]",
-              },
-              {
-                title: "Fan Tiers",
-                desc: "Automatically segment fans by engagement level. Reward your most loyal supporters differently.",
-                Icon: Crown,
-                accent: "#F59E0B",
-                iconBg: "bg-[#F59E0B]/10",
-                hoverBorder: "hover:border-[#F59E0B]/25",
-                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(245,158,11,0.12)]",
-              },
-              {
-                title: "Deep Analytics",
-                desc: "Track engagement, conversion rates, and ROI across every platform and campaign in real-time.",
-                Icon: BarChart3,
-                accent: "#3B82F6",
-                iconBg: "bg-[#3B82F6]/10",
-                hoverBorder: "hover:border-[#3B82F6]/25",
-                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(59,130,246,0.12)]",
-              },
-              {
-                title: "White-Label",
-                desc: "Your brand, your domain, your colors. Remove every trace of Fandomly. Full multi-tenant SaaS.",
-                Icon: Palette,
-                accent: "#8B5CF6",
-                iconBg: "bg-[#8B5CF6]/10",
-                hoverBorder: "hover:border-[#8B5CF6]/25",
-                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(139,92,246,0.12)]",
-              },
-              {
-                title: "No-Code Setup",
-                desc: "Launch a complete loyalty program in 5 minutes. 35+ templates. Zero developers required.",
-                Icon: Zap,
-                accent: "#10B981",
-                iconBg: "bg-[#10B981]/10",
-                hoverBorder: "hover:border-[#10B981]/25",
-                hoverGlow: "group-hover:shadow-[0_0_20px_rgba(16,185,129,0.12)]",
-              },
-            ].map((feature, i) => (
-              <div
-                key={i}
-                className={`group p-7 rounded-3xl bg-white/[0.02] border border-white/[0.05] ${feature.hoverBorder} ${feature.hoverGlow} transition-all duration-500`}
-              >
-                <div className={`w-10 h-10 rounded-xl ${feature.iconBg} flex items-center justify-center mb-5`}>
-                  <feature.Icon className="w-5 h-5" style={{ color: feature.accent }} />
+                {
+                  title: 'Fraud Protection',
+                  desc: 'Real-time verification prevents fake engagement and bot activity. Three verification tiers for every trust level.',
+                  Icon: ShieldCheck,
+                  accent: '#14feee',
+                  iconBg: 'bg-[#14feee]/10',
+                  hoverBorder: 'hover:border-[#14feee]/25',
+                  hoverGlow: 'group-hover:shadow-[0_0_20px_rgba(20,254,238,0.12)]',
+                },
+                {
+                  title: 'Flexible Rewards',
+                  desc: 'Points, NFTs, raffle entries, physical merch, exclusive access -- all in one system.',
+                  Icon: Gift,
+                  accent: '#e10698',
+                  iconBg: 'bg-[#e10698]/10',
+                  hoverBorder: 'hover:border-[#e10698]/25',
+                  hoverGlow: 'group-hover:shadow-[0_0_20px_rgba(225,6,152,0.12)]',
+                },
+                {
+                  title: 'Fan Tiers',
+                  desc: 'Automatically segment fans by engagement level. Reward your most loyal supporters differently.',
+                  Icon: Crown,
+                  accent: '#F59E0B',
+                  iconBg: 'bg-[#F59E0B]/10',
+                  hoverBorder: 'hover:border-[#F59E0B]/25',
+                  hoverGlow: 'group-hover:shadow-[0_0_20px_rgba(245,158,11,0.12)]',
+                },
+                {
+                  title: 'Deep Analytics',
+                  desc: 'Track engagement, conversion rates, and ROI across every platform and campaign in real-time.',
+                  Icon: BarChart3,
+                  accent: '#3B82F6',
+                  iconBg: 'bg-[#3B82F6]/10',
+                  hoverBorder: 'hover:border-[#3B82F6]/25',
+                  hoverGlow: 'group-hover:shadow-[0_0_20px_rgba(59,130,246,0.12)]',
+                },
+                {
+                  title: 'White-Label',
+                  desc: 'Your brand, your domain, your colors. Remove every trace of Fandomly. Full multi-tenant SaaS.',
+                  Icon: Palette,
+                  accent: '#8B5CF6',
+                  iconBg: 'bg-[#8B5CF6]/10',
+                  hoverBorder: 'hover:border-[#8B5CF6]/25',
+                  hoverGlow: 'group-hover:shadow-[0_0_20px_rgba(139,92,246,0.12)]',
+                },
+                {
+                  title: 'No-Code Setup',
+                  desc: 'Launch a complete loyalty program in 5 minutes. 35+ templates. Zero developers required.',
+                  Icon: Zap,
+                  accent: '#10B981',
+                  iconBg: 'bg-[#10B981]/10',
+                  hoverBorder: 'hover:border-[#10B981]/25',
+                  hoverGlow: 'group-hover:shadow-[0_0_20px_rgba(16,185,129,0.12)]',
+                },
+              ].map((feature, i) => (
+                <div
+                  key={i}
+                  className={`group p-7 rounded-3xl bg-white/[0.02] border border-white/[0.05] ${feature.hoverBorder} ${feature.hoverGlow} transition-all duration-500`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-xl ${feature.iconBg} flex items-center justify-center mb-5`}
+                  >
+                    <feature.Icon className="w-5 h-5" style={{ color: feature.accent }} />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{feature.desc}</p>
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{feature.desc}</p>
-              </div>
-            ))}
+              ))}
             </div>
           </motion.div>
         </div>
@@ -1112,26 +1335,30 @@ export default function Home() {
               Ready to build your community?
             </h2>
             <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto relative">
-              Join the creators who are turning followers into loyal fans.
-              Get early access to Fandomly.
+              Join the creators who are turning followers into loyal fans. Get early access to
+              Fandomly.
             </p>
 
             <div className="relative">
               <LandingSignup variant="bottom" />
               <p className="text-sm text-gray-500 mt-4 max-w-xl mx-auto">
-                <span className="text-gray-400">💡 Tip:</span> Use the email from your social account (Google, X, Facebook, TikTok, etc.) so your 1,000 welcome points are automatically credited.
+                <span className="text-gray-400">💡 Tip:</span> Use the email from your social
+                account (Google, X, Facebook, TikTok, etc.) so your 1,000 welcome points are
+                automatically credited.
               </p>
             </div>
 
             <div className="flex flex-wrap justify-center gap-3 mt-10 relative">
-              {["No-Code Setup", "White-Label", "35+ Templates", "10 Platforms", "NFT Rewards"].map((badge) => (
-                <span
-                  key={badge}
-                  className="px-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-full text-xs text-gray-500 font-medium tracking-wide"
-                >
-                  {badge}
-                </span>
-              ))}
+              {['No-Code Setup', 'White-Label', '35+ Templates', '10 Platforms', 'NFT Rewards'].map(
+                (badge) => (
+                  <span
+                    key={badge}
+                    className="px-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-full text-xs text-gray-500 font-medium tracking-wide"
+                  >
+                    {badge}
+                  </span>
+                )
+              )}
             </div>
           </motion.div>
         </div>
@@ -1146,9 +1373,9 @@ export default function Home() {
             </Link>
             <div className="flex items-center gap-4">
               {[
-                { icon: SiX, href: "#", label: "X" },
-                { icon: SiInstagram, href: "#", label: "Instagram" },
-                { icon: SiDiscord, href: "#", label: "Discord" },
+                { icon: SiX, href: '#', label: 'X' },
+                { icon: SiInstagram, href: '#', label: 'Instagram' },
+                { icon: SiDiscord, href: '#', label: 'Discord' },
               ].map((social) => (
                 <a
                   key={social.label}
@@ -1161,21 +1388,28 @@ export default function Home() {
               ))}
             </div>
             <div className="flex items-center gap-4 text-sm">
-              <Link href="/privacy-policy" className="text-gray-500 hover:text-white transition-colors">
+              <Link
+                href="/privacy-policy"
+                className="text-gray-500 hover:text-white transition-colors"
+              >
                 Privacy Policy
               </Link>
               <span className="text-gray-600">·</span>
-              <Link href="/terms-of-service" className="text-gray-500 hover:text-white transition-colors">
+              <Link
+                href="/terms-of-service"
+                className="text-gray-500 hover:text-white transition-colors"
+              >
                 Terms of Service
               </Link>
               <span className="text-gray-600">·</span>
-              <Link href="/data-deletion" className="text-gray-500 hover:text-white transition-colors">
+              <Link
+                href="/data-deletion"
+                className="text-gray-500 hover:text-white transition-colors"
+              >
                 Data Deletion
               </Link>
             </div>
-            <p className="text-gray-600 text-sm">
-              &copy; {new Date().getFullYear()} Fandomly, LLC
-            </p>
+            <p className="text-gray-600 text-sm">&copy; {new Date().getFullYear()} Fandomly, LLC</p>
           </div>
         </div>
       </footer>

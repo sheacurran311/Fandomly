@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,10 +11,17 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Menu, X, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { useAuthModal } from '@/hooks/use-auth-modal';
+import { isParticleAuthEnabled } from '@/contexts/particle-provider';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
 import { transformImageUrl } from '@/lib/image-utils';
 import { BrandSwitcher } from '@/components/brand-switcher';
+
+// Lazy-load Particle ConnectButton to avoid bundle impact when not configured
+const ParticleConnectButton = lazy(() =>
+  import('@particle-network/connectkit').then((mod) => ({
+    default: mod.ConnectButton,
+  }))
+);
 
 export default function Navigation() {
   const [location] = useLocation();
@@ -22,7 +29,7 @@ export default function Navigation() {
 
   // Use new auth context
   const { user, isAuthenticated, isLoading, logout } = useAuth();
-  const { openAuthModal } = useAuthModal();
+  const particleEnabled = isParticleAuthEnabled();
 
   // Landing page has its own minimal footer with logo — no nav bar needed
   if (location === '/') return null;
@@ -189,13 +196,30 @@ export default function Navigation() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              ) : (
-                <Button
-                  onClick={() => openAuthModal()}
-                  className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105"
+              ) : particleEnabled ? (
+                <div
+                  data-particle-connect-btn
+                  className="[&_button]:rounded-xl [&_button]:font-semibold [&_button]:transition-all [&_button]:duration-200 [&_button]:hover:scale-105"
                 >
-                  Sign In
-                </Button>
+                  <Suspense
+                    fallback={
+                      <Button
+                        disabled
+                        className="bg-brand-primary/50 text-white/50 px-6 py-2 rounded-xl"
+                      >
+                        Loading...
+                      </Button>
+                    }
+                  >
+                    <ParticleConnectButton label="Sign In" />
+                  </Suspense>
+                </div>
+              ) : (
+                <Link href="/login">
+                  <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105">
+                    Sign In
+                  </Button>
+                </Link>
               )}
             </div>
 
@@ -252,17 +276,36 @@ export default function Navigation() {
                     </Link>
                   </>
                 )}
-                {!isAuthenticated && (
-                  <Button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      openAuthModal();
-                    }}
-                    className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
-                  >
-                    Sign In
-                  </Button>
-                )}
+                {!isAuthenticated &&
+                  (particleEnabled ? (
+                    <div
+                      data-particle-connect-btn
+                      className="[&_button]:w-full [&_button]:rounded-xl [&_button]:font-semibold"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <Suspense
+                        fallback={
+                          <Button
+                            disabled
+                            className="w-full bg-brand-primary/50 text-white/50 py-2 rounded-xl"
+                          >
+                            Loading...
+                          </Button>
+                        }
+                      >
+                        <ParticleConnectButton label="Sign In" />
+                      </Suspense>
+                    </div>
+                  ) : (
+                    <Link href="/login">
+                      <Button
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                  ))}
               </div>
             </div>
           )}

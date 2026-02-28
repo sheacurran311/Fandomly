@@ -1,9 +1,9 @@
 /**
  * Particle Connect Provider
  *
- * Wraps the app with Particle's ConnectKitProvider when Particle is configured.
- * Falls back to rendering children directly when Particle credentials are missing
- * (i.e., legacy auth mode).
+ * Wraps the app with Particle's ConnectKitProvider when Particle credentials
+ * are configured. Falls back to rendering children directly when credentials
+ * are missing (e.g. landing-only production build).
  *
  * This component sits ABOVE AuthProvider in the component tree so that
  * Particle's hooks are available inside the auth context bridge.
@@ -24,14 +24,12 @@ interface ParticleProviderProps {
 }
 
 /**
- * Feature flag: determines whether Particle auth is active.
- * Controlled by VITE_AUTH_PROVIDER env var.
- *   'particle' = use Particle Connect for auth
- *   'legacy' (default) = use existing JWT + OAuth auth
+ * Returns true when Particle Connect is active (credentials configured).
+ * No feature flag needed — Particle is the primary auth provider.
+ * Falls back gracefully when credentials are absent.
  */
 export function isParticleAuthEnabled(): boolean {
-  const provider = import.meta.env.VITE_AUTH_PROVIDER;
-  return provider === 'particle' && isParticleConfigured();
+  return isParticleConfigured();
 }
 
 export function ParticleProvider({ children }: ParticleProviderProps) {
@@ -47,16 +45,14 @@ export function ParticleProvider({ children }: ParticleProviderProps) {
     }
   }, [enabled]);
 
-  // If Particle is not enabled or config failed, render children directly
+  // If Particle is not configured or config failed, render children directly
   if (!config) {
     return <>{children}</>;
   }
 
   return (
     <React.Suspense fallback={<>{children}</>}>
-      <ConnectKitProvider config={config}>
-        {children}
-      </ConnectKitProvider>
+      <ConnectKitProvider config={config}>{children}</ConnectKitProvider>
     </React.Suspense>
   );
 }

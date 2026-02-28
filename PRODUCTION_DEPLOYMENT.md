@@ -19,7 +19,7 @@ All beta signup features are complete and tested:
 In your production hosting platform (Replit, Vercel, etc.), add:
 
 ```
-VITE_LANDING_ONLY=true
+LANDING_ONLY=true
 ```
 
 This strips the app down to just the landing page - no navigation, no footer, no auth flows.
@@ -27,6 +27,7 @@ This strips the app down to just the landing page - no navigation, no footer, no
 ### 2. Deploy
 
 Build and deploy as normal:
+
 ```bash
 npm run build
 npm start
@@ -43,6 +44,7 @@ Your production site will show ONLY the landing page at all routes.
 ## How Points Work
 
 ### User Flow:
+
 1. **User signs up** on landing page with `user@example.com`
    - Stored in `beta_signups` table
    - `claimed = false`
@@ -59,6 +61,7 @@ Your production site will show ONLY the landing page at all routes.
    - Can be used for rewards, monthly fees, swag
 
 ### Preventing Double-Claims:
+
 - Email is checked as lowercase (case-insensitive matching)
 - `claimed` flag prevents re-crediting if user logs out/in
 - Each beta signup can only be claimed once
@@ -66,13 +69,15 @@ Your production site will show ONLY the landing page at all routes.
 ## Development vs Production
 
 ### Development (no env var set):
+
 - Full app with all features
 - Navigation with all links
 - Footer with product information
 - Authentication flows work
 - Landing page accessible at `/` without redirect
 
-### Production (`VITE_LANDING_ONLY=true`):
+### Production (`LANDING_ONLY=true`):
+
 - **ONLY** landing page content
 - No navigation bar
 - Minimal footer (logo, social, legal only)
@@ -83,13 +88,15 @@ Your production site will show ONLY the landing page at all routes.
 ## Testing Checklist
 
 Before deploying:
+
 - [ ] Beta signup form submits successfully
 - [ ] Success modal shows "1,000 Fandomly Points"
 - [ ] Duplicate email shows "already registered" message
 - [ ] Form validation works (invalid email shows error)
-- [ ] `VITE_LANDING_ONLY=true` env variable set in production
+- [ ] `LANDING_ONLY=true` env variable set in production
 
 After going live:
+
 - [ ] Submit a test beta signup
 - [ ] Later: Log in with that email's social account
 - [ ] Verify 1,000 points appear in account
@@ -98,13 +105,15 @@ After going live:
 ## Database Queries
 
 ### Check beta signups:
+
 ```sql
-SELECT email, claimed, claimed_at, created_at 
-FROM beta_signups 
+SELECT email, claimed, claimed_at, created_at
+FROM beta_signups
 ORDER BY created_at DESC;
 ```
 
 ### Check if points were credited:
+
 ```sql
 SELECT u.email, ppt.points, ppt.source, ppt.created_at
 FROM platform_points_transactions ppt
@@ -126,9 +135,10 @@ ORDER BY ppt.created_at DESC;
 ## Support
 
 If anything doesn't work:
+
 1. Check server logs for `[Beta Signup]` messages
 2. Verify `beta_signups` table exists
-3. Ensure `VITE_LANDING_ONLY=true` is set in production
+3. Ensure `LANDING_ONLY=true` is set in production
 4. Check database for email (case-insensitive)
 
 ---

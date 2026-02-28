@@ -287,9 +287,14 @@ function App() {
 }
 
 /**
- * Landing-only mode: when VITE_LANDING_ONLY=true, renders just the Home page
- * with no auth, nav, footer, or routing. Used for production beta collection.
+ * Landing-only mode: renders just the Home page with no auth, nav, footer,
+ * or routing. Used for production beta collection.
+ *
+ * Controlled by LANDING_ONLY env var (non-VITE prefix) set as a Replit
+ * production secret. Vite injects it at build time via the `define` config.
  */
+declare const __LANDING_ONLY__: boolean;
+
 function LandingOnlyApp() {
   return (
     <ErrorBoundary>
@@ -302,7 +307,7 @@ function LandingOnlyApp() {
 }
 
 export default function AppEntry() {
-  if (import.meta.env.VITE_LANDING_ONLY === 'true') {
+  if (__LANDING_ONLY__) {
     return <LandingOnlyApp />;
   }
   return <App />;

@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
-import { useAuth } from "@/contexts/auth-context";
-import { useAuthModal } from "@/hooks/use-auth-modal";
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
+import { useAuth } from '@/contexts/auth-context';
+import { useAuthModal } from '@/hooks/use-auth-modal';
 import { SocialProviders } from '@/contexts/social-providers';
-import { migrateLocalStorageToDatabase } from "@/lib/social-connection-api";
+import { migrateLocalStorageToDatabase } from '@/lib/social-connection-api';
 
 interface AuthRouterProps {
   children: React.ReactNode;
@@ -16,16 +16,15 @@ interface AuthRouterProps {
 export default function NewAuthRouter({ children }: AuthRouterProps) {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { openAuthModal, closeAuthModal, isOpen: isAuthModalOpen } = useAuthModal();
+  const { openAuthModal } = useAuthModal();
   const lastAuthPromptPath = useRef<string | null>(null);
 
-  // Close auth modal automatically when user becomes authenticated
+  // Reset auth prompt tracking when user becomes authenticated
   useEffect(() => {
-    if (isAuthenticated && user && isAuthModalOpen) {
-      closeAuthModal();
-      lastAuthPromptPath.current = null; // Reset so future prompts can work
+    if (isAuthenticated && user) {
+      lastAuthPromptPath.current = null;
     }
-  }, [isAuthenticated, user, isAuthModalOpen, closeAuthModal]);
+  }, [isAuthenticated, user]);
 
   // Global PKCE handshake listener for Twitter OAuth popups
   useEffect(() => {
@@ -33,24 +32,45 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       try {
         if (event.origin !== window.location.origin) return;
         if (event.data?.type === 'twitter-pkce-request') {
-          const reqState = (event.data && (event.data as any).state) as string | undefined;
+          const reqState = (event.data && (event.data as Record<string, unknown>).state) as
+            | string
+            | undefined;
           let verifier: string | null = null;
           try {
             const rawMap = localStorage.getItem('twitter_pkce_map');
             const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
             verifier = (reqState && map[reqState]) || null;
-          } catch {}
-          if (!verifier) {
-            try { verifier = localStorage.getItem('twitter_pkce_verifier'); } catch {}
+          } catch {
+            // noop
           }
           if (!verifier) {
-            try { verifier = (window as any).__twitterPkceVerifier || null; } catch {}
+            try {
+              verifier = localStorage.getItem('twitter_pkce_verifier');
+            } catch {
+              // noop
+            }
+          }
+          if (!verifier) {
+            try {
+              verifier =
+                ((window as Record<string, unknown>).__twitterPkceVerifier as string | null) ||
+                null;
+            } catch {
+              // noop
+            }
           }
           try {
-            (event.source as Window | null)?.postMessage({ type: 'twitter-pkce-response', state: reqState, verifier }, event.origin);
-          } catch {}
+            (event.source as Window | null)?.postMessage(
+              { type: 'twitter-pkce-response', state: reqState, verifier },
+              event.origin
+            );
+          } catch {
+            // noop
+          }
         }
-      } catch {}
+      } catch {
+        // noop
+      }
     }
 
     window.addEventListener('message', messageListener);
@@ -61,12 +81,22 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
 
   // Get current path and define routes
   const currentPath = window.location.pathname;
-  const protectedRoutes = ['/creator-dashboard', '/fan-dashboard', '/admin-dashboard', '/agency-dashboard'];
+  const protectedRoutes = [
+    '/creator-dashboard',
+    '/fan-dashboard',
+    '/admin-dashboard',
+    '/agency-dashboard',
+  ];
   const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
   // Simplified: creator onboarding is just type selection now (no multi-step wizard)
   const creatorOnboardingRoutes = ['/creator-type-selection'];
   const brandOnboardingRoutes = ['/brand-type-selection'];
-  const publicRoutes = ['/privacy-policy', '/data-deletion', '/privacy/data-deletion', '/terms-of-service'];
+  const publicRoutes = [
+    '/privacy-policy',
+    '/data-deletion',
+    '/privacy/data-deletion',
+    '/terms-of-service',
+  ];
   const authCallbackRoutes = [
     '/auth/google/callback',
     '/instagram-callback',
@@ -77,18 +107,18 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
     '/discord-callback',
     '/twitch-callback',
   ];
-  
+
   // Check route types
-  const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+  const isProtectedRoute = protectedRoutes.some((route) => currentPath.startsWith(route));
   const isAuthCallbackRoute = authCallbackRoutes.includes(currentPath);
-  const isPublicRoute = publicRoutes.includes(currentPath);
+  const _isPublicRoute = publicRoutes.includes(currentPath);
 
   // Migrate localStorage social connections to database once on authentication
   useEffect(() => {
     if (isAuthenticated && user) {
       const migrationKey = `social_migration_done_${user.id}`;
       const hasMigrated = sessionStorage.getItem(migrationKey);
-      
+
       if (!hasMigrated) {
         migrateLocalStorageToDatabase().then(() => {
           sessionStorage.setItem(migrationKey, 'true');
@@ -106,46 +136,57 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       return;
     }
 
-    console.log("[AuthRouter] Auth state:", {
+    console.log('[AuthRouter] Auth state:', {
       isAuthenticated,
       isLoading,
       userType: user?.userType,
       onboardingCompleted: user?.onboardingState?.isCompleted,
-      currentPath
+      currentPath,
     });
 
     // Expose current app user type for popup OAuth state tagging
     try {
-      (window as any).__userType = user?.userType || null;
-    } catch {}
-    
+      (window as Record<string, unknown>).__userType = user?.userType || null;
+    } catch {
+      // noop
+    }
+
     // Check loading state FIRST before any redirects
     if (isLoading) {
-      console.log("[AuthRouter] Loading auth state...");
+      console.log('[AuthRouter] Loading auth state...');
       return;
     }
-    
+
     // Not authenticated
     if (!isAuthenticated || !user) {
-      console.log("[AuthRouter] Not authenticated");
-      
+      console.log('[AuthRouter] Not authenticated');
+
       // For protected dashboard routes, redirect to home (don't prompt modal here - let home page handle it)
       if (isProtectedRoute) {
-        console.log("[AuthRouter] Unauthenticated user accessing protected route, redirecting to home");
+        console.log(
+          '[AuthRouter] Unauthenticated user accessing protected route, redirecting to home'
+        );
         try {
           sessionStorage.setItem('postAuthRedirect', currentPath);
-        } catch {}
+        } catch {
+          // noop
+        }
         setLocation('/');
         return;
       }
-      
+
       // For onboarding routes, prompt login modal so user can continue onboarding
-      const isOnboardingRoute = fanOnboardingRoutes.includes(currentPath) || creatorOnboardingRoutes.includes(currentPath) || brandOnboardingRoutes.includes(currentPath);
+      const isOnboardingRoute =
+        fanOnboardingRoutes.includes(currentPath) ||
+        creatorOnboardingRoutes.includes(currentPath) ||
+        brandOnboardingRoutes.includes(currentPath);
       if (isOnboardingRoute && lastAuthPromptPath.current !== currentPath) {
         lastAuthPromptPath.current = currentPath;
         try {
           sessionStorage.setItem('postAuthRedirect', currentPath);
-        } catch {}
+        } catch {
+          // noop
+        }
         openAuthModal();
       }
       return;
@@ -156,14 +197,20 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
     // 'pending' = DB default for new users; null/undefined = legacy edge case
     if (!user.userType || user.userType === 'pending') {
       if (currentPath !== '/user-type-selection') {
-        console.log('[AuthRouter] User has no userType (pending), redirecting to user-type-selection');
+        console.log(
+          '[AuthRouter] User has no userType (pending), redirecting to user-type-selection'
+        );
         // Clear any stored redirect — the user MUST choose their type first
-        try { sessionStorage.removeItem('postAuthRedirect'); } catch {}
+        try {
+          sessionStorage.removeItem('postAuthRedirect');
+        } catch {
+          // noop
+        }
         setLocation('/user-type-selection');
       }
       return;
     }
-    
+
     // User has a type — check for stored post-auth redirect
     try {
       const postAuthRedirect = sessionStorage.getItem('postAuthRedirect');
@@ -172,20 +219,24 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
         setLocation(postAuthRedirect);
         return;
       }
-    } catch {}
-    
+    } catch {
+      // noop
+    }
+
     // Redirect legacy RBAC dashboard routes to appropriate user dashboards
     if (currentPath === '/rbac-dashboard' || currentPath === '/dashboard') {
       redirectToDashboard();
       return;
     }
-    
+
     // Handle fan onboarding
     if (user.userType === 'fan' && !user.onboardingState?.isCompleted) {
       if (!fanOnboardingRoutes.includes(currentPath)) {
         // Resume from where the user left off, or start at profile
         const resumeRoute = user.onboardingState?.lastOnboardingRoute || '/fan-onboarding/profile';
-        const validResume = fanOnboardingRoutes.includes(resumeRoute) ? resumeRoute : '/fan-onboarding/profile';
+        const validResume = fanOnboardingRoutes.includes(resumeRoute)
+          ? resumeRoute
+          : '/fan-onboarding/profile';
         setLocation(validResume);
       }
       return;
@@ -197,7 +248,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       redirectToDashboard();
       return;
     }
-    
+
     // Handle creator routing - simplified: no more multi-step onboarding checks
     // A creator who has selected their type (has a creator record) always goes to dashboard.
     // A creator who hasn't selected their type yet goes to creator-type-selection.
@@ -207,7 +258,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       // so we use that as a proxy for "has a creator record".
       // Also check for the legacy case where onboarding was completed via old flow.
       const hasCreatorRecord = user.onboardingState?.isCompleted;
-      
+
       if (!hasCreatorRecord) {
         // Brand users go to brand type selection
         const isBrandUser = user.profileData?.brandType || user.profileData?.isBrand;
@@ -223,7 +274,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
         }
         return;
       }
-      
+
       // Creator has a record - always allow dashboard access.
       // Redirect away from old onboarding routes to dashboard.
       if (currentPath === '/creator-onboarding' || currentPath === '/brand-onboarding') {
@@ -231,7 +282,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
         return;
       }
     }
-    
+
     // No redirect from / — authenticated users can stay on the landing page for testing
 
     // Dashboard mismatch guards - prevent creators on fan dashboard and vice versa
@@ -239,7 +290,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       setLocation('/creator-dashboard');
       return;
     }
-    
+
     if (currentPath.startsWith('/creator-dashboard') && user.userType === 'fan') {
       setLocation('/fan-dashboard');
       return;
@@ -251,7 +302,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
         setLocation('/user-type-selection');
         return;
       }
-      
+
       if (user!.userType === 'creator') {
         const hasCreatorRecord = user!.onboardingState?.isCompleted;
         if (!hasCreatorRecord) {
@@ -271,7 +322,8 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
         setLocation('/user-type-selection');
       }
     }
-    
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- route arrays are stable constants
   }, [isAuthenticated, user, isLoading, setLocation, currentPath]);
 
   // Render-gate protected content to prevent 401 API calls before redirects
@@ -286,9 +338,5 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
     );
   }
 
-  return (
-    <SocialProviders>
-      {children}
-    </SocialProviders>
-  );
+  return <SocialProviders>{children}</SocialProviders>;
 }
