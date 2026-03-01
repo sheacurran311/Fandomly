@@ -1,7 +1,7 @@
 import {
   users, creators, loyaltyPrograms, rewards, fanPrograms,
   pointTransactions, rewardRedemptions, tenants, tenantMemberships,
-  campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
+  campaigns, campaignRules, campaignParticipations,
   tasks, taskAssignments, taskTemplates, taskCompletions, rewardDistributions,
   notifications, auditLog,
   type User, type InsertUser, type Creator, type InsertCreator,
@@ -730,29 +730,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  // Social Campaign Task operations
-  async getSocialCampaignTasks(campaignId: string): Promise<any[]> {
-    return await db.select().from(socialCampaignTasks)
-      .where(eq(socialCampaignTasks.campaignId, campaignId))
-      .orderBy(socialCampaignTasks.displayOrder, socialCampaignTasks.createdAt);
-  }
-
-  async createSocialCampaignTask(data: any): Promise<any> {
-    const [row] = await db.insert(socialCampaignTasks).values(data as any).returning();
-    return row;
-  }
-
-  async updateSocialCampaignTask(id: string, data: any): Promise<any> {
-    const [row] = await db.update(socialCampaignTasks)
-      .set({ ...data, updatedAt: new Date() } as any)
-      .where(eq(socialCampaignTasks.id, id))
-      .returning();
-    return row;
-  }
-
-  async deleteSocialCampaignTask(id: string): Promise<void> {
-    await db.delete(socialCampaignTasks).where(eq(socialCampaignTasks.id, id));
-  }
+  // socialCampaignTasks CRUD removed — table dropped in migration 0043
 
   // Creator Facebook Pages - Optimized batch upsert (fixes N+1 query)
   async upsertCreatorFacebookPages(creatorId: string, pages: Array<{
