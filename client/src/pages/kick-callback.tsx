@@ -1,114 +1,205 @@
 /**
  * Kick OAuth Callback Page
- * 
- * Handles the OAuth redirect from Kick after user authorization.
+ *
+ * Handles the OAuth redirect from Kick in a popup window.
+ * Exchanges auth code for token (with PKCE), saves connection, and notifies opener.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { handleKickCallback } from '@/lib/kick';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+
+// Global flag to prevent duplicate execution across multiple renders/remounts
+let kickCallbackProcessed = false;
 
 export default function KickCallbackPage() {
-  const [, navigate] = useLocation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const ranRef = useRef(false);
 
   useEffect(() => {
-    async function processCallback() {
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const error = searchParams.get('error');
-      const errorDescription = searchParams.get('error_description');
-
-      // Handle OAuth error
-      if (error) {
-        setStatus('error');
-        setErrorMessage(errorDescription || error);
-        return;
-      }
-
-      // Validate required params
-      if (!code || !state) {
-        setStatus('error');
-        setErrorMessage('Missing authorization parameters');
-        return;
-      }
-
-      // Process the callback
-      const result = await handleKickCallback(code, state);
-
-      if (result.success) {
-        setStatus('success');
-        // Redirect after a brief success message
-        setTimeout(() => {
-          navigate('/creator-dashboard/social');
-        }, 1500);
-      } else {
-        setStatus('error');
-        setErrorMessage(result.error || 'Failed to connect Kick account');
-      }
+    // Prevent duplicate execution
+    if (ranRef.current || kickCallbackProcessed) {
+      return;
     }
+    ranRef.current = true;
+    kickCallbackProcessed = true;
 
-    processCallback();
-  }, [navigate]);
+    const run = async () => {
+      // Parse URL parameters
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+      const error = params.get('error');
+      const errorDescription = params.get('error_description');
+
+      // Helper to send result to opener with localStorage COOP fallback
+      const sendResultToOpener = (result: {
+        success: boolean;
+        error?: string;
+        username?: string;
+      }) => {
+        if (state) {
+          try {
+            localStorage.setItem(`kick_oauth_result_${state}`, JSON.stringify(result));
+          } catch (e) {
+            console.error('[Kick Callback] Failed to store result in localStorage:', e);
+          }
+        }
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'kick-oauth-result', result }, window.location.origin);
+          window.close();
+          return true;
+        }
+        if (state && state.startsWith('kick_')) {
+          window.close();
+          return true;
+        }
+        return false;
+      };
+
+      try {
+        console.log('[Kick Callback] Processing OAuth callback', {
+          hasCode: !!code,
+          hasState: !!state,
+          hasError: !!error,
+        });
+
+        // Handle OAuth error
+        if (error) {
+          console.error('[Kick Callback] OAuth error:', error);
+          const errorMsg = errorDescription || error || 'Kick authorization failed';
+          if (sendResultToOpener({ success: false, error: errorMsg })) return;
+          toast({ title: 'Kick Connection Failed', description: errorMsg, variant: 'destructive' });
+          setLocation('/creator-dashboard/social');
+          return;
+        }
+
+        // Validate required parameters
+        if (!code || !state) {
+          throw new Error('Missing code or state parameter');
+        }
+
+        // Validate CSRF state
+        const savedState = localStorage.getItem('kick_oauth_state');
+        if (!savedState || savedState !== state) {
+          throw new Error('Invalid state parameter - possible CSRF attack');
+        }
+        localStorage.removeItem('kick_oauth_state');
+
+        // Retrieve PKCE code verifier
+        const codeVerifier = localStorage.getItem('kick_code_verifier');
+        localStorage.removeItem('kick_code_verifier');
+
+        console.log('[Kick Callback] Exchanging code for token (with PKCE)...');
+
+        // Exchange code for access token
+        const redirectUri = `${window.location.origin}/kick-callback`;
+        const tokenResponse = await fetch('/api/social/kick/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            redirect_uri: redirectUri,
+            code_verifier: codeVerifier,
+          }),
+          credentials: 'include',
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          throw new Error(`Token exchange failed: ${errorText}`);
+        }
+
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        if (!accessToken) {
+          throw new Error('No access token received');
+        }
+
+        console.log('[Kick Callback] Token obtained, fetching user profile...');
+
+        // Get user profile
+        const userResponse = await fetch('/api/social/kick/me', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          credentials: 'include',
+        });
+
+        if (!userResponse.ok) {
+          const errorText = await userResponse.text();
+          throw new Error(`Failed to fetch user profile: ${errorText}`);
+        }
+
+        const profileData = await userResponse.json();
+
+        if (!profileData.id && !profileData.username) {
+          throw new Error('No profile data received');
+        }
+
+        console.log(
+          '[Kick Callback] User profile fetched:',
+          profileData.username || profileData.id
+        );
+
+        // Save the connection to the database
+        const saveResponse = await fetch('/api/social-connections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform: 'kick',
+            platformUserId: String(profileData.id),
+            platformUsername: profileData.username,
+            platformDisplayName: profileData.username,
+            accessToken: accessToken,
+            refreshToken: tokenData.refresh_token || null,
+            tokenExpiresAt: tokenData.expires_in
+              ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+              : null,
+            profileData: {
+              id: profileData.id,
+              username: profileData.username,
+              bio: profileData.bio,
+              profilePicture: profileData.profile_pic || profileData.profilePicture,
+              followerCount: profileData.follower_count || profileData.followerCount || 0,
+              isVerified: profileData.verified || profileData.isVerified || false,
+            },
+          }),
+          credentials: 'include',
+        });
+
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          throw new Error(`Failed to save connection: ${errorText}`);
+        }
+
+        console.log('[Kick Callback] Connection saved successfully');
+
+        const username = profileData.username || profileData.id;
+        if (sendResultToOpener({ success: true, username })) return;
+
+        // Fallback: show toast and redirect
+        toast({ title: 'Kick Connected!', description: `Successfully connected ${username}` });
+        setLocation('/creator-dashboard/social');
+      } catch (error) {
+        console.error('[Kick Callback] Error:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Failed to connect Kick';
+        if (sendResultToOpener({ success: false, error: errorMsg })) return;
+
+        toast({ title: 'Kick Connection Failed', description: errorMsg, variant: 'destructive' });
+        setLocation('/creator-dashboard/social');
+      }
+    };
+
+    run();
+  }, [setLocation, toast]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            {status === 'loading' && (
-              <>
-                <Loader2 className="h-6 w-6 animate-spin text-green-500" />
-                Connecting Kick
-              </>
-            )}
-            {status === 'success' && (
-              <>
-                <CheckCircle2 className="h-6 w-6 text-green-500" />
-                Connected!
-              </>
-            )}
-            {status === 'error' && (
-              <>
-                <XCircle className="h-6 w-6 text-red-500" />
-                Connection Failed
-              </>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {status === 'loading' && 'Please wait while we connect your Kick account...'}
-            {status === 'success' && 'Your Kick account has been connected successfully.'}
-            {status === 'error' && (errorMessage || 'Something went wrong.')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          {status === 'success' && (
-            <p className="text-sm text-muted-foreground">Redirecting...</p>
-          )}
-          {status === 'error' && (
-            <div className="space-y-3 w-full">
-              <Button 
-                onClick={() => navigate('/creator-dashboard/social')}
-                className="w-full"
-                variant="outline"
-              >
-                Back to Social Connections
-              </Button>
-              <Button 
-                onClick={() => window.location.reload()}
-                className="w-full"
-              >
-                Try Again
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="text-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
+        <p className="text-muted-foreground">Connecting your Kick account...</p>
+      </div>
     </div>
   );
 }

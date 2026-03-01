@@ -8,7 +8,17 @@ import { TwitterSDKManager } from '@/lib/twitter';
 import InstagramSDKManager from '@/lib/instagram';
 import { FacebookSDKManager } from '@/lib/facebook';
 
-export type SocialPlatform = 'twitter' | 'tiktok' | 'instagram' | 'youtube' | 'spotify' | 'twitch' | 'discord' | 'facebook';
+export type SocialPlatform =
+  | 'twitter'
+  | 'tiktok'
+  | 'instagram'
+  | 'youtube'
+  | 'spotify'
+  | 'twitch'
+  | 'discord'
+  | 'facebook'
+  | 'kick'
+  | 'patreon';
 
 export interface SocialUserInfo {
   id?: string;
@@ -43,7 +53,10 @@ interface PlatformConfig {
   connectEndpoint?: string;
   disconnectEndpoint?: string;
   statusEndpoint?: string;
-  oauthHandler?: (userType: string, userId: string) => Promise<{ success: boolean; user?: any; error?: string }>;
+  oauthHandler?: (
+    userType: string,
+    userId: string
+  ) => Promise<{ success: boolean; user?: Record<string, unknown>; error?: string }>;
 }
 
 const PLATFORM_CONFIGS: Record<SocialPlatform, PlatformConfig> = {
@@ -79,6 +92,14 @@ const PLATFORM_CONFIGS: Record<SocialPlatform, PlatformConfig> = {
     name: 'Facebook',
     emoji: '👍',
   },
+  kick: {
+    name: 'Kick',
+    emoji: '🟢',
+  },
+  patreon: {
+    name: 'Patreon',
+    emoji: '🎨',
+  },
 };
 
 /**
@@ -108,7 +129,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
     const checkStatus = useCallback(async () => {
       const uid = userIdRef.current;
       if (!uid) {
-        setState(prev => ({ ...prev, isLoading: false }));
+        setState((prev) => ({ ...prev, isLoading: false }));
         return;
       }
 
@@ -117,17 +138,17 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
         const response = await fetch(`/api/social-connections/${platform}`, {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
 
         if (response.ok) {
           const data = await response.json();
-          
+
           if (data.connected && data.connection) {
             const conn = data.connection;
-            
+
             // Extract follower counts from multiple possible locations
             const followersCount =
               conn.profileData?.user?.followersCount ||
@@ -156,7 +177,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
               followingCount,
             });
 
-            setState(prev => ({
+            setState((prev) => ({
               ...prev,
               isConnected: true,
               isLoading: false,
@@ -165,7 +186,10 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
                 name: conn.platformDisplayName,
                 username: conn.platformUsername,
                 displayName: conn.platformDisplayName,
-                profileImage: conn.profileData?.profileImage || conn.profileData?.picture || conn.profileData?.avatar,
+                profileImage:
+                  conn.profileData?.profileImage ||
+                  conn.profileData?.picture ||
+                  conn.profileData?.avatar,
                 followersCount,
                 followers_count: followersCount,
                 followingCount,
@@ -174,7 +198,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
               error: null,
             }));
           } else {
-            setState(prev => ({
+            setState((prev) => ({
               ...prev,
               isConnected: false,
               isLoading: false,
@@ -182,7 +206,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
             }));
           }
         } else {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             isConnected: false,
             isLoading: false,
@@ -191,13 +215,13 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
         }
       } catch (error) {
         console.error(`[${config.name} Hook] Error checking status:`, error);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isLoading: false,
           error: 'Failed to check connection status',
         }));
       }
-    }, [config.name]);  // Stable callback - uses refs for user data
+    }, [config.name]); // Stable callback - uses refs for user data
 
     // Initial status check (runs once on mount + when user ID changes)
     useEffect(() => {
@@ -210,12 +234,12 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
     const connect = useCallback(async () => {
       if (!user?.id || state.isConnecting) return;
 
-      setState(prev => ({ ...prev, isConnecting: true, error: null }));
+      setState((prev) => ({ ...prev, isConnecting: true, error: null }));
 
       try {
         // Normalize userType: only 'creator' or 'fan' are valid for SDK managers
         const rawUserType = user.userType || 'fan';
-        const userType = (rawUserType === 'creator' || rawUserType === 'brand') ? 'creator' : 'fan';
+        const userType = rawUserType === 'creator' || rawUserType === 'brand' ? 'creator' : 'fan';
 
         // Call the appropriate secureLogin() method for each platform
         // These open popups directly to the OAuth provider (e.g. Google, TikTok)
@@ -248,7 +272,10 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
                 });
                 console.log('[useSocialConnection] Twitter connection saved from parent window');
               } catch (saveErr) {
-                console.warn('[useSocialConnection] Twitter save failed (popup may have saved):', saveErr);
+                console.warn(
+                  '[useSocialConnection] Twitter save failed (popup may have saved):',
+                  saveErr
+                );
               }
             }
             break;
@@ -265,6 +292,8 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
           case 'spotify':
           case 'discord':
           case 'twitch':
+          case 'kick':
+          case 'patreon':
             result = await socialManager[platform].secureLogin();
             break;
           default:
@@ -290,9 +319,9 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
             variant: 'destructive',
           });
         }
-      } catch (error: any) {
-        const errorMsg = error?.message || 'An error occurred';
-        setState(prev => ({
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'An error occurred';
+        setState((prev) => ({
           ...prev,
           error: errorMsg,
         }));
@@ -303,7 +332,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
           variant: 'destructive',
         });
       } finally {
-        setState(prev => ({ ...prev, isConnecting: false }));
+        setState((prev) => ({ ...prev, isConnecting: false }));
       }
     }, [user, state.isConnecting, checkStatus, toast, config.name, config.emoji]);
 
@@ -311,7 +340,7 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
     const disconnect = useCallback(async () => {
       if (!user?.id || state.isDisconnecting) return;
 
-      setState(prev => ({ ...prev, isDisconnecting: true }));
+      setState((prev) => ({ ...prev, isDisconnecting: true }));
 
       try {
         const { disconnectSocialPlatform } = await import('@/lib/social-connection-api');
@@ -340,15 +369,16 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
         }
       } catch (error) {
         console.error(`[${config.name} Hook] Error disconnecting:`, error);
-        setState(prev => ({ ...prev, isDisconnecting: false }));
+        setState((prev) => ({ ...prev, isDisconnecting: false }));
 
         toast({
-          title: "Disconnect Failed",
+          title: 'Disconnect Failed',
           description: `Failed to disconnect from ${config.name}. Please try again.`,
           variant: 'destructive',
         });
       }
-    }, [user, state.isDisconnecting, toast, config.name, platform]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, state.isDisconnecting, toast, config.name]);
 
     return {
       ...state,
@@ -367,10 +397,11 @@ export const useYouTubeConnection = createSocialConnectionHook('youtube');
 export const useDiscordConnection = createSocialConnectionHook('discord');
 export const useFacebookConnection = createSocialConnectionHook('facebook');
 export const useInstagramConnection = createSocialConnectionHook('instagram');
+export const useKickConnection = createSocialConnectionHook('kick');
+export const usePatreonConnection = createSocialConnectionHook('patreon');
 
 // Generic hook for dynamic platform selection
 export function useSocialConnection(platform: SocialPlatform): UseSocialConnectionReturn {
   const hook = createSocialConnectionHook(platform);
   return hook();
 }
-

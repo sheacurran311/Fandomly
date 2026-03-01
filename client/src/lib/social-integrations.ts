@@ -1,8 +1,20 @@
 // Social Media Integration APIs
-import FacebookSDK, { type FacebookUser, type FacebookPage } from './facebook';
+import FacebookSDK, { type FacebookPage } from './facebook';
+import { KickAPI } from './kick';
+import { PatreonAPI } from './patreon';
 
 export interface SocialMediaAccount {
-  platform: 'facebook' | 'instagram' | 'tiktok' | 'twitter' | 'youtube' | 'spotify' | 'discord' | 'twitch';
+  platform:
+    | 'facebook'
+    | 'instagram'
+    | 'tiktok'
+    | 'twitter'
+    | 'youtube'
+    | 'spotify'
+    | 'discord'
+    | 'twitch'
+    | 'kick'
+    | 'patreon';
   username: string;
   displayName: string;
   profileUrl: string;
@@ -29,8 +41,10 @@ export interface SocialMediaMetrics {
 export class FacebookAPI {
   async connectAccount(): Promise<SocialMediaAccount | null> {
     try {
-      const loginResult = await FacebookSDK.login('email,public_profile,pages_show_list,pages_read_engagement');
-      
+      const loginResult = await FacebookSDK.login(
+        'email,public_profile,pages_show_list,pages_read_engagement'
+      );
+
       if (!loginResult.success || !loginResult.accessToken) {
         return null;
       }
@@ -43,7 +57,7 @@ export class FacebookAPI {
       // Get pages to determine follower count
       const pages = await FacebookSDK.getUserPages(loginResult.accessToken);
       let totalFollowers = 0;
-      
+
       // Sum followers from all connected pages
       for (const page of pages) {
         const followers = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
@@ -59,7 +73,7 @@ export class FacebookAPI {
         verified: false,
         profileImage: userInfo.picture?.data.url || '',
         accessToken: loginResult.accessToken,
-        connectedAt: new Date()
+        connectedAt: new Date(),
       };
     } catch (error) {
       console.error('Facebook connection error:', error);
@@ -74,12 +88,12 @@ export class FacebookAPI {
   async refreshFollowerCount(accessToken: string): Promise<number> {
     const pages = await FacebookSDK.getUserPages(accessToken);
     let totalFollowers = 0;
-    
+
     for (const page of pages) {
       const followers = await FacebookSDK.getPageFollowerCount(page.id, page.access_token);
       totalFollowers += Number(followers || 0);
     }
-    
+
     return totalFollowers;
   }
 }
@@ -100,9 +114,9 @@ export class InstagramAPI {
       redirect_uri: this.redirectUri,
       scope: 'user_profile,user_media',
       response_type: 'code',
-      state: 'instagram_auth'
+      state: 'instagram_auth',
     });
-    
+
     return `https://api.instagram.com/oauth/authorize?${params}`;
   }
 
@@ -110,17 +124,19 @@ export class InstagramAPI {
     const response = await fetch('/api/social/instagram/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri }),
     });
-    
+
     const data = await response.json();
     return data.access_token;
   }
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
-    const response = await fetch(`https://graph.instagram.com/me?fields=id,username,media_count&access_token=${accessToken}`);
+    const response = await fetch(
+      `https://graph.instagram.com/me?fields=id,username,media_count&access_token=${accessToken}`
+    );
     const data = await response.json();
-    
+
     return {
       platform: 'instagram',
       username: data.username,
@@ -130,7 +146,7 @@ export class InstagramAPI {
       verified: false,
       profileImage: '',
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -145,7 +161,7 @@ export class TikTokAPI {
     // Smart detection like X: use domain to derive callback
     const origin = window.location.origin;
     this.redirectUri = `${origin}/tiktok-callback`;
-    
+
     // Validate configuration on initialization
     if (!this.clientKey) {
       console.warn('TikTok: VITE_TIKTOK_CLIENT_KEY not configured');
@@ -154,7 +170,9 @@ export class TikTokAPI {
 
   getAuthUrl(state?: string): string {
     if (!this.clientKey) {
-      throw new Error('TikTok client key not configured. Please set VITE_TIKTOK_CLIENT_KEY environment variable.');
+      throw new Error(
+        'TikTok client key not configured. Please set VITE_TIKTOK_CLIENT_KEY environment variable.'
+      );
     }
 
     const csrfState = state || `tiktok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -164,12 +182,12 @@ export class TikTokAPI {
       scope: 'user.info.basic,user.info.stats',
       response_type: 'code',
       redirect_uri: this.redirectUri,
-      state: csrfState
+      state: csrfState,
     });
-    
+
     const authUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
     console.log('[TikTok] Generated auth URL:', authUrl);
-    
+
     return authUrl;
   }
 
@@ -181,7 +199,7 @@ export class TikTokAPI {
         localStorage.setItem('tiktok_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
-        
+
         const popup = window.open(
           authUrl,
           'tiktok-oauth',
@@ -195,8 +213,16 @@ export class TikTokAPI {
 
         let settled = false;
         const cleanup = () => {
-          try { window.removeEventListener('message', onMsg); } catch {}
-          try { popup?.close(); } catch {}
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            // expected
+          }
+          try {
+            popup?.close();
+          } catch {
+            // expected
+          }
         };
 
         const onMsg = (event: MessageEvent) => {
@@ -207,7 +233,7 @@ export class TikTokAPI {
           cleanup();
           resolve(event.data.result);
         };
-        
+
         window.addEventListener('message', onMsg);
 
         // Poll for popup closure (fallback) -- delay first check to avoid false positives
@@ -222,7 +248,7 @@ export class TikTokAPI {
                     if (settled) return;
                     settled = true;
                     cleanup();
-                    
+
                     // Check localStorage as COOP fallback
                     try {
                       const lsKey = `tiktok_oauth_result_${state}`;
@@ -230,26 +256,31 @@ export class TikTokAPI {
                       if (lsResult) {
                         localStorage.removeItem(lsKey);
                         const parsed = JSON.parse(lsResult);
-                        console.log('[TikTok] Found result in localStorage (COOP fallback):', parsed.success);
+                        console.log(
+                          '[TikTok] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
                         resolve(parsed);
                         return;
                       }
                     } catch (e) {
                       console.error('[TikTok] Error reading localStorage fallback:', e);
                     }
-                    
+
                     resolve({ success: false, error: 'Authorization cancelled' });
                   }, 500);
                 }
               }
-            } catch (error) {
-              // Cross-origin error means popup is still open
+            } catch {
+              // Cross-origin error means popup is still open - expected
             }
           }, 1000);
         };
         let pollTimer: ReturnType<typeof setInterval>;
         setTimeout(() => {
-          if (!settled) { pollTimer = startPolling(); }
+          if (!settled) {
+            pollTimer = startPolling();
+          }
         }, 3000);
 
         // Timeout after 5 minutes
@@ -263,7 +294,10 @@ export class TikTokAPI {
         }, 300000);
       } catch (error) {
         console.error('[TikTok] Login error:', error);
-        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate TikTok login' });
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate TikTok login',
+        });
       }
     });
   }
@@ -272,20 +306,20 @@ export class TikTokAPI {
     const response = await fetch('/api/social/tiktok/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri }),
     });
-    
+
     const data = await response.json();
     return data.access_token;
   }
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
     const response = await fetch('/api/social/tiktok/user', {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
+
     const data = await response.json();
-    
+
     return {
       platform: 'tiktok',
       username: data.data.user.username,
@@ -295,7 +329,7 @@ export class TikTokAPI {
       verified: data.data.user.is_verified,
       profileImage: data.data.user.avatar_url,
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -308,8 +342,12 @@ export class TwitterAPI {
 
   constructor() {
     this.clientId = import.meta.env.VITE_TWITTER_CLIENT_ID || '';
-    this.redirectUri = (import.meta.env.VITE_TWITTER_REDIRECT_URI as string) || `${window.location.origin}/x-callback`;
-    this.scopes = (import.meta.env.VITE_TWITTER_SCOPES as string) || 'tweet.read tweet.write users.read follows.read offline.access';
+    this.redirectUri =
+      (import.meta.env.VITE_TWITTER_REDIRECT_URI as string) ||
+      `${window.location.origin}/x-callback`;
+    this.scopes =
+      (import.meta.env.VITE_TWITTER_SCOPES as string) ||
+      'tweet.read tweet.write users.read follows.read offline.access';
   }
 
   getAuthUrl(): string {
@@ -320,9 +358,9 @@ export class TwitterAPI {
       scope: this.scopes,
       state: 'twitter_auth',
       code_challenge: 'placeholder',
-      code_challenge_method: 'S256'
+      code_challenge_method: 'S256',
     });
-    
+
     return `https://twitter.com/i/oauth2/authorize?${params}`;
   }
 
@@ -331,20 +369,20 @@ export class TwitterAPI {
     const response = await fetch('/api/social/twitter/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri, code_verifier: 'placeholder' })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri, code_verifier: 'placeholder' }),
     });
-    
+
     const data = await response.json();
     return data.access_token;
   }
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
     const response = await fetch('/api/social/twitter/user', {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
+
     const data = await response.json();
-    
+
     return {
       platform: 'twitter',
       username: data.data.username,
@@ -354,7 +392,7 @@ export class TwitterAPI {
       verified: data.data.verified,
       profileImage: data.data.profile_image_url,
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -368,7 +406,7 @@ export class YouTubeAPI {
     this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_YOUTUBE_REDIRECT_URI || `${origin}/youtube-callback`;
-    
+
     if (!this.clientId) {
       console.warn('YouTube: VITE_GOOGLE_CLIENT_ID not configured');
     }
@@ -385,12 +423,13 @@ export class YouTubeAPI {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.channel-memberships.creator',
+      scope:
+        'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.channel-memberships.creator',
       access_type: 'offline',
       prompt: 'consent',
-      state: csrfState
+      state: csrfState,
     });
-    
+
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
@@ -402,7 +441,7 @@ export class YouTubeAPI {
         localStorage.setItem('youtube_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
-        
+
         const popup = window.open(
           authUrl,
           'youtube-oauth',
@@ -416,8 +455,16 @@ export class YouTubeAPI {
 
         let settled = false;
         const cleanup = () => {
-          try { window.removeEventListener('message', onMsg); } catch {}
-          try { popup?.close(); } catch {}
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            // expected
+          }
+          try {
+            popup?.close();
+          } catch {
+            // expected
+          }
         };
 
         const onMsg = (event: MessageEvent) => {
@@ -428,7 +475,7 @@ export class YouTubeAPI {
           cleanup();
           resolve(event.data.result);
         };
-        
+
         window.addEventListener('message', onMsg);
 
         // Poll for popup closure (fallback) -- delay first check to avoid false positives
@@ -442,7 +489,7 @@ export class YouTubeAPI {
                     if (settled) return;
                     settled = true;
                     cleanup();
-                    
+
                     // Check localStorage as COOP fallback
                     try {
                       const lsKey = `youtube_oauth_result_${state}`;
@@ -450,26 +497,31 @@ export class YouTubeAPI {
                       if (lsResult) {
                         localStorage.removeItem(lsKey);
                         const parsed = JSON.parse(lsResult);
-                        console.log('[YouTube] Found result in localStorage (COOP fallback):', parsed.success);
+                        console.log(
+                          '[YouTube] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
                         resolve(parsed);
                         return;
                       }
                     } catch (e) {
                       console.error('[YouTube] Error reading localStorage fallback:', e);
                     }
-                    
+
                     resolve({ success: false, error: 'Authorization cancelled' });
                   }, 500);
                 }
               }
-            } catch (error) {
-              // Cross-origin error means popup is still open
+            } catch {
+              // Cross-origin error means popup is still open - expected
             }
           }, 1000);
         };
         let ytPollTimer: ReturnType<typeof setInterval>;
         setTimeout(() => {
-          if (!settled) { ytPollTimer = startPolling(); }
+          if (!settled) {
+            ytPollTimer = startPolling();
+          }
         }, 3000);
 
         // Timeout after 5 minutes
@@ -483,7 +535,10 @@ export class YouTubeAPI {
         }, 300000);
       } catch (error) {
         console.error('[YouTube] Login error:', error);
-        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate YouTube login' });
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate YouTube login',
+        });
       }
     });
   }
@@ -492,19 +547,21 @@ export class YouTubeAPI {
     const response = await fetch('/api/social/youtube/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri }),
     });
-    
+
     const data = await response.json();
     return data.access_token;
   }
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
-    const response = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&access_token=${accessToken}`);
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&access_token=${accessToken}`
+    );
     const data = await response.json();
-    
+
     const channel = data.items[0];
-    
+
     return {
       platform: 'youtube',
       username: channel.snippet.customUrl || channel.id,
@@ -514,7 +571,7 @@ export class YouTubeAPI {
       verified: false,
       profileImage: channel.snippet.thumbnails.default.url,
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -528,7 +585,7 @@ export class SpotifyAPI {
     this.clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || `${origin}/spotify-callback`;
-    
+
     if (!this.clientId) {
       console.warn('Spotify: VITE_SPOTIFY_CLIENT_ID not configured');
     }
@@ -544,12 +601,13 @@ export class SpotifyAPI {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.clientId,
-      scope: 'user-follow-modify user-follow-read user-library-modify user-library-read user-read-private user-read-email',
+      scope:
+        'user-follow-modify user-follow-read user-library-modify user-library-read user-read-private user-read-email',
       redirect_uri: this.redirectUri,
       state: csrfState,
-      show_dialog: 'true'
+      show_dialog: 'true',
     });
-    
+
     return `https://accounts.spotify.com/authorize?${params.toString()}`;
   }
 
@@ -561,7 +619,7 @@ export class SpotifyAPI {
         localStorage.setItem('spotify_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
-        
+
         const popup = window.open(
           authUrl,
           'spotify-oauth',
@@ -575,8 +633,16 @@ export class SpotifyAPI {
 
         let settled = false;
         const cleanup = () => {
-          try { window.removeEventListener('message', onMsg); } catch {}
-          try { popup?.close(); } catch {}
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            // expected
+          }
+          try {
+            popup?.close();
+          } catch {
+            // expected
+          }
         };
 
         const onMsg = (event: MessageEvent) => {
@@ -587,7 +653,7 @@ export class SpotifyAPI {
           cleanup();
           resolve(event.data.result);
         };
-        
+
         window.addEventListener('message', onMsg);
 
         // Poll for popup closure (fallback) -- delay first check to avoid false positives
@@ -601,7 +667,7 @@ export class SpotifyAPI {
                     if (settled) return;
                     settled = true;
                     cleanup();
-                    
+
                     // Check localStorage as COOP fallback
                     try {
                       const lsKey = `spotify_oauth_result_${state}`;
@@ -609,26 +675,31 @@ export class SpotifyAPI {
                       if (lsResult) {
                         localStorage.removeItem(lsKey);
                         const parsed = JSON.parse(lsResult);
-                        console.log('[Spotify] Found result in localStorage (COOP fallback):', parsed.success);
+                        console.log(
+                          '[Spotify] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
                         resolve(parsed);
                         return;
                       }
                     } catch (e) {
                       console.error('[Spotify] Error reading localStorage fallback:', e);
                     }
-                    
+
                     resolve({ success: false, error: 'Authorization cancelled' });
                   }, 500);
                 }
               }
-            } catch (error) {
-              // Cross-origin error means popup is still open
+            } catch {
+              // Cross-origin error means popup is still open - expected
             }
           }, 1000);
         };
         let spotifyPollTimer: ReturnType<typeof setInterval>;
         setTimeout(() => {
-          if (!settled) { spotifyPollTimer = startSpotifyPoll(); }
+          if (!settled) {
+            spotifyPollTimer = startSpotifyPoll();
+          }
         }, 3000);
 
         // Timeout after 5 minutes
@@ -642,7 +713,10 @@ export class SpotifyAPI {
         }, 300000);
       } catch (error) {
         console.error('[Spotify] Login error:', error);
-        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate Spotify login' });
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate Spotify login',
+        });
       }
     });
   }
@@ -651,20 +725,20 @@ export class SpotifyAPI {
     const response = await fetch('/api/social/spotify/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri }),
     });
-    
+
     const data = await response.json();
     return data.access_token;
   }
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
     const response = await fetch('https://api.spotify.com/v1/me', {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
+
     const data = await response.json();
-    
+
     return {
       platform: 'spotify',
       username: data.id,
@@ -674,7 +748,7 @@ export class SpotifyAPI {
       verified: false,
       profileImage: data.images[0]?.url || '',
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -685,7 +759,8 @@ export class DiscordAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_DISCORD_CLIENT_ID || import.meta.env.VITE_DISCORD_APP_ID || '';
+    this.clientId =
+      import.meta.env.VITE_DISCORD_CLIENT_ID || import.meta.env.VITE_DISCORD_APP_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI || `${origin}/discord-callback`;
 
@@ -707,7 +782,7 @@ export class DiscordAPI {
       scope: 'identify guilds guilds.members.read',
       redirect_uri: this.redirectUri,
       state: csrfState,
-      prompt: 'consent'
+      prompt: 'consent',
     });
 
     return `https://discord.com/oauth2/authorize?${params.toString()}`;
@@ -734,8 +809,16 @@ export class DiscordAPI {
 
         let settled = false;
         const cleanup = () => {
-          try { window.removeEventListener('message', onMsg); } catch {}
-          try { popup?.close(); } catch {}
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            // expected
+          }
+          try {
+            popup?.close();
+          } catch {
+            // expected
+          }
         };
 
         const onMsg = (event: MessageEvent) => {
@@ -760,7 +843,7 @@ export class DiscordAPI {
                     if (settled) return;
                     settled = true;
                     cleanup();
-                    
+
                     // Check localStorage as COOP fallback
                     try {
                       const lsKey = `discord_oauth_result_${state}`;
@@ -768,26 +851,31 @@ export class DiscordAPI {
                       if (lsResult) {
                         localStorage.removeItem(lsKey);
                         const parsed = JSON.parse(lsResult);
-                        console.log('[Discord] Found result in localStorage (COOP fallback):', parsed.success);
+                        console.log(
+                          '[Discord] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
                         resolve(parsed);
                         return;
                       }
                     } catch (e) {
                       console.error('[Discord] Error reading localStorage fallback:', e);
                     }
-                    
+
                     resolve({ success: false, error: 'Authorization cancelled' });
                   }, 500);
                 }
               }
-            } catch (error) {
-              // Cross-origin error means popup is still open
+            } catch {
+              // Cross-origin error means popup is still open - expected
             }
           }, 1000);
         };
         let discordPollTimer: ReturnType<typeof setInterval>;
         setTimeout(() => {
-          if (!settled) { discordPollTimer = startDiscordPoll(); }
+          if (!settled) {
+            discordPollTimer = startDiscordPoll();
+          }
         }, 3000);
 
         setTimeout(() => {
@@ -800,7 +888,10 @@ export class DiscordAPI {
         }, 300000);
       } catch (error) {
         console.error('[Discord] Login error:', error);
-        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate Discord login' });
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate Discord login',
+        });
       }
     });
   }
@@ -809,7 +900,7 @@ export class DiscordAPI {
     const response = await fetch('/api/social/discord/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri }),
     });
 
     const data = await response.json();
@@ -818,7 +909,7 @@ export class DiscordAPI {
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
     const response = await fetch('https://discord.com/api/users/@me', {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const data = await response.json();
@@ -830,9 +921,11 @@ export class DiscordAPI {
       profileUrl: `https://discord.com/users/${data.id}`,
       followers: 0, // Discord doesn't have a follower count
       verified: data.verified || false,
-      profileImage: data.avatar ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png` : '',
+      profileImage: data.avatar
+        ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
+        : '',
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -865,7 +958,7 @@ export class TwitchAPI {
       scope: 'user:read:email channel:read:subscriptions',
       redirect_uri: this.redirectUri,
       state: csrfState,
-      force_verify: 'true'
+      force_verify: 'true',
     });
 
     return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;
@@ -892,8 +985,16 @@ export class TwitchAPI {
 
         let settled = false;
         const cleanup = () => {
-          try { window.removeEventListener('message', onMsg); } catch {}
-          try { popup?.close(); } catch {}
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            // expected
+          }
+          try {
+            popup?.close();
+          } catch {
+            // expected
+          }
         };
 
         const onMsg = (event: MessageEvent) => {
@@ -918,7 +1019,7 @@ export class TwitchAPI {
                     if (settled) return;
                     settled = true;
                     cleanup();
-                    
+
                     // Check localStorage as COOP fallback
                     try {
                       const lsKey = `twitch_oauth_result_${state}`;
@@ -926,26 +1027,31 @@ export class TwitchAPI {
                       if (lsResult) {
                         localStorage.removeItem(lsKey);
                         const parsed = JSON.parse(lsResult);
-                        console.log('[Twitch] Found result in localStorage (COOP fallback):', parsed.success);
+                        console.log(
+                          '[Twitch] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
                         resolve(parsed);
                         return;
                       }
                     } catch (e) {
                       console.error('[Twitch] Error reading localStorage fallback:', e);
                     }
-                    
+
                     resolve({ success: false, error: 'Authorization cancelled' });
                   }, 500);
                 }
               }
-            } catch (error) {
-              // Cross-origin error means popup is still open
+            } catch {
+              // Cross-origin error means popup is still open - expected
             }
           }, 1000);
         };
         let twitchPollTimer: ReturnType<typeof setInterval>;
         setTimeout(() => {
-          if (!settled) { twitchPollTimer = startTwitchPoll(); }
+          if (!settled) {
+            twitchPollTimer = startTwitchPoll();
+          }
         }, 3000);
 
         setTimeout(() => {
@@ -958,7 +1064,10 @@ export class TwitchAPI {
         }, 300000);
       } catch (error) {
         console.error('[Twitch] Login error:', error);
-        resolve({ success: false, error: error instanceof Error ? error.message : 'Failed to initiate Twitch login' });
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate Twitch login',
+        });
       }
     });
   }
@@ -967,7 +1076,7 @@ export class TwitchAPI {
     const response = await fetch('/api/social/twitch/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirect_uri: this.redirectUri })
+      body: JSON.stringify({ code, redirect_uri: this.redirectUri }),
     });
 
     const data = await response.json();
@@ -977,9 +1086,9 @@ export class TwitchAPI {
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
     const response = await fetch('https://api.twitch.tv/helix/users', {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Client-Id': this.clientId
-      }
+        Authorization: `Bearer ${accessToken}`,
+        'Client-Id': this.clientId,
+      },
     });
 
     const data = await response.json();
@@ -998,7 +1107,7 @@ export class TwitchAPI {
       verified: user.broadcaster_type === 'partner',
       profileImage: user.profile_image_url || '',
       accessToken,
-      connectedAt: new Date()
+      connectedAt: new Date(),
     };
   }
 }
@@ -1013,6 +1122,8 @@ export class SocialIntegrationManager {
   private spotify: SpotifyAPI;
   private discord: DiscordAPI;
   private twitch: TwitchAPI;
+  private kick: KickAPI;
+  private patreon: PatreonAPI;
 
   constructor() {
     this.facebook = new FacebookAPI();
@@ -1023,25 +1134,40 @@ export class SocialIntegrationManager {
     this.spotify = new SpotifyAPI();
     this.discord = new DiscordAPI();
     this.twitch = new TwitchAPI();
+    this.kick = new KickAPI();
+    this.patreon = new PatreonAPI();
   }
 
   getAuthUrl(platform: string): string {
     switch (platform) {
-      case 'facebook': return '#'; // Facebook uses SDK login, not URL redirect
-      case 'instagram': return this.instagram.getAuthUrl();
-      case 'tiktok': return this.tiktok.getAuthUrl();
-      case 'twitter': return this.twitter.getAuthUrl();
-      case 'youtube': return this.youtube.getAuthUrl();
-      case 'spotify': return this.spotify.getAuthUrl();
-      case 'discord': return this.discord.getAuthUrl();
-      case 'twitch': return this.twitch.getAuthUrl();
-      default: throw new Error(`Unsupported platform: ${platform}`);
+      case 'facebook':
+        return '#'; // Facebook uses SDK login, not URL redirect
+      case 'instagram':
+        return this.instagram.getAuthUrl();
+      case 'tiktok':
+        return this.tiktok.getAuthUrl();
+      case 'twitter':
+        return this.twitter.getAuthUrl();
+      case 'youtube':
+        return this.youtube.getAuthUrl();
+      case 'spotify':
+        return this.spotify.getAuthUrl();
+      case 'discord':
+        return this.discord.getAuthUrl();
+      case 'twitch':
+        return this.twitch.getAuthUrl();
+      case 'kick':
+        return '#'; // Kick uses popup flow via secureLogin()
+      case 'patreon':
+        return this.patreon.getAuthUrl();
+      default:
+        throw new Error(`Unsupported platform: ${platform}`);
     }
   }
 
   async connectAccount(platform: string, code?: string): Promise<SocialMediaAccount | null> {
     let accessToken: string;
-    
+
     switch (platform) {
       case 'facebook':
         return await this.facebook.connectAccount(); // Facebook uses SDK, no code needed
@@ -1055,7 +1181,9 @@ export class SocialIntegrationManager {
         return this.tiktok.getUserProfile(accessToken);
       case 'twitter':
         // Twitter uses dedicated popup flow via TwitterSDKManager - this path should not be called
-        throw new Error('Twitter integration uses popup flow via TwitterSDKManager, not redirect flow');
+        throw new Error(
+          'Twitter integration uses popup flow via TwitterSDKManager, not redirect flow'
+        );
       case 'youtube':
         if (!code) throw new Error('Code required for YouTube');
         accessToken = await this.youtube.exchangeCodeForToken(code);
@@ -1072,6 +1200,12 @@ export class SocialIntegrationManager {
         if (!code) throw new Error('Code required for Twitch');
         accessToken = await this.twitch.exchangeCodeForToken(code);
         return this.twitch.getUserProfile(accessToken);
+      case 'kick':
+        // Kick uses popup flow via secureLogin() - this path should not be called
+        throw new Error('Kick integration uses popup flow via KickAPI.secureLogin()');
+      case 'patreon':
+        // Patreon uses popup flow via secureLogin() - this path should not be called
+        throw new Error('Patreon integration uses popup flow via PatreonAPI.secureLogin()');
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -1079,13 +1213,13 @@ export class SocialIntegrationManager {
 
   async refreshMetrics(accounts: SocialMediaAccount[]): Promise<SocialMediaMetrics[]> {
     const metrics: SocialMediaMetrics[] = [];
-    
+
     for (const account of accounts) {
       if (account.accessToken) {
         try {
           // Refresh user data to get latest metrics
           const updatedAccount = await this.refreshAccountData(account);
-          
+
           metrics.push({
             platform: account.platform,
             followers: updatedAccount.followers,
@@ -1094,33 +1228,41 @@ export class SocialIntegrationManager {
             engagement: 0, // Would need to calculate from recent posts
             averageLikes: 0,
             averageComments: 0,
-            recentGrowth: 0
+            recentGrowth: 0,
           });
         } catch (error) {
           console.error(`Failed to refresh metrics for ${account.platform}:`, error);
         }
       }
     }
-    
+
     return metrics;
   }
 
   private async refreshAccountData(account: SocialMediaAccount): Promise<SocialMediaAccount> {
     if (!account.accessToken) throw new Error('No access token available');
-    
+
     switch (account.platform) {
-      case 'facebook': 
+      case 'facebook':
         // Refresh Facebook follower count
         const updatedFollowers = await this.facebook.refreshFollowerCount(account.accessToken);
         return { ...account, followers: updatedFollowers };
-      case 'instagram': return this.instagram.getUserProfile(account.accessToken);
-      case 'tiktok': return this.tiktok.getUserProfile(account.accessToken);
-      case 'twitter': return this.twitter.getUserProfile(account.accessToken);
-      case 'youtube': return this.youtube.getUserProfile(account.accessToken);
-      case 'spotify': return this.spotify.getUserProfile(account.accessToken);
-      case 'discord': return this.discord.getUserProfile(account.accessToken);
-      case 'twitch': return this.twitch.getUserProfile(account.accessToken);
-      default: return account;
+      case 'instagram':
+        return this.instagram.getUserProfile(account.accessToken);
+      case 'tiktok':
+        return this.tiktok.getUserProfile(account.accessToken);
+      case 'twitter':
+        return this.twitter.getUserProfile(account.accessToken);
+      case 'youtube':
+        return this.youtube.getUserProfile(account.accessToken);
+      case 'spotify':
+        return this.spotify.getUserProfile(account.accessToken);
+      case 'discord':
+        return this.discord.getUserProfile(account.accessToken);
+      case 'twitch':
+        return this.twitch.getUserProfile(account.accessToken);
+      default:
+        return account;
     }
   }
 }

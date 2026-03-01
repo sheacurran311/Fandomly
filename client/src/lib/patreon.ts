@@ -1,8 +1,8 @@
 /**
  * Patreon OAuth Integration
- * 
- * Handles OAuth flow for connecting Patreon accounts.
- * Supports both creator (checking pledge data) and patron (verifying memberships) use cases.
+ *
+ * OAuth 2.0 with popup-based flow consistent with other platform integrations.
+ * Supports both creator and patron use cases.
  */
 
 // Patreon OAuth configuration
@@ -12,13 +12,7 @@ const PATREON_CONFIG = {
   authUrl: 'https://www.patreon.com/oauth2/authorize',
   tokenUrl: 'https://www.patreon.com/api/oauth2/token',
   apiBase: 'https://www.patreon.com/api/oauth2/v2',
-  // Scopes for reading user identity, memberships, and campaigns
-  scopes: [
-    'identity',
-    'identity[email]',
-    'campaigns',
-    'campaigns.members',
-  ],
+  scopes: ['identity', 'identity[email]', 'campaigns', 'campaigns.members'],
 };
 
 export interface PatreonUser {
@@ -52,67 +46,185 @@ export interface PatreonAuthState {
 }
 
 /**
- * Generate OAuth state for CSRF protection
+ * Patreon OAuth API class with popup-based secureLogin flow
  */
-function generateState(): string {
-  return crypto.randomUUID();
-}
+export class PatreonAPI {
+  private clientId: string;
+  private redirectUri: string;
 
-/**
- * Start OAuth flow by redirecting to Patreon authorization
- */
-export function initiatePatreonOAuth(): void {
-  if (!PATREON_CONFIG.clientId) {
-    console.error('[Patreon] Client ID not configured');
-    return;
+  constructor() {
+    this.clientId = PATREON_CONFIG.clientId;
+    this.redirectUri = PATREON_CONFIG.redirectUri;
   }
 
-  const state = generateState();
-  localStorage.setItem('patreon_oauth_state', state);
+  getAuthUrl(state?: string): string {
+    if (!this.clientId) {
+      throw new Error(
+        'Patreon client ID not configured. Please set VITE_PATREON_CLIENT_ID environment variable.'
+      );
+    }
 
-  const params = new URLSearchParams({
-    client_id: PATREON_CONFIG.clientId,
-    redirect_uri: PATREON_CONFIG.redirectUri,
-    response_type: 'code',
-    scope: PATREON_CONFIG.scopes.join(' '),
-    state,
-  });
+    const csrfState = state || `patreon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  window.location.href = `${PATREON_CONFIG.authUrl}?${params.toString()}`;
-}
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      scope: PATREON_CONFIG.scopes.join(' '),
+      state: csrfState,
+    });
 
-/**
- * Handle OAuth callback
- */
-export async function handlePatreonCallback(code: string, state: string): Promise<{
-  success: boolean;
-  error?: string;
-}> {
-  // Verify state
-  const savedState = localStorage.getItem('patreon_oauth_state');
-  if (state !== savedState) {
-    return { success: false, error: 'Invalid OAuth state' };
+    return `${PATREON_CONFIG.authUrl}?${params.toString()}`;
   }
-  localStorage.removeItem('patreon_oauth_state');
 
-  try {
-    // Exchange code for token via our backend
-    const response = await fetch('/api/social/patreon/callback', {
+  async secureLogin(): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      try {
+        // Generate CSRF state token
+        const state = `patreon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('patreon_oauth_state', state);
+
+        const authUrl = this.getAuthUrl(state);
+
+        const popup = window.open(
+          authUrl,
+          'patreon-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            /* expected */
+          }
+          try {
+            popup?.close();
+          } catch {
+            /* expected */
+          }
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'patreon-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+
+        window.addEventListener('message', onMsg);
+
+        // Poll for popup closure (fallback)
+        const startPolling = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(pollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `patreon_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log(
+                          '[Patreon] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Patreon] Error reading localStorage fallback:', e);
+                    }
+
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
+              }
+            } catch {
+              // Cross-origin error means popup is still open
+            }
+          }, 1000);
+        };
+        let pollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) {
+            pollTimer = startPolling();
+          }
+        }, 3000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[Patreon] Login error:', error);
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate Patreon login',
+        });
+      }
+    });
+  }
+
+  async exchangeCodeForToken(code: string): Promise<string> {
+    const response = await fetch('/api/social/patreon/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({
+        code,
+        redirect_uri: this.redirectUri,
+      }),
       credentials: 'include',
     });
 
+    const data = await response.json();
     if (!response.ok) {
-      const error = await response.json();
-      return { success: false, error: error.message || 'Failed to connect Patreon account' };
+      throw new Error(data.message || 'Token exchange failed');
+    }
+    return data.access_token;
+  }
+
+  async getUserProfile(accessToken: string): Promise<PatreonUser> {
+    const response = await fetch('/api/social/patreon/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch profile');
     }
 
-    return { success: true };
-  } catch (error: any) {
-    console.error('[Patreon] Callback error:', error);
-    return { success: false, error: error.message || 'Failed to connect Patreon account' };
+    return {
+      id: data.id,
+      fullName: data.full_name,
+      vanityName: data.vanity,
+      email: data.email,
+      imageUrl: data.image_url,
+      url: data.url,
+      isCreator: data.is_creator || false,
+    };
   }
 }
 
@@ -126,40 +238,36 @@ export async function getPatreonConnectionStatus(): Promise<PatreonAuthState> {
     });
 
     if (!response.ok) {
-      return {
-        isConnected: false,
-        user: null,
-        memberships: [],
-        accessToken: null,
-        error: null,
-      };
+      return { isConnected: false, user: null, memberships: [], accessToken: null, error: null };
     }
 
     const data = await response.json();
-    
+
     return {
       isConnected: data.isActive,
-      user: data.profileData ? {
-        id: data.platformUserId,
-        fullName: data.profileData.fullName,
-        vanityName: data.platformUsername,
-        email: data.profileData.email,
-        imageUrl: data.profileData.imageUrl,
-        url: data.profileData.url,
-        isCreator: data.profileData.isCreator,
-      } : null,
+      user: data.profileData
+        ? {
+            id: data.platformUserId,
+            fullName: data.profileData.fullName,
+            vanityName: data.platformUsername,
+            email: data.profileData.email,
+            imageUrl: data.profileData.imageUrl,
+            url: data.profileData.url,
+            isCreator: data.profileData.isCreator,
+          }
+        : null,
       memberships: data.profileData?.memberships || [],
-      accessToken: null, // Don't expose token to client
+      accessToken: null,
       error: null,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Patreon] Connection status error:', error);
     return {
       isConnected: false,
       user: null,
       memberships: [],
       accessToken: null,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -180,9 +288,9 @@ export async function disconnectPatreon(): Promise<{ success: boolean; error?: s
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Patreon] Disconnect error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -212,16 +320,19 @@ export async function getPatreonCampaignMembers(campaignId: string): Promise<{
 
     const data = await response.json();
     return { members: data.members };
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Patreon] Campaign members error:', error);
-    return { members: [], error: error.message };
+    return { members: [], error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
 /**
  * Check if user is a patron of a specific campaign
  */
-export async function checkPatronStatus(campaignId: string, minimumCents?: number): Promise<{
+export async function checkPatronStatus(
+  campaignId: string,
+  minimumCents?: number
+): Promise<{
   isPatron: boolean;
   tier?: string;
   amountCents?: number;
@@ -248,9 +359,9 @@ export async function checkPatronStatus(campaignId: string, minimumCents?: numbe
       tier: data.tier,
       amountCents: data.amountCents,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Patreon] Check patron status error:', error);
-    return { isPatron: false, error: error.message };
+    return { isPatron: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
