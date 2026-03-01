@@ -29,6 +29,18 @@ import {
 import { BarChartCard } from "@/components/charts/BarChartCard";
 import { format } from 'date-fns';
 
+/**
+ * Level and achievement calculation configuration.
+ * TODO: These values should come from the gamification settings API so they can be
+ * tuned per-program without requiring a code change.
+ */
+const LEVEL_CONFIG = {
+  /** Points required to advance one level */
+  pointsPerLevel: 1_000,
+  /** Points required to unlock one achievement */
+  pointsPerAchievement: 500,
+} as const;
+
 export default function FanAchievements() {
   const { user, isLoading, isAuthenticated } = useAuth();
 
@@ -67,8 +79,8 @@ export default function FanAchievements() {
           totalPoints += transactions.reduce((sum: number, tx: any) => sum + tx.pointsAwarded, 0);
         }
 
-        const currentLevel = Math.floor(totalPoints / 1000) + 1;
-        const levelPoints = totalPoints % 1000;
+        const currentLevel = Math.floor(totalPoints / LEVEL_CONFIG.pointsPerLevel) + 1;
+        const levelPoints = totalPoints % LEVEL_CONFIG.pointsPerLevel;
 
         return {
           id: `${user?.id}-level`,
@@ -76,8 +88,8 @@ export default function FanAchievements() {
           currentLevel,
           totalPoints,
           levelPoints,
-          nextLevelThreshold: 1000,
-          achievementsUnlocked: Math.floor(totalPoints / 500),
+          nextLevelThreshold: LEVEL_CONFIG.pointsPerLevel,
+          achievementsUnlocked: Math.floor(totalPoints / LEVEL_CONFIG.pointsPerAchievement),
           createdAt: new Date(),
           updatedAt: new Date()
         };

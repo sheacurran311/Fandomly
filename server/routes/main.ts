@@ -12,7 +12,6 @@ import { registerTenantRoutes } from "./user/tenant-routes";
 import { registerGoogleAuthRoutes } from "./auth/google-routes";
 import { registerAuthRoutes } from "./auth/auth-routes";
 import { registerAdminRoutes } from "./admin/admin-routes";
-import { registerDynamicAnalyticsRoutes } from "./media/dynamic-analytics-routes";
 import { registerTwitterVerificationRoutes } from "./social/twitter-verification-routes";
 import { registerReferralRoutes } from "./points/referral-routes";
 import { registerPointsRoutes } from "./points/points-routes";
@@ -4286,9 +4285,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register admin routes
   registerAdminRoutes(app);
-
-  // Register Dynamic Analytics routes
-  registerDynamicAnalyticsRoutes(app);
 
   // Register Twitter verification routes
   registerTwitterVerificationRoutes(app);

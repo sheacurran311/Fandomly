@@ -142,7 +142,7 @@ export default function TermsOfService() {
               Our Service integrates with third-party platforms including:
             </p>
             <ul className="list-disc list-inside space-y-2 mb-4">
-              <li>Dynamic Labs for wallet authentication</li>
+              <li>Particle Network for wallet authentication</li>
               <li>Facebook Business API for social campaign tracking</li>
               <li>Stripe for payment processing</li>
               <li>Various blockchain networks for Web3 functionality</li>

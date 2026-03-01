@@ -7,7 +7,7 @@ interface AuthProviderProps {
 
 /**
  * Main authentication provider component
- * Replaces DynamicProvider with our own JWT-based auth system
+ * JWT-based auth system provider
  */
 export default function AuthProvider({ children }: AuthProviderProps) {
   return (

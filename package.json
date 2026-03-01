@@ -23,7 +23,6 @@
     "db:push": "drizzle-kit push",
     "create-admin": "tsx scripts/create-admin.ts",
     "list-admins": "tsx scripts/list-admins.ts",
-    "link-admin": "tsx scripts/link-dynamic-to-admin.ts",
     "promote-admin": "tsx scripts/promote-to-admin.ts",
     "validate-imports": "tsx scripts/validate-imports.ts",
     "test-endpoints": "tsx scripts/test-api-endpoints.ts",
@@ -182,6 +181,7 @@
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
     "vite": "^5.4.21",
+    "vite-plugin-node-polyfills": "^0.25.0",
     "vitest": "^4.0.8"
   },
   "optionalDependencies": {
