@@ -211,7 +211,7 @@ export const users = pgTable('users', {
   walletAddress: text('wallet_address'),
   walletChain: text('wallet_chain'),
 
-  // Authentication Provider Fields (replacing Dynamic)
+  // Authentication Provider Fields
   primaryAuthProvider: text('primary_auth_provider'), // 'google' | 'twitter' | 'instagram' | 'tiktok' | 'youtube' | 'spotify' | 'discord' | 'twitch' | 'facebook'
   googleId: text('google_id').unique(), // Google's unique user ID (sub claim)
   linkedAccounts: jsonb('linked_accounts').$type<{
@@ -3154,7 +3154,7 @@ export const nftMints = pgTable('nft_mints', {
   recipientUserId: varchar('recipient_user_id')
     .references(() => users.id)
     .notNull(),
-  recipientWalletAddress: text('recipient_wallet_address').notNull(), // Actual wallet address from Dynamic
+  recipientWalletAddress: text('recipient_wallet_address').notNull(), // Recipient wallet address
   recipientChain: text('recipient_chain').notNull(), // Chain where NFT was minted
 
   // Mint Context

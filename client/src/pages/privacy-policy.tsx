@@ -78,7 +78,7 @@ export default function PrivacyPolicy() {
               We work with trusted service providers who assist us in operating our platform:
             </p>
             <ul className="list-disc list-inside space-y-2 mb-4">
-              <li>Dynamic Labs for wallet authentication</li>
+              <li>Particle Network for wallet authentication</li>
               <li>Neon Database for secure data storage</li>
               <li>Social media platforms for API access</li>
               <li>Analytics and monitoring services</li>

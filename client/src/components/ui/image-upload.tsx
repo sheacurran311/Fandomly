@@ -105,7 +105,7 @@ export function ImageUpload({
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      // Get auth headers (supports both JWT and legacy Dynamic user ID)
+      // Get auth headers (JWT auth)
       const authHeaders = getAuthHeaders();
       
       if (Object.keys(authHeaders).length === 0) {
