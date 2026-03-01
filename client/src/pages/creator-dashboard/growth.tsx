@@ -22,6 +22,21 @@ import {
   Share2,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
+
+/**
+ * Default growth goal targets used when no per-creator configuration exists.
+ * TODO: These should be configurable per-creator via program settings / API so each
+ * creator can set personalized growth milestones.
+ */
+const DEFAULT_GROWTH_GOALS = {
+  /** Additional fans beyond current count to set as the next milestone */
+  fanGrowthIncrement: 500,
+  /** Target engagement rate percentage */
+  engagementRateTarget: 70,
+  /** Target campaign participation percentage */
+  campaignParticipationTarget: 95,
+} as const;
+
 import { GrowthChart } from "@/components/analytics/GrowthChart";
 import { PlatformBreakdown } from "@/components/analytics/PlatformBreakdown";
 import { NetworkSelector } from "@/components/analytics/NetworkSelector";
@@ -176,27 +191,32 @@ export default function CreatorGrowth() {
     staleTime: 5 * 60 * 1000
   });
 
-  // Calculate growth goals based on current metrics
-  const growthGoals: GrowthGoal[] = growthMetrics ? [
-    { 
-      title: `Reach ${Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + 500) / 100) * 100} Fans`, 
-      current: growthMetrics?.fanGrowth?.current || 0, 
-      target: Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + 500) / 100) * 100, 
-      progress: ((growthMetrics?.fanGrowth?.current || 0) / Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + 500) / 100) * 100) * 100 
-    },
-    { 
-      title: "70% Engagement Rate", 
-      current: growthMetrics?.engagementRate?.current || 0, 
-      target: 70, 
-      progress: ((growthMetrics?.engagementRate?.current || 0) / 70) * 100 
-    },
-    { 
-      title: "95% Campaign Participation", 
-      current: growthMetrics?.campaignParticipation?.current || 0, 
-      target: 95, 
-      progress: ((growthMetrics?.campaignParticipation?.current || 0) / 95) * 100 
-    }
-  ] : [];
+  // Calculate growth goals based on current metrics and configurable defaults
+  const growthGoals: GrowthGoal[] = growthMetrics ? (() => {
+    const fanTarget = Math.ceil(((growthMetrics?.fanGrowth?.current || 0) + DEFAULT_GROWTH_GOALS.fanGrowthIncrement) / 100) * 100;
+    const engTarget = DEFAULT_GROWTH_GOALS.engagementRateTarget;
+    const campTarget = DEFAULT_GROWTH_GOALS.campaignParticipationTarget;
+    return [
+      { 
+        title: `Reach ${fanTarget} Fans`, 
+        current: growthMetrics?.fanGrowth?.current || 0, 
+        target: fanTarget, 
+        progress: ((growthMetrics?.fanGrowth?.current || 0) / fanTarget) * 100 
+      },
+      { 
+        title: `${engTarget}% Engagement Rate`, 
+        current: growthMetrics?.engagementRate?.current || 0, 
+        target: engTarget, 
+        progress: ((growthMetrics?.engagementRate?.current || 0) / engTarget) * 100 
+      },
+      { 
+        title: `${campTarget}% Campaign Participation`, 
+        current: growthMetrics?.campaignParticipation?.current || 0, 
+        target: campTarget, 
+        progress: ((growthMetrics?.campaignParticipation?.current || 0) / campTarget) * 100 
+      }
+    ];
+  })() : [];
 
   const getChangeColor = (change: number) => {
     return change > 0 ? "text-green-400" : "text-red-400";

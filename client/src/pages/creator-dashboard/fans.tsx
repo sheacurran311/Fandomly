@@ -20,6 +20,17 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 
+/**
+ * Fan tier point thresholds (cumulative points required for each tier).
+ * TODO: These should eventually be pulled from the loyalty program configuration via the API
+ * so creators can customize tier thresholds per program.
+ */
+const TIER_THRESHOLDS = {
+  platinum: 10_000,
+  gold: 5_000,
+  silver: 1_000,
+} as const;
+
 interface Fan {
   id: string;
   name: string;
@@ -80,9 +91,9 @@ export default function CreatorFans() {
               // Calculate tier based on total points
               const points = fanProgram.totalPointsEarned || 0;
               let tier = 'Bronze';
-              if (points >= 10000) tier = 'Platinum';
-              else if (points >= 5000) tier = 'Gold';
-              else if (points >= 1000) tier = 'Silver';
+              if (points >= TIER_THRESHOLDS.platinum) tier = 'Platinum';
+              else if (points >= TIER_THRESHOLDS.gold) tier = 'Gold';
+              else if (points >= TIER_THRESHOLDS.silver) tier = 'Silver';
               
               allFans.set(fanProgram.fanId, {
                 id: fanProgram.fanId,

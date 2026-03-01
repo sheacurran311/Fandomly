@@ -364,38 +364,56 @@ export default function CreatorRevenue() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {/* Last 6 months revenue bars */}
-                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].reverse().map((month, index) => {
-                    // Generate trend data (most recent month has highest value)
+                  {/* Estimated revenue trend for the last 6 months.
+                      Uses a linear decay from the current monthly revenue to approximate past months.
+                      TODO: Replace with real monthly revenue data once a monthly revenue history API is available. */}
+                  {(() => {
+                    const now = new Date();
+                    const monthLabels = Array.from({ length: 6 }, (_, i) => {
+                      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+                      return {
+                        label: d.toLocaleString('default', { month: 'short' }),
+                        year: d.getFullYear(),
+                      };
+                    });
                     const baseValue = revenueData?.monthlyRevenue || 0;
-                    const multiplier = index === 0 ? 1 : (1 - (index * 0.08)); // Declining trend towards past
-                    const value = Math.floor(baseValue * multiplier);
-                    const maxValue = baseValue * 1.2;
-                    const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
-
-                    return (
-                      <div key={month}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-400">{month} 2025</span>
-                          <span className="text-sm font-medium text-white">
-                            ${value.toLocaleString()}
-                          </span>
+                    const maxValue = baseValue > 0 ? baseValue : 1;
+                    return monthLabels.map(({ label, year }, index) => {
+                      const decayFactor = 1 - ((5 - index) * 0.10);
+                      const value = Math.floor(baseValue * Math.max(decayFactor, 0.50));
+                      const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
+                      return (
+                        <div key={`${label}-${year}`}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-400">{label} {year} (Est.)</span>
+                            <span className="text-sm font-medium text-white">
+                              ${value.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/5 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-brand-primary to-brand-secondary h-2 rounded-full transition-all"
+                              style={{ width: `${Math.max(percentage, 5)}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-white/5 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-brand-primary to-brand-secondary h-2 rounded-full transition-all"
-                            style={{ width: `${Math.max(percentage, 5)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
                 <div className="mt-6 pt-4 border-t border-white/10">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">6-Month Average</span>
+                    <span className="text-gray-400">6-Month Average (Est.)</span>
                     <span className="text-white font-medium">
-                      ${Math.floor((revenueData?.monthlyRevenue || 0) * 0.92).toLocaleString()}
+                      {/* Average of the linear-decay estimated values */}
+                      ${(() => {
+                        const base = revenueData?.monthlyRevenue || 0;
+                        const values = Array.from({ length: 6 }, (_, i) =>
+                          Math.floor(base * Math.max(1 - ((5 - i) * 0.10), 0.50))
+                        );
+                        const avg = values.length > 0 ? Math.floor(values.reduce((a, b) => a + b, 0) / values.length) : 0;
+                        return avg.toLocaleString();
+                      })()}
                     </span>
                   </div>
                 </div>
