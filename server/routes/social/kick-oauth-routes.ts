@@ -1,24 +1,24 @@
 /**
  * Kick OAuth Routes
- * 
+ *
  * Handles OAuth flow for Kick streaming platform.
  * Note: Kick's OAuth API may have limited availability.
  */
 
-import { Express, Request, Response } from "express";
-import { db } from "../../db";
-import { socialConnections, users } from "../../../shared/schema";
-import { eq, and } from "drizzle-orm";
-import { authenticateUser, AuthenticatedRequest } from "../../middleware/rbac";
+import { Express, Request, Response } from 'express';
+import { db } from '../../db';
+import { socialConnections } from '../../../shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 
-// Kick OAuth configuration
+// Kick OAuth configuration - uses id.kick.com for OAuth 2.1 with PKCE
 const KICK_CONFIG = {
   clientId: process.env.KICK_CLIENT_ID || '',
   clientSecret: process.env.KICK_CLIENT_SECRET || '',
   redirectUri: process.env.KICK_REDIRECT_URI || '',
-  authUrl: 'https://kick.com/oauth/authorize', // Placeholder
-  tokenUrl: 'https://kick.com/oauth/token', // Placeholder
-  apiBase: 'https://kick.com/api/v1', // Placeholder
+  authUrl: 'https://id.kick.com/oauth/authorize',
+  tokenUrl: 'https://id.kick.com/oauth/token',
+  apiBase: 'https://api.kick.com/public/v1',
 };
 
 interface KickTokenResponse {
@@ -38,21 +38,32 @@ interface KickUserResponse {
 }
 
 /**
- * Exchange authorization code for access token
+ * Exchange authorization code for access token (OAuth 2.1 with PKCE)
  */
-async function exchangeCodeForToken(code: string): Promise<KickTokenResponse> {
+async function exchangeCodeForToken(
+  code: string,
+  codeVerifier?: string,
+  redirectUri?: string
+): Promise<KickTokenResponse> {
+  const body: Record<string, string> = {
+    grant_type: 'authorization_code',
+    client_id: KICK_CONFIG.clientId,
+    client_secret: KICK_CONFIG.clientSecret,
+    code,
+    redirect_uri: redirectUri || KICK_CONFIG.redirectUri,
+  };
+
+  // PKCE: include code_verifier if provided (required by Kick OAuth 2.1)
+  if (codeVerifier) {
+    body.code_verifier = codeVerifier;
+  }
+
   const response = await fetch(KICK_CONFIG.tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: KICK_CONFIG.clientId,
-      client_secret: KICK_CONFIG.clientSecret,
-      code,
-      redirect_uri: KICK_CONFIG.redirectUri,
-    }),
+    body: new URLSearchParams(body),
   });
 
   if (!response.ok) {
@@ -70,7 +81,7 @@ async function exchangeCodeForToken(code: string): Promise<KickTokenResponse> {
 async function fetchKickProfile(accessToken: string): Promise<KickUserResponse> {
   const response = await fetch(`${KICK_CONFIG.apiBase}/user/me`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 
@@ -83,58 +94,78 @@ async function fetchKickProfile(accessToken: string): Promise<KickUserResponse> 
   return response.json();
 }
 
-/**
- * Refresh access token using refresh token
- */
-async function refreshAccessToken(refreshToken: string): Promise<KickTokenResponse> {
-  const response = await fetch(KICK_CONFIG.tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: KICK_CONFIG.clientId,
-      client_secret: KICK_CONFIG.clientSecret,
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to refresh token');
-  }
-
-  return response.json();
-}
-
 export function registerKickOAuthRoutes(app: Express) {
   /**
-   * Handle OAuth callback from Kick
+   * Exchange authorization code for token (popup flow)
+   */
+  app.post('/api/social/kick/token', async (req: Request, res: Response) => {
+    try {
+      if (!KICK_CONFIG.clientId || !KICK_CONFIG.clientSecret) {
+        return res.status(503).json({ message: 'Kick OAuth is not configured' });
+      }
+
+      const { code, code_verifier, redirect_uri } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: 'Authorization code required' });
+      }
+
+      const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
+      res.json(tokenData);
+    } catch (error) {
+      console.error('[Kick] Token exchange error:', error);
+      res
+        .status(500)
+        .json({ message: error instanceof Error ? error.message : 'Token exchange failed' });
+    }
+  });
+
+  /**
+   * Get authenticated user profile from Kick API
+   */
+  app.get('/api/social/kick/me', async (req: Request, res: Response) => {
+    try {
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ message: 'Access token required' });
+      }
+
+      const profile = await fetchKickProfile(accessToken);
+      res.json(profile);
+    } catch (error) {
+      console.error('[Kick] Profile fetch error:', error);
+      res
+        .status(500)
+        .json({ message: error instanceof Error ? error.message : 'Failed to fetch profile' });
+    }
+  });
+
+  /**
+   * Handle OAuth callback from Kick (legacy redirect flow)
    */
   app.post(
-    "/api/social/kick/callback",
+    '/api/social/kick/callback',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const { code } = req.body;
+        const { code, code_verifier, redirect_uri } = req.body;
         if (!code) {
-          return res.status(400).json({ message: "Authorization code required" });
+          return res.status(400).json({ message: 'Authorization code required' });
         }
 
         // Check if Kick OAuth is configured
         if (!KICK_CONFIG.clientId || !KICK_CONFIG.clientSecret) {
-          return res.status(503).json({ 
-            message: "Kick OAuth is not yet available" 
+          return res.status(503).json({
+            message: 'Kick OAuth is not yet available',
           });
         }
 
-        // Exchange code for tokens
-        const tokenData = await exchangeCodeForToken(code);
+        // Exchange code for tokens (with PKCE code_verifier)
+        const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
 
         // Fetch user profile
         const profile = await fetchKickProfile(tokenData.access_token);
@@ -145,10 +176,7 @@ export function registerKickOAuthRoutes(app: Express) {
 
         // Check for existing connection
         const existing = await db.query.socialConnections.findFirst({
-          where: and(
-            eq(socialConnections.userId, userId),
-            eq(socialConnections.platform, 'kick')
-          ),
+          where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'kick')),
         });
 
         const connectionData = {
@@ -183,10 +211,10 @@ export function registerKickOAuthRoutes(app: Express) {
         }
 
         res.json({ success: true, username: profile.username });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Kick] OAuth callback error:', error);
-        res.status(500).json({ 
-          message: error.message || 'Failed to connect Kick account' 
+        res.status(500).json({
+          message: error instanceof Error ? error.message : 'Failed to connect Kick account',
         });
       }
     }
@@ -196,20 +224,17 @@ export function registerKickOAuthRoutes(app: Express) {
    * Get Kick connection status
    */
   app.get(
-    "/api/social/connections/kick",
+    '/api/social/connections/kick',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const connection = await db.query.socialConnections.findFirst({
-          where: and(
-            eq(socialConnections.userId, userId),
-            eq(socialConnections.platform, 'kick')
-          ),
+          where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'kick')),
         });
 
         if (!connection) {
@@ -227,7 +252,7 @@ export function registerKickOAuthRoutes(app: Express) {
           platformUsername: connection.platformUsername,
           profileData: connection.profileData,
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Kick] Get connection error:', error);
         res.status(500).json({ message: 'Failed to get connection status' });
       }
@@ -238,27 +263,22 @@ export function registerKickOAuthRoutes(app: Express) {
    * Disconnect Kick account
    */
   app.delete(
-    "/api/social/connections/kick",
+    '/api/social/connections/kick',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         await db
           .update(socialConnections)
           .set({ isActive: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(socialConnections.userId, userId),
-              eq(socialConnections.platform, 'kick')
-            )
-          );
+          .where(and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'kick')));
 
         res.json({ success: true });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Kick] Disconnect error:', error);
         res.status(500).json({ message: 'Failed to disconnect account' });
       }

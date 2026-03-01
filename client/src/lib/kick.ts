@@ -1,20 +1,16 @@
 /**
  * Kick OAuth Integration
- * 
- * Handles OAuth flow for connecting Kick accounts.
- * Kick is a newer streaming platform, OAuth may have limited availability.
- * 
- * Note: Kick's OAuth API may not be publicly available yet.
- * This implementation is prepared for when it becomes available.
+ *
+ * OAuth 2.1 with PKCE support for Kick streaming platform.
+ * Uses popup-based flow consistent with other platform integrations.
+ * OAuth server: id.kick.com
  */
 
 // Kick OAuth configuration
 const KICK_CONFIG = {
   clientId: import.meta.env.VITE_KICK_CLIENT_ID || '',
   redirectUri: `${window.location.origin}/kick-callback`,
-  authUrl: 'https://kick.com/oauth/authorize', // Placeholder - update when available
-  tokenUrl: 'https://kick.com/oauth/token', // Placeholder - update when available
-  apiBase: 'https://kick.com/api/v1', // Placeholder - update when available
+  authUrl: 'https://id.kick.com/oauth/authorize',
   scopes: ['user:read', 'channel:read', 'chat:read'],
 };
 
@@ -35,67 +31,210 @@ export interface KickAuthState {
 }
 
 /**
- * Generate OAuth state for CSRF protection
+ * PKCE helpers for OAuth 2.1
  */
-function generateState(): string {
-  return crypto.randomUUID();
+function base64URLEncode(buffer: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < buffer.byteLength; i++) {
+    binary += String.fromCharCode(buffer[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return base64URLEncode(array);
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return base64URLEncode(new Uint8Array(hash));
 }
 
 /**
- * Start OAuth flow by redirecting to Kick authorization
+ * Kick OAuth API class with popup-based secureLogin flow
  */
-export function initiateKickOAuth(): void {
-  if (!KICK_CONFIG.clientId) {
-    console.error('[Kick] Client ID not configured');
-    return;
+export class KickAPI {
+  private clientId: string;
+  private redirectUri: string;
+
+  constructor() {
+    this.clientId = KICK_CONFIG.clientId;
+    this.redirectUri = KICK_CONFIG.redirectUri;
   }
 
-  const state = generateState();
-  localStorage.setItem('kick_oauth_state', state);
+  async getAuthUrl(state: string): Promise<{ url: string; codeVerifier: string }> {
+    if (!this.clientId) {
+      throw new Error(
+        'Kick client ID not configured. Please set VITE_KICK_CLIENT_ID environment variable.'
+      );
+    }
 
-  const params = new URLSearchParams({
-    client_id: KICK_CONFIG.clientId,
-    redirect_uri: KICK_CONFIG.redirectUri,
-    response_type: 'code',
-    scope: KICK_CONFIG.scopes.join(' '),
-    state,
-  });
+    // Generate PKCE code verifier and challenge
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  window.location.href = `${KICK_CONFIG.authUrl}?${params.toString()}`;
-}
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      scope: KICK_CONFIG.scopes.join(' '),
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    });
 
-/**
- * Handle OAuth callback
- */
-export async function handleKickCallback(code: string, state: string): Promise<{
-  success: boolean;
-  error?: string;
-}> {
-  // Verify state
-  const savedState = localStorage.getItem('kick_oauth_state');
-  if (state !== savedState) {
-    return { success: false, error: 'Invalid OAuth state' };
+    return {
+      url: `${KICK_CONFIG.authUrl}?${params.toString()}`,
+      codeVerifier,
+    };
   }
-  localStorage.removeItem('kick_oauth_state');
 
-  try {
-    // Exchange code for token via our backend
-    const response = await fetch('/api/social/kick/callback', {
+  async secureLogin(): Promise<{ success: boolean; error?: string }> {
+    // Generate CSRF state token and PKCE challenge before entering promise
+    const state = `kick_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem('kick_oauth_state', state);
+
+    const { url: authUrl, codeVerifier } = await this.getAuthUrl(state);
+    localStorage.setItem('kick_code_verifier', codeVerifier);
+
+    return new Promise((resolve) => {
+      try {
+        const popup = window.open(
+          authUrl,
+          'kick-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        if (!popup) {
+          resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
+          return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+          try {
+            window.removeEventListener('message', onMsg);
+          } catch {
+            /* expected */
+          }
+          try {
+            popup?.close();
+          } catch {
+            /* expected */
+          }
+        };
+
+        const onMsg = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'kick-oauth-result') return;
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(event.data.result);
+        };
+
+        window.addEventListener('message', onMsg);
+
+        // Poll for popup closure (fallback)
+        const startPolling = () => {
+          return setInterval(() => {
+            try {
+              if (popup.closed) {
+                clearInterval(pollTimer);
+                if (!settled) {
+                  setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+
+                    // Check localStorage as COOP fallback
+                    try {
+                      const lsKey = `kick_oauth_result_${state}`;
+                      const lsResult = localStorage.getItem(lsKey);
+                      if (lsResult) {
+                        localStorage.removeItem(lsKey);
+                        const parsed = JSON.parse(lsResult);
+                        console.log(
+                          '[Kick] Found result in localStorage (COOP fallback):',
+                          parsed.success
+                        );
+                        resolve(parsed);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('[Kick] Error reading localStorage fallback:', e);
+                    }
+
+                    resolve({ success: false, error: 'Authorization cancelled' });
+                  }, 500);
+                }
+              }
+            } catch {
+              // Cross-origin error means popup is still open
+            }
+          }, 1000);
+        };
+        let pollTimer: ReturnType<typeof setInterval>;
+        setTimeout(() => {
+          if (!settled) {
+            pollTimer = startPolling();
+          }
+        }, 3000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!settled) {
+            clearInterval(pollTimer);
+            settled = true;
+            cleanup();
+            resolve({ success: false, error: 'Authorization timeout' });
+          }
+        }, 300000);
+      } catch (error) {
+        console.error('[Kick] Login error:', error);
+        resolve({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to initiate Kick login',
+        });
+      }
+    });
+  }
+
+  async exchangeCodeForToken(code: string): Promise<string> {
+    const codeVerifier = localStorage.getItem('kick_code_verifier') || undefined;
+    const response = await fetch('/api/social/kick/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({
+        code,
+        redirect_uri: this.redirectUri,
+        code_verifier: codeVerifier,
+      }),
       credentials: 'include',
     });
 
+    const data = await response.json();
     if (!response.ok) {
-      const error = await response.json();
-      return { success: false, error: error.message || 'Failed to connect Kick account' };
+      throw new Error(data.message || 'Token exchange failed');
     }
+    return data.access_token;
+  }
 
-    return { success: true };
-  } catch (error: any) {
-    console.error('[Kick] Callback error:', error);
-    return { success: false, error: error.message || 'Failed to connect Kick account' };
+  async getUserProfile(accessToken: string): Promise<KickUser> {
+    const response = await fetch('/api/social/kick/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch profile');
+    }
+    return data;
   }
 }
 
@@ -109,36 +248,33 @@ export async function getKickConnectionStatus(): Promise<KickAuthState> {
     });
 
     if (!response.ok) {
-      return {
-        isConnected: false,
-        user: null,
-        accessToken: null,
-        error: null,
-      };
+      return { isConnected: false, user: null, accessToken: null, error: null };
     }
 
     const data = await response.json();
-    
+
     return {
       isConnected: data.isActive,
-      user: data.profileData ? {
-        id: data.platformUserId,
-        username: data.platformUsername,
-        bio: data.profileData.bio,
-        profilePicture: data.profileData.profilePicture,
-        followerCount: data.profileData.followerCount,
-        isVerified: data.profileData.isVerified,
-      } : null,
-      accessToken: null, // Don't expose token to client
+      user: data.profileData
+        ? {
+            id: data.platformUserId,
+            username: data.platformUsername,
+            bio: data.profileData.bio,
+            profilePicture: data.profileData.profilePicture,
+            followerCount: data.profileData.followerCount,
+            isVerified: data.profileData.isVerified,
+          }
+        : null,
+      accessToken: null,
       error: null,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Kick] Connection status error:', error);
     return {
       isConnected: false,
       user: null,
       accessToken: null,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -159,15 +295,14 @@ export async function disconnectKick(): Promise<{ success: boolean; error?: stri
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Kick] Disconnect error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
 /**
  * Check if Kick OAuth is available
- * (May not be publicly available yet)
  */
 export function isKickOAuthAvailable(): boolean {
   return !!KICK_CONFIG.clientId;

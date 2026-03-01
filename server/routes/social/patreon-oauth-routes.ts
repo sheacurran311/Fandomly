@@ -1,15 +1,15 @@
 /**
  * Patreon OAuth Routes
- * 
+ *
  * Handles OAuth flow for Patreon integration.
  * Supports both creator and patron use cases.
  */
 
-import { Express, Request, Response } from "express";
-import { db } from "../../db";
-import { socialConnections, users } from "../../../shared/schema";
-import { eq, and } from "drizzle-orm";
-import { authenticateUser, AuthenticatedRequest } from "../../middleware/rbac";
+import { Express, Request, Response } from 'express';
+import { db } from '../../db';
+import { socialConnections } from '../../../shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 
 // Patreon OAuth configuration
 const PATREON_CONFIG = {
@@ -44,8 +44,8 @@ interface PatreonUserResponse {
   included?: Array<{
     type: string;
     id: string;
-    attributes: any;
-    relationships?: any;
+    attributes: Record<string, unknown>;
+    relationships?: Record<string, unknown>;
   }>;
 }
 
@@ -68,14 +68,17 @@ interface PatreonMembershipsResponse {
   included?: Array<{
     type: string;
     id: string;
-    attributes: any;
+    attributes: Record<string, unknown>;
   }>;
 }
 
 /**
  * Exchange authorization code for access token
  */
-async function exchangeCodeForToken(code: string): Promise<PatreonTokenResponse> {
+async function exchangeCodeForToken(
+  code: string,
+  redirectUri?: string
+): Promise<PatreonTokenResponse> {
   const response = await fetch(PATREON_CONFIG.tokenUrl, {
     method: 'POST',
     headers: {
@@ -86,7 +89,7 @@ async function exchangeCodeForToken(code: string): Promise<PatreonTokenResponse>
       client_id: PATREON_CONFIG.clientId,
       client_secret: PATREON_CONFIG.clientSecret,
       code,
-      redirect_uri: PATREON_CONFIG.redirectUri,
+      redirect_uri: redirectUri || PATREON_CONFIG.redirectUri,
     }),
   });
 
@@ -103,13 +106,11 @@ async function exchangeCodeForToken(code: string): Promise<PatreonTokenResponse>
  * Fetch user profile from Patreon API
  */
 async function fetchPatreonProfile(accessToken: string): Promise<PatreonUserResponse> {
-  const fields = [
-    'fields[user]=email,full_name,vanity,image_url,url,is_creator',
-  ].join('&');
+  const fields = ['fields[user]=email,full_name,vanity,image_url,url,is_creator'].join('&');
 
   const response = await fetch(`${PATREON_CONFIG.apiBase}/identity?${fields}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 
@@ -135,7 +136,7 @@ async function fetchPatreonMemberships(accessToken: string): Promise<PatreonMemb
 
   const response = await fetch(`${PATREON_CONFIG.apiBase}/identity?include=memberships&${fields}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 
@@ -148,53 +149,83 @@ async function fetchPatreonMemberships(accessToken: string): Promise<PatreonMemb
   return response.json();
 }
 
-/**
- * Refresh access token using refresh token
- */
-async function refreshAccessToken(refreshToken: string): Promise<PatreonTokenResponse> {
-  const response = await fetch(PATREON_CONFIG.tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: PATREON_CONFIG.clientId,
-      client_secret: PATREON_CONFIG.clientSecret,
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to refresh token');
-  }
-
-  return response.json();
-}
-
 export function registerPatreonOAuthRoutes(app: Express) {
   /**
-   * Handle OAuth callback from Patreon
+   * Exchange authorization code for token (popup flow)
+   */
+  app.post('/api/social/patreon/token', async (req: Request, res: Response) => {
+    try {
+      if (!PATREON_CONFIG.clientId || !PATREON_CONFIG.clientSecret) {
+        return res.status(503).json({ message: 'Patreon OAuth is not configured' });
+      }
+
+      const { code, redirect_uri } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: 'Authorization code required' });
+      }
+
+      const tokenData = await exchangeCodeForToken(code, redirect_uri);
+      res.json(tokenData);
+    } catch (error) {
+      console.error('[Patreon] Token exchange error:', error);
+      res
+        .status(500)
+        .json({ message: error instanceof Error ? error.message : 'Token exchange failed' });
+    }
+  });
+
+  /**
+   * Get authenticated user profile from Patreon API
+   */
+  app.get('/api/social/patreon/me', async (req: Request, res: Response) => {
+    try {
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ message: 'Access token required' });
+      }
+
+      const profile = await fetchPatreonProfile(accessToken);
+      const userData = profile.data;
+
+      res.json({
+        id: userData.id,
+        full_name: userData.attributes.full_name,
+        vanity: userData.attributes.vanity,
+        email: userData.attributes.email,
+        image_url: userData.attributes.image_url,
+        url: userData.attributes.url,
+        is_creator: userData.attributes.is_creator,
+      });
+    } catch (error) {
+      console.error('[Patreon] Profile fetch error:', error);
+      res
+        .status(500)
+        .json({ message: error instanceof Error ? error.message : 'Failed to fetch profile' });
+    }
+  });
+
+  /**
+   * Handle OAuth callback from Patreon (legacy redirect flow)
    */
   app.post(
-    "/api/social/patreon/callback",
+    '/api/social/patreon/callback',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const { code } = req.body;
         if (!code) {
-          return res.status(400).json({ message: "Authorization code required" });
+          return res.status(400).json({ message: 'Authorization code required' });
         }
 
         // Check if Patreon OAuth is configured
         if (!PATREON_CONFIG.clientId || !PATREON_CONFIG.clientSecret) {
-          return res.status(503).json({ 
-            message: "Patreon OAuth is not configured" 
+          return res.status(503).json({
+            message: 'Patreon OAuth is not configured',
           });
         }
 
@@ -206,7 +237,15 @@ export function registerPatreonOAuthRoutes(app: Express) {
         const userData = profile.data;
 
         // Try to fetch memberships (may fail if not authorized)
-        let memberships: any[] = [];
+        let memberships: Array<{
+          relationships?: { campaign?: { data?: { id: string } } };
+          attributes: {
+            patron_status: string | null;
+            is_follower: boolean;
+            currently_entitled_amount_cents: number;
+            lifetime_support_cents: number;
+          };
+        }> = [];
         try {
           const membershipsData = await fetchPatreonMemberships(tokenData.access_token);
           memberships = membershipsData.data || [];
@@ -240,7 +279,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
             imageUrl: userData.attributes.image_url,
             url: userData.attributes.url,
             isCreator: userData.attributes.is_creator,
-            memberships: memberships.map((m: any) => ({
+            memberships: memberships.map((m) => ({
               campaignId: m.relationships?.campaign?.data?.id,
               patronStatus: m.attributes.patron_status,
               isFollower: m.attributes.is_follower,
@@ -266,15 +305,15 @@ export function registerPatreonOAuthRoutes(app: Express) {
           });
         }
 
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           username: userData.attributes.vanity || userData.attributes.full_name,
           isCreator: userData.attributes.is_creator,
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Patreon] OAuth callback error:', error);
-        res.status(500).json({ 
-          message: error.message || 'Failed to connect Patreon account' 
+        res.status(500).json({
+          message: error instanceof Error ? error.message : 'Failed to connect Patreon account',
         });
       }
     }
@@ -284,13 +323,13 @@ export function registerPatreonOAuthRoutes(app: Express) {
    * Get Patreon connection status
    */
   app.get(
-    "/api/social/connections/patreon",
+    '/api/social/connections/patreon',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const connection = await db.query.socialConnections.findFirst({
@@ -315,7 +354,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
           platformUsername: connection.platformUsername,
           profileData: connection.profileData,
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Patreon] Get connection error:', error);
         res.status(500).json({ message: 'Failed to get connection status' });
       }
@@ -326,27 +365,24 @@ export function registerPatreonOAuthRoutes(app: Express) {
    * Disconnect Patreon account
    */
   app.delete(
-    "/api/social/connections/patreon",
+    '/api/social/connections/patreon',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         await db
           .update(socialConnections)
           .set({ isActive: false, updatedAt: new Date() })
           .where(
-            and(
-              eq(socialConnections.userId, userId),
-              eq(socialConnections.platform, 'patreon')
-            )
+            and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'patreon'))
           );
 
         res.json({ success: true });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Patreon] Disconnect error:', error);
         res.status(500).json({ message: 'Failed to disconnect account' });
       }
@@ -357,18 +393,18 @@ export function registerPatreonOAuthRoutes(app: Express) {
    * Check patron status for a specific campaign
    */
   app.get(
-    "/api/social/patreon/check-patron",
+    '/api/social/patreon/check-patron',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const { campaignId, minimumCents } = req.query;
         if (!campaignId) {
-          return res.status(400).json({ message: "Campaign ID required" });
+          return res.status(400).json({ message: 'Campaign ID required' });
         }
 
         const connection = await db.query.socialConnections.findFirst({
@@ -380,15 +416,15 @@ export function registerPatreonOAuthRoutes(app: Express) {
         });
 
         if (!connection) {
-          return res.status(404).json({ message: "Patreon not connected" });
+          return res.status(404).json({ message: 'Patreon not connected' });
         }
 
         // Get fresh membership data
         const membershipsData = await fetchPatreonMemberships(connection.accessToken!);
-        
+
         // Find membership for the specific campaign
         const membership = membershipsData.data?.find(
-          (m: any) => m.relationships?.campaign?.data?.id === campaignId
+          (m) => m.relationships?.campaign?.data?.id === campaignId
         );
 
         if (!membership) {
@@ -399,15 +435,14 @@ export function registerPatreonOAuthRoutes(app: Express) {
         }
 
         const isActivePatron = membership.attributes.patron_status === 'active_patron';
-        const meetsMinimum = minimumCents 
-          ? membership.attributes.currently_entitled_amount_cents >= parseInt(minimumCents as string)
+        const meetsMinimum = minimumCents
+          ? membership.attributes.currently_entitled_amount_cents >=
+            parseInt(minimumCents as string)
           : true;
 
         // Get tier info if available
         const tierId = membership.relationships?.currently_entitled_tiers?.data?.[0]?.id;
-        const tier = membershipsData.included?.find(
-          (i: any) => i.type === 'tier' && i.id === tierId
-        );
+        const tier = membershipsData.included?.find((i) => i.type === 'tier' && i.id === tierId);
 
         res.json({
           isPatron: isActivePatron && meetsMinimum,
@@ -417,7 +452,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
           tier: tier?.attributes?.title,
           tierAmountCents: tier?.attributes?.amount_cents,
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Patreon] Check patron error:', error);
         res.status(500).json({ message: 'Failed to check patron status' });
       }
@@ -428,13 +463,13 @@ export function registerPatreonOAuthRoutes(app: Express) {
    * Get campaign members (for creators)
    */
   app.get(
-    "/api/social/patreon/campaigns/:campaignId/members",
+    '/api/social/patreon/campaigns/:campaignId/members',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user?.id;
         if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+          return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const { campaignId } = req.params;
@@ -448,7 +483,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
         });
 
         if (!connection) {
-          return res.status(404).json({ message: "Patreon not connected" });
+          return res.status(404).json({ message: 'Patreon not connected' });
         }
 
         // Fetch campaign members (requires creator scope)
@@ -462,7 +497,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
           `${PATREON_CONFIG.apiBase}/campaigns/${campaignId}/members?${fields}`,
           {
             headers: {
-              'Authorization': `Bearer ${connection.accessToken}`,
+              Authorization: `Bearer ${connection.accessToken}`,
             },
           }
         );
@@ -470,31 +505,46 @@ export function registerPatreonOAuthRoutes(app: Express) {
         if (!response.ok) {
           const error = await response.text();
           console.error('[Patreon] Fetch members error:', error);
-          return res.status(response.status).json({ 
-            message: 'Failed to fetch campaign members' 
+          return res.status(response.status).json({
+            message: 'Failed to fetch campaign members',
           });
         }
 
-        const data = await response.json();
-        
-        const members = data.data?.map((member: any) => {
-          const userId = member.relationships?.user?.data?.id;
-          const user = data.included?.find(
-            (i: any) => i.type === 'user' && i.id === userId
-          );
-          
-          return {
-            patronId: userId,
-            fullName: user?.attributes?.full_name || member.attributes?.full_name,
-            email: user?.attributes?.email || member.attributes?.email,
-            currentlyEntitledAmountCents: member.attributes?.currently_entitled_amount_cents,
-            lifetimeSupportCents: member.attributes?.lifetime_support_cents,
-            patronStatus: member.attributes?.patron_status,
-          };
-        }) || [];
+        const data = (await response.json()) as {
+          data?: Array<{
+            relationships?: { user?: { data?: { id: string } } };
+            attributes?: Record<string, unknown>;
+          }>;
+          included?: Array<{
+            type: string;
+            id: string;
+            attributes?: Record<string, unknown>;
+          }>;
+        };
+
+        const members =
+          data.data?.map((member) => {
+            const userId = member.relationships?.user?.data?.id;
+            const user = data.included?.find((i) => i.type === 'user' && i.id === userId);
+
+            return {
+              patronId: userId,
+              fullName:
+                (user?.attributes?.full_name as string | undefined) ||
+                (member.attributes?.full_name as string | undefined),
+              email:
+                (user?.attributes?.email as string | undefined) ||
+                (member.attributes?.email as string | undefined),
+              currentlyEntitledAmountCents: member.attributes?.currently_entitled_amount_cents as
+                | number
+                | undefined,
+              lifetimeSupportCents: member.attributes?.lifetime_support_cents as number | undefined,
+              patronStatus: member.attributes?.patron_status as string | undefined,
+            };
+          }) || [];
 
         res.json({ members });
-      } catch (error: any) {
+      } catch (error) {
         console.error('[Patreon] Campaign members error:', error);
         res.status(500).json({ message: 'Failed to get campaign members' });
       }

@@ -1,6 +1,6 @@
 /**
  * Token Refresh Service
- * 
+ *
  * Handles refreshing OAuth tokens for various social platforms.
  * Should be called before making API calls to ensure valid tokens.
  */
@@ -19,12 +19,15 @@ export interface TokenRefreshResult {
 /**
  * Platform-specific refresh configurations
  */
-const PLATFORM_CONFIGS: Record<string, {
-  tokenUrl: string;
-  clientIdEnv: string;
-  clientSecretEnv: string;
-  useBasicAuth?: boolean;
-}> = {
+const PLATFORM_CONFIGS: Record<
+  string,
+  {
+    tokenUrl: string;
+    clientIdEnv: string;
+    clientSecretEnv: string;
+    useBasicAuth?: boolean;
+  }
+> = {
   spotify: {
     tokenUrl: 'https://accounts.spotify.com/api/token',
     clientIdEnv: 'SPOTIFY_CLIENT_ID',
@@ -56,7 +59,7 @@ const PLATFORM_CONFIGS: Record<string, {
     useBasicAuth: true,
   },
   kick: {
-    tokenUrl: 'https://kick.com/oauth/token', // Placeholder - update when Kick OAuth is available
+    tokenUrl: 'https://id.kick.com/oauth/token',
     clientIdEnv: 'KICK_CLIENT_ID',
     clientSecretEnv: 'KICK_CLIENT_SECRET',
     useBasicAuth: false,
@@ -133,7 +136,8 @@ class TokenRefreshService {
       let body: URLSearchParams;
 
       if (config.useBasicAuth) {
-        headers['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+        headers['Authorization'] =
+          `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
         body = new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: connection.refreshToken,
@@ -178,18 +182,20 @@ class TokenRefreshService {
         })
         .where(eq(socialConnections.id, connection.id));
 
-      console.log(`[TokenRefresh] Successfully refreshed ${platform} token for connection ${connection.id}`);
+      console.log(
+        `[TokenRefresh] Successfully refreshed ${platform} token for connection ${connection.id}`
+      );
 
       return {
         success: true,
         accessToken: data.access_token,
         expiresAt,
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error(`[TokenRefresh] ${platform} refresh error:`, error);
       return {
         success: false,
-        error: error.message || 'Token refresh failed',
+        error: error instanceof Error ? error.message : 'Token refresh failed',
       };
     }
   }
@@ -218,7 +224,7 @@ class TokenRefreshService {
    */
   async getValidToken(connection: SocialConnection): Promise<string | null> {
     const result = await this.refreshIfNeeded(connection);
-    
+
     if (result.success && result.accessToken) {
       return result.accessToken;
     }
@@ -230,7 +236,10 @@ class TokenRefreshService {
    * Bulk refresh all expiring tokens for a platform
    * Useful for scheduled maintenance
    */
-  async refreshExpiringTokens(platform: string, bufferHours: number = 1): Promise<{
+  async refreshExpiringTokens(
+    platform: string,
+    bufferHours: number = 1
+  ): Promise<{
     total: number;
     refreshed: number;
     failed: number;
@@ -240,12 +249,13 @@ class TokenRefreshService {
 
     // Get all connections that will expire soon
     const connections = await db.query.socialConnections.findMany({
-      where: (sc, { and, eq, lt, isNotNull }) => and(
-        eq(sc.platform, platform),
-        eq(sc.isActive, true),
-        isNotNull(sc.refreshToken),
-        lt(sc.tokenExpiresAt, expirationThreshold)
-      ),
+      where: (sc, { and, eq, lt, isNotNull }) =>
+        and(
+          eq(sc.platform, platform),
+          eq(sc.isActive, true),
+          isNotNull(sc.refreshToken),
+          lt(sc.tokenExpiresAt, expirationThreshold)
+        ),
     });
 
     let refreshed = 0;
@@ -260,7 +270,7 @@ class TokenRefreshService {
       }
 
       // Add small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     return {
