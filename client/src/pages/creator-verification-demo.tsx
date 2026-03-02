@@ -1,27 +1,28 @@
-import { useState } from "react";
-import { useCreatorVerification } from "@/hooks/useCreatorVerification";
-import { CreatorVerificationProgress } from "@/components/creator/CreatorVerificationProgress";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, Info } from "lucide-react";
+import { useState } from 'react';
+import { useCreatorVerification } from '@/hooks/useCreatorVerification';
+import { CreatorVerificationProgress } from '@/components/creator/CreatorVerificationProgress';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, RefreshCw, Info } from 'lucide-react';
 
 /**
  * Demo page showing Creator Verification UI
  * This demonstrates both the compact and full views
  */
 export default function CreatorVerificationDemo() {
-  const { 
-    creator, 
-    verificationData, 
-    isLoading, 
+  const {
+    creator,
+    verificationData,
+    platformActivity,
+    isLoading,
     error,
     checkVerification,
     isChecking,
-    refetch
+    refetch,
   } = useCreatorVerification();
-  
-  const [showWizard, setShowWizard] = useState(false);
+
+  const [_showWizard, setShowWizard] = useState(false);
 
   if (isLoading) {
     return (
@@ -78,6 +79,7 @@ export default function CreatorVerificationDemo() {
               <CreatorVerificationProgress
                 creator={creator}
                 verificationData={verificationData}
+                platformActivity={platformActivity}
                 onStartWizard={() => setShowWizard(true)}
                 compact={true}
               />
@@ -108,12 +110,8 @@ export default function CreatorVerificationDemo() {
                   </>
                 )}
               </Button>
-              
-              <Button
-                onClick={() => refetch()}
-                variant="outline"
-                className="w-full"
-              >
+
+              <Button onClick={() => refetch()} variant="outline" className="w-full">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh Data
               </Button>
@@ -126,6 +124,7 @@ export default function CreatorVerificationDemo() {
           <CreatorVerificationProgress
             creator={creator}
             verificationData={verificationData}
+            platformActivity={platformActivity}
             onStartWizard={() => setShowWizard(true)}
             compact={false}
           />
@@ -146,4 +145,3 @@ export default function CreatorVerificationDemo() {
     </div>
   );
 }
-

@@ -18,8 +18,20 @@ import {
 } from '../../services/reputation/reputation-score-calculator';
 import { db } from '../../db';
 import { eq, desc, sql } from 'drizzle-orm';
-import { reputationScores, reputationSyncLog } from '@shared/schema';
+import { reputationScores, reputationSyncLog, creators } from '@shared/schema';
 import { REPUTATION_THRESHOLDS } from '@shared/blockchain-config';
+
+/**
+ * Build signalWeights response filtered to the user's type.
+ */
+function getSignalWeightsForUser(isCreator: boolean) {
+  const targetType = isCreator ? 'creator' : 'fan';
+  return Object.fromEntries(
+    Object.entries(SIGNAL_CONFIG)
+      .filter(([_, config]) => config.userType === targetType || config.userType === 'both')
+      .map(([key, config]) => [key, { weight: config.weight, description: config.description }])
+  );
+}
 
 export function registerReputationRoutes(app: Express) {
   // ==========================================================================
@@ -37,6 +49,13 @@ export function registerReputationRoutes(app: Express) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
+      // Check if user is a creator for signal type filtering
+      const creatorRecord = await db.query.creators.findFirst({
+        where: eq(creators.userId, userId),
+      });
+      const isCreator = !!creatorRecord;
+      const signalWeights = getSignalWeightsForUser(isCreator);
+
       const oracle = getReputationOracle();
       if (oracle) {
         const data = await oracle.getUserReputation(userId);
@@ -49,12 +68,7 @@ export function registerReputationRoutes(app: Express) {
           walletAddress: data.walletAddress,
           thresholds: data.thresholds,
           maxScore: 1000,
-          signalWeights: Object.fromEntries(
-            Object.entries(SIGNAL_CONFIG).map(([key, config]) => [
-              key,
-              { weight: config.weight, description: config.description },
-            ])
-          ),
+          signalWeights,
         });
       }
 
@@ -72,12 +86,7 @@ export function registerReputationRoutes(app: Express) {
           creatorToken: score >= REPUTATION_THRESHOLDS.CREATOR_TOKEN,
         },
         maxScore: 1000,
-        signalWeights: Object.fromEntries(
-          Object.entries(SIGNAL_CONFIG).map(([key, config]) => [
-            key,
-            { weight: config.weight, description: config.description },
-          ])
-        ),
+        signalWeights,
       });
     } catch (error) {
       console.error('[ReputationRoutes] Error fetching reputation:', error);

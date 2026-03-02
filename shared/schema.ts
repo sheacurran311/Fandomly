@@ -542,6 +542,15 @@ export const creators = pgTable('creators', {
       verificationMethod?: 'auto' | 'manual'; // Auto when profile is complete, manual for admin override
       completionPercentage: number; // 0-100
       missingFields?: string[]; // Fields still needed for verification
+      // Badge NFT data (populated when verification badge is minted)
+      badgeNFT?: {
+        onChainBadgeTypeId: number;
+        txHash: string;
+        mintedAt: string;
+        recipientWallet: string;
+      };
+      badgeRevoked?: boolean;
+      badgeRevokedAt?: string;
     }>()
     .default({
       profileComplete: false,
@@ -1545,6 +1554,9 @@ export const platformTasks = pgTable('platform_tasks', {
   // Task Configuration
   requiredFields: jsonb('required_fields').$type<string[]>().default([]), // For profile tasks
   socialPlatform: text('social_platform'), // For social connection tasks
+
+  // Eligibility — which account types can see/complete this task
+  eligibleAccountTypes: jsonb('eligible_account_types').$type<string[]>().default(['fan']),
 
   // Status
   isActive: boolean('is_active').default(true),
@@ -3021,6 +3033,9 @@ export const fandomlyBadgeTemplates = pgTable('fandomly_badge_templates', {
 
   // Linked Collection
   collectionId: varchar('collection_id').references(() => nftCollections.id),
+
+  // On-chain badge type ID (from FandomlyBadge contract)
+  onChainBadgeTypeId: integer('on_chain_badge_type_id'),
 
   // Status
   isActive: boolean('is_active').default(true),

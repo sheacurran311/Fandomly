@@ -1,14 +1,14 @@
-import { memo } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { type Creator } from "@shared/schema";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { Link } from "wouter";
-import { Trophy, Target, Calendar, ExternalLink, Check } from "lucide-react";
-import { transformImageUrl } from "@/lib/image-utils";
+import { memo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { type Creator } from '@shared/schema';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { Trophy, Target, Calendar, ExternalLink, Check } from 'lucide-react';
+import { transformImageUrl } from '@/lib/image-utils';
+import { VerifiedBadgeNFT } from '@/components/creator/VerifiedBadgeNFT';
 
 // Progress data for the "progress" variant (fan dashboard)
 interface ProgressData {
@@ -29,7 +29,7 @@ interface CreatorCardProps {
     };
     tenant?: {
       slug: string;
-      branding?: any;
+      branding?: Record<string, unknown>;
     };
     program?: {
       id?: string;
@@ -40,10 +40,10 @@ interface CreatorCardProps {
       pageConfig?: {
         logo?: string;
         headerImage?: string;
-        brandColors?: any;
-        socialLinks?: any;
+        brandColors?: Record<string, string>;
+        socialLinks?: Record<string, string>;
         location?: string;
-        creatorDetails?: any;
+        creatorDetails?: Record<string, unknown>;
       };
     } | null;
     isLive?: boolean;
@@ -51,54 +51,54 @@ interface CreatorCardProps {
     publishedTasksCount?: number;
     hasActiveCampaign?: boolean;
   };
-  
+
   // Variant determines the card layout
-  variant?: "full" | "compact" | "selection" | "progress";
-  
+  variant?: 'full' | 'compact' | 'selection' | 'progress';
+
   // Display options (can override variant defaults)
   showBanner?: boolean;
   showBio?: boolean;
   showStats?: boolean;
   showJoinButton?: boolean;
-  
+
   // Selection variant props
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (creatorId: string) => void;
-  
+
   // Progress variant props
   progress?: ProgressData;
-  
+
   // Auth handling
   onUnauthenticatedClick?: () => void;
 }
 
-function CreatorCard({ 
-  creator, 
-  variant = "full",
+function CreatorCard({
+  creator,
+  variant = 'full',
   showBanner: showBannerProp,
   showBio: showBioProp,
   showStats: showStatsProp,
   showJoinButton: showJoinButtonProp,
-  selectable = false,
+  selectable: _selectable = false,
   selected = false,
   onSelect,
   progress,
-  onUnauthenticatedClick 
+  onUnauthenticatedClick,
 }: CreatorCardProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Determine display options based on variant (with prop overrides)
-  const showBanner = showBannerProp ?? (variant !== "compact");
-  const showBio = showBioProp ?? (variant === "full" || variant === "progress");
-  const showStats = showStatsProp ?? (variant === "full");
-  const showJoinButton = showJoinButtonProp ?? (variant === "full");
+  const showBanner = showBannerProp ?? variant !== 'compact';
+  const showBio = showBioProp ?? (variant === 'full' || variant === 'progress');
+  const showStats = showStatsProp ?? variant === 'full';
+  const showJoinButton = showJoinButtonProp ?? variant === 'full';
 
   // Fetch tenant/branding data if not provided
   const { data: creatorData } = useQuery({
-    queryKey: ["/api/store", creator.user?.username],
+    queryKey: ['/api/store', creator.user?.username],
     queryFn: async () => {
       const response = await fetch(`/api/store/${creator.user?.username}`, {
         credentials: 'include',
@@ -114,62 +114,65 @@ function CreatorCard({
 
   // Fetch user's fan programs to check join status
   const { data: userPrograms = [] } = useQuery({
-    queryKey: ["/api/fan-programs/user", user?.id],
+    queryKey: ['/api/fan-programs/user', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await apiRequest("GET", `/api/fan-programs/user/${user.id}`);
+      const response = await apiRequest('GET', `/api/fan-programs/user/${user.id}`);
       return await response.json();
     },
     enabled: !!user?.id,
   });
 
   // Check if user has joined a program for this creator
-  const hasJoinedProgram = userPrograms.some((program: any) => program.creatorId === creator.id || program.tenantId === tenantId);
+  const hasJoinedProgram = userPrograms.some(
+    (program: Record<string, unknown>) =>
+      program.creatorId === creator.id || program.tenantId === tenantId
+  );
 
   // Join program mutation - one-tap: follow tenant + enroll in program
   const joinProgramMutation = useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("Must be authenticated to join");
-      
+      if (!user) throw new Error('Must be authenticated to join');
+
       // One-tap join: single API call handles follow + enroll
-      const response = await apiRequest("POST", `/api/fan-programs/join-creator/${creator.id}`, {});
+      const response = await apiRequest('POST', `/api/fan-programs/join-creator/${creator.id}`, {});
       return await response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Success!",
+        title: 'Success!',
         description: `You've joined ${creator.displayName}'s loyalty program!`,
       });
       // Invalidate queries to refresh join state immediately
-      queryClient.invalidateQueries({ queryKey: ["/api/fan-programs/user", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/fan-programs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/creators"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/fan-programs/user', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/fan-programs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/creators'] });
     },
     onError: (error) => {
-      console.error("Join program error:", error);
+      console.error('Join program error:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to join program",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to join program',
+        variant: 'destructive',
       });
     },
   });
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "athlete":
-        return "bg-brand-secondary text-brand-dark-bg";
-      case "musician":
-        return "bg-brand-primary text-white";
-      case "creator":
-        return "bg-brand-accent text-white";
+      case 'athlete':
+        return 'bg-brand-secondary text-brand-dark-bg';
+      case 'musician':
+        return 'bg-brand-primary text-white';
+      case 'creator':
+        return 'bg-brand-accent text-white';
       default:
-        return "bg-gray-500 text-white";
+        return 'bg-gray-500 text-white';
     }
   };
 
   const formatFollowerCount = (count: number | null) => {
-    if (!count) return "0 fans";
+    if (!count) return '0 fans';
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M fans`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K fans`;
     return `${count} fans`;
@@ -180,34 +183,34 @@ function CreatorCard({
   // creator.imageUrl, creator.displayName, etc. already reflect program values.
   // We still fall back to legacy sources for older data that hasn't been migrated.
   const programPageConfig = creator.program?.pageConfig;
-  
+
   // Banner: program headerImage is canonical
   const bannerUrl = transformImageUrl(
-    programPageConfig?.headerImage || 
-    creator.user?.profileData?.bannerImage || 
-    creatorData?.user?.profileData?.bannerImage || 
-    creator.tenant?.branding?.bannerUrl
+    programPageConfig?.headerImage ||
+      creator.user?.profileData?.bannerImage ||
+      creatorData?.user?.profileData?.bannerImage ||
+      creator.tenant?.branding?.bannerUrl
   );
-  
+
   // Profile photo: program logo is canonical
   const profilePhotoUrl = transformImageUrl(
-    programPageConfig?.logo || 
-    creator.imageUrl || 
-    creator.user?.profileData?.avatar || 
-    creatorData?.user?.profileData?.avatar || 
-    creator.tenant?.branding?.logoUrl
+    programPageConfig?.logo ||
+      creator.imageUrl ||
+      creator.user?.profileData?.avatar ||
+      creatorData?.user?.profileData?.avatar ||
+      creator.tenant?.branding?.logoUrl
   );
-  
+
   // URL: prefer program slug, fall back to tenant slug or username
   const creatorUrl = creator.program?.slug || creator.tenant?.slug || creator.user?.username;
 
   const handleCardClick = () => {
     // For selection variant, clicking the card toggles selection
-    if (variant === "selection" && onSelect) {
+    if (variant === 'selection' && onSelect) {
       onSelect(creator.id);
       return;
     }
-    
+
     if (!user && onUnauthenticatedClick) {
       onUnauthenticatedClick();
     } else if (creatorUrl) {
@@ -240,63 +243,58 @@ function CreatorCard({
   };
 
   // Render profile photo component (reused across variants)
-  const renderProfilePhoto = (size: "sm" | "md" | "lg" = "md") => {
+  const renderProfilePhoto = (size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClasses = {
-      sm: "w-10 h-10 text-sm",
-      md: "w-14 h-14 text-lg",
-      lg: "w-16 h-16 text-xl"
+      sm: 'w-10 h-10 text-sm',
+      md: 'w-14 h-14 text-lg',
+      lg: 'w-16 h-16 text-xl',
     };
-    
+
     const borderClasses = {
-      sm: "border-2",
-      md: "border-2",
-      lg: "border-4"
+      sm: 'border-2',
+      md: 'border-2',
+      lg: 'border-4',
     };
 
     if (profilePhotoUrl) {
       return (
-        <img 
-          src={profilePhotoUrl} 
+        <img
+          src={profilePhotoUrl}
           alt={creator.displayName}
           className={`${sizeClasses[size]} rounded-full ${borderClasses[size]} border-brand-dark-bg object-cover`}
         />
       );
     }
-    
+
     return (
-      <div className={`${sizeClasses[size]} bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full ${borderClasses[size]} border-brand-dark-bg flex items-center justify-center text-white font-bold`}>
+      <div
+        className={`${sizeClasses[size]} bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full ${borderClasses[size]} border-brand-dark-bg flex items-center justify-center text-white font-bold`}
+      >
         {creator.displayName?.[0] || 'C'}
       </div>
     );
   };
 
   // Render verification badge
-  const renderVerificationBadge = () => {
-    if (!creator.isVerified) return null;
-    return (
-      <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center ml-1">
-        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-        </svg>
-      </div>
-    );
+  const renderVerificationBadge = (size: 'sm' | 'md' | 'lg' = 'md') => {
+    return <VerifiedBadgeNFT isVerified={!!creator.isVerified} size={size} className="ml-1" />;
   };
 
   // ============================================
   // COMPACT VARIANT
   // ============================================
-  if (variant === "compact") {
+  if (variant === 'compact') {
     return (
-      <div 
+      <div
         className="bg-white/5 backdrop-blur-lg rounded-xl overflow-hidden border border-white/10 hover:border-brand-primary/50 transition-all duration-300 cursor-pointer p-3"
         onClick={handleCardClick}
       >
         <div className="flex items-center gap-3">
-          {renderProfilePhoto("sm")}
+          {renderProfilePhoto('sm')}
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-white truncate flex items-center">
               {creator.displayName}
-              {creator.isVerified && <span className="ml-1 text-brand-secondary text-xs">✓</span>}
+              {renderVerificationBadge('sm')}
             </h3>
             <Badge className={`${getCategoryColor(creator.category)} text-xs scale-90 origin-left`}>
               {creator.category}
@@ -310,19 +308,19 @@ function CreatorCard({
   // ============================================
   // SELECTION VARIANT (for fan-choose-creators)
   // ============================================
-  if (variant === "selection") {
+  if (variant === 'selection') {
     return (
-      <div 
+      <div
         className={`bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
-          selected 
-            ? "border-brand-primary bg-brand-primary/10" 
-            : "border-white/10 hover:border-brand-primary/50"
+          selected
+            ? 'border-brand-primary bg-brand-primary/10'
+            : 'border-white/10 hover:border-brand-primary/50'
         }`}
         onClick={handleCardClick}
       >
         {/* Banner Image */}
         {showBanner && (
-          <div 
+          <div
             className="h-24 bg-gradient-to-br from-brand-primary/20 to-brand-accent/20 relative bg-cover bg-center"
             style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : {}}
           >
@@ -334,9 +332,7 @@ function CreatorCard({
             {/* Active Campaign Badge */}
             {creator.hasActiveCampaign && (
               <div className="absolute bottom-2 left-2">
-                <Badge className="bg-green-500/90 text-white border-0 text-xs">
-                  Active
-                </Badge>
+                <Badge className="bg-green-500/90 text-white border-0 text-xs">Active</Badge>
               </div>
             )}
             {/* Selection Indicator */}
@@ -349,36 +345,30 @@ function CreatorCard({
             )}
           </div>
         )}
-        
+
         <div className="p-4">
           {/* Profile Photo and Info */}
           <div className={`flex items-start gap-3 ${showBanner ? '-mt-8' : ''}`}>
-            <div className="relative flex-shrink-0">
-              {renderProfilePhoto("md")}
-            </div>
+            <div className="relative flex-shrink-0">{renderProfilePhoto('md')}</div>
             <div className={`flex-1 min-w-0 ${showBanner ? 'pt-6' : ''}`}>
               <h3 className="text-base font-bold text-white truncate flex items-center">
                 {creator.displayName}
-                {creator.isVerified && <span className="ml-1 text-brand-secondary">✓</span>}
+                {renderVerificationBadge('sm')}
               </h3>
-              <p className="text-xs text-gray-400">
-                {formatFollowerCount(creator.followerCount)}
-              </p>
+              <p className="text-xs text-gray-400">{formatFollowerCount(creator.followerCount)}</p>
             </div>
           </div>
-          
+
           {/* Bio */}
           {showBio && creator.bio && (
-            <p className="text-gray-300 text-sm mt-3 line-clamp-2">
-              {creator.bio}
-            </p>
+            <p className="text-gray-300 text-sm mt-3 line-clamp-2">{creator.bio}</p>
           )}
-          
+
           {/* Selection Button */}
           <div className="mt-4">
-            <Button 
-              variant={selected ? "default" : "neon"}
-              className={`w-full ${selected ? "bg-brand-primary" : ""}`}
+            <Button
+              variant={selected ? 'default' : 'neon'}
+              className={`w-full ${selected ? 'bg-brand-primary' : ''}`}
               onClick={handleSelectClick}
             >
               {selected ? (
@@ -386,7 +376,9 @@ function CreatorCard({
                   <Check className="w-4 h-4 mr-2" />
                   Selected
                 </>
-              ) : "Enroll"}
+              ) : (
+                'Enroll'
+              )}
             </Button>
           </div>
         </div>
@@ -397,9 +389,9 @@ function CreatorCard({
   // ============================================
   // PROGRESS VARIANT (for fan-dashboard/joined)
   // ============================================
-  if (variant === "progress") {
+  if (variant === 'progress') {
     return (
-      <div 
+      <div
         className="bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-white/10 hover:bg-white/10 transition-colors"
         onClick={handleCardClick}
       >
@@ -407,30 +399,35 @@ function CreatorCard({
           {/* Header with Profile Photo */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              {renderProfilePhoto("md")}
+              {renderProfilePhoto('md')}
               <div>
                 <div className="flex items-center">
                   <h3 className="text-lg font-bold text-white">{creator.displayName}</h3>
                   {renderVerificationBadge()}
                 </div>
-                <Badge variant="outline" className={`text-xs border-transparent ${
-                  creator.category === "athlete" ? "text-green-400" :
-                  creator.category === "musician" ? "text-purple-400" :
-                  "text-blue-400"
-                }`}>
+                <Badge
+                  variant="outline"
+                  className={`text-xs border-transparent ${
+                    creator.category === 'athlete'
+                      ? 'text-green-400'
+                      : creator.category === 'musician'
+                        ? 'text-purple-400'
+                        : 'text-blue-400'
+                  }`}
+                >
                   {creator.category || 'Creator'}
                 </Badge>
               </div>
             </div>
           </div>
-          
+
           {/* Bio */}
           {showBio && (
             <p className="text-gray-300 text-sm mt-4 line-clamp-2">
-              {creator.bio || "Creating amazing content and building community."}
+              {creator.bio || 'Creating amazing content and building community.'}
             </p>
           )}
-          
+
           {/* Progress Section */}
           {progress && (
             <div className="mt-4 space-y-4">
@@ -442,13 +439,13 @@ function CreatorCard({
                   <span className="text-lg font-bold text-brand-secondary">
                     {progress.points?.toLocaleString() || 0} pts
                   </span>
-                  {progress.tier && (
-                    <span className="text-sm text-gray-400">{progress.tier}</span>
-                  )}
+                  {progress.tier && <span className="text-sm text-gray-400">{progress.tier}</span>}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-400 mt-2">
                   <Target className="h-3 w-3" />
-                  <span>{progress.activeTasks} active task{progress.activeTasks !== 1 ? 's' : ''}</span>
+                  <span>
+                    {progress.activeTasks} active task{progress.activeTasks !== 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
 
@@ -459,16 +456,16 @@ function CreatorCard({
                   <span className="text-xs">Since {progress.joinedDate}</span>
                 </div>
                 <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="border-white/20 text-gray-300 hover:bg-white/10"
                     onClick={handleVisitProgramClick}
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="bg-brand-primary hover:bg-brand-primary/80"
                     onClick={handleVisitProgramClick}
                   >
@@ -487,95 +484,94 @@ function CreatorCard({
   // FULL VARIANT (default - original behavior)
   // ============================================
   return (
-    <div 
+    <div
       className="bg-white/5 backdrop-blur-lg rounded-3xl overflow-hidden border border-white/10 hover:border-brand-primary/50 transition-all duration-300 hover:scale-105 cursor-pointer"
       onClick={handleCardClick}
     >
       {/* Banner Image */}
       {showBanner && (
-        <div 
+        <div
           className="h-32 bg-gradient-to-br from-brand-primary/20 to-brand-accent/20 relative bg-cover bg-center"
           style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : {}}
         >
           <div className="absolute top-3 right-3">
-            <Badge className={getCategoryColor(creator.category)}>
-              {creator.category}
-            </Badge>
+            <Badge className={getCategoryColor(creator.category)}>{creator.category}</Badge>
           </div>
           {/* Live Badge - Only show if creator has active content */}
           {creator.isLive && (
             <div className="absolute bottom-3 left-3">
-              <Badge className="bg-green-500/90 text-white border-0">
-                Live
-              </Badge>
+              <Badge className="bg-green-500/90 text-white border-0">Live</Badge>
             </div>
           )}
         </div>
       )}
-      
+
       <div className="p-5">
         {/* Profile Photo and Info */}
         <div className={`flex items-start mb-3 ${showBanner ? '-mt-10' : ''}`}>
-          <div className="relative">
-            {renderProfilePhoto("lg")}
-          </div>
+          <div className="relative">{renderProfilePhoto('lg')}</div>
           <div className={`ml-3 ${showBanner ? 'mt-10' : ''}`}>
             <h3 className="text-lg font-bold text-white flex items-center">
               {creator.displayName}
-              {creator.isVerified && (
-                <span className="ml-1 text-brand-secondary">✓</span>
-              )}
+              {renderVerificationBadge()}
             </h3>
-            <p className="text-gray-400 text-xs">
-              {formatFollowerCount(creator.followerCount)}
-            </p>
+            <p className="text-gray-400 text-xs">{formatFollowerCount(creator.followerCount)}</p>
           </div>
         </div>
-        
+
         {showBio && (
           <p className="text-gray-300 text-sm mb-3 line-clamp-2">
-            {creator.bio || "Creating amazing content and building community."}
+            {creator.bio || 'Creating amazing content and building community.'}
           </p>
         )}
-        
+
         {/* Activity Stats */}
         {showStats && (creator.activeCampaignsCount || creator.publishedTasksCount) ? (
           <div className="flex gap-3 mb-3 text-xs text-gray-400">
             {(creator.activeCampaignsCount ?? 0) > 0 && (
               <div className="flex items-center gap-1">
                 <Trophy className="h-3 w-3 text-brand-primary" />
-                <span>{creator.activeCampaignsCount} campaign{creator.activeCampaignsCount !== 1 ? 's' : ''}</span>
+                <span>
+                  {creator.activeCampaignsCount} campaign
+                  {creator.activeCampaignsCount !== 1 ? 's' : ''}
+                </span>
               </div>
             )}
             {(creator.publishedTasksCount ?? 0) > 0 && (
               <div className="flex items-center gap-1">
                 <Target className="h-3 w-3 text-brand-accent" />
-                <span>{creator.publishedTasksCount} task{creator.publishedTasksCount !== 1 ? 's' : ''}</span>
+                <span>
+                  {creator.publishedTasksCount} task{creator.publishedTasksCount !== 1 ? 's' : ''}
+                </span>
               </div>
             )}
           </div>
         ) : null}
-        
+
         {/* Action Buttons */}
         {showJoinButton && (
           <div className="flex gap-2">
-            <Button 
+            <Button
               onClick={handleVisitProgramClick}
               variant="outline"
               className="flex-1 border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white transition-colors"
             >
               Visit Program
             </Button>
-            <Button 
+            <Button
               onClick={handleJoinClick}
               disabled={joinProgramMutation.isPending || hasJoinedProgram}
               className={`flex-1 transition-colors ${
                 hasJoinedProgram
-                  ? "bg-green-500 hover:bg-green-500/80 text-white"
-                  : "bg-brand-primary hover:bg-brand-primary/80 text-white"
+                  ? 'bg-green-500 hover:bg-green-500/80 text-white'
+                  : 'bg-brand-primary hover:bg-brand-primary/80 text-white'
               }`}
             >
-              {joinProgramMutation.isPending ? "Enrolling..." : hasJoinedProgram ? "Enrolled" : "Enroll"}
+              {joinProgramMutation.isPending
+                ? 'Enrolling...'
+                : hasJoinedProgram
+                  ? 'Enrolled'
+                  : 'Enroll'}
             </Button>
           </div>
         )}

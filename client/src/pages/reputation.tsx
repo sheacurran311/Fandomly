@@ -214,12 +214,20 @@ function BreakdownCard({
   description: string;
 }) {
   const labels: Record<string, string> = {
+    // Fan signals
     totalPoints: 'Points Earned',
     taskCompletions: 'Tasks Completed',
     socialConnections: 'Social Connections',
     streakDays: 'Streak Days',
     referralCount: 'Referrals',
     accountAgeDays: 'Account Age',
+    // Creator signals
+    activeFanCount: 'Active Fans',
+    programEngagement: 'Program Engagement',
+    verifiedStatus: 'Verification Status',
+    creatorSocialConnections: 'Social Connections',
+    fanRewardRedemptions: 'Fan Redemptions',
+    creatorAccountAgeDays: 'Account Age',
   };
 
   return (
@@ -369,15 +377,17 @@ export default function ReputationPage() {
                   Score Breakdown
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(reputation.breakdown).map(([signal, data]) => (
-                    <BreakdownCard
-                      key={signal}
-                      signal={signal}
-                      data={data as { score: number; rawValue: number }}
-                      weight={reputation.signalWeights[signal]?.weight ?? 0}
-                      description={reputation.signalWeights[signal]?.description ?? ''}
-                    />
-                  ))}
+                  {Object.entries(reputation.breakdown)
+                    .filter(([key]) => key !== 'weightedScores' && key !== 'normalizedScore')
+                    .map(([signal, data]) => (
+                      <BreakdownCard
+                        key={signal}
+                        signal={signal}
+                        data={data as { score: number; rawValue: number }}
+                        weight={reputation.signalWeights[signal]?.weight ?? 0}
+                        description={reputation.signalWeights[signal]?.description ?? ''}
+                      />
+                    ))}
                 </div>
               </div>
             )}

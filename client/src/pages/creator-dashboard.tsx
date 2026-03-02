@@ -8,6 +8,8 @@ import DashboardCard from '@/components/dashboard/dashboard-card';
 import RevenueWidget from '@/components/dashboard/revenue-widget';
 import LeaderboardWidget from '@/components/dashboard/leaderboard-widget';
 import NewFansWidget from '@/components/dashboard/new-fans-widget';
+import { useCreatorVerification } from '@/hooks/useCreatorVerification';
+import { CreatorVerificationProgress } from '@/components/creator/CreatorVerificationProgress';
 import { useInstagramConnection } from '@/contexts/instagram-connection-context';
 import InstagramSDKManager from '@/lib/instagram';
 import { useEffect, useMemo } from 'react';
@@ -218,6 +220,13 @@ export default function CreatorDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
   const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
+  const {
+    creator: verificationCreator,
+    verificationData,
+    platformActivity,
+    isVerified,
+    isLoading: verificationLoading,
+  } = useCreatorVerification();
 
   // Only use Instagram connection for creators
   const instagramConnection = user?.userType === 'creator' ? useInstagramConnection() : null;
@@ -827,6 +836,17 @@ export default function CreatorDashboard() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Verification Progress Card */}
+          {!verificationLoading && verificationData && verificationCreator && !isVerified && (
+            <CreatorVerificationProgress
+              creator={verificationCreator as Record<string, unknown>}
+              verificationData={verificationData}
+              platformActivity={platformActivity}
+              onStartWizard={() => (window.location.href = '/creator-dashboard/settings')}
+              compact
+            />
           )}
 
           {/* SECTION 1: Key Metrics Row */}

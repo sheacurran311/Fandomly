@@ -1,11 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { CreatorVerificationData } from "@shared/creatorVerificationSchema";
-import type { Creator } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import type {
+  CreatorVerificationData,
+  PlatformActivityContext,
+} from '@shared/creatorVerificationSchema';
+import type { Creator } from '@shared/schema';
 
 interface VerificationStatusResponse {
-  creator: Pick<Creator, 'id' | 'displayName' | 'category' | 'isVerified'> & Partial<Pick<Creator, 'bio' | 'typeSpecificData'>>;
+  creator: Pick<Creator, 'id' | 'displayName' | 'category' | 'isVerified'> &
+    Partial<Pick<Creator, 'bio' | 'typeSpecificData'>>;
   verificationData: CreatorVerificationData;
+  platformActivity?: PlatformActivityContext;
   missingFieldsDisplay: string[];
 }
 
@@ -24,12 +29,7 @@ export function useCreatorVerification() {
   const queryClient = useQueryClient();
 
   // Fetch verification status
-  const {
-    data,
-    isLoading,
-    error,
-    refetch
-  } = useQuery<VerificationStatusResponse>({
+  const { data, isLoading, error, refetch } = useQuery<VerificationStatusResponse>({
     queryKey: ['creatorVerification'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/creator-verification/status');
@@ -60,13 +60,14 @@ export function useCreatorVerification() {
     // Data
     creator: data?.creator,
     verificationData: data?.verificationData,
+    platformActivity: data?.platformActivity,
     missingFieldsDisplay: data?.missingFieldsDisplay || [],
     isVerified: data?.creator?.isVerified || false,
-    
+
     // Loading states
     isLoading,
     error,
-    
+
     // Actions
     refetch,
     checkVerification: checkVerificationMutation.mutate,
@@ -74,4 +75,3 @@ export function useCreatorVerification() {
     checkError: checkVerificationMutation.error,
   };
 }
-

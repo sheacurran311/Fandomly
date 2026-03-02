@@ -57,7 +57,7 @@ import {
   creatorFacebookPages,
 } from '@shared/schema';
 import { db } from '../db';
-import { eq, desc, and, sql, or, isNull } from 'drizzle-orm';
+import { eq, desc, and, sql, or, isNull, count } from 'drizzle-orm';
 import { encryptToken, decryptToken } from '../utils/crypto-utils';
 
 export interface IStorage {
@@ -381,7 +381,28 @@ export class DatabaseStorage implements IStorage {
       try {
         const { calculateCreatorVerification } = await import('@shared/creatorVerificationSchema');
         const creatorType = updatedCreator.category as 'athlete' | 'musician' | 'content_creator';
-        const verificationData = calculateCreatorVerification(updatedCreator, creatorType);
+
+        // Query platform activity for verification requirements
+        const [programResult, taskResult] = await Promise.all([
+          db
+            .select({ total: count() })
+            .from(loyaltyPrograms)
+            .where(and(eq(loyaltyPrograms.creatorId, id), eq(loyaltyPrograms.isActive, true))),
+          db
+            .select({ total: count() })
+            .from(tasks)
+            .where(and(eq(tasks.creatorId, id), eq(tasks.ownershipLevel, 'creator'))),
+        ]);
+        const platformActivity = {
+          activeProgramCount: Number(programResult[0]?.total) || 0,
+          publishedTaskCount: Number(taskResult[0]?.total) || 0,
+        };
+
+        const verificationData = calculateCreatorVerification(
+          updatedCreator,
+          creatorType,
+          platformActivity
+        );
 
         // Auto-verify if profile is complete
         const shouldVerify = verificationData.profileComplete && !updatedCreator.isVerified;
