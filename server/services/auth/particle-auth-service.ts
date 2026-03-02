@@ -13,20 +13,20 @@
 
 import { db } from '../../db';
 import { users } from '@shared/schema';
-import { eq, or } from 'drizzle-orm';
-import { signAccessToken, signRefreshToken } from './jwt-service';
+import { eq } from 'drizzle-orm';
+import { signAccessToken } from './jwt-service';
 
 // Particle Network API configuration
 const PARTICLE_PROJECT_ID = process.env.PARTICLE_PROJECT_ID;
 const PARTICLE_SERVER_KEY = process.env.PARTICLE_SERVER_KEY;
 
 interface ParticleUserInfo {
-  uuid: string;           // Particle's unique user ID
+  uuid: string; // Particle's unique user ID
   email?: string;
   name?: string;
   avatar?: string;
   phone?: string;
-  provider?: string;      // 'google', 'twitter', 'apple', 'email', etc.
+  provider?: string; // 'google', 'twitter', 'apple', 'email', etc.
   thirdparty_user_info?: {
     provider_id?: string;
     provider_user_id?: string;
@@ -45,7 +45,9 @@ interface ParticleAuthResult {
     username: string;
     userType: string;
     role: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     profileData: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onboardingState: any;
     avatar?: string;
     avalancheL1Address?: string;
@@ -79,7 +81,7 @@ export async function validateParticleToken(
       headers: {
         'Content-Type': 'application/json',
         // Basic auth with project credentials
-        'Authorization': `Basic ${Buffer.from(`${pId}:${sKey}`).toString('base64')}`,
+        Authorization: `Basic ${Buffer.from(`${pId}:${sKey}`).toString('base64')}`,
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
@@ -122,6 +124,26 @@ export async function handleParticleCallback(
     return { success: false, error: 'Invalid Particle session token' };
   }
 
+  // 1b. Validate wallet address format and ownership (C1 + H1)
+  if (walletAddress) {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      return { success: false, error: 'Invalid wallet address format' };
+    }
+
+    const walletsArray = particleUser.wallets || [];
+    const walletBelongsToUser = walletsArray.some(
+      (w) => w.public_address.toLowerCase() === walletAddress.toLowerCase()
+    );
+
+    if (!walletBelongsToUser) {
+      console.error('[Particle Auth] Wallet address not found in user wallets:', {
+        provided: walletAddress,
+        available: walletsArray.map((w) => w.public_address),
+      });
+      return { success: false, error: 'Wallet address does not belong to authenticated user' };
+    }
+  }
+
   const email = particleUser.email || null;
   const provider = particleUser.provider || 'particle';
   const particleUuid = particleUser.uuid;
@@ -146,15 +168,27 @@ export async function handleParticleCallback(
     // particleUserId column may not exist yet (pre-migration)
   }
 
-  // Try email match if no Particle match found
+  // Try email match if no Particle match found (C2: prevent silent account takeover)
   if (!existingUser && email) {
-    const [byEmail] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const [byEmail] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (byEmail) {
+      // If the existing user already has a Particle ID, it's a different Particle account
+      // If they don't have one, we must NOT auto-link -- require explicit account linking
+      if (byEmail.particleUserId && byEmail.particleUserId !== particleUuid) {
+        return { success: false, error: 'Email already associated with a different account' };
+      }
+      if (!byEmail.particleUserId) {
+        console.warn('[Particle Auth] Email match found but no Particle link:', {
+          email,
+          existingUserId: byEmail.id,
+          particleUuid,
+        });
+        return {
+          success: false,
+          error: 'Email already registered. Please link your Particle account from settings.',
+        };
+      }
       existingUser = byEmail;
     }
   }
@@ -166,6 +200,7 @@ export async function handleParticleCallback(
     // 3a. Existing user -- update with Particle + wallet info
     userId = existingUser.id;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: Record<string, any> = {};
 
     // Set Particle UUID if not already set
@@ -210,6 +245,7 @@ export async function handleParticleCallback(
           authProvider: provider,
         },
         onboardingState: { step: 'user_type_selection' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)
       .returning();
 
@@ -217,11 +253,7 @@ export async function handleParticleCallback(
   }
 
   // 4. Fetch the full user record for the response
-  const [fullUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const [fullUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
   if (!fullUser) {
     return { success: false, error: 'Failed to fetch user after creation' };
@@ -244,8 +276,9 @@ export async function handleParticleCallback(
       role: fullUser.role,
       profileData: fullUser.profileData,
       onboardingState: fullUser.onboardingState,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       avatar: (fullUser.profileData as any)?.avatar,
-      avalancheL1Address: walletAddress || fullUser.avalancheL1Address,
+      avalancheL1Address: walletAddress || fullUser.avalancheL1Address || undefined,
     },
     accessToken,
     isNewUser,

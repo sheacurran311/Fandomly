@@ -3,6 +3,7 @@ import { type Task } from '@shared/schema';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 import { type Creator, type LoyaltyProgram } from '@shared/schema';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1103,6 +1104,7 @@ export default function CampaignBuilder() {
   const [points, setPoints] = useState(50);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('');
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   // Fetch programs for the creator
   const { data: programsData, isLoading: programsLoading } = useQuery({
@@ -1169,10 +1171,6 @@ export default function CampaignBuilder() {
       if (likePost) selectedActions.push('Like Post');
       if (retweet) selectedActions.push('Retweet');
 
-      console.log(
-        `🎯 Quick Social Campaign created! Selected actions: ${selectedActions.join(', ')}. Points: ${points} each. Assign tasks from the Tasks page to publish.`
-      );
-
       return campaign;
     },
     onSuccess: (campaign) => {
@@ -1198,6 +1196,13 @@ export default function CampaignBuilder() {
       setLikePost(false);
       setRetweet(false);
     },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to create campaign',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    },
   });
 
   // Task assignment mutation for bidirectional workflow
@@ -1216,6 +1221,13 @@ export default function CampaignBuilder() {
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns/pending'] });
     },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to assign tasks',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    },
   });
 
   // Publish campaign mutation for bidirectional workflow
@@ -1230,6 +1242,13 @@ export default function CampaignBuilder() {
       setSelectedTaskIds([]);
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns/pending'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to publish campaign',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive',
+      });
     },
   });
 

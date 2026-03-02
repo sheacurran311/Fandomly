@@ -1,22 +1,22 @@
-import { useState, useEffect } from "react";
-import { useCreatorActivity } from "@/hooks/use-creator-dashboard";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { useCreatorActivity } from '@/hooks/use-creator-dashboard';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Search, Filter, Download } from "lucide-react";
+} from '@/components/ui/select';
+import { Search, Download } from 'lucide-react';
 
 export default function ActivityPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [filterDate, setFilterDate] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<string>('all');
 
   // Debounced search term to avoid too many API calls
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -36,14 +36,13 @@ export default function ActivityPage() {
   const { data: activities = [], isLoading } = useCreatorActivity({
     search: debouncedSearch,
     type: filterType,
-    dateFilter: filterDate
+    dateFilter: filterDate,
   });
 
   const displayActivities = activities;
 
   const handleExport = () => {
     // Implement CSV export logic
-    console.log("Exporting activity data...");
   };
 
   return (
@@ -122,15 +121,16 @@ export default function ActivityPage() {
         {/* Activity List */}
         <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
           <CardHeader>
-            <CardTitle className="text-white">
-              All Activity ({displayActivities.length})
-            </CardTitle>
+            <CardTitle className="text-white">All Activity ({displayActivities.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 10 }).map((_, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 animate-pulse">
+                  <div
+                    key={index}
+                    className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 animate-pulse"
+                  >
                     <div className="w-2 h-2 rounded-full mt-2 bg-gray-600" />
                     <div className="flex-1 space-y-2">
                       <div className="h-4 bg-gray-600 rounded w-3/4"></div>
@@ -141,18 +141,25 @@ export default function ActivityPage() {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {displayActivities.map((activity: any, index: number) => (
-                  <div 
-                    key={activity.id || index} 
+                  <div
+                    key={activity.id || index}
                     className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                   >
-                    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                      activity.type === 'join' ? 'bg-green-400' : 
-                      activity.type === 'redeem' ? 'bg-yellow-400' : 
-                      activity.type === 'task' ? 'bg-purple-400' :
-                      activity.type === 'campaign' ? 'bg-orange-400' :
-                      'bg-blue-400'
-                    }`} />
+                    <div
+                      className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                        activity.type === 'join'
+                          ? 'bg-green-400'
+                          : activity.type === 'redeem'
+                            ? 'bg-yellow-400'
+                            : activity.type === 'task'
+                              ? 'bg-purple-400'
+                              : activity.type === 'campaign'
+                                ? 'bg-orange-400'
+                                : 'bg-blue-400'
+                      }`}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white">
                         <span className="font-medium">{activity.fan || 'A fan'}</span>{' '}
@@ -162,12 +169,10 @@ export default function ActivityPage() {
                         {activity.timestamp || 'Unknown time'}
                       </p>
                     </div>
-                    <div className="text-xs text-gray-500 capitalize">
-                      {activity.type}
-                    </div>
+                    <div className="text-xs text-gray-500 capitalize">{activity.type}</div>
                   </div>
                 ))}
-                
+
                 {displayActivities.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-400">No activities found matching your filters.</p>
@@ -181,4 +186,3 @@ export default function ActivityPage() {
     </DashboardLayout>
   );
 }
-
