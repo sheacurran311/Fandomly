@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 import { db } from '../../db';
-import { creators } from '@shared/schema';
+import { creators, loyaltyPrograms, tasks } from '@shared/schema';
 import {
   authenticateUser,
   requireFandomlyAdmin,
@@ -11,12 +11,34 @@ import {
   calculateCreatorVerification,
   getMissingFieldsDisplay,
 } from '@shared/creatorVerificationSchema';
+import type { PlatformActivityContext } from '@shared/creatorVerificationSchema';
 import {
   mintVerifiedCreatorBadge,
   handleCreatorDeVerification,
 } from '../../services/nft/creator-verification-badge-service';
 
 const router = Router();
+
+/**
+ * Query platform activity counts for a creator (programs + tasks).
+ */
+async function getPlatformActivity(creatorId: string): Promise<PlatformActivityContext> {
+  const [programResult, taskResult] = await Promise.all([
+    db
+      .select({ total: count() })
+      .from(loyaltyPrograms)
+      .where(and(eq(loyaltyPrograms.creatorId, creatorId), eq(loyaltyPrograms.isActive, true))),
+    db
+      .select({ total: count() })
+      .from(tasks)
+      .where(and(eq(tasks.creatorId, creatorId), eq(tasks.ownershipLevel, 'creator'))),
+  ]);
+
+  return {
+    activeProgramCount: Number(programResult[0]?.total) || 0,
+    publishedTaskCount: Number(taskResult[0]?.total) || 0,
+  };
+}
 
 /**
  * GET /api/creator-verification/status
@@ -40,7 +62,8 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
 
     // Calculate current verification status
     const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
-    const verificationData = calculateCreatorVerification(creator, creatorType);
+    const platformActivity = await getPlatformActivity(creator.id);
+    const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
     res.json({
       creator: {
@@ -50,6 +73,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
         isVerified: creator.isVerified,
       },
       verificationData,
+      platformActivity,
       missingFieldsDisplay: verificationData.missingFields
         ? getMissingFieldsDisplay(verificationData.missingFields)
         : [],
@@ -82,7 +106,8 @@ router.post('/check', authenticateUser, async (req: AuthenticatedRequest, res) =
 
     // Calculate verification status
     const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
-    const verificationData = calculateCreatorVerification(creator, creatorType);
+    const platformActivity = await getPlatformActivity(creator.id);
+    const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
     // Update verification data in database
     const updateData: Record<string, unknown> = {
@@ -152,7 +177,8 @@ router.post(
 
       // Calculate current verification data
       const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
-      const verificationData = calculateCreatorVerification(creator, creatorType);
+      const platformActivity = await getPlatformActivity(creator.id);
+      const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
       // Update with manual verification
       await db
@@ -207,7 +233,8 @@ router.post(
 
       // Recalculate verification data and remove verification
       const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
-      const verificationData = calculateCreatorVerification(creator, creatorType);
+      const platformActivity = await getPlatformActivity(creator.id);
+      const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
       await db
         .update(creators)
