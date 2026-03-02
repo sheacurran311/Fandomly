@@ -90,6 +90,8 @@ import AdminTasks from '@/pages/admin-dashboard/tasks';
 import AdminPlatformTaskCreate from '@/pages/admin-dashboard/platform-tasks/create';
 import AdminProfile from '@/pages/admin-dashboard/profile';
 import AdminAnalytics from '@/pages/admin-dashboard/analytics';
+import AdminReputation from '@/pages/admin-dashboard/reputation';
+import AdminReviewQueue from '@/pages/admin-dashboard/review-queue';
 import AgencyDashboard from '@/pages/agency-dashboard';
 
 function RedirectTo({ href }: { href: string }) {
@@ -201,6 +203,8 @@ function Router() {
       />
       <Route path="/admin-dashboard/profile" component={AdminProfile} />
       <Route path="/admin-dashboard/analytics" component={AdminAnalytics} />
+      <Route path="/admin-dashboard/reputation" component={AdminReputation} />
+      <Route path="/admin-dashboard/review-queue" component={AdminReviewQueue} />
 
       {/* Agency Dashboard */}
       <Route path="/agency-dashboard" component={AgencyDashboard} />

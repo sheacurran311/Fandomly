@@ -1,24 +1,19 @@
-import { Link, useLocation } from "wouter";
-import { cn } from "@/lib/utils";
+import { Link, useLocation } from 'wouter';
+import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Users,
   Store,
   Target,
-  DollarSign,
-  TrendingUp,
-  Share2,
   Settings,
-  Database,
   BarChart3,
-  FileText,
   Shield,
-  Zap,
-  Image,
   Building2,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+  Award,
+  ClipboardCheck,
+  User,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface AdminSidebarProps {
   className?: string;
@@ -26,124 +21,83 @@ interface AdminSidebarProps {
 
 const navigationSections = [
   {
-    title: "Overview",
+    title: 'Overview',
     items: [
       {
-        title: "Dashboard",
-        href: "/admin-dashboard/overview",
+        title: 'Dashboard',
+        href: '/admin-dashboard/overview',
         icon: LayoutDashboard,
-        description: "Platform overview and KPIs",
+        description: 'Platform overview and KPIs',
       },
       {
-        title: "Analytics",
-        href: "/admin-dashboard/analytics",
+        title: 'Analytics',
+        href: '/admin-dashboard/analytics',
         icon: BarChart3,
-        description: "Deep dive analytics",
+        description: 'Deep dive analytics',
+      },
+      {
+        title: 'Reputation',
+        href: '/admin-dashboard/reputation',
+        icon: Award,
+        description: 'Reputation scores and sync',
       },
     ],
   },
   {
-    title: "Users & Accounts",
+    title: 'Users & Accounts',
     items: [
       {
-        title: "All Users",
-        href: "/admin-dashboard/users",
+        title: 'All Users',
+        href: '/admin-dashboard/users',
         icon: Users,
-        description: "Fans, creators, and admins",
+        description: 'Fans, creators, and admins',
       },
       {
-        title: "Creators",
-        href: "/admin-dashboard/creators",
+        title: 'Creators',
+        href: '/admin-dashboard/creators',
         icon: Store,
-        description: "Creator accounts and tenants",
+        description: 'Creator accounts and tenants',
       },
       {
-        title: "Agencies",
-        href: "/admin-dashboard/agencies",
+        title: 'Agencies',
+        href: '/admin-dashboard/agencies',
         icon: Building2,
-        description: "Multi-brand agency accounts",
-      },
-      {
-        title: "Fans",
-        href: "/admin-dashboard/fans",
-        icon: Users,
-        description: "Fan accounts and activity",
+        description: 'Multi-brand agency accounts',
       },
     ],
   },
   {
-    title: "Platform Management",
+    title: 'Platform Management',
     items: [
       {
-        title: "Platform Tasks",
-        href: "/admin-dashboard/platform-tasks",
+        title: 'Platform Tasks',
+        href: '/admin-dashboard/platform-tasks',
         icon: Target,
-        description: "Global tasks and rewards",
-        badge: "Admin Only",
+        description: 'Global tasks and rewards',
+        badge: 'Admin Only',
       },
       {
-        title: "NFT Management",
-        href: "/admin-dashboard/nft-management",
-        icon: Image,
-        description: "Badges and platform NFTs",
-      },
-      {
-        title: "Referrals",
-        href: "/admin-dashboard/referrals",
-        icon: Share2,
-        description: "Referral tracking and payouts",
-      },
-      {
-        title: "Revenue",
-        href: "/admin-dashboard/revenue",
-        icon: DollarSign,
-        description: "Platform revenue and payouts",
+        title: 'Review Queue',
+        href: '/admin-dashboard/review-queue',
+        icon: ClipboardCheck,
+        description: 'Manual review moderation',
       },
     ],
   },
   {
-    title: "Data & Reports",
+    title: 'System',
     items: [
       {
-        title: "Reports",
-        href: "/admin-dashboard/reports",
-        icon: FileText,
-        description: "Generate custom reports",
+        title: 'Profile',
+        href: '/admin-dashboard/profile',
+        icon: User,
+        description: 'Your admin profile',
       },
       {
-        title: "Database",
-        href: "/admin-dashboard/database",
-        icon: Database,
-        description: "Direct database access",
-      },
-      {
-        title: "Trends",
-        href: "/admin-dashboard/trends",
-        icon: TrendingUp,
-        description: "Growth and engagement trends",
-      },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      {
-        title: "Settings",
-        href: "/admin-dashboard/settings",
+        title: 'Settings',
+        href: '/admin-dashboard/settings',
         icon: Settings,
-        description: "Platform configuration",
-      },
-      {
-        title: "Permissions",
-        href: "/admin-dashboard/permissions",
-        icon: Shield,
-        description: "Role and access management",
-      },
-      {
-        title: "System Health",
-        href: "/admin-dashboard/system",
-        icon: Zap,
-        description: "Performance and monitoring",
+        description: 'Platform configuration',
       },
     ],
   },
@@ -153,7 +107,12 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   const [location] = useLocation();
 
   return (
-    <div className={cn("flex flex-col h-full bg-brand-dark-purple/30 border-r border-white/10", className)}>
+    <div
+      className={cn(
+        'flex flex-col h-full bg-brand-dark-purple/30 border-r border-white/10',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -178,27 +137,32 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
               {section.items.map((item) => {
                 const isActive = location === item.href;
                 const Icon = item.icon;
-                
+
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group",
+                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group',
                       isActive
-                        ? "bg-brand-primary text-white"
-                        : "text-gray-300 hover:bg-white/5 hover:text-white"
+                        ? 'bg-brand-primary text-white'
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     )}
                   >
-                    <Icon className={cn(
-                      "h-4 w-4 flex-shrink-0",
-                      isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-                    )} />
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 flex-shrink-0',
+                        isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                      )}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{item.title}</span>
                         {item.badge && (
-                          <Badge variant="outline" className="text-xs border-brand-primary/50 text-brand-primary">
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-brand-primary/50 text-brand-primary"
+                          >
                             {item.badge}
                           </Badge>
                         )}
@@ -224,9 +188,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
             <Shield className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-semibold text-yellow-400">Admin Access</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                You have full platform control
-              </p>
+              <p className="text-xs text-gray-400 mt-0.5">You have full platform control</p>
             </div>
           </div>
         </div>
@@ -234,4 +196,3 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
     </div>
   );
 }
-

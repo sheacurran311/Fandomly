@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AdminLayout } from '@/components/admin/AdminLayout';
+import { AdminStatCard } from '@/components/admin/AdminStatCard';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -12,10 +13,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Search, Building2, Users, TrendingUp, Eye } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+} from '@/components/ui/table';
+import { Search, Building2, Users, TrendingUp, Eye } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Link } from 'wouter';
 
 interface Agency {
   id: string;
@@ -30,16 +31,16 @@ interface Agency {
 }
 
 export default function AdminAgencies() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: agencies, isLoading } = useQuery<Agency[]>({
     queryKey: ['/api/admin/agencies', { search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      
+
       const response = await fetch(`/api/admin/agencies?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to fetch agencies');
       return response.json();
@@ -51,7 +52,11 @@ export default function AdminAgencies() {
       case 'strict':
         return <Badge className="bg-red-500/20 text-red-400 border-red-500/50">Strict</Badge>;
       case 'aggregated':
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">Aggregated</Badge>;
+        return (
+          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+            Aggregated
+          </Badge>
+        );
       case 'shared':
         return <Badge className="bg-green-500/20 text-green-400 border-green-500/50">Shared</Badge>;
       default:
@@ -63,53 +68,37 @@ export default function AdminAgencies() {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
   const totalBrands = agencies?.reduce((sum, agency) => sum + (agency.brandCount || 0), 0) || 0;
 
   return (
-    <AdminLayout
-      title="Agency Management"
-      description="Manage agencies and multi-brand accounts"
-    >
+    <AdminLayout title="Agency Management" description="Manage agencies and multi-brand accounts">
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Total Agencies</CardTitle>
-            <Building2 className="h-4 w-4 text-purple-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{agencies?.length || 0}</div>
-            <p className="text-xs text-gray-400 mt-1">Active agency accounts</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Managed Brands</CardTitle>
-            <Users className="h-4 w-4 text-blue-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{totalBrands}</div>
-            <p className="text-xs text-gray-400 mt-1">Brands under management</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">Avg Brands/Agency</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {agencies?.length ? (totalBrands / agencies.length).toFixed(1) : '0'}
-            </div>
-            <p className="text-xs text-gray-400 mt-1">Average portfolio size</p>
-          </CardContent>
-        </Card>
+        <AdminStatCard
+          title="Total Agencies"
+          value={agencies?.length || 0}
+          description="Active agency accounts"
+          icon={Building2}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="Managed Brands"
+          value={totalBrands}
+          description="Brands under management"
+          icon={Users}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="Avg Brands/Agency"
+          value={agencies?.length ? (totalBrands / agencies.length).toFixed(1) : '0'}
+          description="Average portfolio size"
+          icon={TrendingUp}
+          loading={isLoading}
+        />
       </div>
 
       {/* Agencies Table */}
@@ -146,13 +135,27 @@ export default function AdminAgencies() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-white/10">
-                      <TableCell><Skeleton className="h-8 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-48" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-12" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-16 ml-auto" />
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : agencies && agencies.length > 0 ? (
@@ -162,9 +165,9 @@ export default function AdminAgencies() {
                         <div>
                           <div className="font-medium text-white">{agency.name}</div>
                           {agency.website && (
-                            <a 
-                              href={agency.website} 
-                              target="_blank" 
+                            <a
+                              href={agency.website}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="text-sm text-blue-400 hover:underline"
                             >
@@ -175,7 +178,9 @@ export default function AdminAgencies() {
                       </TableCell>
                       <TableCell>
                         <div className="text-gray-300">{agency.ownerUsername || 'Unknown'}</div>
-                        <div className="text-xs text-gray-500">{agency.ownerUserId.slice(0, 8)}...</div>
+                        <div className="text-xs text-gray-500">
+                          {agency.ownerUserId.slice(0, 8)}...
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="border-blue-500/50 text-blue-400">
@@ -185,9 +190,13 @@ export default function AdminAgencies() {
                       <TableCell>{getIsolationBadge(agency.dataIsolationLevel)}</TableCell>
                       <TableCell>
                         {agency.allowCrossBrandAnalytics ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/50">Enabled</Badge>
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+                            Enabled
+                          </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-gray-500/50 text-gray-400">Disabled</Badge>
+                          <Badge variant="outline" className="border-gray-500/50 text-gray-400">
+                            Disabled
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-gray-400 text-sm">
@@ -195,7 +204,11 @@ export default function AdminAgencies() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Link href={`/admin-dashboard/agencies/${agency.id}`}>
-                          <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-300 hover:text-white"
+                          >
                             <Eye className="h-4 w-4 mr-1" />
                             View
                           </Button>
@@ -218,4 +231,3 @@ export default function AdminAgencies() {
     </AdminLayout>
   );
 }
-

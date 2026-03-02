@@ -5,49 +5,57 @@ import { createServer, type Server } from 'http';
 import { storage } from '../core/storage';
 import { db } from '../db';
 /* eslint-disable */
-import { registerSocialRoutes } from "./social/social-routes";
-import { registerKickOAuthRoutes } from "./social/kick-oauth-routes";
-import { registerPatreonOAuthRoutes } from "./social/patreon-oauth-routes";
-import { registerTenantRoutes } from "./user/tenant-routes";
-import { registerGoogleAuthRoutes } from "./auth/google-routes";
-import { registerAuthRoutes } from "./auth/auth-routes";
-import { registerAdminRoutes } from "./admin/admin-routes";
-import { registerDynamicAnalyticsRoutes } from "./media/dynamic-analytics-routes";
-import { registerTwitterVerificationRoutes } from "./social/twitter-verification-routes";
-import { registerReferralRoutes } from "./points/referral-routes";
-import { registerPointsRoutes } from "./points/points-routes";
-import { registerAdminPlatformTasksRoutes } from "./tasks/admin-platform-tasks-routes";
-import { registerPlatformPointsRoutes } from "./points/platform-points-routes";
-import { registerPlatformTaskRoutes } from "./tasks/platform-task-routes";
-import { registerFanDashboardRoutes } from "./user/fan-dashboard-routes";
-import { registerDashboardStatsRoutes } from "./user/dashboard-stats-routes";
-import { registerNotificationRoutes } from "./user/notification-routes";
-import { registerRedemptionRoutes } from "./rewards/redemption-routes";
-import { registerGdprRoutes } from "./user/gdpr-routes";
-import { registerProgramRoutes } from "./programs/program-routes";
-import { registerAnnouncementRoutes } from "./media/announcement-routes";
-import { registerAgencyRoutes } from "./admin/agency-routes";
-import { registerFacebookWebhooks } from "../webhooks/facebook-webhooks";
-import { registerInstagramWebhooks } from "../webhooks/instagram-webhooks";
-import { registerInstagramTaskRoutes } from "./tasks/instagram-task-routes";
-import { registerTwitterTaskRoutes } from "./tasks/twitter-task-routes";
-import { registerYouTubeTaskRoutes } from "./tasks/youtube-task-routes";
-import { registerSpotifyTaskRoutes } from "./tasks/spotify-task-routes";
-import { registerTikTokTaskRoutes } from "./tasks/tiktok-task-routes";
-import { registerLeaderboardRoutes } from "./programs/leaderboard-routes";
-import { registerBetaSignupRoutes } from "./beta-signup-routes";
-import { registerVerificationAnalyticsRoutes } from "./analytics/verification-analytics-routes";
-import { registerSyncPreferencesRoutes } from "./analytics/sync-preferences-routes";
-import { registerCreatorAnalyticsRoutes } from "./analytics/creator-analytics-routes";
-import { registerHealthRoutes } from "./health/health-routes";
-import { registerParticleAuthRoutes } from "./auth/particle-routes";
-import { registerCampaignV2Routes } from "./campaigns/campaign-routes-v2";
+import { registerSocialRoutes } from './social/social-routes';
+import { registerKickOAuthRoutes } from './social/kick-oauth-routes';
+import { registerPatreonOAuthRoutes } from './social/patreon-oauth-routes';
+import { registerTenantRoutes } from './user/tenant-routes';
+import { registerGoogleAuthRoutes } from './auth/google-routes';
+import { registerAuthRoutes } from './auth/auth-routes';
+import { registerAdminRoutes } from './admin/admin-routes';
+import { registerAdminAnalyticsRoutes } from './admin/admin-analytics-routes';
+import { registerDynamicAnalyticsRoutes } from './media/dynamic-analytics-routes';
+import { registerTwitterVerificationRoutes } from './social/twitter-verification-routes';
+import { registerReferralRoutes } from './points/referral-routes';
+import { registerPointsRoutes } from './points/points-routes';
+import { registerAdminPlatformTasksRoutes } from './tasks/admin-platform-tasks-routes';
+import { registerPlatformPointsRoutes } from './points/platform-points-routes';
+import { registerPlatformTaskRoutes } from './tasks/platform-task-routes';
+import { registerFanDashboardRoutes } from './user/fan-dashboard-routes';
+import { registerDashboardStatsRoutes } from './user/dashboard-stats-routes';
+import { registerNotificationRoutes } from './user/notification-routes';
+import { registerRedemptionRoutes } from './rewards/redemption-routes';
+import { registerGdprRoutes } from './user/gdpr-routes';
+import { registerProgramRoutes } from './programs/program-routes';
+import { registerAnnouncementRoutes } from './media/announcement-routes';
+import { registerAgencyRoutes } from './admin/agency-routes';
+import { registerFacebookWebhooks } from '../webhooks/facebook-webhooks';
+import { registerInstagramWebhooks } from '../webhooks/instagram-webhooks';
+import { registerInstagramTaskRoutes } from './tasks/instagram-task-routes';
+import { registerTwitterTaskRoutes } from './tasks/twitter-task-routes';
+import { registerYouTubeTaskRoutes } from './tasks/youtube-task-routes';
+import { registerSpotifyTaskRoutes } from './tasks/spotify-task-routes';
+import { registerTikTokTaskRoutes } from './tasks/tiktok-task-routes';
+import { registerLeaderboardRoutes } from './programs/leaderboard-routes';
+import { registerBetaSignupRoutes } from './beta-signup-routes';
+import { registerVerificationAnalyticsRoutes } from './analytics/verification-analytics-routes';
+import { registerSyncPreferencesRoutes } from './analytics/sync-preferences-routes';
+import { registerCreatorAnalyticsRoutes } from './analytics/creator-analytics-routes';
+import { registerHealthRoutes } from './health/health-routes';
+import { registerParticleAuthRoutes } from './auth/particle-routes';
+import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
+import { registerReputationRoutes } from './reputation/reputation-routes';
 import {
-  insertUserSchema, insertCreatorSchema, insertLoyaltyProgramSchema,
-  insertRewardSchema, insertFanProgramSchema,
-  insertCampaignSchema, insertCampaignRuleSchema,
-  insertTaskSchema, insertTaskAssignmentSchema, insertTaskTemplateSchema
-} from "@shared/schema";
+  insertUserSchema,
+  insertCreatorSchema,
+  insertLoyaltyProgramSchema,
+  insertRewardSchema,
+  insertFanProgramSchema,
+  insertCampaignSchema,
+  insertCampaignRuleSchema,
+  insertTaskSchema,
+  insertTaskAssignmentSchema,
+  insertTaskTemplateSchema,
+} from '@shared/schema';
 import {
   CORE_TASK_TEMPLATES,
   PLATFORM_TASK_TYPES,
@@ -867,11 +875,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-            return res
-              .status(400)
-              .json({
-                error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
-              });
+            return res.status(400).json({
+              error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
+            });
           }
 
           // Check if username is already taken
@@ -1240,12 +1246,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching user profile:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch user',
-          details: error instanceof Error ? error.message : 'Unknown error',
-        });
+      res.status(500).json({
+        error: 'Failed to fetch user',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   });
 
@@ -2632,7 +2636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prerequisiteCampaigns: campaignData.requirements?.prerequisiteCampaigns || [],
         allTasksRequired: campaignData.requirements?.allTasksRequired ?? true,
         requiredTaskIds: campaignData.requirements?.requiredTaskIds || [],
-        requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || []
+        requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || [],
       };
 
       // Validate JSONB references before creation
@@ -2669,11 +2673,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Enhanced campaign creation failed:', error);
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : 'Failed to create enhanced campaign',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : 'Failed to create enhanced campaign',
+      });
     }
   });
 
@@ -2837,54 +2839,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function getActionPoints(actionType: string): number {
     // Normalize legacy campaign action types to canonical format
     const legacyMap: Record<string, string> = {
-      'follow_facebook': 'facebook_like_page',
-      'follow_instagram': 'instagram_follow',
-      'follow_x': 'twitter_follow',
-      'like_post': 'facebook_like_post',
-      'share_post': 'facebook_share_post',
-      'comment_post': 'facebook_comment_post',
-      'retweet': 'twitter_retweet',
+      follow_facebook: 'facebook_like_page',
+      follow_instagram: 'instagram_follow',
+      follow_x: 'twitter_follow',
+      like_post: 'facebook_like_post',
+      share_post: 'facebook_share_post',
+      comment_post: 'facebook_comment_post',
+      retweet: 'twitter_retweet',
     };
     const canonical = legacyMap[actionType] || actionType;
 
     // Canonical task template names (platform_action format)
     const pointMap: Record<string, number> = {
-      'twitter_follow': 50,
-      'twitter_like': 25,
-      'twitter_retweet': 100,
-      'twitter_mention': 75,
-      'twitter_quote_tweet': 85,
-      'twitter_hashtag_post': 85,
-      'twitter_include_name': 25,
-      'twitter_include_bio': 25,
-      'instagram_follow': 50,
-      'instagram_like_post': 25,
-      'facebook_like_page': 50,
-      'facebook_like_post': 50,
-      'facebook_like_photo': 25,
-      'facebook_share_post': 200,
-      'facebook_share_page': 75,
-      'facebook_comment_post': 100,
-      'facebook_comment_photo': 100,
-      'youtube_subscribe': 100,
-      'youtube_like': 25,
-      'youtube_comment': 40,
-      'tiktok_follow': 50,
-      'tiktok_like': 25,
-      'tiktok_comment': 40,
-      'spotify_follow': 50,
-      'spotify_playlist': 40,
-      'spotify_album': 30,
-      'discord_join': 75,
-      'discord_role': 50,
-      'discord_react': 25,
-      'twitch_follow': 50,
-      'twitch_subscribe': 200,
-      'kick_follow': 50,
-      'kick_subscribe': 200,
-      'patreon_support': 200,
-      'patreon_tier_check': 150,
-      'default': 50
+      twitter_follow: 50,
+      twitter_like: 25,
+      twitter_retweet: 100,
+      twitter_mention: 75,
+      twitter_quote_tweet: 85,
+      twitter_hashtag_post: 85,
+      twitter_include_name: 25,
+      twitter_include_bio: 25,
+      instagram_follow: 50,
+      instagram_like_post: 25,
+      facebook_like_page: 50,
+      facebook_like_post: 50,
+      facebook_like_photo: 25,
+      facebook_share_post: 200,
+      facebook_share_page: 75,
+      facebook_comment_post: 100,
+      facebook_comment_photo: 100,
+      youtube_subscribe: 100,
+      youtube_like: 25,
+      youtube_comment: 40,
+      tiktok_follow: 50,
+      tiktok_like: 25,
+      tiktok_comment: 40,
+      spotify_follow: 50,
+      spotify_playlist: 40,
+      spotify_album: 30,
+      discord_join: 75,
+      discord_role: 50,
+      discord_react: 25,
+      twitch_follow: 50,
+      twitch_subscribe: 200,
+      kick_follow: 50,
+      kick_subscribe: 200,
+      patreon_support: 200,
+      patreon_tier_check: 150,
+      default: 50,
     };
     return pointMap[canonical] || pointMap['default'];
   }
@@ -3091,11 +3093,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-          return res
-            .status(400)
-            .json({
-              error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
-            });
+          return res.status(400).json({
+            error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
+          });
         }
 
         // Check if username is already taken by another user
@@ -3196,11 +3196,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error importing Facebook profile:', error);
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : 'Failed to import Facebook profile',
-        });
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Failed to import Facebook profile',
+      });
     }
   });
 
@@ -4286,6 +4284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register admin routes
   registerAdminRoutes(app);
+  registerAdminAnalyticsRoutes(app);
 
   // Register Dynamic Analytics routes
   registerDynamicAnalyticsRoutes(app);
@@ -4429,6 +4428,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Campaign V2 routes (sponsors, gating, sequential tasks, deferred verification)
   registerCampaignV2Routes(app);
+
+  // Register Reputation Oracle routes (score query, admin sync, stats)
+  registerReputationRoutes(app);
 
   // ============================================================================
   // CAMPAIGN BUILDER: Draft & Task Assignment Endpoints (legacy)

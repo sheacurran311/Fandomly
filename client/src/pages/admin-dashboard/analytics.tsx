@@ -1,697 +1,648 @@
-import { AdminLayout } from "@/components/admin/AdminLayout";
-import { VerificationAnalyticsDashboard } from "@/components/analytics/VerificationAnalyticsDashboard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Users, Wallet, Activity, ExternalLink, AlertCircle, CheckCircle2, BarChart3, Globe, Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth } from "@/hooks/use-auth";
-import { 
-  useDynamicWalletAnalytics,
-  useDynamicVisitAnalytics,
-  useDynamicOverviewAnalytics,
-  useDynamicEngagementAnalytics,
-  useDynamicToplineAnalytics,
-  useDynamicWalletBreakdown,
-  useDynamicUsers,
-} from "@/hooks/useDynamicAnalytics";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AdminLayout } from '@/components/admin/AdminLayout';
+import { AdminStatCard } from '@/components/admin/AdminStatCard';
+import { VerificationAnalyticsDashboard } from '@/components/analytics/VerificationAnalyticsDashboard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Users, Activity, Share2, Award } from 'lucide-react';
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  PieChart,
+  Pie,
   Cell,
   Legend,
 } from 'recharts';
 
-// Helper to safely extract data from API response
-function safeGet(obj: any, path: string, defaultValue: any = '--') {
-  try {
-    const keys = path.split('.');
-    let result = obj;
-    for (const key of keys) {
-      if (result && typeof result === 'object' && key in result) {
-        result = result[key];
-      } else {
-        return defaultValue;
-      }
-    }
-    return result ?? defaultValue;
-  } catch {
-    return defaultValue;
-  }
+const PERIOD_OPTIONS = [
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+  { label: '90d', value: '90d' },
+] as const;
+
+const CHART_COLORS = [
+  '#8b5cf6',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#3b82f6',
+  '#ec4899',
+  '#14b8a6',
+  '#f97316',
+];
+
+const tooltipStyle = {
+  backgroundColor: '#1a1a2e',
+  border: '1px solid #333',
+  borderRadius: 8,
+};
+
+function PeriodToggle({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-1">
+      {PERIOD_OPTIONS.map((opt) => (
+        <Button
+          key={opt.value}
+          variant={value === opt.value ? 'default' : 'ghost'}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </Button>
+      ))}
+    </div>
+  );
 }
 
-// Helper to format numbers
-function formatNumber(value: any): string {
-  if (typeof value === 'number') {
-    return value.toLocaleString();
-  }
-  if (typeof value === 'string' && !isNaN(Number(value))) {
-    return Number(value).toLocaleString();
-  }
-  return '--';
-}
+// ============================================================================
+// USER ANALYTICS TAB
+// ============================================================================
 
-export default function AdminAnalytics() {
-  const { user, isLoading: isUserLoading } = useAuth();
-  
-  // Only fetch analytics when user is loaded and is admin
-  const shouldFetchAnalytics = !isUserLoading && user?.role === 'fandomly_admin';
-  
-  // Fetch Dynamic Analytics data
-  const walletAnalytics = useDynamicWalletAnalytics(shouldFetchAnalytics);
-  const visitAnalytics = useDynamicVisitAnalytics(shouldFetchAnalytics);
-  const overviewAnalytics = useDynamicOverviewAnalytics(shouldFetchAnalytics);
-  const engagementAnalytics = useDynamicEngagementAnalytics(shouldFetchAnalytics);
-  const toplineAnalytics = useDynamicToplineAnalytics(shouldFetchAnalytics);
-  const walletBreakdown = useDynamicWalletBreakdown(shouldFetchAnalytics);
-  const dynamicUsers = useDynamicUsers(shouldFetchAnalytics);
+function UserAnalyticsTab() {
+  const [period, setPeriod] = useState('30d');
 
-  // Check if Dynamic is configured
-  const isDynamicConfigured = walletAnalytics.data?.configured ?? false;
-  const isLoading = isUserLoading || walletAnalytics.isLoading || visitAnalytics.isLoading;
-
-  // Extract API response data
-  const walletData = walletAnalytics.data?.data;
-  const visitData = visitAnalytics.data?.data;
-  const overviewData = overviewAnalytics.data?.data;
-  const engagementData = engagementAnalytics.data?.data;
-  const toplineData = toplineAnalytics.data?.data;
-  const breakdownData = walletBreakdown.data?.data;
-  const usersData = dynamicUsers.data?.data;
-
-  console.log('📊 Dynamic Analytics Data:', {
-    wallet: walletData,
-    visit: visitData,
-    overview: overviewData,
-    engagement: engagementData,
-    topline: toplineData,
-    breakdown: breakdownData,
-    users: usersData,
+  const { data, isLoading } = useQuery<{
+    growth: Array<{ date: string; signups: number; fans: number; creators: number }>;
+    providers: Array<{ provider: string; count: number }>;
+    totals: { dau: number; wau: number; mau: number; total: number };
+  }>({
+    queryKey: ['/api/admin/analytics/users', period],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/analytics/users?period=${period}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
   });
 
   return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <AdminStatCard
+          title="DAU"
+          value={data?.totals.dau.toLocaleString() ?? '0'}
+          description="Daily active users"
+          icon={Users}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="WAU"
+          value={data?.totals.wau.toLocaleString() ?? '0'}
+          description="Weekly active users"
+          icon={Users}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="MAU"
+          value={data?.totals.mau.toLocaleString() ?? '0'}
+          description="Monthly active users"
+          icon={Users}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="Total Users"
+          value={data?.totals.total.toLocaleString() ?? '0'}
+          description="All registered users"
+          icon={Users}
+          loading={isLoading}
+        />
+      </div>
+
+      <Card className="bg-white/5 border-white/10">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-white text-base">Signups Over Time</CardTitle>
+          <PeriodToggle value={period} onChange={setPeriod} />
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[250px] w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={data?.growth ?? []}>
+                <defs>
+                  <linearGradient id="colorSignups" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis
+                  dataKey="date"
+                  stroke="#666"
+                  tick={{ fill: '#999', fontSize: 11 }}
+                  tickFormatter={(d) =>
+                    new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  }
+                />
+                <YAxis stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: '#999' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="signups"
+                  stroke="#8b5cf6"
+                  fill="url(#colorSignups)"
+                  name="Total Signups"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="fans"
+                  stroke="#3b82f6"
+                  fill="none"
+                  strokeDasharray="4 4"
+                  name="Fans"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="creators"
+                  stroke="#10b981"
+                  fill="none"
+                  strokeDasharray="4 4"
+                  name="Creators"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white/5 border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base">Auth Provider Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[250px] w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={data?.providers ?? []}
+                  dataKey="count"
+                  nameKey="provider"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  label={({ provider, count }) => `${provider} (${count})`}
+                  labelLine={{ stroke: '#666' }}
+                >
+                  {(data?.providers ?? []).map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#fff' }} />
+                <Legend wrapperStyle={{ color: '#999' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// TASK ANALYTICS TAB
+// ============================================================================
+
+function TaskAnalyticsTab() {
+  const [period, setPeriod] = useState('30d');
+
+  const { data, isLoading } = useQuery<{
+    byPlatform: Array<{ platform: string; completions: number }>;
+    byTier: Array<{ tier: string; completions: number; verified: number }>;
+    byType: Array<{ taskType: string; completions: number }>;
+    daily: Array<{ date: string; completions: number }>;
+  }>({
+    queryKey: ['/api/admin/analytics/tasks', period],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/analytics/tasks?period=${period}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-white/5 border-white/10">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-white text-base">Daily Completions</CardTitle>
+          <PeriodToggle value={period} onChange={setPeriod} />
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={data?.daily ?? []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis
+                  dataKey="date"
+                  stroke="#666"
+                  tick={{ fill: '#999', fontSize: 11 }}
+                  tickFormatter={(d) =>
+                    new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  }
+                />
+                <YAxis stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: '#999' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Bar
+                  dataKey="completions"
+                  fill="#8b5cf6"
+                  radius={[4, 4, 0, 0]}
+                  name="Completions"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Completions by Platform</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[200px] w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={data?.byPlatform ?? []} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis type="number" stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="platform"
+                    stroke="#666"
+                    tick={{ fill: '#999', fontSize: 11 }}
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: '#999' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Bar
+                    dataKey="completions"
+                    fill="#10b981"
+                    radius={[0, 4, 4, 0]}
+                    name="Completions"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">By Verification Tier</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[200px] w-full" />
+            ) : (
+              <div className="space-y-3">
+                {(data?.byTier ?? []).map((t) => {
+                  const rate =
+                    t.completions > 0 ? Math.round((t.verified / t.completions) * 100) : 0;
+                  return (
+                    <div key={t.tier} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-300">Tier {t.tier}</span>
+                        <span className="text-gray-400">
+                          {t.completions} completions ({rate}% verified)
+                        </span>
+                      </div>
+                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-500 rounded-full"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!data?.byTier || data.byTier.length === 0) && (
+                  <p className="text-sm text-gray-500 text-center py-4">No tier data available</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="bg-white/5 border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base">Top Task Types</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={data?.byType ?? []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis
+                  dataKey="taskType"
+                  stroke="#666"
+                  tick={{ fill: '#999', fontSize: 10 }}
+                  angle={-30}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: '#999' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Bar
+                  dataKey="completions"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                  name="Completions"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// SOCIAL ANALYTICS TAB
+// ============================================================================
+
+function SocialAnalyticsTab() {
+  const { data, isLoading } = useQuery<{
+    platforms: Array<{ platform: string; connections: number }>;
+    trend: Array<{ date: string; connections: number }>;
+  }>({
+    queryKey: ['/api/admin/analytics/social'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/analytics/social', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+  });
+
+  const totalConnections = data?.platforms.reduce((sum, p) => sum + p.connections, 0) ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <AdminStatCard
+        title="Total Social Connections"
+        value={totalConnections.toLocaleString()}
+        description={`${data?.platforms.length ?? 0} platforms connected`}
+        icon={Share2}
+        loading={isLoading}
+      />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Connections by Platform</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[250px] w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={data?.platforms ?? []} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis type="number" stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="platform"
+                    stroke="#666"
+                    tick={{ fill: '#999', fontSize: 11 }}
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: '#999' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Bar dataKey="connections" name="Connections">
+                    {(data?.platforms ?? []).map((_, i) => (
+                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">New Connections (30d)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[250px] w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={data?.trend ?? []}>
+                  <defs>
+                    <linearGradient id="colorSocial" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#666"
+                    tick={{ fill: '#999', fontSize: 11 }}
+                    tickFormatter={(d) =>
+                      new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }
+                  />
+                  <YAxis stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: '#999' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="connections"
+                    stroke="#3b82f6"
+                    fill="url(#colorSocial)"
+                    name="Connections"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// BLOCKCHAIN ANALYTICS TAB
+// ============================================================================
+
+function BlockchainAnalyticsTab() {
+  const { data, isLoading } = useQuery<{
+    distribution: Array<{ range: string; count: number }>;
+    syncStats: {
+      total: number;
+      synced: number;
+      pending: number;
+      failed: number;
+      avgScore: number;
+      stakingEligible: number;
+      tokenEligible: number;
+    };
+  }>({
+    queryKey: ['/api/admin/analytics/blockchain'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/analytics/blockchain', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+  });
+
+  const s = data?.syncStats;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <AdminStatCard
+          title="Avg Reputation Score"
+          value={s?.avgScore ?? 0}
+          description="Across all users"
+          icon={Award}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="Staking Eligible"
+          value={s?.stakingEligible?.toLocaleString() ?? '0'}
+          description="Score >= 500"
+          icon={Award}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="Token Eligible"
+          value={s?.tokenEligible?.toLocaleString() ?? '0'}
+          description="Score >= 750"
+          icon={Award}
+          loading={isLoading}
+        />
+        <AdminStatCard
+          title="On-Chain Synced"
+          value={s?.synced?.toLocaleString() ?? '0'}
+          description={`${s?.pending ?? 0} pending, ${s?.failed ?? 0} failed`}
+          icon={Activity}
+          loading={isLoading}
+        />
+      </div>
+
+      <Card className="bg-white/5 border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base">Reputation Score Distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[250px] w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data?.distribution ?? []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="range" stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                <YAxis stroke="#666" tick={{ fill: '#999', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: '#999' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Bar dataKey="count" name="Users" radius={[4, 4, 0, 0]}>
+                  {(data?.distribution ?? []).map((entry, i) => {
+                    const start = parseInt(entry.range);
+                    let color = '#6b7280';
+                    if (start >= 750) color = '#f59e0b';
+                    else if (start >= 500) color = '#10b981';
+                    else if (start >= 250) color = '#8b5cf6';
+                    return <Cell key={i} fill={color} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN ANALYTICS PAGE
+// ============================================================================
+
+export default function AdminAnalytics() {
+  return (
     <AdminLayout
       title="Analytics & Insights"
-      description="Platform-wide analytics powered by Dynamic and Google Analytics"
+      description="Platform-wide analytics across users, tasks, social, and blockchain"
     >
-      {/* Configuration Status */}
-      {!isDynamicConfigured && !isLoading && (
-        <Alert className="bg-yellow-500/10 border-yellow-500/20">
-          <AlertCircle className="h-4 w-4 text-yellow-500" />
-          <AlertTitle className="text-yellow-400">Dynamic Analytics Not Configured</AlertTitle>
-          <AlertDescription className="text-gray-300">
-            Add <code className="bg-white/10 px-2 py-1 rounded">DYNAMIC_ENVIRONMENT_ID</code> and{' '}
-            <code className="bg-white/10 px-2 py-1 rounded">DYNAMIC_API_TOKEN</code> to your .env file to enable real-time analytics.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isDynamicConfigured && !isLoading && (
-        <Alert className="bg-green-500/10 border-green-500/20">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <AlertTitle className="text-green-400">Dynamic Analytics Connected</AlertTitle>
-          <AlertDescription className="text-gray-300">
-            Live data from Dynamic is being displayed below.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue="users" className="space-y-6">
         <TabsList className="bg-white/5 border-white/10">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="wallets">Wallets</TabsTrigger>
-          <TabsTrigger value="engagement">Engagement</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="social">Social</TabsTrigger>
+          <TabsTrigger value="blockchain">Blockchain</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
-          <TabsTrigger value="traffic">Traffic</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            {/* Total Users/Visitors */}
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  Total Users
-                </CardTitle>
-                <Users className="h-4 w-4 text-brand-primary" />
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="text-2xl font-bold text-white animate-pulse">...</div>
-                ) : isDynamicConfigured ? (
-                  <>
-                    <div className="text-2xl font-bold text-white">
-                      {formatNumber(
-                        usersData?.users?.length || 
-                        usersData?.count ||
-                        overviewData?.totalUsers ||
-                        toplineData?.totalUsers ||
-                        visitData?.totalVisitors ||
-                        0
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      From Dynamic Analytics
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-2xl font-bold text-white">--</div>
-                    <p className="text-xs text-gray-400 mt-1">Configure Dynamic</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Wallet Connections */}
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  Wallet Connections
-                </CardTitle>
-                <Wallet className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="text-2xl font-bold text-white animate-pulse">...</div>
-                ) : isDynamicConfigured ? (
-                  <>
-                    <div className="text-2xl font-bold text-white">
-                      {formatNumber(
-                        walletData?.reduce((sum: number, w: { walletName: string; count: number }) => sum + w.count, 0) || 0
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {walletData?.map((wallet: { walletName: string; count: number }) => (
-                        <span
-                          key={wallet.walletName}
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            wallet.walletName.includes('phantom') 
-                              ? 'bg-purple-500/20 text-purple-300'
-                              : wallet.walletName.includes('metamask')
-                              ? 'bg-orange-500/20 text-orange-300'
-                              : 'bg-blue-500/20 text-blue-300'
-                          }`}
-                        >
-                          {wallet.walletName} ({wallet.count})
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-2xl font-bold text-white">--</div>
-                    <p className="text-xs text-gray-400 mt-1">Configure Dynamic</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Unique Visits */}
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  Unique Visits
-                </CardTitle>
-                <Eye className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="text-2xl font-bold text-white animate-pulse">...</div>
-                ) : isDynamicConfigured ? (
-                  <>
-                    <div className="text-2xl font-bold text-white">
-                      {formatNumber(visitData?.summedTotalUniqueCount || 0)}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-xs text-gray-400">
-                        {formatNumber(visitData?.summedSessionsCount || 0)} total sessions
-                      </p>
-                      <span className="text-xs text-gray-600">•</span>
-                      <p className="text-xs text-gray-400">
-                        {formatNumber(visitData?.users?.totalUnique || 0)} unique users
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-2xl font-bold text-white">--</div>
-                    <p className="text-xs text-gray-400 mt-1">Configure Dynamic</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Active Sessions/Engagement */}
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  Engagement
-                </CardTitle>
-                <Activity className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="text-2xl font-bold text-white animate-pulse">...</div>
-                ) : isDynamicConfigured ? (
-                  <>
-                    <div className="text-2xl font-bold text-white">
-                      {formatNumber(
-                        engagementData?.activeSessions ||
-                        engagementData?.sessions ||
-                        engagementData?.total ||
-                        0
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Active sessions
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-2xl font-bold text-white">--</div>
-                    <p className="text-xs text-gray-400 mt-1">Configure Dynamic</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Wallet Distribution Chart */}
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white">Wallet Distribution</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Connected wallets by type
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {walletData?.length ? (
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={walletData}
-                      margin={{
-                        top: 10,
-                        right: 10,
-                        left: 0,
-                        bottom: 20,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                      <XAxis
-                        dataKey="walletName"
-                        stroke="#ffffff40"
-                        tick={{ fill: '#ffffff40', fontSize: 12 }}
-                      />
-                      <YAxis
-                        stroke="#ffffff40"
-                        tick={{ fill: '#ffffff40', fontSize: 12 }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#ffffff10',
-                          border: '1px solid #ffffff20',
-                          borderRadius: '8px',
-                          color: '#fff',
-                        }}
-                      />
-                      <Bar dataKey="count" name="Connected Wallets" fill="#3b82f6">
-                        {walletData.map((entry: { walletName: string; count: number }, index: number) => (
-                          <Cell
-                            key={index}
-                            fill={
-                              entry.walletName.includes('phantom') ? '#9333ea' :
-                              entry.walletName.includes('metamask') ? '#f97316' : '#3b82f6'
-                            }
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400">
-                  No wallet data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Visit Analytics Chart */}
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white">Visit Analytics</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Daily sessions and unique visitors
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {visitData?.users?.sessions ? (
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={visitData.users.sessions}
-                      margin={{
-                        top: 10,
-                        right: 10,
-                        left: 0,
-                        bottom: 20,
-                      }}
-                    >
-                      <defs>
-                        <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorUnique" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(date) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        stroke="#ffffff40"
-                        tick={{ fill: '#ffffff40', fontSize: 12 }}
-                      />
-                      <YAxis
-                        stroke="#ffffff40"
-                        tick={{ fill: '#ffffff40', fontSize: 12 }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#ffffff10',
-                          border: '1px solid #ffffff20',
-                          borderRadius: '8px',
-                          color: '#fff',
-                        }}
-                        labelFormatter={(date) => new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-                      />
-                      <Legend
-                        wrapperStyle={{
-                          color: '#ffffff80',
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="count"
-                        name="Total Sessions"
-                        stroke="#3b82f6"
-                        fillOpacity={1}
-                        fill="url(#colorSessions)"
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="uniqueUsers"
-                        name="Unique Users"
-                        stroke="#22c55e"
-                        fillOpacity={1}
-                        fill="url(#colorUnique)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400">
-                  No visit data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Raw Dynamic Data (for debugging) */}
-          {isDynamicConfigured && (
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
-                  <span>Dynamic API Response Data</span>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-white/20"
-                    onClick={() => {
-                      console.log('📊 Complete Dynamic Analytics:', {
-                        wallet: walletData,
-                        visit: visitData,
-                        overview: overviewData,
-                        engagement: engagementData,
-                        topline: toplineData,
-                        breakdown: breakdownData,
-                        users: usersData,
-                      });
-                    }}
-                  >
-                    Log to Console
-                  </Button>
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Raw data from Dynamic Analytics API (for development)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* Overview Data */}
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Globe className="h-4 w-4 text-blue-400" />
-                      <h4 className="font-medium text-white">Overview</h4>
-                    </div>
-                    <pre className="text-xs text-gray-400 overflow-auto max-h-[200px]">
-                      {JSON.stringify(overviewData, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Wallet Data */}
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Wallet className="h-4 w-4 text-green-400" />
-                      <h4 className="font-medium text-white">Wallet Analytics</h4>
-                    </div>
-                    <pre className="text-xs text-gray-400 overflow-auto max-h-[200px]">
-                      {JSON.stringify(walletData, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Visit Data */}
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Eye className="h-4 w-4 text-blue-400" />
-                      <h4 className="font-medium text-white">Visit Analytics</h4>
-                    </div>
-                    <pre className="text-xs text-gray-400 overflow-auto max-h-[200px]">
-                      {JSON.stringify(visitData, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Engagement Data */}
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Activity className="h-4 w-4 text-purple-400" />
-                      <h4 className="font-medium text-white">Engagement</h4>
-                    </div>
-                    <pre className="text-xs text-gray-400 overflow-auto max-h-[200px]">
-                      {JSON.stringify(engagementData, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Topline Data */}
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BarChart3 className="h-4 w-4 text-yellow-400" />
-                      <h4 className="font-medium text-white">Topline Metrics</h4>
-                    </div>
-                    <pre className="text-xs text-gray-400 overflow-auto max-h-[200px]">
-                      {JSON.stringify(toplineData, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Users Data */}
-                  <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="h-4 w-4 text-brand-primary" />
-                      <h4 className="font-medium text-white">Users ({usersData?.users?.length || 0})</h4>
-                    </div>
-                    <pre className="text-xs text-gray-400 overflow-auto max-h-[200px]">
-                      {JSON.stringify(usersData, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="users">
+          <UserAnalyticsTab />
         </TabsContent>
 
-        {/* Wallets Tab */}
-        <TabsContent value="wallets" className="space-y-6">
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white">Wallet Analytics</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Powered by Dynamic Analytics API
-                  </CardDescription>
-                </div>
-                <Button variant="outline" className="border-white/20" size="sm">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Dynamic Docs
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-6 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    🔌 Ready to Integrate
-                  </h3>
-                  <p className="text-gray-400 mb-4">
-                    Connect to Dynamic's powerful analytics endpoints:
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>• <code className="bg-white/10 px-2 py-1 rounded">GET /analytics/wallets</code> - Wallet connection data</li>
-                    <li>• <code className="bg-white/10 px-2 py-1 rounded">GET /analytics/visits</code> - Visit tracking</li>
-                    <li>• <code className="bg-white/10 px-2 py-1 rounded">GET /analytics/overview</code> - Overview metrics</li>
-                    <li>• <code className="bg-white/10 px-2 py-1 rounded">GET /analytics/engagement</code> - Engagement data</li>
-                  </ul>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Card className="bg-white/5 border-white/10">
-                    <CardHeader>
-                      <CardTitle className="text-sm text-gray-400">
-                        Wallet Types
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-white">--</div>
-                      <p className="text-xs text-gray-400 mt-1">Breakdown coming</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-white/5 border-white/10">
-                    <CardHeader>
-                      <CardTitle className="text-sm text-gray-400">
-                        Chain Distribution
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-white">--</div>
-                      <p className="text-xs text-gray-400 mt-1">By network</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-white/5 border-white/10">
-                    <CardHeader>
-                      <CardTitle className="text-sm text-gray-400">
-                        Connection Rate
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-white">--%</div>
-                      <p className="text-xs text-gray-400 mt-1">Success rate</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="tasks">
+          <TaskAnalyticsTab />
         </TabsContent>
 
-        {/* Engagement Tab */}
-        <TabsContent value="engagement" className="space-y-6">
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white">User Engagement</CardTitle>
-              <CardDescription className="text-gray-400">
-                Track how users interact with the platform
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div className="text-sm text-gray-400 mb-1">Avg. Session Time</div>
-                  <div className="text-3xl font-bold text-white">-- min</div>
-                </div>
-                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div className="text-sm text-gray-400 mb-1">Daily Active Users</div>
-                  <div className="text-3xl font-bold text-white">--</div>
-                </div>
-                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div className="text-sm text-gray-400 mb-1">Bounce Rate</div>
-                  <div className="text-3xl font-bold text-white">--%</div>
-                </div>
-              </div>
-
-              <div className="p-6 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                <p className="text-gray-300">
-                  <strong className="text-white">Coming Soon:</strong> Detailed engagement metrics 
-                  via Dynamic Analytics API and Google Analytics integration.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="social">
+          <SocialAnalyticsTab />
         </TabsContent>
 
-        {/* Verification Tab */}
-        <TabsContent value="verification" className="space-y-6">
+        <TabsContent value="blockchain">
+          <BlockchainAnalyticsTab />
+        </TabsContent>
+
+        <TabsContent value="verification">
           <VerificationAnalyticsDashboard />
-        </TabsContent>
-
-        {/* Traffic Tab */}
-        <TabsContent value="traffic" className="space-y-6">
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white">Traffic Sources</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Powered by Google Analytics
-                  </CardDescription>
-                </div>
-                <Button variant="outline" className="border-white/20" size="sm">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Setup GA4
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="p-6 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  📊 Google Analytics Integration
-                </h3>
-                <p className="text-gray-400 mb-4">
-                  Track page views, traffic sources, and user behavior across the platform.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-300">
-                  <li>• Real-time visitor tracking</li>
-                  <li>• Traffic source attribution</li>
-                  <li>• Page-level analytics</li>
-                  <li>• Conversion funnel tracking</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </AdminLayout>
   );
 }
-
