@@ -96,10 +96,10 @@ export class KickAPI {
   async secureLogin(): Promise<{ success: boolean; error?: string }> {
     // Generate CSRF state token and PKCE challenge before entering promise
     const state = `kick_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    localStorage.setItem('kick_oauth_state', state);
+    sessionStorage.setItem('kick_oauth_state', state);
 
     const { url: authUrl, codeVerifier } = await this.getAuthUrl(state);
-    localStorage.setItem('kick_code_verifier', codeVerifier);
+    sessionStorage.setItem('kick_code_verifier', codeVerifier);
 
     return new Promise((resolve) => {
       try {
@@ -205,7 +205,7 @@ export class KickAPI {
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
-    const codeVerifier = localStorage.getItem('kick_code_verifier') || undefined;
+    const codeVerifier = sessionStorage.getItem('kick_code_verifier') || undefined;
     const response = await fetch('/api/social/kick/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

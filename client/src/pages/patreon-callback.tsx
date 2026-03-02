@@ -88,95 +88,40 @@ export default function PatreonCallbackPage() {
         }
 
         // Validate CSRF state
-        const savedState = localStorage.getItem('patreon_oauth_state');
+        const savedState = sessionStorage.getItem('patreon_oauth_state');
         if (!savedState || savedState !== state) {
           throw new Error('Invalid state parameter - possible CSRF attack');
         }
-        localStorage.removeItem('patreon_oauth_state');
+        sessionStorage.removeItem('patreon_oauth_state');
 
-        console.log('[Patreon Callback] Exchanging code for token...');
+        // Retrieve code verifier for PKCE
+        const codeVerifier = sessionStorage.getItem('patreon_code_verifier');
+        sessionStorage.removeItem('patreon_code_verifier');
 
-        // Exchange code for access token
+        console.log('[Patreon Callback] Processing callback with server-side endpoint...');
+
+        // Use server-side callback endpoint for complete token exchange + save
         const redirectUri = `${window.location.origin}/patreon-callback`;
-        const tokenResponse = await fetch('/api/social/patreon/token', {
+        const callbackResponse = await fetch('/api/social/patreon/callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             code,
+            code_verifier: codeVerifier,
             redirect_uri: redirectUri,
           }),
           credentials: 'include',
         });
 
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          throw new Error(`Token exchange failed: ${errorText}`);
+        if (!callbackResponse.ok) {
+          const errorText = await callbackResponse.text();
+          throw new Error(`Connection failed: ${errorText}`);
         }
 
-        const tokenData = await tokenResponse.json();
-        const accessToken = tokenData.access_token;
+        const result = await callbackResponse.json();
+        const displayName = result.username;
 
-        if (!accessToken) {
-          throw new Error('No access token received');
-        }
-
-        console.log('[Patreon Callback] Token obtained, fetching user profile...');
-
-        // Get user profile
-        const userResponse = await fetch('/api/social/patreon/me', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          credentials: 'include',
-        });
-
-        if (!userResponse.ok) {
-          const errorText = await userResponse.text();
-          throw new Error(`Failed to fetch user profile: ${errorText}`);
-        }
-
-        const profileData = await userResponse.json();
-
-        if (!profileData.id) {
-          throw new Error('No profile data received');
-        }
-
-        console.log(
-          '[Patreon Callback] User profile fetched:',
-          profileData.full_name || profileData.vanity
-        );
-
-        // Save the connection to the database
-        const displayName = profileData.vanity || profileData.full_name;
-        const saveResponse = await fetch('/api/social-connections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            platform: 'patreon',
-            platformUserId: String(profileData.id),
-            platformUsername: displayName,
-            platformDisplayName: profileData.full_name,
-            accessToken: accessToken,
-            refreshToken: tokenData.refresh_token || null,
-            tokenExpiresAt: tokenData.expires_in
-              ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-              : null,
-            profileData: {
-              fullName: profileData.full_name,
-              vanity: profileData.vanity,
-              email: profileData.email,
-              imageUrl: profileData.image_url,
-              url: profileData.url,
-              isCreator: profileData.is_creator || false,
-            },
-          }),
-          credentials: 'include',
-        });
-
-        if (!saveResponse.ok) {
-          const errorText = await saveResponse.text();
-          throw new Error(`Failed to save connection: ${errorText}`);
-        }
-
-        console.log('[Patreon Callback] Connection saved successfully');
+        console.log('[Patreon Callback] Connection saved successfully:', displayName);
 
         if (sendResultToOpener({ success: true, displayName })) return;
 

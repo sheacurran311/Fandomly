@@ -465,7 +465,37 @@ export class CampaignEngineService {
     });
     if (!campaign) return false;
 
-    // Award completion bonus points
+    // Atomically mark completion + claim bonus in a single UPDATE.
+    // The WHERE clause ensures only one concurrent request can succeed,
+    // preventing double-award of completion bonus points (C5 race condition fix).
+    const result = await db
+      .update(campaignParticipations)
+      .set({
+        campaignCompleted: true,
+        campaignCompletedAt: new Date(),
+        completionBonusAwarded: true,
+        progressMetadata: {
+          lastActivityAt: new Date().toISOString(),
+        },
+      })
+      .where(
+        and(
+          eq(campaignParticipations.campaignId, campaignId),
+          eq(campaignParticipations.memberId, userId),
+          eq(campaignParticipations.completionBonusAwarded, false)
+        )
+      )
+      .returning({ id: campaignParticipations.id });
+
+    // If no rows updated, another request already completed this campaign
+    if (result.length === 0) {
+      console.warn(
+        `[CampaignEngine] Completion already claimed for user ${userId} campaign ${campaignId}`
+      );
+      return false;
+    }
+
+    // Award completion bonus points AFTER the atomic claim succeeds
     if (campaign.completionBonusPoints && campaign.completionBonusPoints > 0) {
       try {
         await this.pointsService.awardPoints(
@@ -481,24 +511,6 @@ export class CampaignEngineService {
         console.error(`[CampaignEngine] Failed to award completion bonus:`, err);
       }
     }
-
-    // Mark campaign as completed
-    await db
-      .update(campaignParticipations)
-      .set({
-        campaignCompleted: true,
-        campaignCompletedAt: new Date(),
-        completionBonusAwarded: true,
-        progressMetadata: {
-          lastActivityAt: new Date().toISOString(),
-        },
-      })
-      .where(
-        and(
-          eq(campaignParticipations.campaignId, campaignId),
-          eq(campaignParticipations.memberId, userId)
-        )
-      );
 
     return true;
   }

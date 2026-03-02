@@ -5,11 +5,12 @@
  * Note: Kick's OAuth API may have limited availability.
  */
 
-import { Express, Request, Response } from 'express';
+import { Express, Response } from 'express';
 import { db } from '../../db';
 import { socialConnections } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
+import { encryptToken, safeDecryptToken } from '../../lib/token-encryption';
 
 // Kick OAuth configuration - uses id.kick.com for OAuth 2.1 with PKCE
 const KICK_CONFIG = {
@@ -95,49 +96,97 @@ async function fetchKickProfile(accessToken: string): Promise<KickUserResponse> 
 }
 
 export function registerKickOAuthRoutes(app: Express) {
+  // Allowed redirect URIs for validation (M13)
+  const ALLOWED_KICK_REDIRECT_URIS = [
+    KICK_CONFIG.redirectUri,
+    // Allow any same-origin callback path
+  ].filter(Boolean);
+
+  /**
+   * Validate redirect_uri against allowed list
+   */
+  function validateRedirectUri(uri: string | undefined, allowed: string[]): boolean {
+    if (!uri) return true; // Will use default
+    return allowed.some((a) => a === uri);
+  }
+
   /**
    * Exchange authorization code for token (popup flow)
    */
-  app.post('/api/social/kick/token', async (req: Request, res: Response) => {
-    try {
-      if (!KICK_CONFIG.clientId || !KICK_CONFIG.clientSecret) {
-        return res.status(503).json({ message: 'Kick OAuth is not configured' });
-      }
+  app.post(
+    '/api/social/kick/token',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
 
-      const { code, code_verifier, redirect_uri } = req.body;
-      if (!code) {
-        return res.status(400).json({ message: 'Authorization code required' });
-      }
+        if (!KICK_CONFIG.clientId || !KICK_CONFIG.clientSecret) {
+          return res.status(503).json({ message: 'Kick OAuth is not configured' });
+        }
 
-      const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
-      res.json(tokenData);
-    } catch (error) {
-      console.error('[Kick] Token exchange error:', error);
-      res
-        .status(500)
-        .json({ message: error instanceof Error ? error.message : 'Token exchange failed' });
+        const { code, code_verifier, redirect_uri } = req.body;
+        if (!code) {
+          return res.status(400).json({ message: 'Authorization code required' });
+        }
+
+        // Validate redirect_uri (M13)
+        if (redirect_uri && !validateRedirectUri(redirect_uri, ALLOWED_KICK_REDIRECT_URIS)) {
+          return res.status(400).json({ message: 'Invalid redirect_uri' });
+        }
+
+        const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
+        res.json(tokenData);
+      } catch (error) {
+        console.error('[Kick] Token exchange error:', error);
+        res
+          .status(500)
+          .json({ message: error instanceof Error ? error.message : 'Token exchange failed' });
+      }
     }
-  });
+  );
 
   /**
    * Get authenticated user profile from Kick API
+   * Uses stored access token from socialConnections instead of client-provided header
    */
-  app.get('/api/social/kick/me', async (req: Request, res: Response) => {
-    try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!accessToken) {
-        return res.status(401).json({ message: 'Access token required' });
-      }
+  app.get(
+    '/api/social/kick/me',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
 
-      const profile = await fetchKickProfile(accessToken);
-      res.json(profile);
-    } catch (error) {
-      console.error('[Kick] Profile fetch error:', error);
-      res
-        .status(500)
-        .json({ message: error instanceof Error ? error.message : 'Failed to fetch profile' });
+        // Use stored token from socialConnections instead of client-provided header
+        const connection = await db.query.socialConnections.findFirst({
+          where: and(
+            eq(socialConnections.userId, userId),
+            eq(socialConnections.platform, 'kick'),
+            eq(socialConnections.isActive, true)
+          ),
+        });
+
+        if (!connection?.accessToken) {
+          return res
+            .status(404)
+            .json({ message: 'Kick not connected. Please connect via OAuth first.' });
+        }
+
+        const profile = await fetchKickProfile(safeDecryptToken(connection.accessToken));
+        res.json(profile);
+      } catch (error) {
+        console.error('[Kick] Profile fetch error:', error);
+        res
+          .status(500)
+          .json({ message: error instanceof Error ? error.message : 'Failed to fetch profile' });
+      }
     }
-  });
+  );
 
   /**
    * Handle OAuth callback from Kick (legacy redirect flow)
@@ -164,6 +213,11 @@ export function registerKickOAuthRoutes(app: Express) {
           });
         }
 
+        // Validate redirect_uri (M13)
+        if (redirect_uri && !validateRedirectUri(redirect_uri, ALLOWED_KICK_REDIRECT_URIS)) {
+          return res.status(400).json({ message: 'Invalid redirect_uri' });
+        }
+
         // Exchange code for tokens (with PKCE code_verifier)
         const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
 
@@ -183,8 +237,8 @@ export function registerKickOAuthRoutes(app: Express) {
           platform: 'kick' as const,
           platformUserId: profile.id,
           platformUsername: profile.username,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
+          accessToken: encryptToken(tokenData.access_token),
+          refreshToken: tokenData.refresh_token ? encryptToken(tokenData.refresh_token) : null,
           tokenExpiresAt: expiresAt,
           profileData: {
             bio: profile.bio,

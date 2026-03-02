@@ -11,7 +11,7 @@ import { campaignEngine } from '../../services/campaigns/campaign-engine';
 import { campaignSponsorService } from '../../services/campaigns/campaign-sponsor';
 import { campaignVerificationService } from '../../services/campaigns/campaign-verification';
 import { db } from '../../db';
-import { campaigns, taskAssignments, tasks, creators } from '@shared/schema';
+import { campaigns, taskAssignments, tasks, creators, campaignSponsors } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
 export function registerCampaignV2Routes(app: Express) {
@@ -291,6 +291,20 @@ export function registerCampaignV2Routes(app: Express) {
     async (req: AuthenticatedRequest, res) => {
       try {
         const { campaignId } = req.params;
+        const userId = req.user?.id;
+
+        // Verify campaign ownership
+        const creator = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId!),
+        });
+        if (!creator) return res.status(403).json({ error: 'Creator profile required' });
+
+        const campaign = await db.query.campaigns.findFirst({
+          where: and(eq(campaigns.id, campaignId), eq(campaigns.creatorId, creator.id)),
+        });
+        if (!campaign)
+          return res.status(404).json({ error: 'Campaign not found or access denied' });
+
         const sponsor = await campaignSponsorService.addSponsor({
           campaignId,
           ...req.body,
@@ -318,6 +332,24 @@ export function registerCampaignV2Routes(app: Express) {
     async (req: AuthenticatedRequest, res) => {
       try {
         const { sponsorId } = req.params;
+        const userId = req.user?.id;
+
+        // Verify ownership via sponsor -> campaign -> creator
+        const creator = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId!),
+        });
+        if (!creator) return res.status(403).json({ error: 'Creator profile required' });
+
+        const sponsor = await db.query.campaignSponsors.findFirst({
+          where: eq(campaignSponsors.id, sponsorId),
+        });
+        if (!sponsor) return res.status(404).json({ error: 'Sponsor not found' });
+
+        const campaign = await db.query.campaigns.findFirst({
+          where: and(eq(campaigns.id, sponsor.campaignId), eq(campaigns.creatorId, creator.id)),
+        });
+        if (!campaign) return res.status(403).json({ error: 'Access denied' });
+
         const updated = await campaignSponsorService.updateSponsor(sponsorId, req.body);
         if (!updated) return res.status(404).json({ error: 'Sponsor not found' });
         res.json(updated);
@@ -333,6 +365,24 @@ export function registerCampaignV2Routes(app: Express) {
     async (req: AuthenticatedRequest, res) => {
       try {
         const { sponsorId } = req.params;
+        const userId = req.user?.id;
+
+        // Verify ownership via sponsor -> campaign -> creator
+        const creator = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId!),
+        });
+        if (!creator) return res.status(403).json({ error: 'Creator profile required' });
+
+        const sponsor = await db.query.campaignSponsors.findFirst({
+          where: eq(campaignSponsors.id, sponsorId),
+        });
+        if (!sponsor) return res.status(404).json({ error: 'Sponsor not found' });
+
+        const campaign = await db.query.campaigns.findFirst({
+          where: and(eq(campaigns.id, sponsor.campaignId), eq(campaigns.creatorId, creator.id)),
+        });
+        if (!campaign) return res.status(403).json({ error: 'Access denied' });
+
         await campaignSponsorService.removeSponsor(sponsorId);
         res.json({ success: true });
       } catch (error) {
@@ -354,7 +404,21 @@ export function registerCampaignV2Routes(app: Express) {
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
       try {
-        const { assignmentId } = req.params;
+        const { campaignId, assignmentId } = req.params;
+        const userId = req.user?.id;
+
+        // Verify campaign ownership
+        const creator = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId!),
+        });
+        if (!creator) return res.status(403).json({ error: 'Creator profile required' });
+
+        const campaign = await db.query.campaigns.findFirst({
+          where: and(eq(campaigns.id, campaignId), eq(campaigns.creatorId, creator.id)),
+        });
+        if (!campaign)
+          return res.status(404).json({ error: 'Campaign not found or access denied' });
+
         const body = req.body;
 
         const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -400,19 +464,49 @@ export function registerCampaignV2Routes(app: Express) {
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
       try {
-        const { order } = req.body; // Array of { assignmentId, taskOrder }
+        const { campaignId } = req.params;
+        const userId = req.user?.id;
 
-        if (!Array.isArray(order)) {
+        // Verify campaign ownership
+        const creator = await db.query.creators.findFirst({
+          where: eq(creators.userId, userId!),
+        });
+        if (!creator) return res.status(403).json({ error: 'Creator profile required' });
+
+        const campaign = await db.query.campaigns.findFirst({
+          where: and(eq(campaigns.id, campaignId), eq(campaigns.creatorId, creator.id)),
+        });
+        if (!campaign)
+          return res.status(404).json({ error: 'Campaign not found or access denied' });
+
+        // Accept both formats:
+        // - { orderedAssignmentIds: string[] } (client sends this - IDs in desired order)
+        // - { order: [{ assignmentId, taskOrder }] } (legacy explicit format)
+        const { orderedAssignmentIds, order } = req.body;
+
+        if (Array.isArray(orderedAssignmentIds)) {
+          // Client format: array of assignment IDs in desired order
+          for (let i = 0; i < orderedAssignmentIds.length; i++) {
+            await db
+              .update(taskAssignments)
+              .set({ taskOrder: i, updatedAt: new Date() })
+              .where(eq(taskAssignments.id, orderedAssignmentIds[i]));
+          }
+        } else if (Array.isArray(order)) {
+          // Legacy format: explicit { assignmentId, taskOrder } objects
+          for (const item of order) {
+            await db
+              .update(taskAssignments)
+              .set({ taskOrder: item.taskOrder, updatedAt: new Date() })
+              .where(eq(taskAssignments.id, item.assignmentId));
+          }
+        } else {
           return res
             .status(400)
-            .json({ error: 'order must be an array of { assignmentId, taskOrder }' });
-        }
-
-        for (const item of order) {
-          await db
-            .update(taskAssignments)
-            .set({ taskOrder: item.taskOrder, updatedAt: new Date() })
-            .where(eq(taskAssignments.id, item.assignmentId));
+            .json({
+              error:
+                'Provide orderedAssignmentIds (array of IDs) or order (array of { assignmentId, taskOrder })',
+            });
         }
 
         res.json({ success: true });

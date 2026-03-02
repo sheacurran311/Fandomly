@@ -24,6 +24,7 @@ import { registerFanDashboardRoutes } from './user/fan-dashboard-routes';
 import { registerDashboardStatsRoutes } from './user/dashboard-stats-routes';
 import { registerNotificationRoutes } from './user/notification-routes';
 import { registerRedemptionRoutes } from './rewards/redemption-routes';
+import { registerRewardManagementRoutes } from './rewards/reward-management-routes';
 import { registerGdprRoutes } from './user/gdpr-routes';
 import { registerProgramRoutes } from './programs/program-routes';
 import { registerAnnouncementRoutes } from './media/announcement-routes';
@@ -40,6 +41,7 @@ import { registerBetaSignupRoutes } from './beta-signup-routes';
 import { registerVerificationAnalyticsRoutes } from './analytics/verification-analytics-routes';
 import { registerSyncPreferencesRoutes } from './analytics/sync-preferences-routes';
 import { registerCreatorAnalyticsRoutes } from './analytics/creator-analytics-routes';
+import { registerCreatorActivityRoutes } from './analytics/creator-activity-routes';
 import { registerHealthRoutes } from './health/health-routes';
 import { registerParticleAuthRoutes } from './auth/particle-routes';
 import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
@@ -75,6 +77,15 @@ import {
   requireFandomlyAdmin,
   AuthenticatedRequest,
 } from '../middleware/rbac';
+import { standardApiLimiter, syncActionLimiter } from '../middleware/rate-limit';
+import rateLimit from 'express-rate-limit';
+const authRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth requests, please try again later.' },
+});
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import multer from 'multer';
@@ -1255,108 +1266,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User type switching route
-  app.post('/api/auth/switch-user-type', async (req, res) => {
-    try {
-      const { userId, userType } = req.body;
+  app.post(
+    '/api/auth/switch-user-type',
+    authRateLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { userId, userType } = req.body;
 
-      if (!userId || !userType || !['fan', 'creator'].includes(userType)) {
-        return res.status(400).json({ error: 'Invalid user type or user ID' });
-      }
-
-      const updatedUser = await storage.updateUserType(userId, userType);
-      if (!updatedUser) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // If switching to creator, create a tenant if they don't have one
-      if (userType === 'creator' && !updatedUser.currentTenantId) {
-        try {
-          const username = updatedUser.username || 'creator';
-          const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${updatedUser.id.slice(-6)}`;
-
-          const tenant = await storage.createTenant({
-            slug: tenantSlug,
-            name: `${username}'s Store`,
-            ownerId: updatedUser.id,
-            status: 'trial',
-            subscriptionTier: 'starter',
-            branding: {
-              primaryColor: '#8B5CF6',
-              secondaryColor: '#06B6D4',
-              accentColor: '#10B981',
-            },
-            businessInfo: {
-              businessType: 'individual' as const,
-            },
-            limits: {
-              maxMembers: 100,
-              maxCampaigns: 3,
-              maxRewards: 10,
-              maxApiCalls: 1000,
-              storageLimit: 100,
-              customDomain: false,
-              advancedAnalytics: false,
-              whiteLabel: false,
-            },
-            settings: {
-              timezone: 'UTC',
-              currency: 'USD',
-              language: 'en',
-              nilCompliance: false,
-              publicProfile: true,
-              allowRegistration: true,
-              requireEmailVerification: false,
-              enableSocialLogin: true,
-            },
-          });
-
-          // Create initial tenant membership for the creator
-          await storage.createTenantMembership({
-            tenantId: tenant.id,
-            userId: updatedUser.id,
-            role: 'owner',
-          });
-
-          // Update user's current tenant
-          await storage.updateUser(updatedUser.id, { currentTenantId: tenant.id });
-
-          console.log('Created tenant for user switching to creator:', tenant.id);
-        } catch (error) {
-          console.error('Failed to create tenant for user switching to creator:', error);
-          // Continue even if tenant creation fails
+        if (!userId || !userType || !['fan', 'creator'].includes(userType)) {
+          return res.status(400).json({ error: 'Invalid user type or user ID' });
         }
-      }
 
-      res.json({
-        ...updatedUser,
-        message: `Successfully switched to ${userType} account`,
-      });
-    } catch (error) {
-      console.error('Error switching user type:', error);
-      res.status(500).json({ error: 'Failed to switch user type' });
+        if (req.user?.id !== userId && req.user?.role !== 'fandomly_admin') {
+          return res.status(403).json({ error: 'Unauthorized to modify this user' });
+        }
+
+        const updatedUser = await storage.updateUserType(userId, userType);
+        if (!updatedUser) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // If switching to creator, create a tenant if they don't have one
+        if (userType === 'creator' && !updatedUser.currentTenantId) {
+          try {
+            const username = updatedUser.username || 'creator';
+            const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${updatedUser.id.slice(-6)}`;
+
+            const tenant = await storage.createTenant({
+              slug: tenantSlug,
+              name: `${username}'s Store`,
+              ownerId: updatedUser.id,
+              status: 'trial',
+              subscriptionTier: 'starter',
+              branding: {
+                primaryColor: '#8B5CF6',
+                secondaryColor: '#06B6D4',
+                accentColor: '#10B981',
+              },
+              businessInfo: {
+                businessType: 'individual' as const,
+              },
+              limits: {
+                maxMembers: 100,
+                maxCampaigns: 3,
+                maxRewards: 10,
+                maxApiCalls: 1000,
+                storageLimit: 100,
+                customDomain: false,
+                advancedAnalytics: false,
+                whiteLabel: false,
+              },
+              settings: {
+                timezone: 'UTC',
+                currency: 'USD',
+                language: 'en',
+                nilCompliance: false,
+                publicProfile: true,
+                allowRegistration: true,
+                requireEmailVerification: false,
+                enableSocialLogin: true,
+              },
+            });
+
+            // Create initial tenant membership for the creator
+            await storage.createTenantMembership({
+              tenantId: tenant.id,
+              userId: updatedUser.id,
+              role: 'owner',
+            });
+
+            // Update user's current tenant
+            await storage.updateUser(updatedUser.id, { currentTenantId: tenant.id });
+
+            console.log('Created tenant for user switching to creator:', tenant.id);
+          } catch (error) {
+            console.error('Failed to create tenant for user switching to creator:', error);
+            // Continue even if tenant creation fails
+          }
+        }
+
+        res.json({
+          ...updatedUser,
+          message: `Successfully switched to ${userType} account`,
+        });
+      } catch (error) {
+        console.error('Error switching user type:', error);
+        res.status(500).json({ error: 'Failed to switch user type' });
+      }
     }
-  });
+  );
 
   // Onboarding state management
-  app.post('/api/auth/update-onboarding', async (req, res) => {
-    try {
-      const { userId, onboardingState } = req.body;
+  app.post(
+    '/api/auth/update-onboarding',
+    authRateLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { userId, onboardingState } = req.body;
 
-      if (!userId || !onboardingState) {
-        return res.status(400).json({ error: 'User ID and onboarding state required' });
+        if (!userId || !onboardingState) {
+          return res.status(400).json({ error: 'User ID and onboarding state required' });
+        }
+
+        if (req.user?.id !== userId && req.user?.role !== 'fandomly_admin') {
+          return res.status(403).json({ error: 'Unauthorized to modify this user' });
+        }
+
+        const updatedUser = await storage.updateOnboardingState(userId, onboardingState);
+        if (!updatedUser) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(updatedUser);
+      } catch (error) {
+        console.error('Error updating onboarding state:', error);
+        res.status(500).json({ error: 'Failed to update onboarding state' });
       }
-
-      const updatedUser = await storage.updateOnboardingState(userId, onboardingState);
-      if (!updatedUser) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error('Error updating onboarding state:', error);
-      res.status(500).json({ error: 'Failed to update onboarding state' });
     }
-  });
+  );
 
   // Role-based authentication route
   app.get('/api/auth/role', authenticateUser, async (req: AuthenticatedRequest, res) => {
@@ -1386,33 +1415,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Switch user type endpoint
-  app.patch('/api/auth/user/:userId/switch-type', async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { newUserType } = req.body;
+  app.patch(
+    '/api/auth/user/:userId/switch-type',
+    authRateLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { userId } = req.params;
+        const { newUserType } = req.body;
 
-      if (!['fan', 'creator'].includes(newUserType)) {
-        return res.status(400).json({ error: 'Invalid user type' });
+        if (!['fan', 'creator'].includes(newUserType)) {
+          return res.status(400).json({ error: 'Invalid user type' });
+        }
+
+        if (req.user?.id !== req.params.userId && req.user?.role !== 'fandomly_admin') {
+          return res.status(403).json({ error: 'Unauthorized to modify this user' });
+        }
+
+        const newRole = newUserType === 'creator' ? 'customer_admin' : 'customer_end_user';
+
+        // Update user type and role
+        const updatedUser = await storage.updateUser(userId, {
+          userType: newUserType,
+          role: newRole,
+        });
+
+        if (!updatedUser) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(updatedUser);
+      } catch (error) {
+        console.error('Failed to switch user type:', error);
+        res.status(500).json({ error: 'Failed to switch user type' });
       }
-
-      const newRole = newUserType === 'creator' ? 'customer_admin' : 'customer_end_user';
-
-      // Update user type and role
-      const updatedUser = await storage.updateUser(userId, {
-        userType: newUserType,
-        role: newRole,
-      });
-
-      if (!updatedUser) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error('Failed to switch user type:', error);
-      res.status(500).json({ error: 'Failed to switch user type' });
     }
-  });
+  );
 
   // Creator routes (public creation for onboarding)
   app.post(
@@ -1829,49 +1867,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // =====================================
-  // TASK TEMPLATE API ROUTES
-  // =====================================
-
-  // Get task templates (with core templates + tenant-specific)
-  app.get('/api/task-templates', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: 'Creator profile required to access templates' });
-      }
-
-      // Get both global templates and tenant-specific templates
-      const dbTemplates = await storage.getTaskTemplates(creator.tenantId);
-
-      // Merge with core templates from code (if not already in database)
-      const coreTemplateIds = dbTemplates.map((t) => t.id).filter(Boolean);
-      const missingCoreTemplates = CORE_TASK_TEMPLATES.filter(
-        (coreTemplate) => !coreTemplateIds.includes(coreTemplate.id)
-      ).map((coreTemplate) => ({
-        ...coreTemplate,
-        id: coreTemplate.id,
-        tenantId: null,
-        creatorId: null,
-        isActive: true,
-        readOnly: true, // Flag core templates as read-only
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
-
-      const allTemplates = [...dbTemplates, ...missingCoreTemplates];
-      res.json(allTemplates);
-    } catch (error) {
-      console.error('Failed to fetch task templates:', error);
-      res.status(500).json({ error: 'Failed to fetch task templates' });
-    }
-  });
-
   // Get specific task template
   app.get('/api/task-templates/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
@@ -2193,1164 +2188,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Rewards routes
-  app.get('/api/rewards', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      // Get user's current tenant context
-      const user = await storage.getUser(req.user?.id || '');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Get creator to determine tenant
-      let tenantId = null;
-      if (user.userType === 'creator') {
-        const creator = await storage.getCreatorByUserId(user.id);
-        tenantId = creator?.tenantId;
-      }
-
-      // Fetch rewards with tenant isolation
-      const rewards = tenantId ? await storage.getAllRewards(tenantId) : [];
-      res.json(rewards);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch rewards' });
-    }
-  });
-
-  // Get rewards by creator (for fan dashboard)
-  app.get(
-    '/api/rewards/creator/:creatorId',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const creator = await storage.getCreator(req.params.creatorId);
-        if (!creator) {
-          return res.status(404).json({ error: 'Creator not found' });
-        }
-
-        // Get active rewards for this creator's tenant
-        const rewards = await storage.getAllRewards(creator.tenantId);
-        const activeRewards = rewards.filter((reward) => reward.isActive);
-        res.json(activeRewards);
-      } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch rewards' });
-      }
-    }
-  );
-
-  // Create reward (creator-only)
-  app.post('/api/rewards', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = await storage.getUser(req.user?.id || '');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Verify user is a creator
-      if (user.userType !== 'creator') {
-        return res.status(403).json({ error: 'Access denied. Creator account required.' });
-      }
-
-      const creator = await storage.getCreatorByUserId(user.id);
-      if (!creator) {
-        return res.status(403).json({ error: 'Creator profile not found' });
-      }
-
-      // Validate request body
-      const rewardData = insertRewardSchema.parse({
-        ...req.body,
-        tenantId: creator.tenantId, // Override client-supplied tenantId for security
-      });
-
-      const reward = await storage.createReward(rewardData);
-      res.status(201).json(reward);
-    } catch (error) {
-      console.error('Reward creation error:', error);
-      res.status(400).json({
-        error: error instanceof Error ? error.message : 'Invalid reward data',
-      });
-    }
-  });
-
-  // Update reward (creator-only)
-  app.put('/api/rewards/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = await storage.getUser(req.user?.id || '');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Verify user is a creator
-      if (user.userType !== 'creator') {
-        return res.status(403).json({ error: 'Access denied. Creator account required.' });
-      }
-
-      const creator = await storage.getCreatorByUserId(user.id);
-      if (!creator) {
-        return res.status(403).json({ error: 'Creator profile not found' });
-      }
-
-      // Verify the reward belongs to this creator's tenant
-      const existingReward = await storage.getReward(req.params.id, creator.tenantId);
-      if (!existingReward) {
-        return res.status(404).json({ error: 'Reward not found' });
-      }
-
-      // Validate update data (partial schema)
-      const updateData = insertRewardSchema.partial().parse(req.body);
-
-      const updatedReward = await storage.updateReward(req.params.id, updateData);
-      res.json(updatedReward);
-    } catch (error) {
-      console.error('Reward update error:', error);
-      res.status(400).json({
-        error: error instanceof Error ? error.message : 'Invalid reward data',
-      });
-    }
-  });
-
-  // Delete reward (creator-only)
-  app.delete('/api/rewards/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = await storage.getUser(req.user?.id || '');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Verify user is a creator
-      if (user.userType !== 'creator') {
-        return res.status(403).json({ error: 'Access denied. Creator account required.' });
-      }
-
-      const creator = await storage.getCreatorByUserId(user.id);
-      if (!creator) {
-        return res.status(403).json({ error: 'Creator profile not found' });
-      }
-
-      // Verify the reward belongs to this creator's tenant
-      const existingReward = await storage.getReward(req.params.id, creator.tenantId);
-      if (!existingReward) {
-        return res.status(404).json({ error: 'Reward not found' });
-      }
-
-      // Soft delete by setting isActive to false
-      await storage.updateReward(req.params.id, { isActive: false });
-      res.status(204).send();
-    } catch (error) {
-      console.error('Reward deletion error:', error);
-      res.status(500).json({ error: 'Failed to delete reward' });
-    }
-  });
-
-  // Redeem reward (fan-only)
-  app.post('/api/rewards/:id/redeem', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = await storage.getUser(req.user?.id || '');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Get the reward details
-      const reward = await storage.getReward(req.params.id);
-      if (!reward || !reward.isActive) {
-        return res.status(404).json({ error: 'Reward not found or inactive' });
-      }
-
-      // Get user's tenant membership for this reward's tenant
-      const membership = await storage.getUserTenantMembership(user.id, reward.tenantId);
-      if (!membership) {
-        return res.status(403).json({ error: 'Not authorized to redeem from this creator' });
-      }
-
-      // Validate redemption request
-      const { entries = 1 } = req.body; // For raffles, allow multiple entries
-      const totalCost = reward.pointsCost * entries;
-
-      // Check if user has enough points
-      if ((membership.memberData?.points || 0) < totalCost) {
-        return res.status(400).json({
-          error: 'Insufficient points',
-          required: totalCost,
-          available: membership.memberData?.points || 0,
-        });
-      }
-
-      // Check stock/max redemptions
-      if (reward.maxRedemptions && (reward.currentRedemptions || 0) >= reward.maxRedemptions) {
-        return res.status(400).json({ error: 'Reward no longer available' });
-      }
-
-      // For raffle rewards, check max entries
-      if (reward.rewardType === 'raffle' && reward.rewardData?.raffleData?.maxEntries) {
-        const maxEntries = reward.rewardData.raffleData.maxEntries;
-        if (entries > maxEntries) {
-          return res.status(400).json({
-            error: `Maximum ${maxEntries} entries allowed per person`,
-          });
-        }
-      }
-
-      // Use atomic redemption to prevent race conditions and ensure data integrity
-      const result = await storage.redeemRewardAtomic({
-        userId: user.id,
-        rewardId: reward.id,
-        entries,
-        membershipId: membership.id,
-      });
-
-      res.json({
-        success: true,
-        message: `Successfully redeemed ${reward.name}`,
-        pointsSpent: reward.pointsCost * entries,
-        remainingPoints: result.updatedMembership.memberData?.points || 0,
-        entries: entries,
-        redemptionId: result.rewardRedemption.id,
-      });
-    } catch (error) {
-      console.error('Reward redemption error:', error);
-      res.status(500).json({ error: 'Failed to redeem reward' });
-    }
-  });
-
-  // Campaign routes
-  app.get('/api/campaigns/creator/:creatorId', async (req, res) => {
-    try {
-      // Get creator to verify tenant context
-      const creator = await storage.getCreator(req.params.creatorId);
-      if (!creator) {
-        return res.status(404).json({ error: 'Creator not found' });
-      }
-
-      // Fetch campaigns with tenant isolation
-      const data = await storage.getCampaignsByCreator(req.params.creatorId, creator.tenantId);
-      res.json(data);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch campaigns' });
-    }
-  });
-
-  app.get('/api/campaigns/active', async (req, res) => {
-    try {
-      // Get all active campaigns across all tenants (public marketplace)
-      const campaigns = await storage.getAllActiveCampaigns();
-
-      // Enrich with creator information
-      const enrichedCampaigns = await Promise.all(
-        campaigns.map(async (campaign) => {
-          const creator = await storage.getCreator(campaign.creatorId);
-          const rules = await storage.getCampaignRules(campaign.id);
-          return {
-            ...campaign,
-            creator: creator
-              ? {
-                  displayName: creator.displayName,
-                  imageUrl: creator.imageUrl,
-                  category: creator.category,
-                }
-              : null,
-            rules,
-          };
-        })
-      );
-
-      res.json(enrichedCampaigns);
-    } catch (error) {
-      console.error('Failed to fetch active campaigns:', error);
-      res.status(500).json({ error: 'Failed to fetch active campaigns' });
-    }
-  });
-
-  // ============================================================================
-  // CAMPAIGN JSONB REFERENCE VALIDATION
-  // ============================================================================
-  async function validateCampaignReferences(campaignData: any) {
-    const errors: string[] = [];
-
-    // Validate prerequisite campaigns
-    if (
-      campaignData.prerequisiteCampaigns &&
-      Array.isArray(campaignData.prerequisiteCampaigns) &&
-      campaignData.prerequisiteCampaigns.length > 0
-    ) {
-      const { campaigns } = await import('@shared/schema');
-      const { inArray } = await import('drizzle-orm');
-
-      const existing = await db
-        .select({ id: campaigns.id })
-        .from(campaigns)
-        .where(inArray(campaigns.id, campaignData.prerequisiteCampaigns));
-
-      const existingIds = new Set(existing.map((c) => c.id));
-      const invalid = campaignData.prerequisiteCampaigns.filter(
-        (id: string) => !existingIds.has(id)
-      );
-
-      if (invalid.length > 0) {
-        errors.push(`Invalid prerequisite campaigns: ${invalid.join(', ')}`);
-      }
-    }
-
-    // Validate required tasks
-    if (
-      campaignData.requiredTaskIds &&
-      Array.isArray(campaignData.requiredTaskIds) &&
-      campaignData.requiredTaskIds.length > 0
-    ) {
-      const { tasks } = await import('@shared/schema');
-      const { inArray } = await import('drizzle-orm');
-
-      const existing = await db
-        .select({ id: tasks.id })
-        .from(tasks)
-        .where(inArray(tasks.id, campaignData.requiredTaskIds));
-
-      const existingIds = new Set(existing.map((t) => t.id));
-      const invalid = campaignData.requiredTaskIds.filter((id: string) => !existingIds.has(id));
-
-      if (invalid.length > 0) {
-        errors.push(`Invalid required tasks: ${invalid.join(', ')}`);
-      }
-    }
-
-    // Validate badge templates
-    if (
-      campaignData.requiredBadgeIds &&
-      Array.isArray(campaignData.requiredBadgeIds) &&
-      campaignData.requiredBadgeIds.length > 0
-    ) {
-      const { fandomlyBadgeTemplates } = await import('@shared/schema');
-      const { inArray } = await import('drizzle-orm');
-
-      const existing = await db
-        .select({ id: fandomlyBadgeTemplates.id })
-        .from(fandomlyBadgeTemplates)
-        .where(inArray(fandomlyBadgeTemplates.id, campaignData.requiredBadgeIds));
-
-      const existingIds = new Set(existing.map((b) => b.id));
-      const invalid = campaignData.requiredBadgeIds.filter((id: string) => !existingIds.has(id));
-
-      if (invalid.length > 0) {
-        errors.push(`Invalid badge templates: ${invalid.join(', ')}`);
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new Error(`Campaign reference validation failed: ${errors.join('; ')}`);
-    }
-  }
-
-  app.post('/api/campaigns', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      // Get user's creator profile for tenant scoping
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: 'Creator profile required to create campaigns' });
-      }
-
-      // REQUIRED: All campaigns must belong to a program
-      if (!req.body.programId) {
-        return res.status(400).json({
-          error: 'All campaigns must be associated with a program. Please select a program.',
-          code: 'PROGRAM_REQUIRED',
-        });
-      }
-
-      const payload = insertCampaignSchema.parse({
-        ...req.body,
-        tenantId: creator.tenantId,
-        creatorId: creator.id,
-      });
-
-      // Validate JSONB references before creation
-      await validateCampaignReferences(payload);
-
-      const created = await storage.createCampaign(payload);
-      res.json(created);
-    } catch (error) {
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Invalid campaign data' });
-    }
-  });
-
-  // Enhanced campaign creation endpoint for multi-step modal
-  app.post('/api/campaigns/enhanced', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      // Get user's creator profile to ensure they can create campaigns
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(403).json({ error: 'Creator profile required to create campaigns' });
-      }
-
-      const {
-        campaignData,
-        socialTasks = [],
-      }: {
-        campaignData: any;
-        socialTasks: any[];
-      } = req.body;
-
-      // Validate campaign data
-      if (!campaignData.name || !campaignData.type || campaignData.type.length === 0) {
-        return res.status(400).json({ error: 'Campaign name and type are required' });
-      }
-
-      // REQUIRED: All campaigns must belong to a program
-      if (!campaignData.programId) {
-        return res.status(400).json({
-          error: 'All campaigns must be associated with a program. Please select a program.',
-          code: 'PROGRAM_REQUIRED',
-        });
-      }
-
-      // Helper to parse dates to Date objects
-      const parseDate = (value: any): Date | null => {
-        if (!value) return null;
-        const date = new Date(value);
-        return isNaN(date.getTime()) ? null : date;
-      };
-
-      // Create the main campaign with proper tenant scoping
-      const campaignPayload = {
-        tenantId: creator.tenantId,
-        creatorId: creator.id,
-        programId: campaignData.programId, // Required
-        name: campaignData.name,
-        description: campaignData.description || '',
-        campaignType: 'direct' as const,
-        trigger: 'custom_event' as const,
-        startDate: parseDate(campaignData.startDate) || new Date(), // Must be Date object
-        endDate: parseDate(campaignData.endDate), // Must be Date object or null
-        status: 'active' as const,
-        campaignTypes: campaignData.type || ['points'],
-        rewardStructure: campaignData.rewardStructure,
-        prerequisiteCampaigns: campaignData.requirements?.prerequisiteCampaigns || [],
-        allTasksRequired: campaignData.requirements?.allTasksRequired ?? true,
-        requiredTaskIds: campaignData.requirements?.requiredTaskIds || [],
-        requiredBadgeIds: campaignData.requirements?.requiredBadgeIds || [],
-      };
-
-      // Validate JSONB references before creation
-      await validateCampaignReferences(campaignPayload);
-
-      const campaign = await storage.createCampaign(campaignPayload);
-
-      // Create social campaign tasks
-      const createdTasks = [];
-      for (const task of socialTasks) {
-        const taskPayload = {
-          tenantId: campaign.tenantId,
-          campaignId: campaign.id,
-          platform: task.platform,
-          taskType: task.taskType,
-          targetUrl: task.targetUrl,
-          hashtags: task.hashtags,
-          inviteCode: task.inviteCode,
-          customInstructions: task.customInstructions,
-          rewardType: task.rewardType || 'points',
-          pointsToReward: task.pointsToReward || 50,
-          rewardMetadata: task.rewardMetadata,
-          displayOrder: task.displayOrder || 1,
-        };
-
-        const createdTask = await storage.createSocialCampaignTask(taskPayload);
-        createdTasks.push(createdTask);
-      }
-
-      res.json({
-        campaign,
-        tasks: createdTasks,
-        message: 'Campaign created successfully with social tasks',
-      });
-    } catch (error) {
-      console.error('Enhanced campaign creation failed:', error);
-      res.status(400).json({
-        error: error instanceof Error ? error.message : 'Failed to create enhanced campaign',
-      });
-    }
-  });
-
-  // Social Campaign Tasks routes
-  app.get('/api/campaigns/:campaignId/tasks', async (req, res) => {
-    try {
-      const { campaignId } = req.params;
-      const tasks = await storage.getSocialCampaignTasks(campaignId);
-      res.json(tasks);
-    } catch (error) {
-      console.error('Failed to fetch campaign tasks:', error);
-      res.status(500).json({ error: 'Failed to fetch campaign tasks' });
-    }
-  });
-
-  app.post('/api/campaigns/:campaignId/tasks', async (req, res) => {
-    try {
-      const { campaignId } = req.params;
-      const taskData = { ...req.body, campaignId };
-      const created = await storage.createSocialCampaignTask(taskData);
-      res.json(created);
-    } catch (error) {
-      console.error('Failed to create campaign task:', error);
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Failed to create campaign task' });
-    }
-  });
-
-  app.put('/api/campaigns/tasks/:taskId', async (req, res) => {
-    try {
-      const { taskId } = req.params;
-      const updated = await storage.updateSocialCampaignTask(taskId, req.body);
-      res.json(updated);
-    } catch (error) {
-      console.error('Failed to update campaign task:', error);
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Failed to update campaign task' });
-    }
-  });
-
-  app.delete('/api/campaigns/tasks/:taskId', async (req, res) => {
-    try {
-      const { taskId } = req.params;
-      await storage.deleteSocialCampaignTask(taskId);
-      res.json({ success: true, message: 'Campaign task deleted successfully' });
-    } catch (error) {
-      console.error('Failed to delete campaign task:', error);
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Failed to delete campaign task' });
-    }
-  });
-
-  app.post(
-    '/api/campaigns/participate',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { campaignId, actionType, metadata } = req.body;
-        const userId = req.user?.id;
-
-        if (!userId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Get campaign and verify it exists and is active
-        const campaigns = await storage.getAllActiveCampaigns();
-        const campaign = campaigns.find((c) => c.id === campaignId);
-        if (!campaign || campaign.status !== 'active') {
-          return res.status(404).json({ error: 'Campaign not found or inactive' });
-        }
-
-        // Check if user already participated in this campaign
-        const existingParticipation = await storage.getCampaignParticipation(campaignId, userId);
-
-        if (existingParticipation) {
-          // Update existing participation
-          const updatedParticipation = await storage.updateCampaignParticipation(
-            existingParticipation.id,
-            {
-              participationCount: existingParticipation.participationCount + 1,
-              lastParticipation: new Date(),
-              participationData: {
-                ...existingParticipation.participationData,
-                rewardsEarned: [
-                  ...(existingParticipation.participationData?.rewardsEarned || []),
-                  {
-                    type: actionType,
-                    value: metadata,
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
-              },
-            }
-          );
-
-          res.json({
-            success: true,
-            participation: updatedParticipation,
-            message: 'Action completed! Points will be awarded.',
-            pointsEarned: getActionPoints(actionType),
-          });
-        } else {
-          // Create new participation
-          const participation = await storage.createCampaignParticipation({
-            tenantId: campaign.tenantId,
-            campaignId,
-            memberId: userId,
-            participationCount: 1,
-            totalUnitsEarned: 0,
-            participationData: {
-              triggerDetails: { actionType, metadata },
-              rewardsEarned: [
-                {
-                  type: actionType,
-                  value: metadata,
-                  timestamp: new Date().toISOString(),
-                },
-              ],
-            },
-          });
-
-          res.json({
-            success: true,
-            participation,
-            message: 'Joined campaign! Points will be awarded.',
-            pointsEarned: getActionPoints(actionType),
-          });
-        }
-      } catch (error) {
-        console.error('Campaign participation error:', error);
-        res.status(500).json({ error: 'Failed to participate in campaign' });
-      }
-    }
-  );
-
-  app.get('/api/campaign-rules/:campaignId', async (req, res) => {
-    try {
-      const data = await storage.getCampaignRules(req.params.campaignId);
-      res.json(data);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch campaign rules' });
-    }
-  });
-
-  app.post('/api/campaign-rules', async (req, res) => {
-    try {
-      const payload = insertCampaignRuleSchema.parse(req.body);
-      const created = await storage.createCampaignRule(payload);
-      res.json(created);
-    } catch (error) {
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Invalid campaign rule data' });
-    }
-  });
-
-  // Helper function to get points for social actions
-  function getActionPoints(actionType: string): number {
-    // Normalize legacy campaign action types to canonical format
-    const legacyMap: Record<string, string> = {
-      follow_facebook: 'facebook_like_page',
-      follow_instagram: 'instagram_follow',
-      follow_x: 'twitter_follow',
-      like_post: 'facebook_like_post',
-      share_post: 'facebook_share_post',
-      comment_post: 'facebook_comment_post',
-      retweet: 'twitter_retweet',
-    };
-    const canonical = legacyMap[actionType] || actionType;
-
-    // Canonical task template names (platform_action format)
-    const pointMap: Record<string, number> = {
-      twitter_follow: 50,
-      twitter_like: 25,
-      twitter_retweet: 100,
-      twitter_mention: 75,
-      twitter_quote_tweet: 85,
-      twitter_hashtag_post: 85,
-      twitter_include_name: 25,
-      twitter_include_bio: 25,
-      instagram_follow: 50,
-      instagram_like_post: 25,
-      facebook_like_page: 50,
-      facebook_like_post: 50,
-      facebook_like_photo: 25,
-      facebook_share_post: 200,
-      facebook_share_page: 75,
-      facebook_comment_post: 100,
-      facebook_comment_photo: 100,
-      youtube_subscribe: 100,
-      youtube_like: 25,
-      youtube_comment: 40,
-      tiktok_follow: 50,
-      tiktok_like: 25,
-      tiktok_comment: 40,
-      spotify_follow: 50,
-      spotify_playlist: 40,
-      spotify_album: 30,
-      discord_join: 75,
-      discord_role: 50,
-      discord_react: 25,
-      twitch_follow: 50,
-      twitch_subscribe: 200,
-      kick_follow: 50,
-      kick_subscribe: 200,
-      patreon_support: 200,
-      patreon_tier_check: 150,
-      default: 50,
-    };
-    return pointMap[canonical] || pointMap['default'];
-  }
-
-  // Creator Facebook Pages: import and fetch
-  app.post('/api/creators/:creatorId/facebook-pages', async (req, res) => {
-    try {
-      const { creatorId } = req.params;
-      const pages = req.body?.pages || [];
-      if (!Array.isArray(pages)) return res.status(400).json({ error: 'pages array required' });
-      const saved = await storage.upsertCreatorFacebookPages(
-        creatorId,
-        pages.map((p: any) => ({
-          pageId: p.pageId || p.id,
-          name: p.name,
-          accessToken: p.accessToken || p.access_token,
-          followersCount: p.followersCount ?? p.followers_count,
-          fanCount: p.fanCount ?? p.fan_count,
-          instagramBusinessAccountId:
-            p.instagramBusinessAccountId || p.instagram_business_account?.id,
-          connectedInstagramAccountId:
-            p.connectedInstagramAccountId || p.connected_instagram_account?.id,
-        }))
-      );
-      res.json({ success: true, saved });
-    } catch (error) {
-      console.error('Import creator FB pages error:', error);
-      res.status(500).json({ error: 'Failed to import creator Facebook pages' });
-    }
-  });
-
-  app.get(
-    '/api/creators/:creatorId/facebook-pages',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { creatorId } = req.params;
-        const rows = await storage.getCreatorFacebookPages(creatorId);
-        res.json(rows);
-      } catch (error) {
-        console.error('Fetch creator FB pages error:', error);
-        res.status(500).json({ error: 'Failed to fetch creator Facebook pages' });
-      }
-    }
-  );
-
-  // Creator Instagram Account: save Instagram Business Account data
-  app.post(
-    '/api/creators/instagram-account',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { instagramUserId, username, accessToken, accountType } = req.body;
-
-        if (!instagramUserId || !username || !accessToken) {
-          return res
-            .status(400)
-            .json({ error: 'instagramUserId, username, and accessToken are required' });
-        }
-
-        // Get the creator for this user
-        const creator = await storage.getCreatorByUserId(req.user?.id || '');
-        if (!creator) {
-          return res.status(404).json({ error: 'Creator not found' });
-        }
-
-        // Save Instagram account data (you may need to add this table to your schema)
-        // For now, we'll store it in the creator's metadata or create a separate table
-        const instagramData = {
-          instagramUserId,
-          username,
-          accountType: accountType || 'BUSINESS',
-          connectedAt: new Date().toISOString(),
-          // Don't store the access token in the response for security
-        };
-
-        // You might want to add an instagram_accounts table or store in creator metadata
-        // For now, let's return success
-        res.json({
-          success: true,
-          message: 'Instagram account connected successfully',
-          data: instagramData,
-        });
-      } catch (error) {
-        console.error('Save Instagram account error:', error);
-        res.status(500).json({ error: 'Failed to save Instagram account' });
-      }
-    }
-  );
-
-  // Fan Facebook profile quick fetch (returns saved profileData.facebookData)
-  app.get(
-    '/api/fans/:userId/facebook-profile',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { userId } = req.params;
-        const user = await storage.getUser(userId);
-        if (!user) return res.status(404).json({ error: 'User not found' });
-        res.json(user.profileData?.facebookData || null);
-      } catch (error) {
-        console.error('Fetch fan FB profile error:', error);
-        res.status(500).json({ error: 'Failed to fetch fan Facebook profile' });
-      }
-    }
-  );
-
-  // Follow tenant (create membership) for a fan
-  app.post(
-    '/api/tenants/:tenantId/follow',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ error: 'Authentication required' });
-
-        const { tenantId } = req.params;
-        if (!tenantId) return res.status(400).json({ error: 'tenantId required' });
-
-        const membership = await storage.createTenantMembership({
-          tenantId,
-          userId,
-          role: 'member',
-        });
-        res.json(membership);
-      } catch (error) {
-        res
-          .status(400)
-          .json({ error: error instanceof Error ? error.message : 'Failed to follow tenant' });
-      }
-    }
-  );
-
-  // Get tenant memberships (followers/fans)
-  app.get(
-    '/api/tenant-memberships/:tenantId',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { tenantId } = req.params;
-
-        // Get all memberships for this tenant
-        const memberships = await storage.getTenantMembers(tenantId);
-
-        // Enrich with user data
-        const enrichedMemberships = await Promise.all(
-          memberships.map(async (membership) => {
-            const user = await storage.getUser(membership.userId);
-            return {
-              ...membership,
-              user: user
-                ? {
-                    id: user.id,
-                    username: user.username,
-                    email: user.email,
-                    avatar: user.avatar,
-                  }
-                : null,
-            };
-          })
-        );
-
-        console.log(`✅ Returning ${enrichedMemberships.length} members for tenant ${tenantId}`);
-        res.json(enrichedMemberships);
-      } catch (error) {
-        console.error('Error fetching tenant memberships:', error);
-        res.status(500).json({ error: 'Failed to fetch tenant members' });
-      }
-    }
-  );
-
-  // Get user's tenant memberships (tenants the user is following)
-  app.get(
-    '/api/tenants/user/memberships',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ error: 'Authentication required' });
-
-        const memberships = await storage.getUserMemberships(userId);
-        res.json(memberships);
-      } catch (error) {
-        console.error('Error fetching user memberships:', error);
-        res.status(500).json({ error: 'Failed to fetch user memberships' });
-      }
-    }
-  );
-
-  // Update user profile data (fan onboarding info and enhanced fields)
-  // Supports: Basic info, marketing fields (phone, creatorTypeInterests, interestSubcategories), social links, preferences
-  app.post('/api/auth/profile', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const { userId, username, avatar, profileData } = req.body;
-      if (!userId) return res.status(400).json({ error: 'userId required' });
-
-      const updates: any = {};
-
-      // Handle username update with validation
-      if (username) {
-        // Validate username format
-        if (username.length < 3 || username.length > 30) {
-          return res.status(400).json({ error: 'Username must be between 3 and 30 characters' });
-        }
-
-        if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-          return res.status(400).json({
-            error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
-          });
-        }
-
-        // Check if username is already taken by another user
-        const existingUser = await storage.getUserByUsername(username);
-        if (existingUser && existingUser.id !== userId) {
-          return res.status(400).json({ error: 'Username is already taken' });
-        }
-
-        updates.username = username;
-      }
-
-      // Handle avatar update (separate field in users table)
-      if (avatar !== undefined) {
-        updates.avatar = avatar;
-      }
-
-      // Handle profile data updates (supports enhanced schema)
-      if (profileData) {
-        // Optional: International phone number validation (if provided)
-        if (profileData.phone && profileData.phone.length > 0) {
-          // Check for country code prefix (+ followed by digits)
-          const phoneRegex = /^\+\d{1,4}\s?[\d\s\-\(\)]{7,15}$/;
-          if (!phoneRegex.test(profileData.phone.trim())) {
-            return res.status(400).json({
-              error: 'Phone number must include country code (e.g., +1 555-123-4567)',
-            });
-          }
-          // Remove all non-digit characters (except +) for length validation
-          const digitsOnly = profileData.phone.replace(/[^\d+]/g, '');
-          if (digitsOnly.length < 11 || digitsOnly.length > 18) {
-            return res.status(400).json({
-              error: 'Phone number must be between 11-18 characters (including country code)',
-            });
-          }
-        }
-
-        updates.profileData = profileData;
-      }
-
-      const updated = await storage.updateUser(userId, updates);
-      res.json(updated);
-    } catch (error) {
-      console.error('Profile update error:', error);
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Failed to update profile' });
-    }
-  });
-
-  // Import Facebook profile data to user account
-  app.post('/api/auth/facebook-profile-import', async (req, res) => {
-    try {
-      const { userId, facebookData } = req.body;
-      if (!userId) return res.status(400).json({ error: 'userId required' });
-      if (!facebookData) return res.status(400).json({ error: 'Facebook data required' });
-
-      // Prepare user updates
-      const userUpdates: any = {};
-
-      // Update email if provided and not already set
-      if (facebookData.email) {
-        userUpdates.email = facebookData.email;
-      }
-
-      // Update profile data with Facebook information
-      const currentUser = await storage.getUser(userId);
-      if (!currentUser) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const updatedProfileData = {
-        ...currentUser.profileData,
-        name: facebookData.name || currentUser.profileData?.name,
-        avatar: facebookData.picture || currentUser.profileData?.avatar,
-        facebookData: {
-          id: facebookData.id,
-          name: facebookData.name,
-          email: facebookData.email,
-          picture: facebookData.picture,
-          likes: facebookData.likes,
-          importedAt: new Date().toISOString(),
-        },
-      };
-
-      userUpdates.profileData = updatedProfileData;
-
-      // Update the user
-      const updated = await storage.updateUser(userId, userUpdates);
-      res.json({
-        success: true,
-        user: updated,
-        imported: {
-          email: !!facebookData.email,
-          name: !!facebookData.name,
-          picture: !!facebookData.picture,
-          likes: !!facebookData.likes?.data,
-        },
-      });
-    } catch (error) {
-      console.error('Error importing Facebook profile:', error);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to import Facebook profile',
-      });
-    }
-  });
-
-  app.post('/api/rewards', async (req, res) => {
-    try {
-      const rewardData = insertRewardSchema.parse(req.body);
-      const reward = await storage.createReward(rewardData);
-      res.json(reward);
-    } catch (error) {
-      res
-        .status(400)
-        .json({ error: error instanceof Error ? error.message : 'Invalid reward data' });
-    }
-  });
-
-  app.get('/api/rewards/program/:programId', async (req, res) => {
-    try {
-      // Get loyalty program to verify tenant context
-      const program = await storage.getLoyaltyProgram(req.params.programId);
-      if (!program) {
-        return res.status(404).json({ error: 'Program not found' });
-      }
-
-      // Fetch rewards with tenant isolation
-      const rewards = await storage.getRewardsByProgram(req.params.programId, program.tenantId);
-      res.json(rewards);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch rewards' });
-    }
-  });
-
-  // Admin physical rewards approval routes
-  app.get(
-    '/api/admin/physical-rewards',
-    authenticateUser,
-    requireFandomlyAdmin,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const userId = req.user?.id;
-        if (!userId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Get all physical rewards using storage layer
-        const creator = await storage.getCreatorByUserId(userId);
-        if (!creator) {
-          return res.status(403).json({ error: 'Creator profile required' });
-        }
-
-        const allRewards = await storage.getAllRewards(creator.tenantId);
-        const physicalRewards = allRewards.filter((r) => r.rewardType === 'physical');
-
-        res.json(physicalRewards);
-      } catch (error) {
-        console.error('Error fetching physical rewards:', error);
-        res.status(500).json({ error: 'Failed to fetch physical rewards' });
-      }
-    }
-  );
-
-  app.put(
-    '/api/admin/physical-rewards/:id/approve',
-    authenticateUser,
-    requireFandomlyAdmin,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const userId = req.user?.id;
-        if (!userId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        const { id } = req.params;
-        const { adminNotes, approvedAt } = req.body;
-
-        // Get the reward and update it
-        const reward = await storage.getReward(id);
-        if (!reward) {
-          return res.status(404).json({ error: 'Reward not found' });
-        }
-
-        // Update reward data with approval status
-        const updatedRewardData = {
-          ...reward.rewardData,
-          physicalData: {
-            ...(reward.rewardData as any)?.physicalData,
-            approvalStatus: 'approved',
-            adminNotes: adminNotes || null,
-            approvedAt: approvedAt || new Date().toISOString(),
-          },
-        };
-
-        const updatedReward = await storage.updateReward(id, {
-          rewardData: updatedRewardData,
-          isActive: true, // Auto-activate approved rewards
-        });
-
-        res.json(updatedReward);
-      } catch (error) {
-        console.error('Error approving reward:', error);
-        res.status(500).json({ error: 'Failed to approve reward' });
-      }
-    }
-  );
-
-  app.put(
-    '/api/admin/physical-rewards/:id/reject',
-    authenticateUser,
-    requireFandomlyAdmin,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const userId = req.user?.id;
-        if (!userId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        const { id } = req.params;
-        const { adminNotes } = req.body;
-
-        if (!adminNotes) {
-          return res.status(400).json({ error: 'Admin notes are required for rejection' });
-        }
-
-        // Get the reward and update it
-        const reward = await storage.getReward(id);
-        if (!reward) {
-          return res.status(404).json({ error: 'Reward not found' });
-        }
-
-        // Update reward data with rejection status
-        const updatedRewardData = {
-          ...reward.rewardData,
-          physicalData: {
-            ...(reward.rewardData as any)?.physicalData,
-            approvalStatus: 'rejected',
-            adminNotes: adminNotes,
-          },
-        };
-
-        const updatedReward = await storage.updateReward(id, {
-          rewardData: updatedRewardData,
-          isActive: false, // Deactivate rejected rewards
-        });
-
-        res.json(updatedReward);
-      } catch (error) {
-        console.error('Error rejecting reward:', error);
-        res.status(500).json({ error: 'Failed to reject reward' });
-      }
-    }
-  );
-
   // ================================================================
   // One-tap join: Follow tenant + Enroll in program in a single call
   // Simplifies fan onboarding and creator card join buttons
@@ -3449,41 +2286,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/fan-programs/user/:fanId', async (req, res) => {
-    try {
-      const { db } = await import('../db');
-      const { eq } = await import('drizzle-orm');
-      const { fanPrograms: fanProgramsTable, loyaltyPrograms } = await import('@shared/schema');
+  app.get(
+    '/api/fan-programs/user/:fanId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        if (req.params.fanId !== req.user?.id && req.user?.role !== 'fandomly_admin') {
+          return res.status(403).json({ error: "Unauthorized to view this user's programs" });
+        }
 
-      // Fetch fan programs with program details including creatorId
-      const fanProgramsWithDetails = await db
-        .select({
-          fanProgram: fanProgramsTable,
-          program: loyaltyPrograms,
-        })
-        .from(fanProgramsTable)
-        .leftJoin(loyaltyPrograms, eq(fanProgramsTable.programId, loyaltyPrograms.id))
-        .where(eq(fanProgramsTable.fanId, req.params.fanId));
+        const { db } = await import('../db');
+        const { eq } = await import('drizzle-orm');
+        const { fanPrograms: fanProgramsTable, loyaltyPrograms } = await import('@shared/schema');
 
-      // Transform to include creatorId at top level for easy access
-      const enrichedFanPrograms = fanProgramsWithDetails.map(({ fanProgram, program }) => ({
-        ...fanProgram,
-        creatorId: program?.creatorId,
-        programName: program?.name,
-        programSlug: program?.slug,
-        totalPoints: fanProgram.totalPointsEarned || 0,
-        joinedAt: fanProgram.joinedAt,
-      }));
+        // Fetch fan programs with program details including creatorId
+        const fanProgramsWithDetails = await db
+          .select({
+            fanProgram: fanProgramsTable,
+            program: loyaltyPrograms,
+          })
+          .from(fanProgramsTable)
+          .leftJoin(loyaltyPrograms, eq(fanProgramsTable.programId, loyaltyPrograms.id))
+          .where(eq(fanProgramsTable.fanId, req.params.fanId));
 
-      console.log(
-        `[API] Returning ${enrichedFanPrograms.length} fan programs for user ${req.params.fanId}`
-      );
-      res.json(enrichedFanPrograms);
-    } catch (error) {
-      console.error('Failed to fetch fan programs:', error);
-      res.status(500).json({ error: 'Failed to fetch fan programs' });
+        // Transform to include creatorId at top level for easy access
+        const enrichedFanPrograms = fanProgramsWithDetails.map(({ fanProgram, program }) => ({
+          ...fanProgram,
+          creatorId: program?.creatorId,
+          programName: program?.name,
+          programSlug: program?.slug,
+          totalPoints: fanProgram.totalPointsEarned || 0,
+          joinedAt: fanProgram.joinedAt,
+        }));
+
+        console.log(
+          `[API] Returning ${enrichedFanPrograms.length} fan programs for user ${req.params.fanId}`
+        );
+        res.json(enrichedFanPrograms);
+      } catch (error) {
+        console.error('Failed to fetch fan programs:', error);
+        res.status(500).json({ error: 'Failed to fetch fan programs' });
+      }
     }
-  });
+  );
 
   // Get all fans enrolled in a specific program (for creator dashboard)
   app.get('/api/fan-programs/program/:programId', async (req, res) => {
@@ -3556,445 +2401,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Creator Activity Feed
-  app.get('/api/creator/activity/:creatorId', async (req, res) => {
-    try {
-      const { creatorId } = req.params; // This is actually the userId passed from frontend
-      const { search = '', type = 'all', dateFilter = 'all', limit = '100' } = req.query;
-
-      // Get creator's programs
-      const {
-        loyaltyPrograms,
-        fanPrograms,
-        taskCompletions,
-        rewardRedemptions,
-        pointTransactions,
-        users,
-        tasks,
-        creators,
-      } = await import('@shared/schema');
-      const { eq, and, desc, or, like, gte, sql } = await import('drizzle-orm');
-      const db = (await import('../db')).db;
-
-      // First, look up the actual creator.id from the user.id
-      const [creator] = await db
-        .select()
-        .from(creators)
-        .where(eq(creators.userId, creatorId))
-        .limit(1);
-
-      // Try both the userId as creatorId directly and the looked-up creator.id
-      const creatorIds = creator ? [creatorId, creator.id] : [creatorId];
-
-      const programs = await db
-        .select()
-        .from(loyaltyPrograms)
-        .where(or(...creatorIds.map((cid) => eq(loyaltyPrograms.creatorId, cid))));
-
-      if (programs.length === 0) {
-        return res.json([]);
-      }
-
-      const programIds = programs.map((p) => p.id);
-      const tenantIds = [...new Set(programs.map((p) => p.tenantId).filter(Boolean))];
-      const activities: any[] = [];
-
-      // Calculate date filter
-      let dateThreshold: Date | null = null;
-      const now = new Date();
-      if (dateFilter === 'today') {
-        dateThreshold = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      } else if (dateFilter === 'week') {
-        dateThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (dateFilter === 'month') {
-        dateThreshold = new Date(now.getFullYear(), now.getMonth(), 1);
-      } else if (dateFilter === 'quarter') {
-        const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
-        dateThreshold = new Date(now.getFullYear(), quarterMonth, 1);
-      }
-
-      // 1. Fetch fan enrollments (joins)
-      if (type === 'all' || type === 'join') {
-        for (const programId of programIds) {
-          const joins = await db
-            .select({
-              id: fanPrograms.id,
-              fanId: fanPrograms.fanId,
-              joinedAt: fanPrograms.joinedAt,
-              fanUsername: users.username,
-            })
-            .from(fanPrograms)
-            .leftJoin(users, eq(fanPrograms.fanId, users.id))
-            .where(
-              and(
-                eq(fanPrograms.programId, programId),
-                dateThreshold ? gte(fanPrograms.joinedAt, dateThreshold) : sql`true`
-              )
-            )
-            .orderBy(desc(fanPrograms.joinedAt))
-            .limit(parseInt(limit as string));
-
-          joins.forEach((join) => {
-            activities.push({
-              id: join.id,
-              type: 'join',
-              description: `joined your loyalty program`,
-              timestamp: join.joinedAt,
-              fanName: join.fanUsername || 'Anonymous Fan',
-              fanId: join.fanId,
-            });
-          });
-        }
-      }
-
-      // 2. Fetch task completions
-      if (type === 'all' || type === 'task' || type === 'earn') {
-        const processedCompletionIds = new Set<string>();
-
-        // First try by programId
-        for (const programId of programIds) {
-          // Query completions including both 'completed' and 'claimed' status
-          const completions = await db
-            .select({
-              id: taskCompletions.id,
-              userId: taskCompletions.userId,
-              taskId: taskCompletions.taskId,
-              completedAt: taskCompletions.completedAt,
-              updatedAt: taskCompletions.updatedAt,
-              pointsEarned: taskCompletions.pointsEarned,
-              status: taskCompletions.status,
-              fanUsername: users.username,
-              taskName: tasks.name,
-            })
-            .from(taskCompletions)
-            .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-            .leftJoin(users, eq(taskCompletions.userId, users.id))
-            .where(
-              and(
-                eq(tasks.programId, programId),
-                or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
-                dateThreshold
-                  ? gte(
-                      sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`,
-                      dateThreshold
-                    )
-                  : sql`true`
-              )
-            )
-            .orderBy(
-              desc(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`)
-            )
-            .limit(parseInt(limit as string));
-
-          completions.forEach((completion) => {
-            // Use completedAt or fall back to updatedAt
-            const timestamp = completion.completedAt || completion.updatedAt;
-            if (timestamp && !processedCompletionIds.has(completion.id)) {
-              processedCompletionIds.add(completion.id);
-              activities.push({
-                id: completion.id,
-                type: 'task',
-                description: `completed task: ${completion.taskName}`,
-                timestamp: timestamp,
-                points: completion.pointsEarned,
-                fanName: completion.fanUsername || 'Anonymous Fan',
-                fanId: completion.userId,
-              });
-            }
-          });
-        }
-
-        // Fallback: Also try by tenantId for tasks that might not have programId set
-        for (const tenantId of tenantIds) {
-          const tenantCompletions = await db
-            .select({
-              id: taskCompletions.id,
-              userId: taskCompletions.userId,
-              taskId: taskCompletions.taskId,
-              completedAt: taskCompletions.completedAt,
-              updatedAt: taskCompletions.updatedAt,
-              pointsEarned: taskCompletions.pointsEarned,
-              status: taskCompletions.status,
-              fanUsername: users.username,
-              taskName: tasks.name,
-            })
-            .from(taskCompletions)
-            .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-            .leftJoin(users, eq(taskCompletions.userId, users.id))
-            .where(
-              and(
-                eq(tasks.tenantId, tenantId),
-                or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
-                dateThreshold
-                  ? gte(
-                      sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`,
-                      dateThreshold
-                    )
-                  : sql`true`
-              )
-            )
-            .orderBy(
-              desc(sql`COALESCE(${taskCompletions.completedAt}, ${taskCompletions.updatedAt})`)
-            )
-            .limit(parseInt(limit as string));
-
-          tenantCompletions.forEach((completion) => {
-            // Use completedAt or fall back to updatedAt, avoid duplicates
-            const timestamp = completion.completedAt || completion.updatedAt;
-            if (timestamp && !processedCompletionIds.has(completion.id)) {
-              processedCompletionIds.add(completion.id);
-              activities.push({
-                id: completion.id,
-                type: 'task',
-                description: `completed task: ${completion.taskName}`,
-                timestamp: timestamp,
-                points: completion.pointsEarned,
-                fanName: completion.fanUsername || 'Anonymous Fan',
-                fanId: completion.userId,
-              });
-            }
-          });
-        }
-      }
-
-      // 3. Fetch reward redemptions
-      if (type === 'all' || type === 'redeem') {
-        for (const programId of programIds) {
-          const redemptions = await db
-            .select({
-              id: rewardRedemptions.id,
-              fanId: rewardRedemptions.fanId,
-              redeemedAt: rewardRedemptions.redeemedAt,
-              pointsSpent: rewardRedemptions.pointsSpent,
-              rewardId: rewardRedemptions.rewardId,
-              fanUsername: users.username,
-            })
-            .from(rewardRedemptions)
-            .leftJoin(users, eq(rewardRedemptions.fanId, users.id))
-            .where(
-              and(
-                sql`${rewardRedemptions.rewardId} IN (SELECT id FROM rewards WHERE program_id = ${programId})`,
-                dateThreshold ? gte(rewardRedemptions.redeemedAt, dateThreshold) : sql`true`
-              )
-            )
-            .orderBy(desc(rewardRedemptions.redeemedAt))
-            .limit(parseInt(limit as string));
-
-          redemptions.forEach((redemption) => {
-            activities.push({
-              id: redemption.id,
-              type: 'redeem',
-              description: `redeemed a reward`,
-              timestamp: redemption.redeemedAt,
-              points: -redemption.pointsSpent,
-              fanName: redemption.fanUsername || 'Anonymous Fan',
-              fanId: redemption.fanId,
-            });
-          });
-        }
-      }
-
-      // Sort all activities by timestamp
-      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-      // Apply search filter
-      let filteredActivities = activities;
-      if (search && typeof search === 'string' && search.trim() !== '') {
-        const searchLower = search.toLowerCase();
-        filteredActivities = activities.filter(
-          (activity) =>
-            activity.fanName?.toLowerCase().includes(searchLower) ||
-            activity.description?.toLowerCase().includes(searchLower)
-        );
-      }
-
-      // Limit results
-      const limitedActivities = filteredActivities.slice(0, parseInt(limit as string));
-
-      res.json(limitedActivities);
-    } catch (error) {
-      console.error('Error fetching creator activity:', error);
-      res.status(500).json({ error: 'Failed to fetch creator activity' });
-    }
-  });
-
-  // Creator Engagement Metrics (supports week, month, all periods with comparison)
-  app.get('/api/creator/weekly-metrics/:creatorId', async (req, res) => {
-    try {
-      const { creatorId } = req.params;
-      const period = (req.query.period as string) || 'week';
-
-      const {
-        loyaltyPrograms,
-        fanPrograms,
-        taskCompletions,
-        rewardRedemptions,
-        tasks,
-        pointTransactions,
-        creators,
-      } = await import('@shared/schema');
-      const { eq, and, gte, lt, sql, inArray, or } = await import('drizzle-orm');
-      const db = (await import('../db')).db;
-
-      // Get creator's programs - first try by creatorId directly, then by user_id lookup
-      let programs = await db
-        .select()
-        .from(loyaltyPrograms)
-        .where(eq(loyaltyPrograms.creatorId, creatorId));
-
-      // If no programs found, the creatorId might be a user_id - look up the creator and try again
-      if (programs.length === 0) {
-        const [creator] = await db.select().from(creators).where(eq(creators.userId, creatorId));
-        if (creator) {
-          programs = await db
-            .select()
-            .from(loyaltyPrograms)
-            .where(eq(loyaltyPrograms.creatorId, creator.id));
-        }
-      }
-
-      if (programs.length === 0) {
-        return res.json({
-          newFans: 0,
-          tasksCompleted: 0,
-          rewardsRedeemed: 0,
-          pointsDistributed: 0,
-        });
-      }
-
-      const programIds = programs.map((p) => p.id);
-
-      // Calculate date ranges based on period
-      const now = new Date();
-      let currentStart: Date;
-      let previousStart: Date;
-      let previousEnd: Date;
-
-      if (period === 'week') {
-        // Current week (Sunday to now)
-        currentStart = new Date(now);
-        currentStart.setDate(now.getDate() - now.getDay());
-        currentStart.setHours(0, 0, 0, 0);
-        // Previous week
-        previousEnd = new Date(currentStart);
-        previousStart = new Date(currentStart);
-        previousStart.setDate(previousStart.getDate() - 7);
-      } else if (period === 'month') {
-        // Current month (1st to now)
-        currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        // Previous month
-        previousEnd = new Date(currentStart);
-        previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      } else {
-        // All time - no comparison
-        currentStart = new Date(0);
-        previousStart = new Date(0);
-        previousEnd = new Date(0);
-      }
-
-      // Helper function to get metrics for a date range
-      const getMetricsForRange = async (startDate: Date, endDate?: Date) => {
-        let newFans = 0;
-        let tasksCompleted = 0;
-        let rewardsRedeemed = 0;
-        let pointsDistributed = 0;
-
-        for (const programId of programIds) {
-          // Count new fans
-          const fansQuery = endDate
-            ? and(
-                eq(fanPrograms.programId, programId),
-                gte(fanPrograms.joinedAt, startDate),
-                lt(fanPrograms.joinedAt, endDate)
-              )
-            : and(eq(fanPrograms.programId, programId), gte(fanPrograms.joinedAt, startDate));
-
-          const fans = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(fanPrograms)
-            .where(fansQuery);
-          newFans += Number(fans[0]?.count || 0);
-
-          // Count tasks completed (including 'claimed' status)
-          const completionsQuery = endDate
-            ? and(
-                eq(tasks.programId, programId),
-                or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
-                gte(taskCompletions.completedAt, startDate),
-                lt(taskCompletions.completedAt, endDate)
-              )
-            : and(
-                eq(tasks.programId, programId),
-                or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
-                gte(taskCompletions.completedAt, startDate)
-              );
-
-          const completions = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(taskCompletions)
-            .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-            .where(completionsQuery);
-          tasksCompleted += Number(completions[0]?.count || 0);
-
-          // Count rewards redeemed
-          const { rewards } = await import('@shared/schema');
-          const redemptionsQuery = endDate
-            ? and(
-                eq(rewards.programId, programId),
-                gte(rewardRedemptions.redeemedAt, startDate),
-                lt(rewardRedemptions.redeemedAt, endDate)
-              )
-            : and(eq(rewards.programId, programId), gte(rewardRedemptions.redeemedAt, startDate));
-
-          const redemptions = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(rewardRedemptions)
-            .innerJoin(rewards, eq(rewardRedemptions.rewardId, rewards.id))
-            .where(redemptionsQuery);
-          rewardsRedeemed += Number(redemptions[0]?.count || 0);
-        }
-
-        // Get points distributed from fan_programs for this creator's programs
-        // Sum totalPointsEarned from all fans in these programs
-        const fanProgramsData = await db
-          .select({
-            totalEarned: sql<number>`COALESCE(SUM(${fanPrograms.totalPointsEarned}), 0)`,
-          })
-          .from(fanPrograms)
-          .where(inArray(fanPrograms.programId, programIds));
-
-        pointsDistributed = Number(fanProgramsData[0]?.totalEarned || 0);
-
-        return { newFans, tasksCompleted, rewardsRedeemed, pointsDistributed };
-      };
-
-      // Get current period metrics
-      const currentMetrics = await getMetricsForRange(currentStart);
-
-      // Get previous period metrics for comparison (only if not "all" period)
-      let previousMetrics = null;
-      if (period !== 'all') {
-        previousMetrics = await getMetricsForRange(previousStart, previousEnd);
-      }
-
-      res.json({
-        newFans: currentMetrics.newFans,
-        tasksCompleted: currentMetrics.tasksCompleted,
-        rewardsRedeemed: currentMetrics.rewardsRedeemed,
-        pointsDistributed: currentMetrics.pointsDistributed,
-        ...(previousMetrics && {
-          previousNewFans: previousMetrics.newFans,
-          previousTasksCompleted: previousMetrics.tasksCompleted,
-          previousRewardsRedeemed: previousMetrics.rewardsRedeemed,
-          previousPointsDistributed: previousMetrics.pointsDistributed,
-        }),
-      });
-    } catch (error) {
-      console.error('Error fetching engagement metrics:', error);
-      res.status(500).json({ error: 'Failed to fetch engagement metrics' });
-    }
-  });
-
   // Admin routes for user management
   app.get(
     '/api/admin/users',
@@ -4059,39 +2465,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stripe Payment Routes - Using javascript_stripe integration
 
   // Stripe payment intent for one-time payments
-  app.post('/api/create-payment-intent', async (req, res) => {
-    try {
-      const { amount, currency = 'usd' } = req.body;
+  app.post(
+    '/api/create-payment-intent',
+    syncActionLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { amount, currency = 'usd' } = req.body;
 
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: 'Invalid amount' });
+        if (!amount || amount <= 0) {
+          return res.status(400).json({ error: 'Invalid amount' });
+        }
+
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+          apiVersion: '2024-06-20' as any,
+        });
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount * 100), // Convert to cents
+          currency: currency,
+          automatic_payment_methods: {
+            enabled: true,
+          },
+        });
+
+        res.json({
+          clientSecret: paymentIntent.client_secret,
+          paymentIntentId: paymentIntent.id,
+        });
+      } catch (error: any) {
+        console.error('Payment intent creation error:', error);
+        res.status(500).json({
+          error: 'Error creating payment intent',
+          message: error.message,
+        });
       }
-
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-        apiVersion: '2024-06-20' as any,
-      });
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
-        currency: currency,
-        automatic_payment_methods: {
-          enabled: true,
-        },
-      });
-
-      res.json({
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-      });
-    } catch (error: any) {
-      console.error('Payment intent creation error:', error);
-      res.status(500).json({
-        error: 'Error creating payment intent',
-        message: error.message,
-      });
     }
-  });
+  );
 
   // Get or create subscription for authenticated user
   app.post(
@@ -4332,6 +2743,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register redemption routes (Sprint 6)
   registerRedemptionRoutes(app);
 
+  // Register reward management routes (M21 extraction)
+  registerRewardManagementRoutes(app, storage);
+
   // Register GDPR compliance routes (Sprint 9)
   registerGdprRoutes(app);
 
@@ -4346,6 +2760,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register creator analytics routes
   registerCreatorAnalyticsRoutes(app);
+
+  // Register creator activity routes (M21 extraction)
+  registerCreatorActivityRoutes(app);
 
   // Register health check routes
   registerHealthRoutes(app);

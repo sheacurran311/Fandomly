@@ -5,11 +5,12 @@
  * Supports both creator and patron use cases.
  */
 
-import { Express, Request, Response } from 'express';
+import { Express, Response } from 'express';
 import { db } from '../../db';
 import { socialConnections } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
+import { encryptToken, safeDecryptToken } from '../../lib/token-encryption';
 
 // Patreon OAuth configuration
 const PATREON_CONFIG = {
@@ -77,20 +78,28 @@ interface PatreonMembershipsResponse {
  */
 async function exchangeCodeForToken(
   code: string,
+  codeVerifier?: string,
   redirectUri?: string
 ): Promise<PatreonTokenResponse> {
+  const body: Record<string, string> = {
+    grant_type: 'authorization_code',
+    client_id: PATREON_CONFIG.clientId,
+    client_secret: PATREON_CONFIG.clientSecret,
+    code,
+    redirect_uri: redirectUri || PATREON_CONFIG.redirectUri,
+  };
+
+  // PKCE: include code_verifier if provided
+  if (codeVerifier) {
+    body.code_verifier = codeVerifier;
+  }
+
   const response = await fetch(PATREON_CONFIG.tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: PATREON_CONFIG.clientId,
-      client_secret: PATREON_CONFIG.clientSecret,
-      code,
-      redirect_uri: redirectUri || PATREON_CONFIG.redirectUri,
-    }),
+    body: new URLSearchParams(body),
   });
 
   if (!response.ok) {
@@ -149,60 +158,134 @@ async function fetchPatreonMemberships(accessToken: string): Promise<PatreonMemb
   return response.json();
 }
 
+/**
+ * Refresh an expired Patreon access token
+ */
+async function refreshPatreonToken(refreshToken: string): Promise<PatreonTokenResponse> {
+  const response = await fetch(PATREON_CONFIG.tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: PATREON_CONFIG.clientId,
+      client_secret: PATREON_CONFIG.clientSecret,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('[Patreon] Token refresh error:', error);
+    throw new Error('Failed to refresh Patreon token');
+  }
+
+  return response.json();
+}
+
 export function registerPatreonOAuthRoutes(app: Express) {
+  // Allowed redirect URIs for validation (M13)
+  const ALLOWED_PATREON_REDIRECT_URIS = [
+    PATREON_CONFIG.redirectUri,
+    // Allow any same-origin callback path
+  ].filter(Boolean);
+
+  /**
+   * Validate redirect_uri against allowed list
+   */
+  function validateRedirectUri(uri: string | undefined, allowed: string[]): boolean {
+    if (!uri) return true; // Will use default
+    return allowed.some((a) => a === uri);
+  }
+
   /**
    * Exchange authorization code for token (popup flow)
    */
-  app.post('/api/social/patreon/token', async (req: Request, res: Response) => {
-    try {
-      if (!PATREON_CONFIG.clientId || !PATREON_CONFIG.clientSecret) {
-        return res.status(503).json({ message: 'Patreon OAuth is not configured' });
-      }
+  app.post(
+    '/api/social/patreon/token',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
 
-      const { code, redirect_uri } = req.body;
-      if (!code) {
-        return res.status(400).json({ message: 'Authorization code required' });
-      }
+        if (!PATREON_CONFIG.clientId || !PATREON_CONFIG.clientSecret) {
+          return res.status(503).json({ message: 'Patreon OAuth is not configured' });
+        }
 
-      const tokenData = await exchangeCodeForToken(code, redirect_uri);
-      res.json(tokenData);
-    } catch (error) {
-      console.error('[Patreon] Token exchange error:', error);
-      res
-        .status(500)
-        .json({ message: error instanceof Error ? error.message : 'Token exchange failed' });
+        const { code, code_verifier, redirect_uri } = req.body;
+        if (!code) {
+          return res.status(400).json({ message: 'Authorization code required' });
+        }
+
+        // Validate redirect_uri (M13)
+        if (redirect_uri && !validateRedirectUri(redirect_uri, ALLOWED_PATREON_REDIRECT_URIS)) {
+          return res.status(400).json({ message: 'Invalid redirect_uri' });
+        }
+
+        const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
+        res.json(tokenData);
+      } catch (error) {
+        console.error('[Patreon] Token exchange error:', error);
+        res
+          .status(500)
+          .json({ message: error instanceof Error ? error.message : 'Token exchange failed' });
+      }
     }
-  });
+  );
 
   /**
    * Get authenticated user profile from Patreon API
+   * Uses stored access token from socialConnections instead of client-provided header
    */
-  app.get('/api/social/patreon/me', async (req: Request, res: Response) => {
-    try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!accessToken) {
-        return res.status(401).json({ message: 'Access token required' });
+  app.get(
+    '/api/social/patreon/me',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        // Use stored token from socialConnections instead of client-provided header
+        const connection = await db.query.socialConnections.findFirst({
+          where: and(
+            eq(socialConnections.userId, userId),
+            eq(socialConnections.platform, 'patreon'),
+            eq(socialConnections.isActive, true)
+          ),
+        });
+
+        if (!connection?.accessToken) {
+          return res
+            .status(404)
+            .json({ message: 'Patreon not connected. Please connect via OAuth first.' });
+        }
+
+        const profile = await fetchPatreonProfile(safeDecryptToken(connection.accessToken));
+        const userData = profile.data;
+
+        res.json({
+          id: userData.id,
+          full_name: userData.attributes.full_name,
+          vanity: userData.attributes.vanity,
+          email: userData.attributes.email,
+          image_url: userData.attributes.image_url,
+          url: userData.attributes.url,
+          is_creator: userData.attributes.is_creator,
+        });
+      } catch (error) {
+        console.error('[Patreon] Profile fetch error:', error);
+        res
+          .status(500)
+          .json({ message: error instanceof Error ? error.message : 'Failed to fetch profile' });
       }
-
-      const profile = await fetchPatreonProfile(accessToken);
-      const userData = profile.data;
-
-      res.json({
-        id: userData.id,
-        full_name: userData.attributes.full_name,
-        vanity: userData.attributes.vanity,
-        email: userData.attributes.email,
-        image_url: userData.attributes.image_url,
-        url: userData.attributes.url,
-        is_creator: userData.attributes.is_creator,
-      });
-    } catch (error) {
-      console.error('[Patreon] Profile fetch error:', error);
-      res
-        .status(500)
-        .json({ message: error instanceof Error ? error.message : 'Failed to fetch profile' });
     }
-  });
+  );
 
   /**
    * Handle OAuth callback from Patreon (legacy redirect flow)
@@ -217,7 +300,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
           return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const { code } = req.body;
+        const { code, code_verifier, redirect_uri } = req.body;
         if (!code) {
           return res.status(400).json({ message: 'Authorization code required' });
         }
@@ -229,8 +312,13 @@ export function registerPatreonOAuthRoutes(app: Express) {
           });
         }
 
+        // Validate redirect_uri (M13)
+        if (redirect_uri && !validateRedirectUri(redirect_uri, ALLOWED_PATREON_REDIRECT_URIS)) {
+          return res.status(400).json({ message: 'Invalid redirect_uri' });
+        }
+
         // Exchange code for tokens
-        const tokenData = await exchangeCodeForToken(code);
+        const tokenData = await exchangeCodeForToken(code, code_verifier, redirect_uri);
 
         // Fetch user profile
         const profile = await fetchPatreonProfile(tokenData.access_token);
@@ -269,8 +357,8 @@ export function registerPatreonOAuthRoutes(app: Express) {
           platform: 'patreon' as const,
           platformUserId: userData.id,
           platformUsername: userData.attributes.vanity || userData.attributes.full_name,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
+          accessToken: encryptToken(tokenData.access_token),
+          refreshToken: encryptToken(tokenData.refresh_token),
           tokenExpiresAt: expiresAt,
           profileData: {
             fullName: userData.attributes.full_name,
@@ -390,6 +478,65 @@ export function registerPatreonOAuthRoutes(app: Express) {
   );
 
   /**
+   * Refresh Patreon access token
+   */
+  app.post(
+    '/api/social/patreon/refresh',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        // Get stored connection with refresh token
+        const connection = await db.query.socialConnections.findFirst({
+          where: and(
+            eq(socialConnections.userId, userId),
+            eq(socialConnections.platform, 'patreon'),
+            eq(socialConnections.isActive, true)
+          ),
+        });
+
+        if (!connection?.refreshToken) {
+          return res.status(404).json({ message: 'No Patreon connection or refresh token found' });
+        }
+
+        // Refresh the token
+        const tokenData = await refreshPatreonToken(safeDecryptToken(connection.refreshToken));
+
+        // Calculate new expiration
+        const expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+
+        // Update stored tokens
+        await db
+          .update(socialConnections)
+          .set({
+            accessToken: encryptToken(tokenData.access_token),
+            refreshToken: tokenData.refresh_token
+              ? encryptToken(tokenData.refresh_token)
+              : connection.refreshToken,
+            tokenExpiresAt: expiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialConnections.id, connection.id));
+
+        res.json({
+          success: true,
+          expiresAt: expiresAt.toISOString(),
+        });
+      } catch (error) {
+        console.error('[Patreon] Token refresh error:', error);
+        res.status(500).json({
+          message: error instanceof Error ? error.message : 'Failed to refresh token',
+        });
+      }
+    }
+  );
+
+  /**
    * Check patron status for a specific campaign
    */
   app.get(
@@ -420,7 +567,9 @@ export function registerPatreonOAuthRoutes(app: Express) {
         }
 
         // Get fresh membership data
-        const membershipsData = await fetchPatreonMemberships(connection.accessToken!);
+        const membershipsData = await fetchPatreonMemberships(
+          safeDecryptToken(connection.accessToken!)
+        );
 
         // Find membership for the specific campaign
         const membership = membershipsData.data?.find(
@@ -497,7 +646,7 @@ export function registerPatreonOAuthRoutes(app: Express) {
           `${PATREON_CONFIG.apiBase}/campaigns/${campaignId}/members?${fields}`,
           {
             headers: {
-              Authorization: `Bearer ${connection.accessToken}`,
+              Authorization: `Bearer ${safeDecryptToken(connection.accessToken!)}`,
             },
           }
         );

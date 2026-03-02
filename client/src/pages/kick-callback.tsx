@@ -81,101 +81,40 @@ export default function KickCallbackPage() {
         }
 
         // Validate CSRF state
-        const savedState = localStorage.getItem('kick_oauth_state');
+        const savedState = sessionStorage.getItem('kick_oauth_state');
         if (!savedState || savedState !== state) {
           throw new Error('Invalid state parameter - possible CSRF attack');
         }
-        localStorage.removeItem('kick_oauth_state');
+        sessionStorage.removeItem('kick_oauth_state');
 
         // Retrieve PKCE code verifier
-        const codeVerifier = localStorage.getItem('kick_code_verifier');
-        localStorage.removeItem('kick_code_verifier');
+        const codeVerifier = sessionStorage.getItem('kick_code_verifier');
+        sessionStorage.removeItem('kick_code_verifier');
 
-        console.log('[Kick Callback] Exchanging code for token (with PKCE)...');
+        console.log('[Kick Callback] Processing callback with server-side endpoint...');
 
-        // Exchange code for access token
+        // Use server-side callback endpoint for complete token exchange + save
         const redirectUri = `${window.location.origin}/kick-callback`;
-        const tokenResponse = await fetch('/api/social/kick/token', {
+        const callbackResponse = await fetch('/api/social/kick/callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             code,
-            redirect_uri: redirectUri,
             code_verifier: codeVerifier,
+            redirect_uri: redirectUri,
           }),
           credentials: 'include',
         });
 
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          throw new Error(`Token exchange failed: ${errorText}`);
+        if (!callbackResponse.ok) {
+          const errorText = await callbackResponse.text();
+          throw new Error(`Connection failed: ${errorText}`);
         }
 
-        const tokenData = await tokenResponse.json();
-        const accessToken = tokenData.access_token;
+        const result = await callbackResponse.json();
+        const username = result.username;
 
-        if (!accessToken) {
-          throw new Error('No access token received');
-        }
-
-        console.log('[Kick Callback] Token obtained, fetching user profile...');
-
-        // Get user profile
-        const userResponse = await fetch('/api/social/kick/me', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          credentials: 'include',
-        });
-
-        if (!userResponse.ok) {
-          const errorText = await userResponse.text();
-          throw new Error(`Failed to fetch user profile: ${errorText}`);
-        }
-
-        const profileData = await userResponse.json();
-
-        if (!profileData.id && !profileData.username) {
-          throw new Error('No profile data received');
-        }
-
-        console.log(
-          '[Kick Callback] User profile fetched:',
-          profileData.username || profileData.id
-        );
-
-        // Save the connection to the database
-        const saveResponse = await fetch('/api/social-connections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            platform: 'kick',
-            platformUserId: String(profileData.id),
-            platformUsername: profileData.username,
-            platformDisplayName: profileData.username,
-            accessToken: accessToken,
-            refreshToken: tokenData.refresh_token || null,
-            tokenExpiresAt: tokenData.expires_in
-              ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-              : null,
-            profileData: {
-              id: profileData.id,
-              username: profileData.username,
-              bio: profileData.bio,
-              profilePicture: profileData.profile_pic || profileData.profilePicture,
-              followerCount: profileData.follower_count || profileData.followerCount || 0,
-              isVerified: profileData.verified || profileData.isVerified || false,
-            },
-          }),
-          credentials: 'include',
-        });
-
-        if (!saveResponse.ok) {
-          const errorText = await saveResponse.text();
-          throw new Error(`Failed to save connection: ${errorText}`);
-        }
-
-        console.log('[Kick Callback] Connection saved successfully');
-
-        const username = profileData.username || profileData.id;
+        console.log('[Kick Callback] Connection saved successfully:', username);
         if (sendResultToOpener({ success: true, username })) return;
 
         // Fallback: show toast and redirect

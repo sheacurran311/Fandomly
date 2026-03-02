@@ -14,6 +14,8 @@ import {
   bigint,
   date,
   uuid,
+  index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
@@ -162,44 +164,48 @@ export const tenants = pgTable('tenants', {
 });
 
 // Social Media Connections table - stores OAuth tokens and connection data
-export const socialConnections = pgTable('social_connections', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  platform: text('platform').notNull(), // 'facebook', 'twitter', 'tiktok', 'instagram', etc.
+export const socialConnections = pgTable(
+  'social_connections',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    platform: text('platform').notNull(), // 'facebook', 'twitter', 'tiktok', 'instagram', etc.
 
-  // OAuth data
-  platformUserId: text('platform_user_id'), // User's ID on the platform
-  platformUsername: text('platform_username'), // @handle or username
-  platformDisplayName: text('platform_display_name'),
-  accessToken: text('access_token'), // Encrypted in production
-  refreshToken: text('refresh_token'), // Encrypted in production
-  tokenExpiresAt: timestamp('token_expires_at'),
+    // OAuth data
+    platformUserId: text('platform_user_id'), // User's ID on the platform
+    platformUsername: text('platform_username'), // @handle or username
+    platformDisplayName: text('platform_display_name'),
+    accessToken: text('access_token'), // Encrypted in production
+    refreshToken: text('refresh_token'), // Encrypted in production
+    tokenExpiresAt: timestamp('token_expires_at'),
 
-  // Platform-specific data
-  profileData: jsonb('profile_data').$type<{
-    followers?: number;
-    following?: number;
-    mediaCount?: number;
-    verified?: boolean;
-    profilePictureUrl?: string;
-    bio?: string;
-    website?: string;
-    // Platform-specific fields
-    [key: string]: unknown;
-  }>(),
+    // Platform-specific data
+    profileData: jsonb('profile_data').$type<{
+      followers?: number;
+      following?: number;
+      mediaCount?: number;
+      verified?: boolean;
+      profilePictureUrl?: string;
+      bio?: string;
+      website?: string;
+      // Platform-specific fields
+      [key: string]: unknown;
+    }>(),
 
-  // Connection metadata
-  connectedAt: timestamp('connected_at').defaultNow(),
-  lastSyncedAt: timestamp('last_synced_at'),
-  isActive: boolean('is_active').default(true),
+    // Connection metadata
+    connectedAt: timestamp('connected_at').defaultNow(),
+    lastSyncedAt: timestamp('last_synced_at'),
+    isActive: boolean('is_active').default(true),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [index('social_connections_user_platform_idx').on(table.userId, table.platform)]
+);
 
 export const users = pgTable('users', {
   id: varchar('id')
@@ -413,7 +419,7 @@ export const users = pgTable('users', {
 
   // Particle Network / Blockchain Integration
   particleUserId: text('particle_user_id').unique(), // Particle Network UUID
-  avalancheL1Address: text('avalanche_l1_address'), // Fandomly Chain wallet address
+  avalancheL1Address: text('avalanche_l1_address').unique(), // Fandomly Chain wallet address
   blockchainEnabled: boolean('blockchain_enabled').default(false), // Whether user has on-chain wallet
 
   // Soft delete columns
@@ -472,119 +478,126 @@ export const tenantMemberships = pgTable('tenant_memberships', {
   lastActiveAt: timestamp('last_active_at').defaultNow(),
 });
 
-export const creators = pgTable('creators', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar('user_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Each creator belongs to a tenant
-  displayName: text('display_name').notNull(),
-  bio: text('bio'),
-  category: text('category').notNull(), // "athlete" | "musician" | "content_creator" | "brand"
-  imageUrl: text('image_url'),
-  followerCount: integer('follower_count').default(0),
+export const creators = pgTable(
+  'creators',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Each creator belongs to a tenant
+    displayName: text('display_name').notNull(),
+    bio: text('bio'),
+    category: text('category').notNull(), // "athlete" | "musician" | "content_creator" | "brand"
+    imageUrl: text('image_url'),
+    followerCount: integer('follower_count').default(0),
 
-  // Creator Type-Specific Data
-  typeSpecificData: jsonb('type_specific_data').$type<{
-    // Athlete-specific data
-    athlete?: {
-      sport: string;
-      ageRange: string; // "under_18" | "18_22" | "23_30" | "over_30"
-      education: string; // "middle_school" | "high_school" | "college" | "professional" | "other"
-      position: string;
-      school?: string;
-      currentSponsors?: string[];
-      nilCompliant: boolean;
-    };
-
-    // Musician-specific data
-    musician?: {
-      bandArtistName: string;
-      musicCatalogUrl: string;
-      artistType: string; // "independent" | "signed" | "hobby"
-      musicGenre: string[];
-    };
-
-    // Content Creator-specific data
-    contentCreator?: {
-      contentType: string[]; // ["video", "podcast", "gaming", "lifestyle", etc.]
-      topicsOfFocus: string[];
-      sponsorships?: string[];
-      totalViews?: string; // "under_1k" | "1k_10k" | "10k_100k" | "100k_1m" | "over_1m"
-      platforms: string[]; // ["instagram", "tiktok", "youtube", "twitch", etc.]
-    };
-  }>(),
-
-  brandColors: jsonb('brand_colors').$type<{
-    primary: string;
-    secondary: string;
-    accent: string;
-  }>(),
-  socialLinks: jsonb('social_links').$type<{
-    instagram?: string;
-    tiktok?: string;
-    twitter?: string;
-    facebook?: string;
-    discord?: string;
-  }>(),
-
-  // Creator Verification System
-  isVerified: boolean('is_verified').default(false),
-  verificationData: jsonb('verification_data')
-    .$type<{
-      profileComplete: boolean;
-      requiredFieldsFilled: string[]; // List of completed required fields
-      verifiedAt?: string;
-      verificationMethod?: 'auto' | 'manual'; // Auto when profile is complete, manual for admin override
-      completionPercentage: number; // 0-100
-      missingFields?: string[]; // Fields still needed for verification
-      // Badge NFT data (populated when verification badge is minted)
-      badgeNFT?: {
-        onChainBadgeTypeId: number;
-        txHash: string;
-        mintedAt: string;
-        recipientWallet: string;
+    // Creator Type-Specific Data
+    typeSpecificData: jsonb('type_specific_data').$type<{
+      // Athlete-specific data
+      athlete?: {
+        sport: string;
+        ageRange: string; // "under_18" | "18_22" | "23_30" | "over_30"
+        education: string; // "middle_school" | "high_school" | "college" | "professional" | "other"
+        position: string;
+        school?: string;
+        currentSponsors?: string[];
+        nilCompliant: boolean;
       };
-      badgeRevoked?: boolean;
-      badgeRevokedAt?: string;
-    }>()
-    .default({
-      profileComplete: false,
-      requiredFieldsFilled: [],
-      completionPercentage: 0,
-    }),
 
-  // Public Page Settings - Controls what sections are visible on creator's public page
-  publicPageSettings: jsonb('public_page_settings')
-    .$type<{
-      showAbout: boolean;
-      showTasks: boolean;
-      showSocialPosts: boolean;
-      showAnalytics: boolean;
-      showRewards: boolean;
-      showCommunity: boolean;
-    }>()
-    .default({
-      showAbout: true,
-      showTasks: true,
-      showSocialPosts: true,
-      showAnalytics: false,
-      showRewards: true,
-      showCommunity: true,
-    }),
+      // Musician-specific data
+      musician?: {
+        bandArtistName: string;
+        musicCatalogUrl: string;
+        artistType: string; // "independent" | "signed" | "hobby"
+        musicGenre: string[];
+      };
 
-  // Soft-delete fields (SaaS industry standard)
-  deletedAt: timestamp('deleted_at'),
-  deletedBy: varchar('deleted_by'),
-  deletionReason: text('deletion_reason'),
+      // Content Creator-specific data
+      contentCreator?: {
+        contentType: string[]; // ["video", "podcast", "gaming", "lifestyle", etc.]
+        topicsOfFocus: string[];
+        sponsorships?: string[];
+        totalViews?: string; // "under_1k" | "1k_10k" | "10k_100k" | "100k_1m" | "over_1m"
+        platforms: string[]; // ["instagram", "tiktok", "youtube", "twitch", etc.]
+      };
+    }>(),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    brandColors: jsonb('brand_colors').$type<{
+      primary: string;
+      secondary: string;
+      accent: string;
+    }>(),
+    socialLinks: jsonb('social_links').$type<{
+      instagram?: string;
+      tiktok?: string;
+      twitter?: string;
+      facebook?: string;
+      discord?: string;
+    }>(),
+
+    // Creator Verification System
+    isVerified: boolean('is_verified').default(false),
+    verificationData: jsonb('verification_data')
+      .$type<{
+        profileComplete: boolean;
+        requiredFieldsFilled: string[]; // List of completed required fields
+        verifiedAt?: string;
+        verificationMethod?: 'auto' | 'manual'; // Auto when profile is complete, manual for admin override
+        completionPercentage: number; // 0-100
+        missingFields?: string[]; // Fields still needed for verification
+        // Badge NFT data (populated when verification badge is minted)
+        badgeNFT?: {
+          onChainBadgeTypeId: number;
+          txHash: string;
+          mintedAt: string;
+          recipientWallet: string;
+        };
+        badgeRevoked?: boolean;
+        badgeRevokedAt?: string;
+      }>()
+      .default({
+        profileComplete: false,
+        requiredFieldsFilled: [],
+        completionPercentage: 0,
+      }),
+
+    // Public Page Settings - Controls what sections are visible on creator's public page
+    publicPageSettings: jsonb('public_page_settings')
+      .$type<{
+        showAbout: boolean;
+        showTasks: boolean;
+        showSocialPosts: boolean;
+        showAnalytics: boolean;
+        showRewards: boolean;
+        showCommunity: boolean;
+      }>()
+      .default({
+        showAbout: true,
+        showTasks: true,
+        showSocialPosts: true,
+        showAnalytics: false,
+        showRewards: true,
+        showCommunity: true,
+      }),
+
+    // Soft-delete fields (SaaS industry standard)
+    deletedAt: timestamp('deleted_at'),
+    deletedBy: varchar('deleted_by'),
+    deletionReason: text('deletion_reason'),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('creators_user_id_idx').on(table.userId),
+    index('creators_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 // Creator Facebook Pages (stores page tokens and metrics per creator)
 export const creatorFacebookPages = pgTable('creator_facebook_pages', {
@@ -658,142 +671,149 @@ export const agencyTenants = pgTable('agency_tenants', {
 
 // Programs are the highest level container (one per creator)
 // Previously called "loyalty_programs" - now serves as the Program Page
-export const loyaltyPrograms = pgTable('loyalty_programs', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant
-  creatorId: varchar('creator_id')
-    .references(() => creators.id, { onDelete: 'cascade' })
-    .notNull(),
+export const loyaltyPrograms = pgTable(
+  'loyalty_programs',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant
+    creatorId: varchar('creator_id')
+      .references(() => creators.id, { onDelete: 'cascade' })
+      .notNull(),
 
-  // Basic Program Info
-  name: text('name').notNull(),
-  description: text('description'),
-  isActive: boolean('is_active').default(true),
-  pointsName: text('points_name').default('Points'), // e.g. "Thunder Points", "Luna Coins"
+    // Basic Program Info
+    name: text('name').notNull(),
+    description: text('description'),
+    isActive: boolean('is_active').default(true),
+    pointsName: text('points_name').default('Points'), // e.g. "Thunder Points", "Luna Coins"
 
-  // Program Page Configuration (Snap-inspired)
-  pageConfig: jsonb('page_config').$type<{
-    headerImage?: string;
-    logo?: string;
-    brandColors?: {
-      primary: string;
-      secondary: string;
-      accent: string;
-    };
-    theme?: {
-      mode: 'light' | 'dark' | 'custom'; // Preset or custom
-      backgroundColor?: string; // Custom background color
-      textColor?: string; // Custom text color
-      templateId?: string;
-      typography?: {
-        fontFamily?: { heading?: string; body?: string; mono?: string };
-        fontSize?: Record<string, string> & {
-          xs?: string;
-          sm?: string;
-          base?: string;
-          lg?: string;
-          xl?: string;
-          '2xl'?: string;
-          '3xl'?: string;
-          '4xl'?: string;
-          '5xl'?: string;
+    // Program Page Configuration (Snap-inspired)
+    pageConfig: jsonb('page_config').$type<{
+      headerImage?: string;
+      logo?: string;
+      brandColors?: {
+        primary: string;
+        secondary: string;
+        accent: string;
+      };
+      theme?: {
+        mode: 'light' | 'dark' | 'custom'; // Preset or custom
+        backgroundColor?: string; // Custom background color
+        textColor?: string; // Custom text color
+        templateId?: string;
+        typography?: {
+          fontFamily?: { heading?: string; body?: string; mono?: string };
+          fontSize?: Record<string, string> & {
+            xs?: string;
+            sm?: string;
+            base?: string;
+            lg?: string;
+            xl?: string;
+            '2xl'?: string;
+            '3xl'?: string;
+            '4xl'?: string;
+            '5xl'?: string;
+          };
+          fontWeight?: Record<string, string | number> & {
+            light?: number;
+            normal?: number;
+            medium?: number;
+            semibold?: number;
+            bold?: number;
+            extrabold?: number;
+          };
+          lineHeight?: Record<string, string | number> & {
+            tight?: number;
+            normal?: number;
+            relaxed?: number;
+            loose?: number;
+          };
         };
-        fontWeight?: Record<string, string | number> & {
-          light?: number;
-          normal?: number;
-          medium?: number;
-          semibold?: number;
-          bold?: number;
-          extrabold?: number;
+        layout?: {
+          borderRadius?: Record<string, string>;
+          [k: string]: unknown;
         };
-        lineHeight?: Record<string, string | number> & {
-          tight?: number;
-          normal?: number;
-          relaxed?: number;
-          loose?: number;
+        colors?: {
+          primary?: string;
+          secondary?: string;
+          accent?: string;
+          tertiary?: string;
+          background?: string;
+          surface?: string;
+          surfaceHover?: string;
+          border?: string;
+          success?: string;
+          warning?: string;
+          error?: string;
+          info?: string;
+          text?: { primary?: string; secondary?: string; tertiary?: string };
+          [k: string]: unknown;
         };
       };
-      layout?: {
-        borderRadius?: Record<string, string>;
-        [k: string]: unknown;
+      creatorDetails?: Record<string, unknown>;
+      location?: string;
+      customDomain?: string;
+      socialLinks?: {
+        twitter?: string;
+        instagram?: string;
+        discord?: string;
+        website?: string;
       };
-      colors?: {
-        primary?: string;
-        secondary?: string;
-        accent?: string;
-        tertiary?: string;
-        background?: string;
-        surface?: string;
-        surfaceHover?: string;
-        border?: string;
-        success?: string;
-        warning?: string;
-        error?: string;
-        info?: string;
-        text?: { primary?: string; secondary?: string; tertiary?: string };
-        [k: string]: unknown;
+      visibility?: {
+        // Section-level visibility
+        showProfile?: boolean;
+        showCampaigns?: boolean;
+        showTasks?: boolean;
+        showRewards?: boolean;
+        showLeaderboard?: boolean;
+        showActivityFeed?: boolean;
+        showFanWidget?: boolean;
+        // Granular profile data visibility
+        profileData?: {
+          showBio?: boolean;
+          showLocation?: boolean;
+          showWebsite?: boolean;
+          showSocialLinks?: boolean;
+          showJoinDate?: boolean;
+          showFollowerCount?: boolean;
+          showVerificationBadge?: boolean;
+          showTiers?: boolean;
+        };
       };
-    };
-    creatorDetails?: Record<string, unknown>;
-    location?: string;
-    customDomain?: string;
-    socialLinks?: {
-      twitter?: string;
-      instagram?: string;
-      discord?: string;
-      website?: string;
-    };
-    visibility?: {
-      // Section-level visibility
-      showProfile?: boolean;
-      showCampaigns?: boolean;
-      showTasks?: boolean;
-      showRewards?: boolean;
-      showLeaderboard?: boolean;
-      showActivityFeed?: boolean;
-      showFanWidget?: boolean;
-      // Granular profile data visibility
-      profileData?: {
-        showBio?: boolean;
-        showLocation?: boolean;
-        showWebsite?: boolean;
-        showSocialLinks?: boolean;
-        showJoinDate?: boolean;
-        showFollowerCount?: boolean;
-        showVerificationBadge?: boolean;
-        showTiers?: boolean;
-      };
-    };
-  }>(),
+    }>(),
 
-  // Tiers/Levels
-  tiers: jsonb('tiers').$type<
-    Array<{
-      id: string;
-      name: string;
-      minPoints: number;
-      benefits: string[];
-      color: string;
-    }>
-  >(),
+    // Tiers/Levels
+    tiers: jsonb('tiers').$type<
+      Array<{
+        id: string;
+        name: string;
+        minPoints: number;
+        benefits: string[];
+        color: string;
+      }>
+    >(),
 
-  // Publishing & Status
-  status: text('status').notNull().default('draft'), // 'draft' | 'published' | 'archived'
-  publishedAt: timestamp('published_at'),
-  slug: text('slug'), // URL-friendly identifier for public page
+    // Publishing & Status
+    status: text('status').notNull().default('draft'), // 'draft' | 'published' | 'archived'
+    publishedAt: timestamp('published_at'),
+    slug: text('slug'), // URL-friendly identifier for public page
 
-  // Soft-delete fields (SaaS industry standard)
-  deletedAt: timestamp('deleted_at'),
-  deletedBy: varchar('deleted_by'),
-  deletionReason: text('deletion_reason'),
+    // Soft-delete fields (SaaS industry standard)
+    deletedAt: timestamp('deleted_at'),
+    deletedBy: varchar('deleted_by'),
+    deletionReason: text('deletion_reason'),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('loyalty_programs_creator_id_idx').on(table.creatorId),
+    index('loyalty_programs_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 export const rewards = pgTable('rewards', {
   id: varchar('id')
@@ -905,27 +925,34 @@ export const fanPrograms = pgTable('fan_programs', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-export const pointTransactions = pgTable('point_transactions', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant - financial audit trail
-  fanProgramId: varchar('fan_program_id')
-    .references(() => fanPrograms.id, { onDelete: 'cascade' })
-    .notNull(),
-  points: integer('points').notNull(),
-  type: text('type').notNull(), // "earned" | "spent"
-  source: text('source').notNull(), // "social_follow" | "reward_redemption" | "referral" | etc.
-  metadata: jsonb('metadata').$type<{
-    socialPlatform?: string;
-    rewardId?: string;
-    referralId?: string;
-    postUrl?: string;
-  }>(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const pointTransactions = pgTable(
+  'point_transactions',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant - financial audit trail
+    fanProgramId: varchar('fan_program_id')
+      .references(() => fanPrograms.id, { onDelete: 'cascade' })
+      .notNull(),
+    points: integer('points').notNull(),
+    type: text('type').notNull(), // "earned" | "spent"
+    source: text('source').notNull(), // "social_follow" | "reward_redemption" | "referral" | etc.
+    metadata: jsonb('metadata').$type<{
+      socialPlatform?: string;
+      rewardId?: string;
+      referralId?: string;
+      postUrl?: string;
+    }>(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('point_transactions_fan_program_id_idx').on(table.fanProgramId),
+    index('point_transactions_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 export const rewardRedemptions = pgTable('reward_redemptions', {
   id: varchar('id')
@@ -1172,167 +1199,179 @@ export const taskTypeEnum = pgEnum('task_type', [
 ]);
 
 // Campaigns belong to a Program (second level in hierarchy)
-export const campaigns = pgTable('campaigns', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant
-  creatorId: varchar('creator_id')
-    .references(() => creators.id, { onDelete: 'cascade' })
-    .notNull(),
-  programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'restrict' }), // REQUIRED - all campaigns must belong to a program (enforced by DB constraint)
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant
+    creatorId: varchar('creator_id')
+      .references(() => creators.id, { onDelete: 'cascade' })
+      .notNull(),
+    programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'restrict' }), // REQUIRED - all campaigns must belong to a program (enforced by DB constraint)
 
-  // Basic Info
-  name: text('name').notNull(),
-  description: text('description'),
-  displayOrder: integer('display_order'),
+    // Basic Info
+    name: text('name').notNull(),
+    description: text('description'),
+    displayOrder: integer('display_order'),
 
-  // Campaign Type & Trigger
-  campaignType: campaignTypeEnum('campaign_type').notNull(),
-  trigger: campaignTriggerEnum('trigger').notNull(),
+    // Campaign Type & Trigger
+    campaignType: campaignTypeEnum('campaign_type').notNull(),
+    trigger: campaignTriggerEnum('trigger').notNull(),
 
-  // Schedule & Status
-  startDate: timestamp('start_date').notNull(),
-  endDate: timestamp('end_date'),
-  status: campaignStatusEnum('status').notNull().default('draft'),
+    // Schedule & Status
+    startDate: timestamp('start_date').notNull(),
+    endDate: timestamp('end_date'),
+    status: campaignStatusEnum('status').notNull().default('draft'),
 
-  // Visibility & Targeting
-  visibility: text('visibility').notNull().default('everyone'), // 'everyone' | 'segments' | 'tiers' | 'hidden'
-  visibilityRules: jsonb('visibility_rules').$type<{
-    segments?: string[];
-    tiers?: string[];
-    customAttributes?: Record<string, unknown>;
-  }>(),
+    // Visibility & Targeting
+    visibility: text('visibility').notNull().default('everyone'), // 'everyone' | 'segments' | 'tiers' | 'hidden'
+    visibilityRules: jsonb('visibility_rules').$type<{
+      segments?: string[];
+      tiers?: string[];
+      customAttributes?: Record<string, unknown>;
+    }>(),
 
-  // Custom Attributes for API filtering
-  customAttributes: jsonb('custom_attributes').$type<Record<string, unknown>>(),
+    // Custom Attributes for API filtering
+    customAttributes: jsonb('custom_attributes').$type<Record<string, unknown>>(),
 
-  // Transaction Filters (for purchase/return triggers)
-  transactionFilters: jsonb('transaction_filters').$type<{
-    productCategories?: string[];
-    brands?: string[];
-    priceRange?: { min: number; max: number };
-    quantity?: { min: number; max: number };
-    customFilters?: Array<{
-      field: string;
-      operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains';
-      value: unknown;
-    }>;
-  }>(),
+    // Transaction Filters (for purchase/return triggers)
+    transactionFilters: jsonb('transaction_filters').$type<{
+      productCategories?: string[];
+      brands?: string[];
+      priceRange?: { min: number; max: number };
+      quantity?: { min: number; max: number };
+      customFilters?: Array<{
+        field: string;
+        operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains';
+        value: unknown;
+      }>;
+    }>(),
 
-  // Budget & Limits
-  globalBudget: integer('global_budget'), // Total units that can be issued
-  perMemberLimit: jsonb('per_member_limit').$type<{
-    type: 'per_hour' | 'per_day' | 'per_week' | 'per_month' | 'per_year' | 'total';
-    value: number;
-  }>(),
-
-  // Usage tracking
-  totalIssued: integer('total_issued').default(0),
-  totalParticipants: integer('total_participants').default(0),
-
-  // Extended Features for Advanced Campaign Builder
-  campaignTypes: jsonb('campaign_types').$type<string[]>().default(['points']), // Multiple types: points, raffle, nft, badge
-  rewardStructure: jsonb('reward_structure').$type<{
-    taskRewards: boolean;
-    campaignRewards: Array<{
-      type: 'points' | 'raffle' | 'nft' | 'badge';
+    // Budget & Limits
+    globalBudget: integer('global_budget'), // Total units that can be issued
+    perMemberLimit: jsonb('per_member_limit').$type<{
+      type: 'per_hour' | 'per_day' | 'per_week' | 'per_month' | 'per_year' | 'total';
       value: number;
-      metadata?: Record<string, unknown>;
-    }>;
-    defaultPoints: number;
-  }>(),
-  prerequisiteCampaigns: jsonb('prerequisite_campaigns').$type<string[]>().default([]), // Campaign IDs that must be completed first
-  allTasksRequired: boolean('all_tasks_required').default(true), // Must complete all tasks for reward
+    }>(),
 
-  // Sprint 6: Advanced Requirements
-  requiresPaidSubscription: boolean('requires_paid_subscription').default(false), // Requires active paid subscription
-  requiredSubscriberTier: text('required_subscriber_tier'), // Specific tier required (e.g., "premium", "vip")
-  requiredNftCollectionIds: jsonb('required_nft_collection_ids').$type<string[]>().default([]), // Must own NFT from these collections
-  requiredBadgeIds: jsonb('required_badge_ids').$type<string[]>().default([]), // Must have earned these badges
-  requiredTaskIds: jsonb('required_task_ids').$type<string[]>().default([]), // Specific tasks required (overrides allTasksRequired if set)
-  taskDependencies: jsonb('task_dependencies').$type<
-    Array<{
-      taskId: string;
-      dependsOn: string[]; // TaskIds that must be completed before this task
-      isOptional?: boolean;
-    }>
-  >(), // Task completion order requirements
+    // Usage tracking
+    totalIssued: integer('total_issued').default(0),
+    totalParticipants: integer('total_participants').default(0),
 
-  // ============================================
-  // CAMPAIGN V2: Sponsor, Gating, Multiplier, Verification
-  // ============================================
+    // Extended Features for Advanced Campaign Builder
+    campaignTypes: jsonb('campaign_types').$type<string[]>().default(['points']), // Multiple types: points, raffle, nft, badge
+    rewardStructure: jsonb('reward_structure').$type<{
+      taskRewards: boolean;
+      campaignRewards: Array<{
+        type: 'points' | 'raffle' | 'nft' | 'badge';
+        value: number;
+        metadata?: Record<string, unknown>;
+      }>;
+      defaultPoints: number;
+    }>(),
+    prerequisiteCampaigns: jsonb('prerequisite_campaigns').$type<string[]>().default([]), // Campaign IDs that must be completed first
+    allTasksRequired: boolean('all_tasks_required').default(true), // Must complete all tasks for reward
 
-  // Access Control
-  accessCode: text('access_code'), // Optional code required to join campaign
-  accessCodeEnabled: boolean('access_code_enabled').default(false),
+    // Sprint 6: Advanced Requirements
+    requiresPaidSubscription: boolean('requires_paid_subscription').default(false), // Requires active paid subscription
+    requiredSubscriberTier: text('required_subscriber_tier'), // Specific tier required (e.g., "premium", "vip")
+    requiredNftCollectionIds: jsonb('required_nft_collection_ids').$type<string[]>().default([]), // Must own NFT from these collections
+    requiredBadgeIds: jsonb('required_badge_ids').$type<string[]>().default([]), // Must have earned these badges
+    requiredTaskIds: jsonb('required_task_ids').$type<string[]>().default([]), // Specific tasks required (overrides allTasksRequired if set)
+    taskDependencies: jsonb('task_dependencies').$type<
+      Array<{
+        taskId: string;
+        dependsOn: string[]; // TaskIds that must be completed before this task
+        isOptional?: boolean;
+      }>
+    >(), // Task completion order requirements
 
-  // Reputation Gating
-  minimumReputationScore: integer('minimum_reputation_score'), // Min on-chain reputation to join
+    // ============================================
+    // CAMPAIGN V2: Sponsor, Gating, Multiplier, Verification
+    // ============================================
 
-  // Campaign-level multiplier (applies to ALL task rewards within this campaign)
-  campaignMultiplier: decimal('campaign_multiplier', { precision: 10, scale: 2 }).default('1.00'),
+    // Access Control
+    accessCode: text('access_code'), // Optional code required to join campaign
+    accessCodeEnabled: boolean('access_code_enabled').default(false),
 
-  // Completion bonus (awarded when fan completes ALL required tasks)
-  completionBonusPoints: integer('completion_bonus_points').default(0),
-  completionBonusRewards: jsonb('completion_bonus_rewards').$type<
-    Array<{
-      type: 'points' | 'badge' | 'nft' | 'raffle_entry';
-      value: number;
-      metadata?: Record<string, unknown>;
-    }>
-  >(),
+    // Reputation Gating
+    minimumReputationScore: integer('minimum_reputation_score'), // Min on-chain reputation to join
 
-  // Verification timing mode
-  verificationMode: text('verification_mode').default('immediate'), // 'immediate' | 'deferred' | 'end_of_campaign'
-  verificationScheduledAt: timestamp('verification_scheduled_at'), // When batch verification runs
+    // Campaign-level multiplier (applies to ALL task rewards within this campaign)
+    campaignMultiplier: decimal('campaign_multiplier', { precision: 10, scale: 2 }).default('1.00'),
 
-  // Campaign presentation
-  bannerImageUrl: text('banner_image_url'),
-  accentColor: text('accent_color').default('#8B5CF6'),
+    // Completion bonus (awarded when fan completes ALL required tasks)
+    completionBonusPoints: integer('completion_bonus_points').default(0),
+    completionBonusRewards: jsonb('completion_bonus_rewards').$type<
+      Array<{
+        type: 'points' | 'badge' | 'nft' | 'raffle_entry';
+        value: number;
+        metadata?: Record<string, unknown>;
+      }>
+    >(),
 
-  // Task ordering
-  enforceSequentialTasks: boolean('enforce_sequential_tasks').default(false),
+    // Verification timing mode
+    verificationMode: text('verification_mode').default('immediate'), // 'immediate' | 'deferred' | 'end_of_campaign'
+    verificationScheduledAt: timestamp('verification_scheduled_at'), // When batch verification runs
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    // Campaign presentation
+    bannerImageUrl: text('banner_image_url'),
+    accentColor: text('accent_color').default('#8B5CF6'),
+
+    // Task ordering
+    enforceSequentialTasks: boolean('enforce_sequential_tasks').default(false),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('campaigns_creator_id_idx').on(table.creatorId),
+    index('campaigns_tenant_id_idx').on(table.tenantId),
+    index('campaigns_status_idx').on(table.status),
+  ]
+);
 
 // Campaign Sponsors (campaign-scoped, each sponsor belongs to one campaign)
-export const campaignSponsors = pgTable('campaign_sponsors', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  campaignId: varchar('campaign_id')
-    .references(() => campaigns.id, { onDelete: 'cascade' })
-    .notNull(),
+export const campaignSponsors = pgTable(
+  'campaign_sponsors',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    campaignId: varchar('campaign_id')
+      .references(() => campaigns.id, { onDelete: 'cascade' })
+      .notNull(),
 
-  // Sponsor Identity
-  name: text('name').notNull(), // e.g., "Nike Basketball"
-  logoUrl: text('logo_url'),
-  websiteUrl: text('website_url'),
+    // Sponsor Identity
+    name: text('name').notNull(), // e.g., "Nike Basketball"
+    logoUrl: text('logo_url'),
+    websiteUrl: text('website_url'),
 
-  // Social handles used when creating tasks (e.g., "Follow @NikeBasketball on Twitter")
-  socialHandles: jsonb('social_handles').$type<{
-    twitter?: string;
-    instagram?: string;
-    tiktok?: string;
-    youtube?: string;
-    facebook?: string;
-    twitch?: string;
-    discord?: string;
-    kick?: string;
-  }>(),
+    // Social handles used when creating tasks (e.g., "Follow @NikeBasketball on Twitter")
+    socialHandles: jsonb('social_handles').$type<{
+      twitter?: string;
+      instagram?: string;
+      tiktok?: string;
+      youtube?: string;
+      facebook?: string;
+      twitch?: string;
+      discord?: string;
+      kick?: string;
+    }>(),
 
-  // Display
-  displayOrder: integer('display_order').default(0),
-  showInCampaignBanner: boolean('show_in_campaign_banner').default(true),
+    // Display
+    displayOrder: integer('display_order').default(0),
+    showInCampaignBanner: boolean('show_in_campaign_banner').default(true),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [index('campaign_sponsors_campaign_id_idx').on(table.campaignId)]
+);
 
 // Campaign Rules (Conditions + Effects)
 export const campaignRules = pgTable('campaign_rules', {
@@ -1404,134 +1443,141 @@ export const campaignRules = pgTable('campaign_rules', {
 // Task Ownership Level
 export const taskOwnershipEnum = pgEnum('task_ownership', ['platform', 'creator']);
 
-export const tasks = pgTable('tasks', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
 
-  // Ownership
-  ownershipLevel: taskOwnershipEnum('ownership_level').notNull().default('creator'),
-  tenantId: varchar('tenant_id').references(() => tenants.id, { onDelete: 'restrict' }), // NULL for platform tasks
-  creatorId: varchar('creator_id').references(() => creators.id, { onDelete: 'cascade' }), // NULL for platform tasks
+    // Ownership
+    ownershipLevel: taskOwnershipEnum('ownership_level').notNull().default('creator'),
+    tenantId: varchar('tenant_id').references(() => tenants.id, { onDelete: 'restrict' }), // NULL for platform tasks
+    creatorId: varchar('creator_id').references(() => creators.id, { onDelete: 'cascade' }), // NULL for platform tasks
 
-  // Program & Campaign Association
-  programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'cascade' }), // REQUIRED for creator tasks (enforced by DB constraint), NULL for platform tasks
-  campaignId: varchar('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }), // OPTIONAL - tasks can belong to a campaign
+    // Program & Campaign Association
+    programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'cascade' }), // REQUIRED for creator tasks (enforced by DB constraint), NULL for platform tasks
+    campaignId: varchar('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }), // OPTIONAL - tasks can belong to a campaign
 
-  // ============================================
-  // SECTION 1: BASIC DETAILS
-  // ============================================
-  name: text('name').notNull(),
-  description: text('description').notNull(),
+    // ============================================
+    // SECTION 1: BASIC DETAILS
+    // ============================================
+    name: text('name').notNull(),
+    description: text('description').notNull(),
 
-  // Task Organization (Snag-Inspired)
-  section: taskSectionEnum('section').notNull().default('custom'),
+    // Task Organization (Snag-Inspired)
+    section: taskSectionEnum('section').notNull().default('custom'),
 
-  // Task Configuration
-  taskType: taskTypeEnum('task_type').notNull(),
-  platform: socialPlatformEnum('platform').notNull(),
+    // Task Configuration
+    taskType: taskTypeEnum('task_type').notNull(),
+    platform: socialPlatformEnum('platform').notNull(),
 
-  // Time Constraints
-  startTime: timestamp('start_time'),
-  endTime: timestamp('end_time'),
+    // Time Constraints
+    startTime: timestamp('start_time'),
+    endTime: timestamp('end_time'),
 
-  // Special Flags
-  isRequired: boolean('is_required').default(false), // Block other tasks until this is complete
-  hideFromUI: boolean('hide_from_ui').default(false), // Hidden background task
+    // Special Flags
+    isRequired: boolean('is_required').default(false), // Block other tasks until this is complete
+    hideFromUI: boolean('hide_from_ui').default(false), // Hidden background task
 
-  // ============================================
-  // SECTION 2: REWARD CONFIGURATION (Snag-Inspired)
-  // ============================================
-  rewardType: rewardTypeEnum('reward_type').notNull().default('points'),
+    // ============================================
+    // SECTION 2: REWARD CONFIGURATION (Snag-Inspired)
+    // ============================================
+    rewardType: rewardTypeEnum('reward_type').notNull().default('points'),
 
-  // Points reward configuration
-  pointsToReward: integer('points_to_reward').default(50),
-  pointCurrency: text('point_currency').default('default'),
+    // Points reward configuration
+    pointsToReward: integer('points_to_reward').default(50),
+    pointCurrency: text('point_currency').default('default'),
 
-  // Multiplier reward configuration
-  multiplierValue: decimal('multiplier_value', { precision: 4, scale: 2 }), // e.g., 1.50, 2.00, 3.00
-  currenciesToApply: jsonb('currencies_to_apply').$type<string[]>(), // Which currencies the multiplier applies to
-  applyToExistingBalance: boolean('apply_to_existing_balance').default(false),
+    // Multiplier reward configuration
+    multiplierValue: decimal('multiplier_value', { precision: 4, scale: 2 }), // e.g., 1.50, 2.00, 3.00
+    currenciesToApply: jsonb('currencies_to_apply').$type<string[]>(), // Which currencies the multiplier applies to
+    applyToExistingBalance: boolean('apply_to_existing_balance').default(false),
 
-  // Task-specific multiplier (Sprint 1 addition)
-  baseMultiplier: decimal('base_multiplier', { precision: 10, scale: 2 }).default('1.00'), // Task-specific point multiplier
-  multiplierConfig: jsonb('multiplier_config').$type<{
-    stackingType?: 'additive' | 'multiplicative'; // How multipliers stack
-    maxMultiplier?: number; // Cap on total multiplier (e.g., 10x max)
-    allowEventMultipliers?: boolean; // Whether event multipliers apply
-  }>(),
+    // Task-specific multiplier (Sprint 1 addition)
+    baseMultiplier: decimal('base_multiplier', { precision: 10, scale: 2 }).default('1.00'), // Task-specific point multiplier
+    multiplierConfig: jsonb('multiplier_config').$type<{
+      stackingType?: 'additive' | 'multiplicative'; // How multipliers stack
+      maxMultiplier?: number; // Cap on total multiplier (e.g., 10x max)
+      allowEventMultipliers?: boolean; // Whether event multipliers apply
+    }>(),
 
-  // ============================================
-  // SECTION 3: TIMING CONFIGURATION (Snag-Inspired)
-  // ============================================
-  updateCadence: updateCadenceEnum('update_cadence').notNull().default('immediate'),
-  rewardFrequency: rewardFrequencyEnum('reward_frequency').notNull().default('one_time'),
+    // ============================================
+    // SECTION 3: TIMING CONFIGURATION (Snag-Inspired)
+    // ============================================
+    updateCadence: updateCadenceEnum('update_cadence').notNull().default('immediate'),
+    rewardFrequency: rewardFrequencyEnum('reward_frequency').notNull().default('one_time'),
 
-  // ============================================
-  // SECTION 4: TASK-SPECIFIC DATA
-  // ============================================
-  targetUrl: text('target_url'), // URL for posts/videos/playlists
-  hashtags: jsonb('hashtags').$type<string[]>(), // Required hashtags
-  inviteCode: text('invite_code'), // Discord/Telegram invites
-  customInstructions: text('custom_instructions'), // Additional instructions
+    // ============================================
+    // SECTION 4: TASK-SPECIFIC DATA
+    // ============================================
+    targetUrl: text('target_url'), // URL for posts/videos/playlists
+    hashtags: jsonb('hashtags').$type<string[]>(), // Required hashtags
+    inviteCode: text('invite_code'), // Discord/Telegram invites
+    customInstructions: text('custom_instructions'), // Additional instructions
 
-  // Custom settings for each task type (handles, URLs, required fields, etc.)
-  customSettings: jsonb('custom_settings').$type<Record<string, unknown>>(),
+    // Custom settings for each task type (handles, URLs, required fields, etc.)
+    customSettings: jsonb('custom_settings').$type<Record<string, unknown>>(),
 
-  // ============================================
-  // SECTION 5: ELIGIBILITY & TARGETING
-  // ============================================
-  eligibleAccountTypes: jsonb('eligible_account_types').$type<string[]>().default(['fan']),
-  // ['fan', 'creator', 'creator-athlete', 'creator-musician', 'creator-content-creator']
+    // ============================================
+    // SECTION 5: ELIGIBILITY & TARGETING
+    // ============================================
+    eligibleAccountTypes: jsonb('eligible_account_types').$type<string[]>().default(['fan']),
+    // ['fan', 'creator', 'creator-athlete', 'creator-musician', 'creator-content-creator']
 
-  // ============================================
-  // SECTION 6: VERIFICATION SYSTEM (Loyalty Engine Enhancement)
-  // ============================================
-  // Verification tier determines risk-adjusted scoring
-  // T1: API verified (full points) - Spotify, YouTube, Discord, Twitch, Twitter Basic
-  // T2: Code verified (85% points) - Code-in-comment/repost
-  // T3: Starter pack (50% points) - Honor system with embedded profiles
-  verificationTier: text('verification_tier').default('T3'), // 'T1' | 'T2' | 'T3'
+    // ============================================
+    // SECTION 6: VERIFICATION SYSTEM (Loyalty Engine Enhancement)
+    // ============================================
+    // Verification tier determines risk-adjusted scoring
+    // T1: API verified (full points) - Spotify, YouTube, Discord, Twitch, Twitter Basic
+    // T2: Code verified (85% points) - Code-in-comment/repost
+    // T3: Starter pack (50% points) - Honor system with embedded profiles
+    verificationTier: text('verification_tier').default('T3'), // 'T1' | 'T2' | 'T3'
 
-  // Verification method determines how task completion is verified
-  verificationMethod: text('verification_method').default('manual'),
-  // 'api' | 'code_comment' | 'code_repost' | 'hashtag' | 'starter_pack' | 'manual'
+    // Verification method determines how task completion is verified
+    verificationMethod: text('verification_method').default('manual'),
+    // 'api' | 'code_comment' | 'code_repost' | 'hashtag' | 'starter_pack' | 'manual'
 
-  // Is this a starter pack task (one-time per platform per tenant)
-  isStarterPack: boolean('is_starter_pack').default(false),
+    // Is this a starter pack task (one-time per platform per tenant)
+    isStarterPack: boolean('is_starter_pack').default(false),
 
-  // Group goal configuration (for community goals)
-  isGroupGoal: boolean('is_group_goal').default(false),
-  groupGoalConfig: jsonb('group_goal_config').$type<{
-    metricType?:
-      | 'followers'
-      | 'likes'
-      | 'views'
-      | 'comments'
-      | 'shares'
-      | 'reactions'
-      | 'subscribers';
-    targetValue?: number;
-    hashtag?: string;
-    contentId?: string;
-    contentUrl?: string;
-  }>(),
+    // Group goal configuration (for community goals)
+    isGroupGoal: boolean('is_group_goal').default(false),
+    groupGoalConfig: jsonb('group_goal_config').$type<{
+      metricType?:
+        | 'followers'
+        | 'likes'
+        | 'views'
+        | 'comments'
+        | 'shares'
+        | 'reactions'
+        | 'subscribers';
+      targetValue?: number;
+      hashtag?: string;
+      contentId?: string;
+      contentUrl?: string;
+    }>(),
 
-  // ============================================
-  // SECTION 7: STATUS & ANALYTICS
-  // ============================================
-  isActive: boolean('is_active').default(true),
-  isDraft: boolean('is_draft').default(false),
-  totalCompletions: integer('total_completions').default(0),
+    // ============================================
+    // SECTION 7: STATUS & ANALYTICS
+    // ============================================
+    isActive: boolean('is_active').default(true),
+    isDraft: boolean('is_draft').default(false),
+    totalCompletions: integer('total_completions').default(0),
 
-  // Soft-delete fields (SaaS industry standard)
-  deletedAt: timestamp('deleted_at'),
-  deletedBy: varchar('deleted_by'),
-  deletionReason: text('deletion_reason'),
+    // Soft-delete fields (SaaS industry standard)
+    deletedAt: timestamp('deleted_at'),
+    deletedBy: varchar('deleted_by'),
+    deletionReason: text('deletion_reason'),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('tasks_creator_id_idx').on(table.creatorId),
+    index('tasks_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 // Platform Tasks Table - Platform-wide tasks that award Fandomly Points
 export const platformTasks = pgTable('platform_tasks', {
@@ -1605,108 +1651,129 @@ export const taskTemplates = pgTable('task_templates', {
 });
 
 // Task Assignments (Many-to-Many: Tasks <-> Campaigns)
-export const taskAssignments = pgTable('task_assignments', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
-    .notNull(),
-  taskId: varchar('task_id')
-    .references(() => tasks.id, { onDelete: 'cascade' })
-    .notNull(),
-  campaignId: varchar('campaign_id')
-    .references(() => campaigns.id, { onDelete: 'cascade' })
-    .notNull(),
-  userId: varchar('user_id'), // Optional user assignment
+export const taskAssignments = pgTable(
+  'task_assignments',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id)
+      .notNull(),
+    taskId: varchar('task_id')
+      .references(() => tasks.id, { onDelete: 'cascade' })
+      .notNull(),
+    campaignId: varchar('campaign_id')
+      .references(() => campaigns.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: varchar('user_id'), // Optional user assignment
 
-  // Assignment Configuration
-  displayOrder: integer('display_order').default(1),
-  isActive: boolean('is_active').default(true),
+    // Assignment Configuration
+    displayOrder: integer('display_order').default(1),
+    isActive: boolean('is_active').default(true),
 
-  // Assignment-specific Overrides (optional)
-  customRewardValue: integer('custom_reward_value'), // Override task's default reward
-  customInstructions: text('custom_instructions'), // Campaign-specific instructions
+    // Assignment-specific Overrides (optional)
+    customRewardValue: integer('custom_reward_value'), // Override task's default reward
+    customInstructions: text('custom_instructions'), // Campaign-specific instructions
 
-  // Task ordering & dependencies (Campaign V2)
-  taskOrder: integer('task_order').default(0), // Sequential position in campaign
-  dependsOnTaskIds: jsonb('depends_on_task_ids').$type<string[]>().default([]), // Task IDs that must be done first
-  isOptional: boolean('is_optional').default(false), // Optional task in campaign
+    // Task ordering & dependencies (Campaign V2)
+    taskOrder: integer('task_order').default(0), // Sequential position in campaign
+    dependsOnTaskIds: jsonb('depends_on_task_ids').$type<string[]>().default([]), // Task IDs that must be done first
+    isOptional: boolean('is_optional').default(false), // Optional task in campaign
 
-  // Sponsor reference (Campaign V2)
-  useSponsorHandle: boolean('use_sponsor_handle').default(false), // Use sponsor's social handle instead of creator's
-  sponsorId: varchar('sponsor_id').references(() => campaignSponsors.id, { onDelete: 'set null' }),
+    // Sponsor reference (Campaign V2)
+    useSponsorHandle: boolean('use_sponsor_handle').default(false), // Use sponsor's social handle instead of creator's
+    sponsorId: varchar('sponsor_id').references(() => campaignSponsors.id, {
+      onDelete: 'set null',
+    }),
 
-  // Verification timing per-task override (Campaign V2)
-  verificationTiming: text('verification_timing').default('immediate'), // 'immediate' | 'deferred'
+    // Verification timing per-task override (Campaign V2)
+    verificationTiming: text('verification_timing').default('immediate'), // 'immediate' | 'deferred'
 
-  // Campaign-specific task description override
-  taskDescriptionOverride: text('task_description_override'),
+    // Campaign-specific task description override
+    taskDescriptionOverride: text('task_description_override'),
 
-  assignedAt: timestamp('assigned_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    assignedAt: timestamp('assigned_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('task_assignments_campaign_id_idx').on(table.campaignId),
+    index('task_assignments_tenant_id_idx').on(table.tenantId),
+    index('task_assignments_task_id_idx').on(table.taskId),
+  ]
+);
 
 // Campaign Participation Tracking
-export const campaignParticipations = pgTable('campaign_participations', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
-    .notNull(), // Belongs to tenant
-  campaignId: varchar('campaign_id')
-    .references(() => campaigns.id, { onDelete: 'cascade' })
-    .notNull(),
-  memberId: varchar('member_id')
-    .references(() => users.id)
-    .notNull(),
+export const campaignParticipations = pgTable(
+  'campaign_participations',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id)
+      .notNull(), // Belongs to tenant
+    campaignId: varchar('campaign_id')
+      .references(() => campaigns.id, { onDelete: 'cascade' })
+      .notNull(),
+    memberId: varchar('member_id')
+      .references(() => users.id)
+      .notNull(),
 
-  // Tracking
-  participationCount: integer('participation_count').default(1),
-  lastParticipation: timestamp('last_participation').defaultNow(),
-  totalUnitsEarned: integer('total_units_earned').default(0),
+    // Tracking
+    participationCount: integer('participation_count').default(1),
+    lastParticipation: timestamp('last_participation').defaultNow(),
+    totalUnitsEarned: integer('total_units_earned').default(0),
 
-  // Metadata
-  participationData: jsonb('participation_data').$type<{
-    triggerDetails?: unknown;
-    rewardsEarned?: Array<{
-      type: string;
-      value: unknown;
-      timestamp: string;
-    }>;
-  }>(),
+    // Metadata
+    participationData: jsonb('participation_data').$type<{
+      triggerDetails?: unknown;
+      rewardsEarned?: Array<{
+        type: string;
+        value: unknown;
+        timestamp: string;
+      }>;
+    }>(),
 
-  // Campaign V2: Progress tracking
-  tasksCompleted: jsonb('tasks_completed').$type<string[]>().default([]), // Completed task assignment IDs
-  tasksPendingVerification: jsonb('tasks_pending_verification')
-    .$type<
-      Array<{
-        taskId: string;
-        assignmentId: string;
-        completedAt: string;
-        proofUrl?: string;
-        screenshotUrl?: string;
-      }>
-    >()
-    .default([]),
-  totalTasksRequired: integer('total_tasks_required').default(0), // Non-optional tasks count
+    // Campaign V2: Progress tracking
+    tasksCompleted: jsonb('tasks_completed').$type<string[]>().default([]), // Completed task assignment IDs
+    tasksPendingVerification: jsonb('tasks_pending_verification')
+      .$type<
+        Array<{
+          taskId: string;
+          assignmentId: string;
+          completedAt: string;
+          proofUrl?: string;
+          screenshotUrl?: string;
+        }>
+      >()
+      .default([]),
+    totalTasksRequired: integer('total_tasks_required').default(0), // Non-optional tasks count
 
-  // Campaign V2: Completion
-  campaignCompleted: boolean('campaign_completed').default(false),
-  campaignCompletedAt: timestamp('campaign_completed_at'),
-  completionBonusAwarded: boolean('completion_bonus_awarded').default(false),
+    // Campaign V2: Completion
+    campaignCompleted: boolean('campaign_completed').default(false),
+    campaignCompletedAt: timestamp('campaign_completed_at'),
+    completionBonusAwarded: boolean('completion_bonus_awarded').default(false),
 
-  // Campaign V2: Progress metadata
-  progressMetadata: jsonb('progress_metadata').$type<{
-    currentStep?: number;
-    blockedTasks?: string[];
-    availableTasks?: string[];
-    lastActivityAt?: string;
-  }>(),
+    // Campaign V2: Progress metadata
+    progressMetadata: jsonb('progress_metadata').$type<{
+      currentStep?: number;
+      blockedTasks?: string[];
+      availableTasks?: string[];
+      lastActivityAt?: string;
+    }>(),
 
-  createdAt: timestamp('created_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('campaign_participations_campaign_member_unique').on(
+      table.campaignId,
+      table.memberId
+    ),
+    index('campaign_participations_member_id_idx').on(table.memberId),
+    index('campaign_participations_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 // Task Completions - Track fan progress on tasks
 export const taskCompletions = pgTable('task_completions', {
@@ -3922,25 +3989,32 @@ export const campaignVerificationQueue = pgTable('campaign_verification_queue', 
 });
 
 // Campaign Access Logs — track who enters campaigns with access codes/gating
-export const campaignAccessLogs = pgTable('campaign_access_logs', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  campaignId: varchar('campaign_id')
-    .references(() => campaigns.id, { onDelete: 'cascade' })
-    .notNull(),
-  userId: varchar('user_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
+export const campaignAccessLogs = pgTable(
+  'campaign_access_logs',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    campaignId: varchar('campaign_id')
+      .references(() => campaigns.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: varchar('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
 
-  accessGranted: boolean('access_granted').notNull(),
-  accessCodeUsed: text('access_code_used'),
-  accessMethod: text('access_method'), // 'code' | 'nft' | 'badge' | 'reputation' | 'prerequisite' | 'direct'
+    accessGranted: boolean('access_granted').notNull(),
+    accessCodeUsed: text('access_code_used'),
+    accessMethod: text('access_method'), // 'code' | 'nft' | 'badge' | 'reputation' | 'prerequisite' | 'direct'
 
-  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
 
-  createdAt: timestamp('created_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('campaign_access_logs_campaign_id_idx').on(table.campaignId),
+    index('campaign_access_logs_user_id_idx').on(table.userId),
+  ]
+);
 
 // Campaign V2 Relations
 export const campaignSponsorsRelations = relations(campaignSponsors, ({ one }) => ({

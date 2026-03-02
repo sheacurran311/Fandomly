@@ -46,6 +46,30 @@ export interface PatreonAuthState {
 }
 
 /**
+ * PKCE Helper Functions
+ */
+function base64URLEncode(buffer: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < buffer.byteLength; i++) {
+    binary += String.fromCharCode(buffer[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return base64URLEncode(array);
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return base64URLEncode(new Uint8Array(hash));
+}
+
+/**
  * Patreon OAuth API class with popup-based secureLogin flow
  */
 export class PatreonAPI {
@@ -57,7 +81,7 @@ export class PatreonAPI {
     this.redirectUri = PATREON_CONFIG.redirectUri;
   }
 
-  getAuthUrl(state?: string): string {
+  async getAuthUrl(state?: string): Promise<{ url: string; codeVerifier: string }> {
     if (!this.clientId) {
       throw new Error(
         'Patreon client ID not configured. Please set VITE_PATREON_CLIENT_ID environment variable.'
@@ -66,25 +90,38 @@ export class PatreonAPI {
 
     const csrfState = state || `patreon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+    // Generate PKCE parameters
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       scope: PATREON_CONFIG.scopes.join(' '),
       state: csrfState,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
     });
 
-    return `${PATREON_CONFIG.authUrl}?${params.toString()}`;
+    return {
+      url: `${PATREON_CONFIG.authUrl}?${params.toString()}`,
+      codeVerifier,
+    };
   }
 
   async secureLogin(): Promise<{ success: boolean; error?: string }> {
-    return new Promise((resolve) => {
+    // eslint-disable-next-line no-async-promise-executor
+    return new Promise(async (resolve) => {
       try {
         // Generate CSRF state token
         const state = `patreon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        localStorage.setItem('patreon_oauth_state', state);
+        sessionStorage.setItem('patreon_oauth_state', state);
 
-        const authUrl = this.getAuthUrl(state);
+        const { url: authUrl, codeVerifier } = await this.getAuthUrl(state);
+
+        // Store code verifier for PKCE
+        sessionStorage.setItem('patreon_code_verifier', codeVerifier);
 
         const popup = window.open(
           authUrl,
@@ -188,12 +225,15 @@ export class PatreonAPI {
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
+    const codeVerifier = sessionStorage.getItem('patreon_code_verifier') || undefined;
+
     const response = await fetch('/api/social/patreon/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code,
         redirect_uri: this.redirectUri,
+        code_verifier: codeVerifier,
       }),
       credentials: 'include',
     });

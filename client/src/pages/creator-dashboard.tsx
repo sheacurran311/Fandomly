@@ -240,11 +240,7 @@ export default function CreatorDashboard() {
     const hasInstagramCallback = code && state?.includes('instagram');
 
     if (hasInstagramCallback) {
-      console.log('[Creator Dashboard] 🚀 IMMEDIATE Instagram callback detected:', {
-        codeLength: code?.length,
-        state: state,
-        fullUrl: window.location.href,
-      });
+      // Instagram callback detected
     }
   }
 
@@ -253,21 +249,11 @@ export default function CreatorDashboard() {
     const handleInstagramCallback = async () => {
       // Only process Instagram callbacks for creators
       if (user?.userType !== 'creator') {
-        console.log(
-          '[Creator Dashboard] Not a creator user, skipping Instagram callback processing'
-        );
         return;
       }
 
       // Add a small delay to ensure URL is fully loaded
       await new Promise((resolve) => setTimeout(resolve, 100));
-
-      console.log('[Creator Dashboard] 🔍 FULL URL ANALYSIS:');
-      console.log('- Full URL:', window.location.href);
-      console.log('- Pathname:', window.location.pathname);
-      console.log('- Search:', window.location.search);
-      console.log('- Hash:', window.location.hash);
-      console.log('- Is popup:', !!window.opener);
 
       // Check for parameters in both search and hash (some OAuth flows use hash)
       const searchParams = new URLSearchParams(window.location.search);
@@ -277,36 +263,15 @@ export default function CreatorDashboard() {
       const state = searchParams.get('state') || hashParams.get('state');
       const error = searchParams.get('error') || hashParams.get('error');
 
-      console.log('[Creator Dashboard] 🔍 PARAMETER DETECTION:');
-      console.log('- Code (search):', searchParams.get('code') ? 'FOUND' : 'NOT_FOUND');
-      console.log('- Code (hash):', hashParams.get('code') ? 'FOUND' : 'NOT_FOUND');
-      console.log('- State (search):', searchParams.get('state') ? 'FOUND' : 'NOT_FOUND');
-      console.log('- State (hash):', hashParams.get('state') ? 'FOUND' : 'NOT_FOUND');
-      console.log('- Final code:', code ? code.substring(0, 10) + '...' : 'NONE');
-      console.log('- Final state:', state || 'NONE');
-
       // Check if this looks like an Instagram callback URL structure
       const hasInstagramIndicators =
         window.location.href.includes('code=') ||
         window.location.href.includes('error=') ||
         (state && state.includes('instagram'));
 
-      console.log('[Creator Dashboard] Instagram callback indicators:', {
-        hasCodeInURL: window.location.href.includes('code='),
-        hasErrorInURL: window.location.href.includes('error='),
-        hasInstagramState: state?.includes('instagram'),
-        overallDetection: hasInstagramIndicators,
-      });
-
       // Only process if we have Instagram callback parameters
       if (!code && !error && !hasInstagramIndicators) {
-        console.log('[Creator Dashboard] No Instagram callback parameters found, skipping');
         return;
-      }
-
-      // Process Instagram callbacks (even if state is missing for debugging)
-      if (code || error || hasInstagramIndicators) {
-        console.log('[Creator Dashboard] 🎯 PROCESSING INSTAGRAM CALLBACK');
       }
 
       if (error) {
@@ -318,10 +283,6 @@ export default function CreatorDashboard() {
         if (state) {
           try {
             localStorage.setItem(`instagram_oauth_result_${state}`, JSON.stringify(errorResult));
-            console.log(
-              '[Creator Dashboard] Stored error result in localStorage for state:',
-              state
-            );
           } catch (e) {
             console.error('[Creator Dashboard] Failed to store result in localStorage:', e);
           }
@@ -329,7 +290,6 @@ export default function CreatorDashboard() {
 
         // If opened in popup, communicate result to parent
         if (window.opener) {
-          console.log('[Creator Dashboard] Communicating error to parent window');
           window.opener.postMessage(
             {
               type: 'instagram-oauth-result',
@@ -348,9 +308,6 @@ export default function CreatorDashboard() {
 
         // If no opener but state looks like popup flow, close the window
         if (state && state.startsWith('instagram_')) {
-          console.log(
-            '[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage'
-          );
           window.close();
           return;
         }
@@ -368,10 +325,7 @@ export default function CreatorDashboard() {
 
       if (code && state) {
         try {
-          console.log('[Creator Dashboard] Processing Instagram OAuth callback');
-          console.log('[Creator Dashboard] About to call InstagramSDKManager.handleCallback...');
           const result = await InstagramSDKManager.handleCallback(code, state);
-          console.log('[Creator Dashboard] handleCallback result:', result);
 
           // Always store in localStorage for COOP fallback
           if (state) {
@@ -400,15 +354,12 @@ export default function CreatorDashboard() {
                 `instagram_oauth_result_${state}`,
                 JSON.stringify(augmentedResult)
               );
-              console.log('[Creator Dashboard] Stored result in localStorage for state:', state);
             } catch (e) {
               console.error('[Creator Dashboard] Failed to store result in localStorage:', e);
             }
           }
 
           if (result.success) {
-            console.log('[Creator Dashboard] Callback successful, calling global handler...');
-
             // Use the global callback handler (similar to Facebook pattern)
             if (
               (window as { handleInstagramConnectionResult?: (result: unknown) => void })
@@ -422,11 +373,8 @@ export default function CreatorDashboard() {
               await completeConnection(result);
             }
 
-            console.log('[Creator Dashboard] Instagram connection processing finished');
-
             // If opened in popup, communicate result to parent and close
             if (window.opener) {
-              console.log('[Creator Dashboard] Communicating success to parent window');
               window.opener.postMessage(
                 {
                   type: 'instagram-oauth-result',
@@ -444,9 +392,6 @@ export default function CreatorDashboard() {
 
             // If no opener but state looks like popup flow, close the window
             if (state && state.startsWith('instagram_')) {
-              console.log(
-                '[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage'
-              );
               window.close();
               return;
             }
@@ -478,9 +423,6 @@ export default function CreatorDashboard() {
 
             // If no opener but state looks like popup flow, close the window
             if (state && state.startsWith('instagram_')) {
-              console.log(
-                '[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage'
-              );
               window.close();
               return;
             }
@@ -530,9 +472,6 @@ export default function CreatorDashboard() {
 
           // If no opener but state looks like popup flow, close the window
           if (state && state.startsWith('instagram_')) {
-            console.log(
-              '[Creator Dashboard] No opener (likely COOP), closing popup - parent will read localStorage'
-            );
             window.close();
             return;
           }
@@ -546,7 +485,6 @@ export default function CreatorDashboard() {
 
         // Clean up URL after processing (only if not in popup)
         if (!window.opener && !(state && state.startsWith('instagram_'))) {
-          console.log('[Creator Dashboard] Cleaning up URL parameters');
           window.history.replaceState({}, document.title, '/creator-dashboard');
         }
       }

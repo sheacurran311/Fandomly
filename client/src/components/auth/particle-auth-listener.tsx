@@ -17,11 +17,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
-import {
-  useAccount,
-  useDisconnect,
-  useParticleAuth,
-} from '@particle-network/connectkit';
+import { useAccount, useDisconnect, useParticleAuth } from '@particle-network/connectkit';
 
 /**
  * This component is rendered inside ConnectKitProvider.
@@ -29,11 +25,16 @@ import {
  * bridges them to Fandomly's JWT auth system automatically.
  */
 function ParticleAuthListenerInner() {
-  const { loginWithParticle, logout: fandomlyLogout, isAuthenticated: isFandomlyAuthed } = useAuth();
+  const {
+    loginWithParticle,
+    logout: fandomlyLogout,
+    isAuthenticated: isFandomlyAuthed,
+  } = useAuth();
   const { address, isConnected } = useAccount();
   const { getUserInfo } = useParticleAuth();
   const { disconnect } = useDisconnect();
   const bridgingRef = useRef(false);
+  const logoutInProgressRef = useRef(false);
 
   const bridgeAuth = useCallback(async () => {
     if (bridgingRef.current || isFandomlyAuthed || !isConnected || !address) return;
@@ -41,6 +42,7 @@ function ParticleAuthListenerInner() {
 
     try {
       const userInfo = await getUserInfo();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const token = (userInfo as any)?.token;
       if (!token) {
         console.warn('[Particle Auth Listener] No token from Particle, skipping bridge');
@@ -67,9 +69,13 @@ function ParticleAuthListenerInner() {
   }, [isConnected, address, isFandomlyAuthed, bridgeAuth]);
 
   // Handle Particle disconnect → log out of Fandomly too
+  // Guard with ref to prevent re-entrant logout loop (H3 fix)
   useEffect(() => {
-    if (!isConnected && isFandomlyAuthed) {
-      fandomlyLogout();
+    if (!isConnected && isFandomlyAuthed && !logoutInProgressRef.current) {
+      logoutInProgressRef.current = true;
+      Promise.resolve(fandomlyLogout()).finally(() => {
+        logoutInProgressRef.current = false;
+      });
     }
   }, [isConnected, isFandomlyAuthed, fandomlyLogout]);
 
