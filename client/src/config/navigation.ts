@@ -125,6 +125,12 @@ export const creatorNavItems: NavigationItem[] = [
   },
   { label: 'Fans', href: '/creator-dashboard/fans', icon: Users, color: 'text-green-400' },
   { label: 'My Token', href: '/creator-dashboard/token', icon: Coins, color: 'text-purple-400' },
+  {
+    label: 'Fandomly Tasks',
+    href: '/creator-dashboard/platform-tasks',
+    icon: Star,
+    color: 'text-yellow-400',
+  },
   { label: 'Reputation', href: '/reputation', icon: Shield, color: 'text-indigo-400' },
   { label: 'Profile', href: '/profile', icon: User, showInBottomNav: true },
   { label: 'Settings', href: '/creator-dashboard/settings', icon: Settings },
