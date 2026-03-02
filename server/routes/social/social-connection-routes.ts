@@ -4,6 +4,7 @@ import { db } from '../../db';
 import { socialConnections, syncPreferences, platformPointsTransactions } from '@shared/schema';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
+import { onReputationSignalChanged } from '../../services/reputation/reputation-event-handler';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     });
 
     // Return connections without sensitive tokens
-    const sanitizedConnections = connections.map(conn => ({
+    const sanitizedConnections = connections.map((conn) => ({
       id: conn.id,
       platform: conn.platform,
       platformUserId: conn.platformUserId,
@@ -59,10 +60,7 @@ router.get('/:platform', authenticateUser, async (req: AuthenticatedRequest, res
     }
 
     const connection = await db.query.socialConnections.findFirst({
-      where: and(
-        eq(socialConnections.userId, userId),
-        eq(socialConnections.platform, platform)
-      ),
+      where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)),
     });
 
     if (!connection) {
@@ -82,7 +80,7 @@ router.get('/:platform', authenticateUser, async (req: AuthenticatedRequest, res
         connectedAt: connection.connectedAt,
         lastSyncedAt: connection.lastSyncedAt,
         isActive: connection.isActive,
-      }
+      },
     });
   } catch (error) {
     console.error('Error fetching social connection:', error);
@@ -120,10 +118,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
     // Check if connection already exists
     const existingConnection = await db.query.socialConnections.findFirst({
-      where: and(
-        eq(socialConnections.userId, userId),
-        eq(socialConnections.platform, platform)
-      ),
+      where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)),
     });
 
     let savedConnection;
@@ -147,6 +142,9 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         .returning();
 
       savedConnection = updated;
+
+      // Notify reputation system of reconnection (non-blocking)
+      onReputationSignalChanged(userId, 'socialConnections');
     } else {
       // Create new connection
       const [newConnection] = await db
@@ -167,6 +165,9 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         .returning();
 
       savedConnection = newConnection;
+
+      // Notify reputation system of new connection (non-blocking)
+      onReputationSignalChanged(userId, 'socialConnections');
 
       // Award platform points for new social connection (one-time per platform)
       // Check transaction history to prevent exploit via disconnect/reconnect
@@ -191,9 +192,13 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
             }
           );
           pointsActuallyAwarded = SOCIAL_CONNECTION_POINTS;
-          console.log(`[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+          console.log(
+            `[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`
+          );
         } else {
-          console.log(`[Social Connection] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`);
+          console.log(
+            `[Social Connection] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`
+          );
         }
       } catch (pointsError) {
         console.error(`[Social Connection] Error awarding points:`, pointsError);
@@ -203,10 +208,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       // Auto-create sync preferences for new connection (enabled by default)
       try {
         const existingSyncPref = await db.query.syncPreferences.findFirst({
-          where: and(
-            eq(syncPreferences.userId, userId),
-            eq(syncPreferences.platform, platform)
-          ),
+          where: and(eq(syncPreferences.userId, userId), eq(syncPreferences.platform, platform)),
         });
         if (!existingSyncPref) {
           await db.insert(syncPreferences).values({
@@ -267,10 +269,7 @@ router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, r
     await db
       .delete(socialConnections)
       .where(
-        and(
-          eq(socialConnections.userId, userId),
-          eq(socialConnections.platform, platformLower)
-        )
+        and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platformLower))
       );
 
     // Disable sync preferences (keep record for audit, just disable)
@@ -279,16 +278,15 @@ router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, r
         .update(syncPreferences)
         .set({ syncEnabled: false, nextSyncAt: null, syncStatus: 'idle' })
         .where(
-          and(
-            eq(syncPreferences.userId, userId),
-            eq(syncPreferences.platform, platformLower)
-          )
+          and(eq(syncPreferences.userId, userId), eq(syncPreferences.platform, platformLower))
         );
     } catch (syncPrefError) {
       console.error(`[Social Disconnect] Error updating sync preferences:`, syncPrefError);
     }
 
-    console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`);
+    console.log(
+      `[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`
+    );
     res.json({ success: true, message: `${platformLower} account disconnected successfully` });
   } catch (error) {
     console.error('Error disconnecting social connection:', error);
@@ -312,12 +310,7 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
     // Remove from socialConnections table
     await db
       .delete(socialConnections)
-      .where(
-        and(
-          eq(socialConnections.userId, userId),
-          eq(socialConnections.platform, platform)
-        )
-      );
+      .where(and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)));
 
     res.json({ success: true, message: `${platform} disconnected successfully` });
   } catch (error) {

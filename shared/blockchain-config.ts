@@ -22,3 +22,66 @@ export const CONTRACTS = {
 } as const;
 
 export const DEPLOYER_ADDRESS = '0x95A6bEb968633D1440e89F462a133519808f8015' as const;
+
+// ReputationRegistry ABI — subset needed for oracle operations
+export const REPUTATION_REGISTRY_ABI = [
+  {
+    inputs: [
+      { name: 'user', type: 'address' },
+      { name: 'newScore', type: 'uint256' },
+      { name: 'reason', type: 'string' },
+    ],
+    name: 'updateScore',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'users', type: 'address[]' },
+      { name: 'newScores', type: 'uint256[]' },
+      { name: 'reason', type: 'string' },
+    ],
+    name: 'batchUpdateScores',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'user', type: 'address' }],
+    name: 'getScore',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'user', type: 'address' },
+      { name: 'threshold', type: 'uint256' },
+    ],
+    name: 'meetsThreshold',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const;
+
+// Critical reputation thresholds used by on-chain contracts
+export const REPUTATION_THRESHOLDS = {
+  FAN_STAKING: 500, // FanStaking contract requires 500+ to stake
+  CREATOR_TOKEN: 750, // CreatorTokenFactory requires 750+ to create tokens
+} as const;

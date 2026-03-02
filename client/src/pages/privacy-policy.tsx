@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link } from 'wouter';
 
 export default function PrivacyPolicy() {
   return (
@@ -16,13 +16,16 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>
             <p>
-              Fandomly ("we," "our," or "us") operates the Fandomly.ai platform ("Service") that provides Web3-enabled loyalty rewards for athletes, creators, and musicians. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service.
+              Fandomly (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) operates the Fandomly.ai
+              platform (&quot;Service&quot;) that provides Web3-enabled loyalty rewards for
+              athletes, creators, and musicians. This Privacy Policy explains how we collect, use,
+              disclose, and safeguard your information when you use our Service.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">2. Information We Collect</h2>
-            
+
             <h3 className="text-xl font-medium mb-2">2.1 Personal Information</h3>
             <ul className="list-disc list-inside space-y-2 mb-4">
               <li>Name, email address, and profile information</li>
@@ -33,7 +36,8 @@ export default function PrivacyPolicy() {
 
             <h3 className="text-xl font-medium mb-2">2.2 Social Media Data</h3>
             <p className="mb-4">
-              When you connect your social media accounts (Facebook, Instagram, Twitter, TikTok, YouTube, Spotify), we may collect:
+              When you connect your social media accounts (Facebook, Instagram, Twitter, TikTok,
+              YouTube, Spotify), we may collect:
             </p>
             <ul className="list-disc list-inside space-y-2 mb-4">
               <li>Follower counts and audience demographics</li>
@@ -67,10 +71,11 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">4. Data Sharing and Disclosure</h2>
-            
+
             <h3 className="text-xl font-medium mb-2">4.1 With Your Consent</h3>
             <p className="mb-4">
-              We share your information with third parties only when you explicitly consent, such as when connecting social media accounts or participating in creator programs.
+              We share your information with third parties only when you explicitly consent, such as
+              when connecting social media accounts or participating in creator programs.
             </p>
 
             <h3 className="text-xl font-medium mb-2">4.2 Service Providers</h3>
@@ -86,14 +91,18 @@ export default function PrivacyPolicy() {
 
             <h3 className="text-xl font-medium mb-2">4.3 Legal Requirements</h3>
             <p>
-              We may disclose your information when required by law, to protect our rights, or to ensure the safety of our users and the public.
+              We may disclose your information when required by law, to protect our rights, or to
+              ensure the safety of our users and the public.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">5. NIL Compliance and Student-Athlete Privacy</h2>
+            <h2 className="text-2xl font-semibold mb-4">
+              5. NIL Compliance and Student-Athlete Privacy
+            </h2>
             <p className="mb-4">
-              For college athletes using our platform for Name, Image, and Likeness (NIL) activities:
+              For college athletes using our platform for Name, Image, and Likeness (NIL)
+              activities:
             </p>
             <ul className="list-disc list-inside space-y-2">
               <li>We implement additional privacy protections for NIL-related data</li>
@@ -134,29 +143,70 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">8. Third-Party Integrations</h2>
-            
+
             <h3 className="text-xl font-medium mb-2">8.1 Social Media Platforms</h3>
             <p className="mb-4">
-              Our integrations with social media platforms are governed by their respective privacy policies:
+              Our integrations with social media platforms are governed by their respective privacy
+              policies:
             </p>
             <ul className="list-disc list-inside space-y-2 mb-4">
-              <li>Facebook/Instagram: <a href="https://www.facebook.com/policy.php" className="text-primary hover:underline">Facebook Privacy Policy</a></li>
-              <li>Twitter: <a href="https://twitter.com/privacy" className="text-primary hover:underline">Twitter Privacy Policy</a></li>
-              <li>TikTok: <a href="https://www.tiktok.com/legal/privacy-policy" className="text-primary hover:underline">TikTok Privacy Policy</a></li>
-              <li>YouTube: <a href="https://policies.google.com/privacy" className="text-primary hover:underline">Google Privacy Policy</a></li>
-              <li>Spotify: <a href="https://www.spotify.com/legal/privacy-policy/" className="text-primary hover:underline">Spotify Privacy Policy</a></li>
+              <li>
+                Facebook/Instagram:{' '}
+                <a
+                  href="https://www.facebook.com/policy.php"
+                  className="text-primary hover:underline"
+                >
+                  Facebook Privacy Policy
+                </a>
+              </li>
+              <li>
+                Twitter:{' '}
+                <a href="https://twitter.com/privacy" className="text-primary hover:underline">
+                  Twitter Privacy Policy
+                </a>
+              </li>
+              <li>
+                TikTok:{' '}
+                <a
+                  href="https://www.tiktok.com/legal/privacy-policy"
+                  className="text-primary hover:underline"
+                >
+                  TikTok Privacy Policy
+                </a>
+              </li>
+              <li>
+                YouTube:{' '}
+                <a
+                  href="https://policies.google.com/privacy"
+                  className="text-primary hover:underline"
+                >
+                  Google Privacy Policy
+                </a>
+              </li>
+              <li>
+                Spotify:{' '}
+                <a
+                  href="https://www.spotify.com/legal/privacy-policy/"
+                  className="text-primary hover:underline"
+                >
+                  Spotify Privacy Policy
+                </a>
+              </li>
             </ul>
 
             <h3 className="text-xl font-medium mb-2">8.2 Blockchain Networks</h3>
             <p>
-              Blockchain transactions are public and immutable. While we don't control blockchain networks, we implement privacy-preserving practices in our Web3 integrations.
+              Blockchain transactions are public and immutable. While we don&apos;t control
+              blockchain networks, we implement privacy-preserving practices in our Web3
+              integrations.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">9. Data Retention</h2>
             <p className="mb-4">
-              We retain your information only as long as necessary to provide our services and comply with legal obligations:
+              We retain your information only as long as necessary to provide our services and
+              comply with legal obligations:
             </p>
             <ul className="list-disc list-inside space-y-2">
               <li>Account data: Retained while your account is active</li>
@@ -169,36 +219,54 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">10. International Data Transfers</h2>
             <p>
-              Your information may be transferred to and processed in countries other than your own. We implement appropriate safeguards to ensure your data receives adequate protection in accordance with applicable data protection laws.
+              Your information may be transferred to and processed in countries other than your own.
+              We implement appropriate safeguards to ensure your data receives adequate protection
+              in accordance with applicable data protection laws.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">11. Children's Privacy</h2>
+            <h2 className="text-2xl font-semibold mb-4">11. Children&apos;s Privacy</h2>
             <p>
-              Our Service is not intended for individuals under 13 years of age. We do not knowingly collect personal information from children under 13. If we become aware that we have collected such information, we will take steps to delete it promptly.
+              Our Service is not intended for individuals under 13 years of age. We do not knowingly
+              collect personal information from children under 13. If we become aware that we have
+              collected such information, we will take steps to delete it promptly.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">12. Changes to This Privacy Policy</h2>
             <p>
-              We may update this Privacy Policy periodically. We will notify you of any material changes by posting the new policy on this page and updating the "Last updated" date. Your continued use of the Service after such changes constitutes acceptance of the updated policy.
+              We may update this Privacy Policy periodically. We will notify you of any material
+              changes by posting the new policy on this page and updating the &quot;Last
+              updated&quot; date. Your continued use of the Service after such changes constitutes
+              acceptance of the updated policy.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold mb-4">13. Contact Us</h2>
             <p className="mb-4">
-              If you have questions about this Privacy Policy or our data practices, please contact us:
+              If you have questions about this Privacy Policy or our data practices, please contact
+              us:
             </p>
             <div className="bg-muted p-4 rounded-lg">
-              <p><strong>Email:</strong> privacy@fandomly.ai</p>
-              <p><strong>Address:</strong> [Your Business Address]</p>
-              <p><strong>Data Protection Officer:</strong> dpo@fandomly.ai</p>
+              <p>
+                <strong>Email:</strong> privacy@fandomly.ai
+              </p>
+              <p>
+                <strong>Address:</strong> [Your Business Address]
+              </p>
+              <p>
+                <strong>Data Protection Officer:</strong> dpo@fandomly.ai
+              </p>
             </div>
             <p className="mt-4">
-              For data deletion requests, please visit our <Link href="/data-deletion" className="text-primary hover:underline">Data Deletion Instructions</Link> page.
+              For data deletion requests, please visit our{' '}
+              <Link href="/data-deletion" className="text-primary hover:underline">
+                Data Deletion Instructions
+              </Link>{' '}
+              page.
             </p>
           </section>
         </div>
