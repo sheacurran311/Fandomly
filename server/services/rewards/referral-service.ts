@@ -1,6 +1,6 @@
 /**
  * Fandomly Three-Tier Referral Service
- * 
+ *
  * Handles all referral tracking and rewards:
  * 1. Creator → Creator (Revenue Share)
  * 2. Fan → Fan (Fandomly Points)
@@ -8,23 +8,20 @@
  */
 
 import { db } from '../../db';
-import { 
-  creatorReferrals, 
-  fanReferrals, 
+import {
+  creatorReferrals,
+  fanReferrals,
   creatorTaskReferrals,
   creators,
-  users,
   tasks,
   campaigns,
-  type InsertCreatorReferral,
-  type InsertFanReferral,
-  type InsertCreatorTaskReferral,
   type CreatorReferral,
   type FanReferral,
-  type CreatorTaskReferral
-} from "@shared/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
-import { fandomlyPointsService, creatorPointsService } from "../points/points-service";
+  type CreatorTaskReferral,
+} from '@shared/schema';
+import { eq, and, sql, desc } from 'drizzle-orm';
+import { fandomlyPointsService, creatorPointsService } from '../points/points-service';
+import { onReputationSignalChanged } from '../reputation/reputation-event-handler';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -42,27 +39,30 @@ function generateUniqueCode(prefix: string): string {
 /**
  * Generate referral URL for different contexts
  */
-function generateReferralUrl(type: 'creator' | 'fan' | 'task' | 'campaign', params: {
-  code: string;
-  creatorUrl?: string;
-  taskId?: string;
-  campaignId?: string;
-}): string {
+function generateReferralUrl(
+  type: 'creator' | 'fan' | 'task' | 'campaign',
+  params: {
+    code: string;
+    creatorUrl?: string;
+    taskId?: string;
+    campaignId?: string;
+  }
+): string {
   const baseUrl = process.env.VITE_APP_URL || 'https://fandomly.ai';
-  
+
   switch (type) {
     case 'creator':
       return `${baseUrl}?ref=${params.code.toLowerCase()}`;
-    
+
     case 'fan':
       return `${baseUrl}?fanref=${params.code.toLowerCase()}`;
-    
+
     case 'task':
       return `${baseUrl}/${params.creatorUrl}/tasks/${params.taskId}?ref=${params.code.toLowerCase()}`;
-    
+
     case 'campaign':
       return `${baseUrl}/${params.creatorUrl}/campaigns/${params.campaignId}?ref=${params.code.toLowerCase()}`;
-    
+
     default:
       return baseUrl;
   }
@@ -92,13 +92,16 @@ export class CreatorReferralService {
     const code = generateUniqueCode('CREATOR');
     const url = generateReferralUrl('creator', { code });
 
-    const [referral] = await db.insert(creatorReferrals).values({
-      referringCreatorId: creatorId,
-      referralCode: code,
-      referralUrl: url,
-      status: 'active',
-      commissionPercentage: '10.00' // Default 10%
-    }).returning();
+    const [referral] = await db
+      .insert(creatorReferrals)
+      .values({
+        referringCreatorId: creatorId,
+        referralCode: code,
+        referralUrl: url,
+        status: 'active',
+        commissionPercentage: '10.00', // Default 10%
+      })
+      .returning();
 
     return referral;
   }
@@ -107,10 +110,11 @@ export class CreatorReferralService {
    * Track referral link click
    */
   async trackClick(code: string): Promise<void> {
-    await db.update(creatorReferrals)
-      .set({ 
+    await db
+      .update(creatorReferrals)
+      .set({
         clickCount: sql`${creatorReferrals.clickCount} + 1`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorReferrals.referralCode, code));
   }
@@ -129,12 +133,13 @@ export class CreatorReferralService {
       return;
     }
 
-    await db.update(creatorReferrals)
-      .set({ 
+    await db
+      .update(creatorReferrals)
+      .set({
         referredCreatorId: newCreatorId,
         signupDate: new Date(),
         status: 'active',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorReferrals.id, referral.id));
   }
@@ -146,20 +151,23 @@ export class CreatorReferralService {
     const [referral] = await db
       .select()
       .from(creatorReferrals)
-      .where(and(
-        eq(creatorReferrals.referredCreatorId, referredCreatorId),
-        eq(creatorReferrals.status, 'active')
-      ))
+      .where(
+        and(
+          eq(creatorReferrals.referredCreatorId, referredCreatorId),
+          eq(creatorReferrals.status, 'active')
+        )
+      )
       .limit(1);
 
     if (!referral) {
       return;
     }
 
-    await db.update(creatorReferrals)
-      .set({ 
+    await db
+      .update(creatorReferrals)
+      .set({
         firstPaidDate: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorReferrals.id, referral.id));
   }
@@ -167,17 +175,16 @@ export class CreatorReferralService {
   /**
    * Calculate and record commission
    */
-  async calculateCommission(
-    referredCreatorId: string, 
-    paymentAmount: number
-  ): Promise<number> {
+  async calculateCommission(referredCreatorId: string, paymentAmount: number): Promise<number> {
     const [referral] = await db
       .select()
       .from(creatorReferrals)
-      .where(and(
-        eq(creatorReferrals.referredCreatorId, referredCreatorId),
-        eq(creatorReferrals.status, 'active')
-      ))
+      .where(
+        and(
+          eq(creatorReferrals.referredCreatorId, referredCreatorId),
+          eq(creatorReferrals.status, 'active')
+        )
+      )
       .limit(1);
 
     if (!referral) {
@@ -188,11 +195,12 @@ export class CreatorReferralService {
     const commission = paymentAmount * (percentage / 100);
 
     // Update totals
-    await db.update(creatorReferrals)
+    await db
+      .update(creatorReferrals)
       .set({
         totalRevenueGenerated: sql`${creatorReferrals.totalRevenueGenerated} + ${paymentAmount}`,
         totalCommissionEarned: sql`${creatorReferrals.totalCommissionEarned} + ${commission}`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorReferrals.id, referral.id));
 
@@ -205,7 +213,7 @@ export class CreatorReferralService {
   async getCreatorReferralStats(creatorId: string) {
     try {
       console.log('📊 Getting creator referral stats for:', creatorId);
-      
+
       const [referral] = await db
         .select()
         .from(creatorReferrals)
@@ -223,10 +231,12 @@ export class CreatorReferralService {
       const referredCreators = await db
         .select()
         .from(creatorReferrals)
-        .where(and(
-          eq(creatorReferrals.referringCreatorId, creatorId),
-          sql`${creatorReferrals.referredCreatorId} IS NOT NULL`
-        ));
+        .where(
+          and(
+            eq(creatorReferrals.referringCreatorId, creatorId),
+            sql`${creatorReferrals.referredCreatorId} IS NOT NULL`
+          )
+        );
 
       console.log('📈 Found referred creators:', referredCreators.length);
 
@@ -238,13 +248,13 @@ export class CreatorReferralService {
         totalRevenue: parseFloat(referral.totalRevenueGenerated || '0'),
         totalCommission: parseFloat(referral.totalCommissionEarned || '0'),
         commissionPercentage: parseFloat(referral.commissionPercentage || '0'),
-        referredCreators: referredCreators.map(r => ({
+        referredCreators: referredCreators.map((r) => ({
           id: r.referredCreatorId,
           signupDate: r.signupDate,
           firstPaidDate: r.firstPaidDate,
           revenue: parseFloat(r.totalRevenueGenerated || '0'),
-          commission: parseFloat(r.totalCommissionEarned || '0')
-        }))
+          commission: parseFloat(r.totalCommissionEarned || '0'),
+        })),
       };
     } catch (error) {
       console.error('❌ Error in getCreatorReferralStats:', error);
@@ -277,15 +287,18 @@ export class FanReferralService {
     const code = generateUniqueCode('FAN');
     const url = generateReferralUrl('fan', { code });
 
-    const [referral] = await db.insert(fanReferrals).values({
-      referringFanId: fanId,
-      referralCode: code,
-      referralUrl: url,
-      status: 'pending',
-      percentageRewardsEnabled: true,
-      percentageValue: '5.00', // Default 5%
-      percentageExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-    }).returning();
+    const [referral] = await db
+      .insert(fanReferrals)
+      .values({
+        referringFanId: fanId,
+        referralCode: code,
+        referralUrl: url,
+        status: 'pending',
+        percentageRewardsEnabled: true,
+        percentageValue: '5.00', // Default 5%
+        percentageExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      })
+      .returning();
 
     return referral;
   }
@@ -294,10 +307,11 @@ export class FanReferralService {
    * Track referral link click
    */
   async trackClick(code: string): Promise<void> {
-    await db.update(fanReferrals)
-      .set({ 
+    await db
+      .update(fanReferrals)
+      .set({
         clickCount: sql`${fanReferrals.clickCount} + 1`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(fanReferrals.referralCode, code));
   }
@@ -316,22 +330,23 @@ export class FanReferralService {
       return;
     }
 
-    await db.update(fanReferrals)
-      .set({ 
+    await db
+      .update(fanReferrals)
+      .set({
         referredFanId: newFanId,
         signupDate: new Date(),
         status: 'active',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(fanReferrals.id, referral.id));
 
+    // Notify reputation system of new referral (non-blocking)
+    if (referral.referringFanId) {
+      onReputationSignalChanged(referral.referringFanId, 'referralCount');
+    }
+
     // Award signup bonus to referrer
-    await this.awardReferralPoints(
-      referral.id,
-      'signup',
-      50,
-      'Friend signed up'
-    );
+    await this.awardReferralPoints(referral.id, 'signup', 50, 'Friend signed up');
   }
 
   /**
@@ -354,9 +369,9 @@ export class FanReferralService {
     }
 
     // Update milestone tracking
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       totalPointsReferrerEarned: sql`${fanReferrals.totalPointsReferrerEarned} + ${points}`,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     if (milestone === 'first_task') {
@@ -365,9 +380,7 @@ export class FanReferralService {
       updates.profileCompletedAt = new Date();
     }
 
-    await db.update(fanReferrals)
-      .set(updates)
-      .where(eq(fanReferrals.id, referralId));
+    await db.update(fanReferrals).set(updates).where(eq(fanReferrals.id, referralId));
 
     // Award Fandomly Points to referring fan
     if (!referral.referringFanId) return;
@@ -387,11 +400,13 @@ export class FanReferralService {
     const [referral] = await db
       .select()
       .from(fanReferrals)
-      .where(and(
-        eq(fanReferrals.referredFanId, referredFanId),
-        eq(fanReferrals.status, 'active'),
-        eq(fanReferrals.percentageRewardsEnabled, true)
-      ))
+      .where(
+        and(
+          eq(fanReferrals.referredFanId, referredFanId),
+          eq(fanReferrals.status, 'active'),
+          eq(fanReferrals.percentageRewardsEnabled, true)
+        )
+      )
       .limit(1);
 
     if (!referral) {
@@ -407,11 +422,12 @@ export class FanReferralService {
     const bonusPoints = Math.floor(points * (percentage / 100));
 
     // Update tracking
-    await db.update(fanReferrals)
+    await db
+      .update(fanReferrals)
       .set({
         totalPointsReferredUserEarned: sql`${fanReferrals.totalPointsReferredUserEarned} + ${points}`,
         totalPointsReferrerEarned: sql`${fanReferrals.totalPointsReferrerEarned} + ${bonusPoints}`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(fanReferrals.id, referral.id));
 
@@ -433,7 +449,7 @@ export class FanReferralService {
   async getFanReferralStats(fanId: string) {
     try {
       console.log('📊 Getting fan referral stats for:', fanId);
-      
+
       const [referral] = await db
         .select()
         .from(fanReferrals)
@@ -451,36 +467,39 @@ export class FanReferralService {
       const referredFans = await db
         .select()
         .from(fanReferrals)
-        .where(and(
-          eq(fanReferrals.referringFanId, fanId),
-          sql`${fanReferrals.referredFanId} IS NOT NULL`
-        ));
+        .where(
+          and(
+            eq(fanReferrals.referringFanId, fanId),
+            sql`${fanReferrals.referredFanId} IS NOT NULL`
+          )
+        );
 
-      const friendsWithFirstTask = referredFans.filter(r => r.firstTaskCompletedAt).length;
-      const friendsWithProfileComplete = referredFans.filter(r => r.profileCompletedAt).length;
+      const friendsWithFirstTask = referredFans.filter((r) => r.firstTaskCompletedAt).length;
+      const friendsWithProfileComplete = referredFans.filter((r) => r.profileCompletedAt).length;
 
       console.log('📈 Found referred fans:', referredFans.length);
 
-    return {
-      referralCode: referral.referralCode,
-      referralUrl: referral.referralUrl,
-      totalClicks: referral.clickCount,
-      totalFriends: referredFans.length,
-      friendsWithFirstTask,
-      friendsWithProfileComplete,
-      totalPointsEarned: referral.totalPointsReferrerEarned,
-      percentageRewardsActive: referral.percentageRewardsEnabled && 
-        (!referral.percentageExpiresAt || new Date() < referral.percentageExpiresAt),
-      percentageValue: parseFloat(referral.percentageValue ?? '0'),
-      percentageExpiresAt: referral.percentageExpiresAt,
-      referredFans: referredFans.map(r => ({
-        id: r.referredFanId,
-        signupDate: r.signupDate,
-        firstTaskCompleted: r.firstTaskCompletedAt,
-        profileCompleted: r.profileCompletedAt,
-        pointsEarned: r.totalPointsReferredUserEarned || 0
-      }))
-    };
+      return {
+        referralCode: referral.referralCode,
+        referralUrl: referral.referralUrl,
+        totalClicks: referral.clickCount,
+        totalFriends: referredFans.length,
+        friendsWithFirstTask,
+        friendsWithProfileComplete,
+        totalPointsEarned: referral.totalPointsReferrerEarned,
+        percentageRewardsActive:
+          referral.percentageRewardsEnabled &&
+          (!referral.percentageExpiresAt || new Date() < referral.percentageExpiresAt),
+        percentageValue: parseFloat(referral.percentageValue ?? '0'),
+        percentageExpiresAt: referral.percentageExpiresAt,
+        referredFans: referredFans.map((r) => ({
+          id: r.referredFanId,
+          signupDate: r.signupDate,
+          firstTaskCompleted: r.firstTaskCompletedAt,
+          profileCompleted: r.profileCompletedAt,
+          pointsEarned: r.totalPointsReferredUserEarned || 0,
+        })),
+      };
     } catch (error) {
       console.error('❌ Error in getFanReferralStats:', error);
       throw error;
@@ -502,17 +521,9 @@ export class CreatorTaskReferralService {
     creatorId: string
   ): Promise<CreatorTaskReferral> {
     // Get task details for URL generation
-    const [task] = await db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.id, taskId))
-      .limit(1);
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
 
-    const [creator] = await db
-      .select()
-      .from(creators)
-      .where(eq(creators.id, creatorId))
-      .limit(1);
+    const [creator] = await db.select().from(creators).where(eq(creators.id, creatorId)).limit(1);
 
     if (!task || !creator) {
       throw new Error('Task or creator not found');
@@ -522,10 +533,9 @@ export class CreatorTaskReferralService {
     const [existing] = await db
       .select()
       .from(creatorTaskReferrals)
-      .where(and(
-        eq(creatorTaskReferrals.taskId, taskId),
-        eq(creatorTaskReferrals.referringFanId, fanId)
-      ))
+      .where(
+        and(eq(creatorTaskReferrals.taskId, taskId), eq(creatorTaskReferrals.referringFanId, fanId))
+      )
       .limit(1);
 
     if (existing) {
@@ -533,25 +543,32 @@ export class CreatorTaskReferralService {
     }
 
     // Generate code and URL (creator has displayName, not username; use displayName for slug)
-    const creatorSlug = creator.displayName?.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) || creatorId.slice(0, 8);
+    const creatorSlug =
+      creator.displayName
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .slice(0, 20) || creatorId.slice(0, 8);
     const baseCode = generateUniqueCode('TASK');
     const code = `${creatorSlug}-${baseCode}`;
     const url = generateReferralUrl('task', {
       code,
       creatorUrl: creatorSlug,
-      taskId: task.id
+      taskId: task.id,
     });
 
-    const [referral] = await db.insert(creatorTaskReferrals).values({
-      creatorId,
-      taskId,
-      referringFanId: fanId,
-      referralCode: code,
-      referralUrl: url,
-      referralType: 'task',
-      status: 'pending',
-      sharePercentage: '10.00' // Default 10% share
-    }).returning();
+    const [referral] = await db
+      .insert(creatorTaskReferrals)
+      .values({
+        creatorId,
+        taskId,
+        referringFanId: fanId,
+        referralCode: code,
+        referralUrl: url,
+        referralType: 'task',
+        status: 'pending',
+        sharePercentage: '10.00', // Default 10% share
+      })
+      .returning();
 
     return referral;
   }
@@ -571,11 +588,7 @@ export class CreatorTaskReferralService {
       .where(eq(campaigns.id, campaignId))
       .limit(1);
 
-    const [creator] = await db
-      .select()
-      .from(creators)
-      .where(eq(creators.id, creatorId))
-      .limit(1);
+    const [creator] = await db.select().from(creators).where(eq(creators.id, creatorId)).limit(1);
 
     if (!campaign || !creator) {
       throw new Error('Campaign or creator not found');
@@ -585,10 +598,12 @@ export class CreatorTaskReferralService {
     const [existing] = await db
       .select()
       .from(creatorTaskReferrals)
-      .where(and(
-        eq(creatorTaskReferrals.campaignId, campaignId),
-        eq(creatorTaskReferrals.referringFanId, fanId)
-      ))
+      .where(
+        and(
+          eq(creatorTaskReferrals.campaignId, campaignId),
+          eq(creatorTaskReferrals.referringFanId, fanId)
+        )
+      )
       .limit(1);
 
     if (existing) {
@@ -596,25 +611,32 @@ export class CreatorTaskReferralService {
     }
 
     // Generate code and URL (creator has displayName, not username; use displayName for slug)
-    const creatorSlug = creator.displayName?.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) || creatorId.slice(0, 8);
+    const creatorSlug =
+      creator.displayName
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .slice(0, 20) || creatorId.slice(0, 8);
     const baseCode = generateUniqueCode('CAMP');
     const code = `${creatorSlug}-${baseCode}`;
     const url = generateReferralUrl('campaign', {
       code,
       creatorUrl: creatorSlug,
-      campaignId: campaign.id
+      campaignId: campaign.id,
     });
 
-    const [referral] = await db.insert(creatorTaskReferrals).values({
-      creatorId,
-      campaignId,
-      referringFanId: fanId,
-      referralCode: code,
-      referralUrl: url,
-      referralType: 'campaign',
-      status: 'pending',
-      sharePercentage: '10.00'
-    }).returning();
+    const [referral] = await db
+      .insert(creatorTaskReferrals)
+      .values({
+        creatorId,
+        campaignId,
+        referringFanId: fanId,
+        referralCode: code,
+        referralUrl: url,
+        referralType: 'campaign',
+        status: 'pending',
+        sharePercentage: '10.00',
+      })
+      .returning();
 
     return referral;
   }
@@ -623,10 +645,11 @@ export class CreatorTaskReferralService {
    * Track referral link click
    */
   async trackClick(code: string): Promise<void> {
-    await db.update(creatorTaskReferrals)
-      .set({ 
+    await db
+      .update(creatorTaskReferrals)
+      .set({
         clickCount: sql`${creatorTaskReferrals.clickCount} + 1`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorTaskReferrals.referralCode, code));
   }
@@ -645,12 +668,13 @@ export class CreatorTaskReferralService {
       return;
     }
 
-    await db.update(creatorTaskReferrals)
-      .set({ 
+    await db
+      .update(creatorTaskReferrals)
+      .set({
         referredFanId: newFanId,
         signupDate: new Date(),
         status: 'active',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorTaskReferrals.id, referral.id));
 
@@ -667,10 +691,11 @@ export class CreatorTaskReferralService {
    * Mark when friend joins this specific creator
    */
   async markFriendJoinedCreator(referralId: string): Promise<void> {
-    await db.update(creatorTaskReferrals)
-      .set({ 
+    await db
+      .update(creatorTaskReferrals)
+      .set({
         joinedCreatorDate: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorTaskReferrals.id, referralId));
 
@@ -687,11 +712,12 @@ export class CreatorTaskReferralService {
    * Mark when friend completes the task
    */
   async markTaskCompleted(referralId: string): Promise<void> {
-    await db.update(creatorTaskReferrals)
-      .set({ 
+    await db
+      .update(creatorTaskReferrals)
+      .set({
         completedTaskDate: new Date(),
         status: 'completed',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorTaskReferrals.id, referralId));
 
@@ -724,10 +750,11 @@ export class CreatorTaskReferralService {
     }
 
     // Update points tracking
-    await db.update(creatorTaskReferrals)
+    await db
+      .update(creatorTaskReferrals)
       .set({
         totalCreatorPointsEarned: sql`${creatorTaskReferrals.totalCreatorPointsEarned} + ${points}`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(creatorTaskReferrals.id, referralId));
 
@@ -760,10 +787,12 @@ export class CreatorTaskReferralService {
       ? await db
           .select()
           .from(creatorTaskReferrals)
-          .where(and(
-            eq(creatorTaskReferrals.referringFanId, fanId),
-            eq(creatorTaskReferrals.creatorId, creatorId)
-          ))
+          .where(
+            and(
+              eq(creatorTaskReferrals.referringFanId, fanId),
+              eq(creatorTaskReferrals.creatorId, creatorId)
+            )
+          )
           .orderBy(desc(creatorTaskReferrals.createdAt))
       : await db
           .select()
@@ -774,10 +803,10 @@ export class CreatorTaskReferralService {
     const stats = {
       totalShares: referrals.length,
       totalClicks: referrals.reduce((sum, r) => sum + (r.clickCount ?? 0), 0),
-      totalSignups: referrals.filter(r => r.signupDate).length,
-      totalCompletions: referrals.filter(r => r.completedTaskDate).length,
+      totalSignups: referrals.filter((r) => r.signupDate).length,
+      totalCompletions: referrals.filter((r) => r.completedTaskDate).length,
       totalPointsEarned: referrals.reduce((sum, r) => sum + (r.totalCreatorPointsEarned ?? 0), 0),
-      referrals: referrals.map(r => ({
+      referrals: referrals.map((r) => ({
         id: r.id,
         code: r.referralCode,
         url: r.referralUrl,
@@ -788,8 +817,8 @@ export class CreatorTaskReferralService {
         friendJoined: !!r.signupDate,
         taskCompleted: !!r.completedTaskDate,
         pointsEarned: r.totalCreatorPointsEarned ?? 0,
-        createdAt: r.createdAt
-      }))
+        createdAt: r.createdAt,
+      })),
     };
 
     return stats;
@@ -808,20 +837,20 @@ export class CreatorTaskReferralService {
 
     // Group by fan and sum points
     const fanTotals = new Map<string, number>();
-    const fanData = new Map<string, any>();
+    const fanData = new Map<string, Record<string, unknown>>();
 
     for (const ref of referrals) {
       const current = fanTotals.get(ref.referringFanId) || 0;
       fanTotals.set(ref.referringFanId, current + (ref.totalCreatorPointsEarned ?? 0));
-      
+
       if (!fanData.has(ref.referringFanId)) {
         fanData.set(ref.referringFanId, {
           fanId: ref.referringFanId,
           totalShares: 0,
-          totalCompletions: 0
+          totalCompletions: 0,
         });
       }
-      
+
       const data = fanData.get(ref.referringFanId);
       data.totalShares++;
       if (ref.completedTaskDate) data.totalCompletions++;
@@ -832,7 +861,7 @@ export class CreatorTaskReferralService {
       .map(([fanId, points]) => ({
         fanId,
         totalPoints: points,
-        ...fanData.get(fanId)
+        ...fanData.get(fanId),
       }))
       .sort((a, b) => b.totalPoints - a.totalPoints)
       .slice(0, limit);
@@ -848,4 +877,3 @@ export class CreatorTaskReferralService {
 export const creatorReferralService = new CreatorReferralService();
 export const fanReferralService = new FanReferralService();
 export const creatorTaskReferralService = new CreatorTaskReferralService();
-

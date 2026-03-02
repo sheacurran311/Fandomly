@@ -1,75 +1,78 @@
-import express, { type Request, Response, NextFunction } from "express";
-import cookieParser from "cookie-parser";
-import helmet from "helmet";
-import { doubleCsrf } from "csrf-csrf";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { syncScheduler } from "./services/analytics/sync/sync-scheduler";
-import { groupGoalPoller } from "./services/verification/group-goals/group-goal-poller";
-import { pointExpirationJob } from "./jobs/point-expiration-job";
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { doubleCsrf } from 'csrf-csrf';
+import { registerRoutes } from './routes';
+import { setupVite, serveStatic, log } from './vite';
+import { syncScheduler } from './services/analytics/sync/sync-scheduler';
+import { groupGoalPoller } from './services/verification/group-goals/group-goal-poller';
+import { pointExpirationJob } from './jobs/point-expiration-job';
+import { reputationSyncJob } from './jobs/reputation-sync-job';
 
 const app = express();
 
 // Security headers via Helmet
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      // Allow Facebook SDK, Google APIs, and other necessary external scripts
-      scriptSrc: [
-        "'self'", 
-        "'unsafe-inline'", 
-        "'unsafe-eval'", // Required for Vite in dev
-        "https://connect.facebook.net",
-        "https://apis.google.com",
-        "https://accounts.google.com",
-        "https://www.googletagmanager.com",
-        "https://replit.com", // For Replit dev banner
-      ],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "https:", "wss:"],
-      frameSrc: ["'self'", "https://www.facebook.com", "https://accounts.google.com"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // Allow Facebook SDK, Google APIs, and other necessary external scripts
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'", // Required for Vite in dev
+          'https://connect.facebook.net',
+          'https://apis.google.com',
+          'https://accounts.google.com',
+          'https://www.googletagmanager.com',
+          'https://replit.com', // For Replit dev banner
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
+        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+        fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+        connectSrc: ["'self'", 'https:', 'wss:'],
+        frameSrc: ["'self'", 'https://www.facebook.com', 'https://accounts.google.com'],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false, // May interfere with some embeds
-  crossOriginOpenerPolicy: false, // Required for OAuth popup flows -- popups need window.opener access
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resources
-}));
+    crossOriginEmbedderPolicy: false, // May interfere with some embeds
+    crossOriginOpenerPolicy: false, // Required for OAuth popup flows -- popups need window.opener access
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resources
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // CSRF Protection
-const isProduction = process.env.NODE_ENV === "production";
-const {
-  generateCsrfToken,
-  doubleCsrfProtection,
-} = doubleCsrf({
-  getSecret: () => process.env.CSRF_SECRET || process.env.TOKEN_ENCRYPTION_KEY || 'csrf-secret-change-in-production',
+const isProduction = process.env.NODE_ENV === 'production';
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
+  getSecret: () =>
+    process.env.CSRF_SECRET ||
+    process.env.TOKEN_ENCRYPTION_KEY ||
+    'csrf-secret-change-in-production',
   // getSessionIdentifier is required in v4 - use a constant for stateless CSRF
   // The security comes from the httpOnly cookie + token comparison, not session binding
   getSessionIdentifier: () => 'stateless',
   // __Host- prefix requires secure:true which only works on HTTPS
   // Use different cookie name for dev vs prod
-  cookieName: isProduction ? "__Host-csrf" : "csrf-token",
+  cookieName: isProduction ? '__Host-csrf' : 'csrf-token',
   cookieOptions: {
     httpOnly: true,
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? 'strict' : 'lax',
     secure: isProduction,
-    path: "/",
+    path: '/',
   },
   size: 64,
-  ignoredMethods: ["GET", "HEAD", "OPTIONS"],
-  getTokenFromRequest: (req) => req.headers["x-csrf-token"] as string,
+  ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
+  getTokenFromRequest: (req) => req.headers['x-csrf-token'] as string,
 });
 
 // Expose CSRF token endpoint for frontend
-app.get("/api/csrf-token", (req, res) => {
+app.get('/api/csrf-token', (req, res) => {
   const token = generateCsrfToken(req, res);
   res.json({ csrfToken: token });
 });
@@ -78,8 +81,7 @@ app.get("/api/csrf-token", (req, res) => {
 // Exclude webhook endpoints that receive external calls
 app.use((req, res, next) => {
   // Skip CSRF for webhooks (they use signature verification instead)
-  if (req.path.startsWith('/api/webhooks/') || 
-      req.path.startsWith('/api/stripe/webhook')) {
+  if (req.path.startsWith('/api/webhooks/') || req.path.startsWith('/api/stripe/webhook')) {
     return next();
   }
   // Skip CSRF for auth callback routes (OAuth redirects)
@@ -111,7 +113,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -119,16 +121,16 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
+    if (path.startsWith('/api')) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
       if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+        logLine = logLine.slice(0, 79) + '…';
       }
 
       log(logLine);
@@ -142,13 +144,13 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
 
   // Use standardized error handling middleware
-  const { errorHandler } = await import("./utils/error-factory");
+  const { errorHandler } = await import('./utils/error-factory');
   app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (app.get('env') === 'development') {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -159,33 +161,43 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-    
-    // Start background services after server is listening
-    try {
-      syncScheduler.start();
-      log('Analytics sync scheduler started');
-    } catch (err) {
-      console.error('Failed to start sync scheduler:', err);
-    }
+  server.listen(
+    {
+      port,
+      host: '0.0.0.0',
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
 
-    try {
-      groupGoalPoller.start();
-      log('Group goal poller started');
-    } catch (err) {
-      console.error('Failed to start group goal poller:', err);
-    }
+      // Start background services after server is listening
+      try {
+        syncScheduler.start();
+        log('Analytics sync scheduler started');
+      } catch (err) {
+        console.error('Failed to start sync scheduler:', err);
+      }
 
-    try {
-      pointExpirationJob.start();
-      log('Point expiration job started');
-    } catch (err) {
-      console.error('Failed to start point expiration job:', err);
+      try {
+        groupGoalPoller.start();
+        log('Group goal poller started');
+      } catch (err) {
+        console.error('Failed to start group goal poller:', err);
+      }
+
+      try {
+        pointExpirationJob.start();
+        log('Point expiration job started');
+      } catch (err) {
+        console.error('Failed to start point expiration job:', err);
+      }
+
+      try {
+        reputationSyncJob.start();
+        log('Reputation sync job started (hourly)');
+      } catch (err) {
+        console.error('Failed to start reputation sync job:', err);
+      }
     }
-  });
+  );
 })();

@@ -1,16 +1,17 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useState } from "react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useState } from 'react';
 import {
   Users,
   Flame,
@@ -21,7 +22,6 @@ import {
   MessageSquare,
   Heart,
   Video,
-  Music,
   Search,
   Sparkles,
   Trophy,
@@ -31,10 +31,7 @@ import {
   CheckCircle,
   Twitter,
   Repeat2,
-  Play,
-  Bell,
   ThumbsUp,
-  Disc,
   ListMusic,
   Camera,
   Hash,
@@ -43,7 +40,6 @@ import {
   ShieldCheck,
   Shield,
   ShieldAlert,
-  Info,
   AlertTriangle,
   Code,
   Eye,
@@ -51,14 +47,41 @@ import {
   Globe,
   Layers,
   LayoutGrid,
-} from "lucide-react";
-import { SiTiktok, SiSpotify, SiFacebook, SiInstagram, SiYoutube, SiDiscord, SiTwitch } from "react-icons/si";
-import { TIER_GUIDANCE } from "@shared/taskTemplates";
+} from 'lucide-react';
+import {
+  SiTiktok,
+  SiSpotify,
+  SiFacebook,
+  SiInstagram,
+  SiYoutube,
+  SiDiscord,
+  SiTwitch,
+  SiKick,
+} from 'react-icons/si';
+import { FaPatreon } from 'react-icons/fa';
+import { TIER_GUIDANCE } from '@shared/taskTemplates';
 
 // Verification tier type
 type VerificationTier = 'T1' | 'T2' | 'T3';
-type VerificationMethod = 'api' | 'code_comment' | 'code_repost' | 'manual' | 'starter_pack' | 'platform';
-type TemplatePlatform = 'twitter' | 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'spotify' | 'discord' | 'twitch' | 'general';
+type VerificationMethod =
+  | 'api'
+  | 'code_comment'
+  | 'code_repost'
+  | 'manual'
+  | 'starter_pack'
+  | 'platform';
+type TemplatePlatform =
+  | 'twitter'
+  | 'instagram'
+  | 'facebook'
+  | 'youtube'
+  | 'tiktok'
+  | 'spotify'
+  | 'discord'
+  | 'twitch'
+  | 'kick'
+  | 'patreon'
+  | 'general';
 type ViewMode = 'grid' | 'by-platform' | 'by-verification';
 
 export type TaskTemplateType =
@@ -92,6 +115,10 @@ export type TaskTemplateType =
   | 'discord_verify'
   | 'twitch_follow'
   | 'twitch_subscribe'
+  | 'kick_follow'
+  | 'kick_subscribe'
+  | 'patreon_support'
+  | 'patreon_tier_check'
   | 'stream_code_verify'
   | 'social_follow'
   | 'social_like'
@@ -122,14 +149,17 @@ interface TaskTemplate {
 }
 
 // Tier configuration for styling and tooltips
-const TIER_CONFIG: Record<VerificationTier, {
-  icon: typeof ShieldCheck;
-  label: string;
-  shortLabel: string;
-  bgColor: string;
-  textColor: string;
-  borderColor: string;
-}> = {
+const TIER_CONFIG: Record<
+  VerificationTier,
+  {
+    icon: typeof ShieldCheck;
+    label: string;
+    shortLabel: string;
+    bgColor: string;
+    textColor: string;
+    borderColor: string;
+  }
+> = {
   T1: {
     icon: ShieldCheck,
     label: 'API Verified',
@@ -157,10 +187,13 @@ const TIER_CONFIG: Record<VerificationTier, {
 };
 
 // Verification method icons and labels
-const METHOD_CONFIG: Record<VerificationMethod, {
-  icon: typeof CheckCircle;
-  label: string;
-}> = {
+const METHOD_CONFIG: Record<
+  VerificationMethod,
+  {
+    icon: typeof CheckCircle;
+    label: string;
+  }
+> = {
   api: { icon: CheckCircle, label: 'Automatic' },
   code_comment: { icon: Code, label: 'Code in Comment' },
   code_repost: { icon: Code, label: 'Code in Repost' },
@@ -170,13 +203,16 @@ const METHOD_CONFIG: Record<VerificationMethod, {
 };
 
 // Platform configuration for grouping and display
-const PLATFORM_CONFIG: Record<TemplatePlatform, {
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  textColor: string;
-  borderColor: string;
-  sortOrder: number;
-}> = {
+const PLATFORM_CONFIG: Record<
+  TemplatePlatform,
+  {
+    name: string;
+    icon: React.ComponentType<{ className?: string }>;
+    textColor: string;
+    borderColor: string;
+    sortOrder: number;
+  }
+> = {
   twitter: {
     name: 'Twitter / X',
     icon: Twitter,
@@ -233,41 +269,59 @@ const PLATFORM_CONFIG: Record<TemplatePlatform, {
     borderColor: 'border-purple-500/20',
     sortOrder: 8,
   },
+  kick: {
+    name: 'Kick',
+    icon: SiKick,
+    textColor: 'text-green-400',
+    borderColor: 'border-green-500/20',
+    sortOrder: 9,
+  },
+  patreon: {
+    name: 'Patreon',
+    icon: FaPatreon,
+    textColor: 'text-[#FF424D]',
+    borderColor: 'border-[#FF424D]/20',
+    sortOrder: 10,
+  },
   general: {
     name: 'General / Multi-Platform',
     icon: Globe,
     textColor: 'text-gray-300',
     borderColor: 'border-white/10',
-    sortOrder: 9,
+    sortOrder: 11,
   },
 };
 
 // TierBadge component with tooltip
-function TierBadge({ tier, showTooltip = true }: { tier: VerificationTier | null; showTooltip?: boolean }) {
+function TierBadge({
+  tier,
+  showTooltip = true,
+}: {
+  tier: VerificationTier | null;
+  showTooltip?: boolean;
+}) {
   if (!tier) return null;
-  
+
   const config = TIER_CONFIG[tier];
   const guidance = TIER_GUIDANCE[tier];
   const IconComponent = config.icon;
-  
+
   const badge = (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={`text-xs ${config.bgColor} ${config.textColor} ${config.borderColor} cursor-help`}
     >
       <IconComponent className="h-3 w-3 mr-1" />
       {config.label}
     </Badge>
   );
-  
+
   if (!showTooltip) return badge;
-  
+
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          {badge}
-        </TooltipTrigger>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -281,9 +335,7 @@ function TierBadge({ tier, showTooltip = true }: { tier: VerificationTier | null
               <Coins className="h-3 w-3 text-primary" />
               <span className="font-medium">{guidance.pointsRange}</span>
             </div>
-            {guidance.tip && (
-              <p className="text-xs text-green-400 italic">{guidance.tip}</p>
-            )}
+            {guidance.tip && <p className="text-xs text-green-400 italic">{guidance.tip}</p>}
             {guidance.warning && (
               <div className="flex items-start gap-1.5 text-xs text-amber-400">
                 <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
@@ -300,15 +352,18 @@ function TierBadge({ tier, showTooltip = true }: { tier: VerificationTier | null
 // Verification method badge
 function MethodBadge({ method }: { method: VerificationMethod | null }) {
   if (!method) return null;
-  
+
   const config = METHOD_CONFIG[method];
   const IconComponent = config.icon;
-  
+
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant="outline" className="text-xs bg-white/5 text-gray-300 border-white/20 cursor-help">
+          <Badge
+            variant="outline"
+            className="text-xs bg-white/5 text-gray-300 border-white/20 cursor-help"
+          >
             <IconComponent className="h-3 w-3 mr-1" />
             {config.label}
           </Badge>
@@ -335,16 +390,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 98,
     estimatedSetupTime: '5 minutes',
-    benefits: [
-      'Viral growth potential',
-      'Cost-effective acquisition',
-      'Network effects',
-    ],
-    useCases: [
-      'Grow fanbase organically',
-      'Launch new campaigns',
-      'Build community',
-    ],
+    benefits: ['Viral growth potential', 'Cost-effective acquisition', 'Network effects'],
+    useCases: ['Grow fanbase organically', 'Launch new campaigns', 'Build community'],
     verificationTier: 'T1',
     verificationMethod: 'platform',
     recommendedPoints: 100,
@@ -360,16 +407,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 92,
     estimatedSetupTime: '4 minutes',
-    benefits: [
-      'Daily engagement',
-      'Habit formation',
-      'Streak mechanics',
-    ],
-    useCases: [
-      'Keep fans coming back',
-      'Build daily rituals',
-      'Reward consistency',
-    ],
+    benefits: ['Daily engagement', 'Habit formation', 'Streak mechanics'],
+    useCases: ['Keep fans coming back', 'Build daily rituals', 'Reward consistency'],
     verificationTier: 'T1',
     verificationMethod: 'platform',
     recommendedPoints: 10,
@@ -385,16 +424,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 88,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Crowdsourced growth',
-      'Automatic tracking',
-      'Tiered rewards',
-    ],
-    useCases: [
-      'Grow social presence',
-      'Celebrate milestones',
-      'Incentivize promotion',
-    ],
+    benefits: ['Crowdsourced growth', 'Automatic tracking', 'Tiered rewards'],
+    useCases: ['Grow social presence', 'Celebrate milestones', 'Incentivize promotion'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 50,
@@ -415,11 +446,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'Automatic rewards',
       'Grow Twitter following',
     ],
-    useCases: [
-      'Build Twitter audience',
-      'Quick fan engagement',
-      'Simple onboarding',
-    ],
+    useCases: ['Build Twitter audience', 'Quick fan engagement', 'Simple onboarding'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 50,
@@ -435,16 +462,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 92,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Instant API verification',
-      'Boost tweet engagement',
-      'Automatic point rewards',
-    ],
-    useCases: [
-      'Promote important tweets',
-      'Increase engagement',
-      'Viral content',
-    ],
+    benefits: ['Instant API verification', 'Boost tweet engagement', 'Automatic point rewards'],
+    useCases: ['Promote important tweets', 'Increase engagement', 'Viral content'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 25,
@@ -460,16 +479,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 94,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Instant API verification',
-      'Viral reach amplification',
-      'Automatic rewards',
-    ],
-    useCases: [
-      'Spread important announcements',
-      'Go viral',
-      'Amplify content reach',
-    ],
+    benefits: ['Instant API verification', 'Viral reach amplification', 'Automatic rewards'],
+    useCases: ['Spread important announcements', 'Go viral', 'Amplify content reach'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 75,
@@ -485,16 +496,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 90,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Amplify reach with commentary',
-      'Build conversations',
-      'Viral potential',
-    ],
-    useCases: [
-      'Start discussions',
-      'Thought leadership',
-      'Community engagement',
-    ],
+    benefits: ['Amplify reach with commentary', 'Build conversations', 'Viral potential'],
+    useCases: ['Start discussions', 'Thought leadership', 'Community engagement'],
     verificationTier: 'T2',
     verificationMethod: 'code_repost',
     recommendedPoints: 85,
@@ -512,16 +515,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 90,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Grow Facebook following',
-      'Increase page engagement',
-      'Build fan community',
-    ],
-    useCases: [
-      'Build Facebook presence',
-      'Cross-platform growth',
-      'Fan engagement',
-    ],
+    benefits: ['Grow Facebook following', 'Increase page engagement', 'Build fan community'],
+    useCases: ['Build Facebook presence', 'Cross-platform growth', 'Fan engagement'],
     verificationTier: 'T3',
     verificationMethod: 'starter_pack',
     recommendedPoints: 20,
@@ -537,16 +532,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 88,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Boost post engagement',
-      'Increase visibility',
-      'Algorithm benefits',
-    ],
-    useCases: [
-      'Promote important posts',
-      'Increase engagement',
-      'Launch announcements',
-    ],
+    benefits: ['Boost post engagement', 'Increase visibility', 'Algorithm benefits'],
+    useCases: ['Promote important posts', 'Increase engagement', 'Launch announcements'],
     verificationTier: 'T3',
     verificationMethod: 'manual',
     recommendedPoints: 15,
@@ -562,16 +549,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 85,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Code-verified engagement',
-      'Build community discussion',
-      'Increase post reach',
-    ],
-    useCases: [
-      'Start conversations',
-      'Gather feedback',
-      'Community building',
-    ],
+    benefits: ['Code-verified engagement', 'Build community discussion', 'Increase post reach'],
+    useCases: ['Start conversations', 'Gather feedback', 'Community building'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 40,
@@ -587,16 +566,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 83,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Code-verified engagement',
-      'Build community',
-      'Increase visibility',
-    ],
-    useCases: [
-      'Promote photo content',
-      'Community interaction',
-      'Visual storytelling',
-    ],
+    benefits: ['Code-verified engagement', 'Build community', 'Increase visibility'],
+    useCases: ['Promote photo content', 'Community interaction', 'Visual storytelling'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 40,
@@ -614,16 +585,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 95,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Grow Instagram audience',
-      'Increase profile visibility',
-      'Build visual community',
-    ],
-    useCases: [
-      'Build Instagram presence',
-      'Visual storytelling',
-      'Fan engagement',
-    ],
+    benefits: ['Grow Instagram audience', 'Increase profile visibility', 'Build visual community'],
+    useCases: ['Build Instagram presence', 'Visual storytelling', 'Fan engagement'],
     verificationTier: 'T3',
     verificationMethod: 'starter_pack',
     recommendedPoints: 20,
@@ -639,16 +602,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 92,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Boost post engagement',
-      'Increase discoverability',
-      'Algorithm optimization',
-    ],
-    useCases: [
-      'Promote key content',
-      'Feature highlights',
-      'Campaign launches',
-    ],
+    benefits: ['Boost post engagement', 'Increase discoverability', 'Algorithm optimization'],
+    useCases: ['Promote key content', 'Feature highlights', 'Campaign launches'],
     verificationTier: 'T3',
     verificationMethod: 'manual',
     recommendedPoints: 15,
@@ -669,11 +624,7 @@ const TASK_TEMPLATES: TaskTemplate[] = [
       'No manual checking required',
       'Instant point rewards',
     ],
-    useCases: [
-      'Boost post engagement',
-      'Contest entries',
-      'Community interaction',
-    ],
+    useCases: ['Boost post engagement', 'Contest entries', 'Community interaction'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 40,
@@ -689,16 +640,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 91,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Code verification via webhook',
-      'Viral potential',
-      'User-generated content',
-    ],
-    useCases: [
-      'Brand awareness',
-      'UGC campaigns',
-      'Viral marketing',
-    ],
+    benefits: ['Code verification via webhook', 'Viral potential', 'User-generated content'],
+    useCases: ['Brand awareness', 'UGC campaigns', 'Viral marketing'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 60,
@@ -714,16 +657,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 86,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Automatic webhook verification',
-      'Custom keywords/hashtags',
-      'Instant rewards',
-    ],
-    useCases: [
-      'Campaign hashtags',
-      'Contest entries',
-      'Community challenges',
-    ],
+    benefits: ['Automatic webhook verification', 'Custom keywords/hashtags', 'Instant rewards'],
+    useCases: ['Campaign hashtags', 'Contest entries', 'Community challenges'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 40,
@@ -741,16 +676,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 93,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Instant API verification',
-      'Grow subscriber base',
-      'Build loyal audience',
-    ],
-    useCases: [
-      'Channel growth',
-      'Video marketing',
-      'Content creator expansion',
-    ],
+    benefits: ['Instant API verification', 'Grow subscriber base', 'Build loyal audience'],
+    useCases: ['Channel growth', 'Video marketing', 'Content creator expansion'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 100,
@@ -766,16 +693,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 89,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Boost video engagement',
-      'YouTube algorithm boost',
-      'Increase visibility',
-    ],
-    useCases: [
-      'Promote new videos',
-      'Launch campaigns',
-      'Viral content',
-    ],
+    benefits: ['Boost video engagement', 'YouTube algorithm boost', 'Increase visibility'],
+    useCases: ['Promote new videos', 'Launch campaigns', 'Viral content'],
     verificationTier: 'T3',
     verificationMethod: 'manual',
     recommendedPoints: 15,
@@ -791,16 +710,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 87,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Code-verified engagement',
-      'Boost engagement metrics',
-      'Build community',
-    ],
-    useCases: [
-      'Start conversations',
-      'Gather feedback',
-      'Community engagement',
-    ],
+    benefits: ['Code-verified engagement', 'Boost engagement metrics', 'Build community'],
+    useCases: ['Start conversations', 'Gather feedback', 'Community engagement'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 40,
@@ -818,16 +729,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 91,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Grow TikTok presence',
-      'Increase video reach',
-      'Build Gen-Z audience',
-    ],
-    useCases: [
-      'TikTok growth',
-      'Viral content creation',
-      'Youth engagement',
-    ],
+    benefits: ['Grow TikTok presence', 'Increase video reach', 'Build Gen-Z audience'],
+    useCases: ['TikTok growth', 'Viral content creation', 'Youth engagement'],
     verificationTier: 'T3',
     verificationMethod: 'starter_pack',
     recommendedPoints: 20,
@@ -843,16 +746,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 88,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Boost video engagement',
-      'FYP algorithm boost',
-      'Viral potential',
-    ],
-    useCases: [
-      'Promote videos',
-      'Trending content',
-      'Campaign launches',
-    ],
+    benefits: ['Boost video engagement', 'FYP algorithm boost', 'Viral potential'],
+    useCases: ['Promote videos', 'Trending content', 'Campaign launches'],
     verificationTier: 'T3',
     verificationMethod: 'manual',
     recommendedPoints: 15,
@@ -868,16 +763,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 85,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Code-verified engagement',
-      'Build community',
-      'Boost visibility',
-    ],
-    useCases: [
-      'Start conversations',
-      'Community building',
-      'Viral content',
-    ],
+    benefits: ['Code-verified engagement', 'Build community', 'Boost visibility'],
+    useCases: ['Start conversations', 'Community building', 'Viral content'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 40,
@@ -893,16 +780,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 92,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'User-generated content',
-      'Viral campaign potential',
-      'Authentic brand advocacy',
-    ],
-    useCases: [
-      'Hashtag challenges',
-      'UGC campaigns',
-      'Brand awareness',
-    ],
+    benefits: ['User-generated content', 'Viral campaign potential', 'Authentic brand advocacy'],
+    useCases: ['Hashtag challenges', 'UGC campaigns', 'Brand awareness'],
     verificationTier: 'T3',
     verificationMethod: 'manual',
     recommendedPoints: 25,
@@ -920,16 +799,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 89,
     estimatedSetupTime: '5 minutes',
-    benefits: [
-      'Platform-verified engagement',
-      'Gather fan feedback',
-      'Make fans feel heard',
-    ],
-    useCases: [
-      'Content planning',
-      'Merchandise ideas',
-      'Fan preferences',
-    ],
+    benefits: ['Platform-verified engagement', 'Gather fan feedback', 'Make fans feel heard'],
+    useCases: ['Content planning', 'Merchandise ideas', 'Fan preferences'],
     verificationTier: 'T1',
     verificationMethod: 'platform',
     recommendedPoints: 25,
@@ -945,16 +816,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 86,
     estimatedSetupTime: '10 minutes',
-    benefits: [
-      'Platform-verified answers',
-      'Test fan knowledge',
-      'Gamification',
-    ],
-    useCases: [
-      'Trivia contests',
-      'Educational content',
-      'Fan challenges',
-    ],
+    benefits: ['Platform-verified answers', 'Test fan knowledge', 'Gamification'],
+    useCases: ['Trivia contests', 'Educational content', 'Fan challenges'],
     verificationTier: 'T1',
     verificationMethod: 'platform',
     recommendedPoints: 50,
@@ -970,16 +833,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 94,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Auto-verified via tracking',
-      'Drive traffic',
-      'Instant rewards',
-    ],
-    useCases: [
-      'Product launches',
-      'Merch stores',
-      'External content',
-    ],
+    benefits: ['Auto-verified via tracking', 'Drive traffic', 'Instant rewards'],
+    useCases: ['Product launches', 'Merch stores', 'External content'],
     verificationTier: 'T1',
     verificationMethod: 'platform',
     recommendedPoints: 25,
@@ -997,16 +852,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 87,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Instant API verification',
-      'Grow Spotify following',
-      'Build music fanbase',
-    ],
-    useCases: [
-      'Music promotion',
-      'Artist growth',
-      'Release campaigns',
-    ],
+    benefits: ['Instant API verification', 'Grow Spotify following', 'Build music fanbase'],
+    useCases: ['Music promotion', 'Artist growth', 'Release campaigns'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 50,
@@ -1022,16 +869,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 85,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Instant API verification',
-      'Playlist growth',
-      'Fan engagement',
-    ],
-    useCases: [
-      'Promote playlists',
-      'Music discovery',
-      'Curated collections',
-    ],
+    benefits: ['Instant API verification', 'Playlist growth', 'Fan engagement'],
+    useCases: ['Promote playlists', 'Music discovery', 'Curated collections'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 50,
@@ -1049,16 +888,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 93,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Instant API verification',
-      'Build Discord community',
-      'Centralized fan hub',
-    ],
-    useCases: [
-      'Community building',
-      'Fan engagement',
-      'Gaming communities',
-    ],
+    benefits: ['Instant API verification', 'Build Discord community', 'Centralized fan hub'],
+    useCases: ['Community building', 'Fan engagement', 'Gaming communities'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 50,
@@ -1074,16 +905,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 88,
     estimatedSetupTime: '4 minutes',
-    benefits: [
-      'Instant API verification',
-      'Role-based rewards',
-      'Community tiers',
-    ],
-    useCases: [
-      'Verify engagement',
-      'Tiered memberships',
-      'Active community rewards',
-    ],
+    benefits: ['Instant API verification', 'Role-based rewards', 'Community tiers'],
+    useCases: ['Verify engagement', 'Tiered memberships', 'Active community rewards'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 75,
@@ -1101,16 +924,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 91,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Instant API verification',
-      'Grow Twitch following',
-      'Build streaming audience',
-    ],
-    useCases: [
-      'Stream promotion',
-      'Channel growth',
-      'Viewer acquisition',
-    ],
+    benefits: ['Instant API verification', 'Grow Twitch following', 'Build streaming audience'],
+    useCases: ['Stream promotion', 'Channel growth', 'Viewer acquisition'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 50,
@@ -1126,16 +941,84 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 89,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Instant API verification',
-      'Monetization incentive',
-      'Loyal fan recognition',
-    ],
+    benefits: ['Instant API verification', 'Monetization incentive', 'Loyal fan recognition'],
+    useCases: ['Subscriber rewards', 'Monetization boost', 'Premium fan perks'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 150,
+  },
+
+  // Kick Templates
+  {
+    id: 'kick_follow',
+    name: 'Follow on Kick',
+    description: 'Reward fans for following your Kick channel with instant API verification',
+    icon: SiKick,
+    category: 'social',
+    platform: 'kick',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 90,
+    estimatedSetupTime: '2 minutes',
+    benefits: ['Instant API verification', 'Grow Kick following', 'Automatic rewards'],
+    useCases: ['Build streaming audience', 'Quick fan engagement', 'Cross-platform growth'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 50,
+  },
+  {
+    id: 'kick_subscribe',
+    name: 'Subscribe on Kick',
+    description: 'Reward fans for subscribing to your Kick channel - API verified',
+    icon: SiKick,
+    category: 'social',
+    platform: 'kick',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 88,
+    estimatedSetupTime: '3 minutes',
+    benefits: ['Instant API verification', 'Monetization incentive', 'Loyal fan recognition'],
+    useCases: ['Subscriber rewards', 'Monetization boost', 'Premium fan perks'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 200,
+  },
+
+  // Patreon Templates
+  {
+    id: 'patreon_support',
+    name: 'Become a Patron',
+    description: 'Reward fans for becoming a patron on Patreon with instant API verification',
+    icon: FaPatreon,
+    category: 'social',
+    platform: 'patreon',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 91,
+    estimatedSetupTime: '3 minutes',
+    benefits: ['Instant API verification', 'Monetization growth', 'Premium fan engagement'],
     useCases: [
-      'Subscriber rewards',
-      'Monetization boost',
-      'Premium fan perks',
+      'Grow Patreon supporters',
+      'Cross-platform monetization',
+      'Premium content incentive',
     ],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 200,
+  },
+  {
+    id: 'patreon_tier_check',
+    name: 'Join Patreon Tier',
+    description: 'Reward fans for joining a specific Patreon tier - API verified',
+    icon: FaPatreon,
+    category: 'social',
+    platform: 'patreon',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 87,
+    estimatedSetupTime: '3 minutes',
+    benefits: ['Instant API verification', 'Tier-based incentives', 'Premium supporter rewards'],
+    useCases: ['Upgrade patron tiers', 'VIP rewards', 'Premium engagement'],
     verificationTier: 'T1',
     verificationMethod: 'api',
     recommendedPoints: 150,
@@ -1153,16 +1036,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'ready',
     popularityScore: 95,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Code-verified attendance',
-      'Works on any platform',
-      'Reward live viewers',
-    ],
-    useCases: [
-      'Live stream rewards',
-      'Twitter/X Spaces',
-      'Virtual event attendance',
-    ],
+    benefits: ['Code-verified attendance', 'Works on any platform', 'Reward live viewers'],
+    useCases: ['Live stream rewards', 'Twitter/X Spaces', 'Virtual event attendance'],
     verificationTier: 'T2',
     verificationMethod: 'code_comment',
     recommendedPoints: 50,
@@ -1179,16 +1054,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'coming_soon',
     popularityScore: 90,
     estimatedSetupTime: '2 minutes',
-    benefits: [
-      'Quick social growth',
-      'Simple verification',
-      'High conversion',
-    ],
-    useCases: [
-      'Build social following',
-      'Cross-platform growth',
-      'Simple onboarding',
-    ],
+    benefits: ['Quick social growth', 'Simple verification', 'High conversion'],
+    useCases: ['Build social following', 'Cross-platform growth', 'Simple onboarding'],
     verificationTier: null,
     verificationMethod: null,
     recommendedPoints: 50,
@@ -1204,16 +1071,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'coming_soon',
     popularityScore: 85,
     estimatedSetupTime: '3 minutes',
-    benefits: [
-      'Boost engagement',
-      'Algorithmic visibility',
-      'Content promotion',
-    ],
-    useCases: [
-      'Promote new content',
-      'Increase engagement',
-      'Launch campaigns',
-    ],
+    benefits: ['Boost engagement', 'Algorithmic visibility', 'Content promotion'],
+    useCases: ['Promote new content', 'Increase engagement', 'Launch campaigns'],
     verificationTier: null,
     verificationMethod: null,
     recommendedPoints: 25,
@@ -1229,16 +1088,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'coming_soon',
     popularityScore: 87,
     estimatedSetupTime: '4 minutes',
-    benefits: [
-      'Viral potential',
-      'Extended reach',
-      'Authentic promotion',
-    ],
-    useCases: [
-      'Amplify announcements',
-      'Product launches',
-      'Event promotion',
-    ],
+    benefits: ['Viral potential', 'Extended reach', 'Authentic promotion'],
+    useCases: ['Amplify announcements', 'Product launches', 'Event promotion'],
     verificationTier: null,
     verificationMethod: null,
     recommendedPoints: 75,
@@ -1254,16 +1105,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'coming_soon',
     popularityScore: 82,
     estimatedSetupTime: '4 minutes',
-    benefits: [
-      'Boost engagement',
-      'Quality interactions',
-      'Community building',
-    ],
-    useCases: [
-      'Start conversations',
-      'Gather feedback',
-      'Build community',
-    ],
+    benefits: ['Boost engagement', 'Quality interactions', 'Community building'],
+    useCases: ['Start conversations', 'Gather feedback', 'Build community'],
     verificationTier: null,
     verificationMethod: null,
     recommendedPoints: 40,
@@ -1279,16 +1122,8 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     status: 'coming_soon',
     popularityScore: 75,
     estimatedSetupTime: '10 minutes',
-    benefits: [
-      'Maximum flexibility',
-      'Unique mechanics',
-      'Custom validation',
-    ],
-    useCases: [
-      'Special events',
-      'Custom integrations',
-      'Unique campaigns',
-    ],
+    benefits: ['Maximum flexibility', 'Unique mechanics', 'Custom validation'],
+    useCases: ['Special events', 'Custom integrations', 'Unique campaigns'],
     verificationTier: null,
     verificationMethod: null,
     recommendedPoints: 50,
@@ -1300,52 +1135,66 @@ interface TaskTemplateSelectorProps {
   onBack?: () => void;
 }
 
-export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskTemplateSelectorProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedTier, setSelectedTier] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("by-platform");
+export default function TaskTemplateSelector({
+  onSelectTemplate,
+  onBack,
+}: TaskTemplateSelectorProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedTier, setSelectedTier] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('by-platform');
 
-  const filteredTemplates = TASK_TEMPLATES.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         template.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
-    const matchesTier = selectedTier === "all" || template.verificationTier === selectedTier;
+  const filteredTemplates = TASK_TEMPLATES.filter((template) => {
+    const matchesSearch =
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
+    const matchesTier = selectedTier === 'all' || template.verificationTier === selectedTier;
     return matchesSearch && matchesCategory && matchesTier;
   });
 
-  const readyTemplates = filteredTemplates.filter(t => t.status === 'ready');
-  const comingSoonTemplates = filteredTemplates.filter(t => t.status === 'coming_soon');
+  const readyTemplates = filteredTemplates.filter((t) => t.status === 'ready');
+  const comingSoonTemplates = filteredTemplates.filter((t) => t.status === 'coming_soon');
 
   // Group templates by platform (sorted by platform sort order, then by popularity within each platform)
-  const templatesByPlatform = readyTemplates.reduce((acc, template) => {
-    const platform = template.platform;
-    if (!acc[platform]) acc[platform] = [];
-    acc[platform].push(template);
-    return acc;
-  }, {} as Record<TemplatePlatform, TaskTemplate[]>);
+  const templatesByPlatform = readyTemplates.reduce(
+    (acc, template) => {
+      const platform = template.platform;
+      if (!acc[platform]) acc[platform] = [];
+      acc[platform].push(template);
+      return acc;
+    },
+    {} as Record<TemplatePlatform, TaskTemplate[]>
+  );
 
   // Sort platforms by their configured sort order
-  const sortedPlatforms = (Object.keys(templatesByPlatform) as TemplatePlatform[])
-    .sort((a, b) => PLATFORM_CONFIG[a].sortOrder - PLATFORM_CONFIG[b].sortOrder);
+  const sortedPlatforms = (Object.keys(templatesByPlatform) as TemplatePlatform[]).sort(
+    (a, b) => PLATFORM_CONFIG[a].sortOrder - PLATFORM_CONFIG[b].sortOrder
+  );
 
   // Sort templates within each platform by popularity
-  sortedPlatforms.forEach(platform => {
+  sortedPlatforms.forEach((platform) => {
     templatesByPlatform[platform].sort((a, b) => b.popularityScore - a.popularityScore);
   });
 
   // Group templates by verification tier
   const templatesByTier = {
-    T1: readyTemplates.filter(t => t.verificationTier === 'T1').sort((a, b) => b.popularityScore - a.popularityScore),
-    T2: readyTemplates.filter(t => t.verificationTier === 'T2').sort((a, b) => b.popularityScore - a.popularityScore),
-    T3: readyTemplates.filter(t => t.verificationTier === 'T3').sort((a, b) => b.popularityScore - a.popularityScore),
+    T1: readyTemplates
+      .filter((t) => t.verificationTier === 'T1')
+      .sort((a, b) => b.popularityScore - a.popularityScore),
+    T2: readyTemplates
+      .filter((t) => t.verificationTier === 'T2')
+      .sort((a, b) => b.popularityScore - a.popularityScore),
+    T3: readyTemplates
+      .filter((t) => t.verificationTier === 'T3')
+      .sort((a, b) => b.popularityScore - a.popularityScore),
   };
 
   // Count templates by tier for filter badges
   const tierCounts = {
-    T1: TASK_TEMPLATES.filter(t => t.verificationTier === 'T1' && t.status === 'ready').length,
-    T2: TASK_TEMPLATES.filter(t => t.verificationTier === 'T2' && t.status === 'ready').length,
-    T3: TASK_TEMPLATES.filter(t => t.verificationTier === 'T3' && t.status === 'ready').length,
+    T1: TASK_TEMPLATES.filter((t) => t.verificationTier === 'T1' && t.status === 'ready').length,
+    T2: TASK_TEMPLATES.filter((t) => t.verificationTier === 'T2' && t.status === 'ready').length,
+    T3: TASK_TEMPLATES.filter((t) => t.verificationTier === 'T3' && t.status === 'ready').length,
   };
 
   const getCategoryColor = (category: string) => {
@@ -1465,21 +1314,27 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-green-500" />
                     <span>T1 - API Verified</span>
-                    <Badge variant="outline" className="text-xs ml-auto">{tierCounts.T1}</Badge>
+                    <Badge variant="outline" className="text-xs ml-auto">
+                      {tierCounts.T1}
+                    </Badge>
                   </div>
                 </SelectItem>
                 <SelectItem value="T2">
                   <div className="flex items-center gap-2">
                     <Shield className="h-4 w-4 text-blue-500" />
                     <span>T2 - Code Verified</span>
-                    <Badge variant="outline" className="text-xs ml-auto">{tierCounts.T2}</Badge>
+                    <Badge variant="outline" className="text-xs ml-auto">
+                      {tierCounts.T2}
+                    </Badge>
                   </div>
                 </SelectItem>
                 <SelectItem value="T3">
                   <div className="flex items-center gap-2">
                     <ShieldAlert className="h-4 w-4 text-amber-500" />
                     <span>T3 - Honor System</span>
-                    <Badge variant="outline" className="text-xs ml-auto">{tierCounts.T3}</Badge>
+                    <Badge variant="outline" className="text-xs ml-auto">
+                      {tierCounts.T3}
+                    </Badge>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -1558,10 +1413,12 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                   const config = PLATFORM_CONFIG[platform];
                   const templates = templatesByPlatform[platform];
                   const PlatformIcon = config.icon;
-                  
+
                   return (
                     <div key={platform}>
-                      <div className={`flex items-center gap-3 mb-4 pb-2 border-b ${config.borderColor}`}>
+                      <div
+                        className={`flex items-center gap-3 mb-4 pb-2 border-b ${config.borderColor}`}
+                      >
                         <PlatformIcon className={`h-5 w-5 ${config.textColor}`} />
                         <h3 className={`text-lg font-semibold ${config.textColor}`}>
                           {config.name}
@@ -1598,7 +1455,8 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                         T1 - API Verified ({TIER_GUIDANCE.T1.trustLevel} Trust)
                       </h3>
                       <span className="text-sm text-gray-400">
-                        {templatesByTier.T1.length} template{templatesByTier.T1.length !== 1 ? 's' : ''}
+                        {templatesByTier.T1.length} template
+                        {templatesByTier.T1.length !== 1 ? 's' : ''}
                       </span>
                       <span className="text-xs text-green-400/70 ml-auto">
                         Recommended: {TIER_GUIDANCE.T1.pointsRange}
@@ -1628,7 +1486,8 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                         T2 - Code Verified ({TIER_GUIDANCE.T2.trustLevel} Trust)
                       </h3>
                       <span className="text-sm text-gray-400">
-                        {templatesByTier.T2.length} template{templatesByTier.T2.length !== 1 ? 's' : ''}
+                        {templatesByTier.T2.length} template
+                        {templatesByTier.T2.length !== 1 ? 's' : ''}
                       </span>
                       <span className="text-xs text-blue-400/70 ml-auto">
                         Recommended: {TIER_GUIDANCE.T2.pointsRange}
@@ -1658,7 +1517,8 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                         T3 - Honor System ({TIER_GUIDANCE.T3.trustLevel} Trust)
                       </h3>
                       <span className="text-sm text-gray-400">
-                        {templatesByTier.T3.length} template{templatesByTier.T3.length !== 1 ? 's' : ''}
+                        {templatesByTier.T3.length} template
+                        {templatesByTier.T3.length !== 1 ? 's' : ''}
                       </span>
                       <span className="text-xs text-amber-400/70 ml-auto">
                         Recommended: {TIER_GUIDANCE.T3.pointsRange}
@@ -1704,7 +1564,9 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between mb-3">
-                        <div className={`w-12 h-12 rounded-lg bg-gray-500/20 border border-gray-500/30 flex items-center justify-center`}>
+                        <div
+                          className={`w-12 h-12 rounded-lg bg-gray-500/20 border border-gray-500/30 flex items-center justify-center`}
+                        >
                           <Icon className="h-6 w-6 text-gray-400" />
                         </div>
                         <Badge variant="outline" className="text-xs text-gray-400 border-gray-400">
@@ -1735,9 +1597,7 @@ export default function TaskTemplateSelector({ onSelectTemplate, onBack }: TaskT
           <div className="text-center py-16">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-2xl font-bold text-white mb-2">No templates found</h3>
-            <p className="text-gray-400">
-              Try adjusting your search or filter criteria
-            </p>
+            <p className="text-gray-400">Try adjusting your search or filter criteria</p>
           </div>
         )}
       </div>
@@ -1770,7 +1630,9 @@ function TemplateCard({
     >
       <CardHeader>
         <div className="flex items-start justify-between mb-3">
-          <div className={`w-12 h-12 rounded-lg ${iconBgClass} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+          <div
+            className={`w-12 h-12 rounded-lg ${iconBgClass} flex items-center justify-center group-hover:scale-110 transition-transform`}
+          >
             <Icon className="h-6 w-6 text-white" />
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -1778,7 +1640,10 @@ function TemplateCard({
               {template.category}
             </Badge>
             {template.popularityScore >= 90 && (
-              <Badge variant="outline" className="text-xs text-brand-secondary border-brand-secondary">
+              <Badge
+                variant="outline"
+                className="text-xs text-brand-secondary border-brand-secondary"
+              >
                 Popular
               </Badge>
             )}
@@ -1786,9 +1651,7 @@ function TemplateCard({
         </div>
 
         <CardTitle className="text-white">{template.name}</CardTitle>
-        <CardDescription className="text-gray-400">
-          {template.description}
-        </CardDescription>
+        <CardDescription className="text-gray-400">{template.description}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -1805,7 +1668,12 @@ function TemplateCard({
           <span className="font-semibold text-white">{template.recommendedPoints} pts</span>
           {template.verificationTier && (
             <span className="text-xs text-gray-500 ml-auto">
-              ({TIER_GUIDANCE[template.verificationTier].pointsRange.replace(' points recommended', '')})
+              (
+              {TIER_GUIDANCE[template.verificationTier].pointsRange.replace(
+                ' points recommended',
+                ''
+              )}
+              )
             </span>
           )}
         </div>
@@ -1813,13 +1681,9 @@ function TemplateCard({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-gray-400">
             <Target className="h-4 w-4" />
-            <span className={getDifficultyColor(template.difficulty)}>
-              {template.difficulty}
-            </span>
+            <span className={getDifficultyColor(template.difficulty)}>{template.difficulty}</span>
           </div>
-          <div className="text-gray-400">
-            ~{template.estimatedSetupTime}
-          </div>
+          <div className="text-gray-400">~{template.estimatedSetupTime}</div>
         </div>
 
         <div className="space-y-2">
@@ -1842,4 +1706,3 @@ function TemplateCard({
     </Card>
   );
 }
-

@@ -608,7 +608,18 @@ export class CampaignEngineService {
   }
 
   private async getUserReputation(userId: string): Promise<number> {
-    // Query fan programs to get total points as reputation proxy
+    // Use the reputation oracle score (0-1000) if available
+    const { reputationScores } = await import('@shared/schema');
+    const record = await db
+      .select({ offChainScore: reputationScores.offChainScore })
+      .from(reputationScores)
+      .where(eq(reputationScores.userId, userId));
+
+    if (record.length > 0) {
+      return record[0].offChainScore;
+    }
+
+    // Fallback: calculate on-the-fly from raw points (legacy behavior)
     const programs = await db.select().from(fanPrograms).where(eq(fanPrograms.fanId, userId));
     return programs.reduce((sum, p) => sum + (p.totalPointsEarned || 0), 0);
   }

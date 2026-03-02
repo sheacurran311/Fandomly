@@ -13,8 +13,9 @@
  */
 
 import { db } from '../db';
-import { checkInStreaks, taskCompletions } from '@shared/schema';
+import { checkInStreaks } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { onReputationSignalChanged } from './reputation/reputation-event-handler';
 
 export interface CheckInRequest {
   userId: string;
@@ -70,19 +71,15 @@ export class CheckInService {
     const { userId, taskId, tenantId } = request;
 
     // Get or create streak record
-    let streakRecord = await db.query.checkInStreaks.findFirst({
-      where: and(
-        eq(checkInStreaks.userId, userId),
-        eq(checkInStreaks.taskId, taskId)
-      ),
+    const streakRecord = await db.query.checkInStreaks.findFirst({
+      where: and(eq(checkInStreaks.userId, userId), eq(checkInStreaks.taskId, taskId)),
     });
 
     const now = new Date();
-    const previousStreak = streakRecord?.currentStreak || 0;
 
     if (!streakRecord) {
       // First check-in ever
-      const [newStreak] = await db
+      await db
         .insert(checkInStreaks)
         .values({
           userId,
@@ -154,7 +151,7 @@ export class CheckInService {
 
     // Check for milestone achievement
     const milestone = this.checkMilestone(newStreak);
-    const metadata = streakRecord.metadata as any || {};
+    const metadata = (streakRecord.metadata as Record<string, unknown>) || {};
     const streakMilestones = metadata.streakMilestones || [];
 
     if (milestone && !this.hasMilestone(streakMilestones, milestone.days)) {
@@ -177,11 +174,16 @@ export class CheckInService {
           ...metadata,
           streakMilestones,
           missedDays: streakReset ? (metadata.missedDays || 0) + 1 : metadata.missedDays,
-          longestStreakAchievedAt: isNewRecord ? now.toISOString() : metadata.longestStreakAchievedAt,
+          longestStreakAchievedAt: isNewRecord
+            ? now.toISOString()
+            : metadata.longestStreakAchievedAt,
         },
         updatedAt: now,
       })
       .where(eq(checkInStreaks.id, streakRecord.id));
+
+    // Notify reputation system of streak change (non-blocking)
+    onReputationSignalChanged(userId, 'streakDays');
 
     const nextAvailable = this.getNextCheckInTime(now);
 
@@ -215,10 +217,7 @@ export class CheckInService {
    */
   async getStreakStats(userId: string, taskId: string): Promise<StreakStats> {
     const streakRecord = await db.query.checkInStreaks.findFirst({
-      where: and(
-        eq(checkInStreaks.userId, userId),
-        eq(checkInStreaks.taskId, taskId)
-      ),
+      where: and(eq(checkInStreaks.userId, userId), eq(checkInStreaks.taskId, taskId)),
     });
 
     if (!streakRecord) {
@@ -301,7 +300,9 @@ export class CheckInService {
   /**
    * Helper: Check if streak has reached a milestone
    */
-  private checkMilestone(streak: number): { days: number; bonusMultiplier: number; message: string } | null {
+  private checkMilestone(
+    streak: number
+  ): { days: number; bonusMultiplier: number; message: string } | null {
     // Return the highest milestone reached
     for (let i = this.MILESTONES.length - 1; i >= 0; i--) {
       if (streak >= this.MILESTONES[i].days) {
@@ -314,7 +315,9 @@ export class CheckInService {
   /**
    * Helper: Get next milestone after current streak
    */
-  private getNextMilestone(currentStreak: number): { days: number; bonusMultiplier: number; message: string } | null {
+  private getNextMilestone(
+    currentStreak: number
+  ): { days: number; bonusMultiplier: number; message: string } | null {
     for (const milestone of this.MILESTONES) {
       if (milestone.days > currentStreak) {
         return milestone;
@@ -326,20 +329,28 @@ export class CheckInService {
   /**
    * Helper: Check if user already achieved a milestone
    */
-  private hasMilestone(milestones: Array<{ days: number; awardedAt: string }>, days: number): boolean {
-    return milestones.some(m => m.days === days);
+  private hasMilestone(
+    milestones: Array<{ days: number; awardedAt: string }>,
+    days: number
+  ): boolean {
+    return milestones.some((m) => m.days === days);
   }
 
   /**
    * Get leaderboard of top streaks for a task
    */
-  async getLeaderboard(taskId: string, limit: number = 10): Promise<Array<{
-    userId: string;
-    currentStreak: number;
-    longestStreak: number;
-    totalCheckIns: number;
-    lastCheckIn: Date;
-  }>> {
+  async getLeaderboard(
+    taskId: string,
+    limit: number = 10
+  ): Promise<
+    Array<{
+      userId: string;
+      currentStreak: number;
+      longestStreak: number;
+      totalCheckIns: number;
+      lastCheckIn: Date;
+    }>
+  > {
     const streaks = await db.query.checkInStreaks.findMany({
       where: eq(checkInStreaks.taskId, taskId),
     });
@@ -349,7 +360,7 @@ export class CheckInService {
       .sort((a, b) => (b.currentStreak ?? 0) - (a.currentStreak ?? 0))
       .slice(0, limit);
 
-    return sorted.map(s => ({
+    return sorted.map((s) => ({
       userId: s.userId,
       currentStreak: s.currentStreak ?? 0,
       longestStreak: s.longestStreak ?? 0,
@@ -361,7 +372,10 @@ export class CheckInService {
   /**
    * Get check-in eligibility (for frequency service integration)
    */
-  async isEligibleForCheckIn(userId: string, taskId: string): Promise<{
+  async isEligibleForCheckIn(
+    userId: string,
+    taskId: string
+  ): Promise<{
     isEligible: boolean;
     reason?: string;
     nextAvailableAt?: Date;
@@ -373,10 +387,7 @@ export class CheckInService {
     }
 
     const streakRecord = await db.query.checkInStreaks.findFirst({
-      where: and(
-        eq(checkInStreaks.userId, userId),
-        eq(checkInStreaks.taskId, taskId)
-      ),
+      where: and(eq(checkInStreaks.userId, userId), eq(checkInStreaks.taskId, taskId)),
     });
 
     const nextAvailable = this.getNextCheckInTime(new Date(streakRecord!.lastCheckIn!));

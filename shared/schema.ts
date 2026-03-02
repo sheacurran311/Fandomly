@@ -4023,6 +4023,117 @@ export type InsertCampaignVerificationQueueItem = typeof campaignVerificationQue
 export type CampaignAccessLog = typeof campaignAccessLogs.$inferSelect;
 export type InsertCampaignAccessLog = typeof campaignAccessLogs.$inferInsert;
 
+// ============================================================================
+// REPUTATION ORACLE TABLES
+// ============================================================================
+
+// Reputation score sync status enum
+export const reputationSyncStatusEnum = pgEnum('reputation_sync_status', [
+  'pending',
+  'synced',
+  'failed',
+  'stale',
+]);
+
+// Reputation Scores - Bridge between off-chain activity data and on-chain ReputationRegistry
+export const reputationScores = pgTable('reputation_scores', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+
+  // User reference
+  userId: varchar('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull()
+    .unique(),
+
+  // Wallet for on-chain sync
+  walletAddress: text('wallet_address'), // User's wallet address for contract writes
+
+  // Score data (0-1000 scale matching on-chain MAX_SCORE)
+  offChainScore: integer('off_chain_score').default(0).notNull(), // Calculated from DB signals
+  onChainScore: integer('on_chain_score').default(0).notNull(), // Last confirmed on-chain value
+  previousScore: integer('previous_score').default(0).notNull(), // Score before last update (for delta tracking)
+
+  // Score breakdown — granular signals that compose the final score
+  scoreBreakdown: jsonb('score_breakdown').$type<{
+    // Weighted signal contributions (each 0-1000 before weighting)
+    totalPoints: number; // Raw total points earned across all programs
+    taskCompletions: number; // Total tasks completed
+    socialConnections: number; // Number of verified social accounts
+    streakDays: number; // Current longest streak
+    referralCount: number; // Successful referrals
+    accountAgeDays: number; // Days since registration
+    // Weighted scores (after applying weights, before normalization)
+    weightedScores: Record<string, number>;
+    // Final normalized score
+    normalizedScore: number;
+  }>(),
+
+  // Sync state
+  syncStatus: reputationSyncStatusEnum('sync_status').default('pending').notNull(),
+  lastSyncedAt: timestamp('last_synced_at'), // When last successfully pushed on-chain
+  lastCalculatedAt: timestamp('last_calculated_at'), // When score was last recalculated
+  syncError: text('sync_error'), // Last sync error message
+  syncTxHash: text('sync_tx_hash'), // Transaction hash of last on-chain update
+
+  // Threshold tracking — for event-driven updates (Option C foundation)
+  crossedThreshold: integer('crossed_threshold'), // Last threshold crossed (500, 750, etc.)
+  thresholdCrossedAt: timestamp('threshold_crossed_at'), // When threshold was crossed
+  pendingThresholdSync: boolean('pending_threshold_sync').default(false), // Needs immediate sync
+
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Reputation Sync Log - Audit trail of all on-chain sync operations
+export const reputationSyncLog = pgTable('reputation_sync_log', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+
+  // Batch or single sync
+  syncType: text('sync_type').notNull(), // 'batch' | 'threshold' | 'manual'
+  status: text('status').notNull(), // 'started' | 'completed' | 'failed'
+
+  // Stats
+  usersProcessed: integer('users_processed').default(0),
+  usersUpdated: integer('users_updated').default(0), // Actually pushed on-chain (score changed)
+  usersFailed: integer('users_failed').default(0),
+  txHash: text('tx_hash'), // Batch transaction hash
+
+  // Error details
+  errorLog: jsonb('error_log').$type<
+    Array<{
+      userId: string;
+      walletAddress: string;
+      error: string;
+    }>
+  >(),
+
+  // Timing
+  startedAt: timestamp('started_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  durationMs: integer('duration_ms'),
+
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Reputation Score Relations
+export const reputationScoresRelations = relations(reputationScores, ({ one }) => ({
+  user: one(users, {
+    fields: [reputationScores.userId],
+    references: [users.id],
+  }),
+}));
+
+// Reputation Types
+export type ReputationScore = typeof reputationScores.$inferSelect;
+export type InsertReputationScore = typeof reputationScores.$inferInsert;
+export type ReputationSyncLogEntry = typeof reputationSyncLog.$inferSelect;
+export type InsertReputationSyncLogEntry = typeof reputationSyncLog.$inferInsert;
+
 // Additional inferred types for tables used by services
 export type SocialConnection = typeof socialConnections.$inferSelect;
 export type CreatorFacebookPage = typeof creatorFacebookPages.$inferSelect;
