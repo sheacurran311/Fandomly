@@ -211,7 +211,7 @@ export const users = pgTable('users', {
   walletAddress: text('wallet_address'),
   walletChain: text('wallet_chain'),
 
-  // Authentication Provider Fields (replacing Dynamic)
+  // Authentication Provider Fields
   primaryAuthProvider: text('primary_auth_provider'), // 'google' | 'twitter' | 'instagram' | 'tiktok' | 'youtube' | 'spotify' | 'discord' | 'twitch' | 'facebook'
   googleId: text('google_id').unique(), // Google's unique user ID (sub claim)
   linkedAccounts: jsonb('linked_accounts').$type<{
@@ -1388,45 +1388,8 @@ export const campaignRules = pgTable('campaign_rules', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-// Social Campaign Tasks
-export const socialCampaignTasks = pgTable('social_campaign_tasks', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
-    .notNull(),
-  campaignId: varchar('campaign_id')
-    .references(() => campaigns.id, { onDelete: 'cascade' })
-    .notNull(),
-
-  // Task Configuration
-  platform: socialPlatformEnum('platform').notNull(),
-  taskType: taskTypeEnum('task_type').notNull(),
-  displayOrder: integer('display_order').default(1),
-
-  // Task-specific Data
-  targetUrl: text('target_url'), // URL for posts/videos/playlists to like/share
-  hashtags: jsonb('hashtags').$type<string[]>(), // Required hashtags for hashtag_post tasks
-  inviteCode: text('invite_code'), // Discord server invite or Telegram group link
-  customInstructions: text('custom_instructions'), // Additional task instructions
-
-  // Reward Configuration
-  rewardType: rewardTypeEnum('reward_type').notNull().default('points'),
-  rewardMetadata: jsonb('reward_metadata').$type<{
-    nftContractAddress?: string;
-    badgeImageUrl?: string;
-    rafflePrize?: string;
-    additionalData?: Record<string, unknown>;
-  }>(),
-
-  // Verification Settings
-  requiresManualVerification: boolean('requires_manual_verification').default(false),
-  verificationInstructions: text('verification_instructions'),
-
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+// social_campaign_tasks table removed in migration 0043
+// (superseded by the tasks table with campaignId FK)
 
 // Independent Tasks (for new workflow)
 // Task Ownership Level
@@ -2520,11 +2483,7 @@ export const insertCampaignRuleSchema = createInsertSchema(campaignRules).omit({
   createdAt: true,
 });
 
-export const insertSocialCampaignTaskSchema = createInsertSchema(socialCampaignTasks).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+// insertSocialCampaignTaskSchema removed — table dropped in migration 0043
 
 // Task Schemas
 export const insertTaskSchema = createInsertSchema(tasks).omit({
@@ -2698,20 +2657,7 @@ export const userAchievements = pgTable('user_achievements', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-export const userLevels = pgTable('user_levels', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar('user_id').notNull().unique(),
-  tenantId: varchar('tenant_id').references(() => tenants.id),
-  currentLevel: integer('current_level').default(1),
-  totalPoints: integer('total_points').default(0),
-  levelPoints: integer('level_points').default(0), // Points in current level
-  nextLevelThreshold: integer('next_level_threshold').default(1000),
-  achievementsUnlocked: integer('achievements_unlocked').default(0),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+// user_levels table removed in migration 0043 (zero references, never implemented)
 
 // Achievement Schemas
 export const insertAchievementSchema = createInsertSchema(achievements).omit({
@@ -2725,19 +2671,14 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
   createdAt: true,
 });
 
-export const insertUserLevelSchema = createInsertSchema(userLevels).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+// insertUserLevelSchema removed — table dropped in migration 0043
 
 // Achievement Types
 export type Achievement = typeof achievements.$inferSelect;
 export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
 export type UserAchievement = typeof userAchievements.$inferSelect;
 export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
-export type UserLevel = typeof userLevels.$inferSelect;
-export type InsertUserLevel = z.infer<typeof insertUserLevelSchema>;
+// UserLevel / InsertUserLevel types removed — table dropped in migration 0043
 
 // ============================================================================
 // REFERRAL ENGINE TABLES
@@ -3154,7 +3095,7 @@ export const nftMints = pgTable('nft_mints', {
   recipientUserId: varchar('recipient_user_id')
     .references(() => users.id)
     .notNull(),
-  recipientWalletAddress: text('recipient_wallet_address').notNull(), // Actual wallet address from Dynamic
+  recipientWalletAddress: text('recipient_wallet_address').notNull(), // Recipient wallet address
   recipientChain: text('recipient_chain').notNull(), // Chain where NFT was minted
 
   // Mint Context
@@ -4137,7 +4078,7 @@ export type InsertReputationSyncLogEntry = typeof reputationSyncLog.$inferInsert
 // Additional inferred types for tables used by services
 export type SocialConnection = typeof socialConnections.$inferSelect;
 export type CreatorFacebookPage = typeof creatorFacebookPages.$inferSelect;
-export type SocialCampaignTask = typeof socialCampaignTasks.$inferSelect;
+// SocialCampaignTask type removed — table dropped in migration 0043
 export type PlatformTaskCompletion = typeof platformTaskCompletions.$inferSelect;
 export type ManualReviewQueueItem = typeof manualReviewQueue.$inferSelect;
 export type VerificationAttempt = typeof verificationAttempts.$inferSelect;

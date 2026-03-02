@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback } from "react";
-import { Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
-import { ImageCropModal } from "@/components/ui/image-crop-modal";
-import { transformImageUrl } from "@/lib/image-utils";
+import { useState, useRef, useCallback } from 'react';
+import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { getAuthHeaders } from '@/lib/queryClient';
+import { ImageCropModal } from '@/components/ui/image-crop-modal';
+import { transformImageUrl } from '@/lib/image-utils';
 
 interface ImageUploadProps {
   type: 'avatar' | 'banner';
@@ -21,7 +21,7 @@ export function ImageUpload({
   onUploadSuccess,
   onRemove,
   disabled = false,
-  className = ""
+  className = '',
 }: ImageUploadProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,9 +37,7 @@ export function ImageUpload({
   const isBanner = type === 'banner';
 
   // Recommended dimensions
-  const recommendedDimensions = isAvatar
-    ? "400x400px (1:1 ratio)"
-    : "1200x300px (4:1 ratio)";
+  const recommendedDimensions = isAvatar ? '400x400px (1:1 ratio)' : '1200x300px (4:1 ratio)';
 
   const maxSize = 5; // MB
 
@@ -59,97 +57,103 @@ export function ImageUpload({
     return { valid: true };
   };
 
-  const handleFileSelect = useCallback(async (file: File) => {
-    // Validate file
-    const validation = validateFile(file);
-    if (!validation.valid) {
-      toast({
-        title: "Invalid File",
-        description: validation.error,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Create preview and open crop modal
-    const preview = URL.createObjectURL(file);
-    setTempImageUrl(preview);
-    setImageToUpload(file);
-    setShowCropModal(true);
-  }, [toast]);
-
-  const handleCropComplete = useCallback(async (croppedBlob: Blob) => {
-    setShowCropModal(false);
-    
-    // Create a File object from the blob
-    const croppedFile = new File([croppedBlob], imageToUpload?.name || 'cropped-image.jpg', {
-      type: 'image/jpeg'
-    });
-
-    // Create preview of cropped image
-    const preview = URL.createObjectURL(croppedBlob);
-    setPreviewUrl(preview);
-
-    // Upload file
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      const formData = new FormData();
-      formData.append('image', croppedFile);
-
-      const endpoint = `/api/upload/${type}`;
-      
-      // Simulate progress (real progress tracking would require XHR)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90));
-      }, 200);
-
-      // Get auth headers (supports both JWT and legacy Dynamic user ID)
-      const authHeaders = getAuthHeaders();
-      
-      if (Object.keys(authHeaders).length === 0) {
-        throw new Error('Please log in to upload images');
-      }
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-        headers: authHeaders
-      });
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
+  const handleFileSelect = useCallback(
+    async (file: File) => {
+      // Validate file
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        toast({
+          title: 'Invalid File',
+          description: validation.error,
+          variant: 'destructive',
+        });
+        return;
       }
 
-      const data = await response.json();
+      // Create preview and open crop modal
+      const preview = URL.createObjectURL(file);
+      setTempImageUrl(preview);
+      setImageToUpload(file);
+      setShowCropModal(true);
+    },
+    [toast]
+  );
 
-      toast({
-        title: "Upload Successful",
-        description: `Your ${type} has been uploaded successfully!`,
+  const handleCropComplete = useCallback(
+    async (croppedBlob: Blob) => {
+      setShowCropModal(false);
+
+      // Create a File object from the blob
+      const croppedFile = new File([croppedBlob], imageToUpload?.name || 'cropped-image.jpg', {
+        type: 'image/jpeg',
       });
 
-      onUploadSuccess(data.url);
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast({
-        title: "Upload Failed",
-        description: error instanceof Error ? error.message : 'Failed to upload image',
-        variant: "destructive"
-      });
-      setPreviewUrl(null);
-    } finally {
-      setIsUploading(false);
+      // Create preview of cropped image
+      const preview = URL.createObjectURL(croppedBlob);
+      setPreviewUrl(preview);
+
+      // Upload file
+      setIsUploading(true);
       setUploadProgress(0);
-      setTempImageUrl(null);
-      setImageToUpload(null);
-    }
-  }, [type, toast, onUploadSuccess, imageToUpload]);
+
+      try {
+        const formData = new FormData();
+        formData.append('image', croppedFile);
+
+        const endpoint = `/api/upload/${type}`;
+
+        // Simulate progress (real progress tracking would require XHR)
+        const progressInterval = setInterval(() => {
+          setUploadProgress((prev) => Math.min(prev + 10, 90));
+        }, 200);
+
+        // Get auth headers (JWT auth)
+        const authHeaders = getAuthHeaders();
+
+        if (Object.keys(authHeaders).length === 0) {
+          throw new Error('Please log in to upload images');
+        }
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+          headers: authHeaders,
+        });
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        if (!response.ok) {
+          const error: Record<string, unknown> = await response.json();
+          throw new Error((error.error as string) || 'Upload failed');
+        }
+
+        const data = await response.json();
+
+        toast({
+          title: 'Upload Successful',
+          description: `Your ${type} has been uploaded successfully!`,
+        });
+
+        onUploadSuccess(data.url);
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: 'Upload Failed',
+          description: error instanceof Error ? error.message : 'Failed to upload image',
+          variant: 'destructive',
+        });
+        setPreviewUrl(null);
+      } finally {
+        setIsUploading(false);
+        setUploadProgress(0);
+        setTempImageUrl(null);
+        setImageToUpload(null);
+      }
+    },
+    [type, toast, onUploadSuccess, imageToUpload]
+  );
 
   const handleCropCancel = useCallback(() => {
     setShowCropModal(false);
@@ -160,24 +164,30 @@ export function ImageUpload({
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
 
-    if (disabled || isUploading) return;
+      if (disabled || isUploading) return;
 
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
-  }, [disabled, isUploading, handleFileSelect]);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        handleFileSelect(files[0]);
+      }
+    },
+    [disabled, isUploading, handleFileSelect]
+  );
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!disabled && !isUploading) {
-      setIsDragging(true);
-    }
-  }, [disabled, isUploading]);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      if (!disabled && !isUploading) {
+        setIsDragging(true);
+      }
+    },
+    [disabled, isUploading]
+  );
 
   const handleDragLeave = useCallback(() => {
     setIsDragging(false);
@@ -288,7 +298,7 @@ export function ImageUpload({
                 <Loader2 className="h-8 w-8 text-white animate-spin mb-2" />
                 <p className="text-white text-sm">Uploading... {uploadProgress}%</p>
                 <div className="w-2/3 h-2 bg-white/20 rounded-full mt-2 overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-blue-500 transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
@@ -310,15 +320,9 @@ export function ImageUpload({
                 <p className="text-white font-medium mb-1">
                   {isDragging ? 'Drop image here' : `Upload ${type}`}
                 </p>
-                <p className="text-gray-400 text-sm mb-2">
-                  Drag & drop or click to browse
-                </p>
-                <p className="text-gray-500 text-xs">
-                  Recommended: {recommendedDimensions}
-                </p>
-                <p className="text-gray-500 text-xs">
-                  JPG, PNG, or WebP • Max {maxSize}MB
-                </p>
+                <p className="text-gray-400 text-sm mb-2">Drag & drop or click to browse</p>
+                <p className="text-gray-500 text-xs">Recommended: {recommendedDimensions}</p>
+                <p className="text-gray-500 text-xs">JPG, PNG, or WebP • Max {maxSize}MB</p>
               </>
             )}
           </div>
@@ -329,13 +333,13 @@ export function ImageUpload({
       <div className="text-xs text-gray-400 space-y-1">
         {isAvatar && (
           <>
-            <p>• Upload any image - you'll be able to crop it to a square</p>
+            <p>• Upload any image - you&apos;ll be able to crop it to a square</p>
             <p>• Minimum 50x50px, recommended 400x400px or larger</p>
           </>
         )}
         {isBanner && (
           <>
-            <p>• Upload any image - you'll be able to crop it to a wide banner</p>
+            <p>• Upload any image - you&apos;ll be able to crop it to a wide banner</p>
             <p>• Minimum 200x100px, recommended 1200x300px or larger</p>
           </>
         )}

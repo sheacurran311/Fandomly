@@ -1,25 +1,64 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import {
-  users, creators, loyaltyPrograms, rewards, fanPrograms,
-  pointTransactions, rewardRedemptions, tenants, tenantMemberships,
-  campaigns, campaignRules, campaignParticipations, socialCampaignTasks,
-  tasks, taskAssignments, taskTemplates, taskCompletions, rewardDistributions,
-  notifications, auditLog,
-  type User, type InsertUser, type Creator, type InsertCreator,
-  type LoyaltyProgram, type InsertLoyaltyProgram,
-  type Reward, type InsertReward, type FanProgram, type InsertFanProgram,
-  type PointTransaction, type InsertPointTransaction,
-  type RewardRedemption, type InsertRewardRedemption,
-  type Tenant, type InsertTenant, type TenantMembership, type InsertTenantMembership,
-  type Campaign, type InsertCampaign, type CampaignRule, type InsertCampaignRule,
-  type Task, type InsertTask, type TaskTemplate, type InsertTaskTemplate, type TaskAssignment, type InsertTaskAssignment,
-  type TaskCompletion, type InsertTaskCompletion, type RewardDistribution, type InsertRewardDistribution,
-  type AuditLog, type InsertAuditLog,
+  users,
+  creators,
+  loyaltyPrograms,
+  rewards,
+  fanPrograms,
+  pointTransactions,
+  rewardRedemptions,
+  tenants,
+  tenantMemberships,
+  campaigns,
+  campaignRules,
+  campaignParticipations,
+  tasks,
+  taskAssignments,
+  taskTemplates,
+  taskCompletions,
+  rewardDistributions,
+  notifications,
+  auditLog,
+  type User,
+  type InsertUser,
+  type Creator,
+  type InsertCreator,
+  type LoyaltyProgram,
+  type InsertLoyaltyProgram,
+  type Reward,
+  type InsertReward,
+  type FanProgram,
+  type InsertFanProgram,
+  type PointTransaction,
+  type InsertPointTransaction,
+  type RewardRedemption,
+  type InsertRewardRedemption,
+  type Tenant,
+  type InsertTenant,
+  type TenantMembership,
+  type InsertTenantMembership,
+  type Campaign,
+  type InsertCampaign,
+  type CampaignRule,
+  type InsertCampaignRule,
+  type Task,
+  type InsertTask,
+  type TaskTemplate,
+  type InsertTaskTemplate,
+  type TaskAssignment,
+  type InsertTaskAssignment,
+  type TaskCompletion,
+  type InsertTaskCompletion,
+  type RewardDistribution,
+  type InsertRewardDistribution,
+  type AuditLog,
+  type InsertAuditLog,
   insertSocialCampaignTaskSchema,
-  creatorFacebookPages
-} from "@shared/schema";
-import { db } from "../db";
-import { eq, desc, and, sql, or, isNull } from "drizzle-orm";
-import { encryptToken, decryptToken } from "../utils/crypto-utils";
+  creatorFacebookPages,
+} from '@shared/schema';
+import { db } from '../db';
+import { eq, desc, and, sql, or, isNull } from 'drizzle-orm';
+import { encryptToken, decryptToken } from '../utils/crypto-utils';
 
 export interface IStorage {
   // User operations
@@ -30,7 +69,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   createUser(user: any): Promise<User>;
   updateUser(id: string, updates: any): Promise<User | undefined>;
-  updateUserType(userId: string, userType: "fan" | "creator"): Promise<User | undefined>;
+  updateUserType(userId: string, userType: 'fan' | 'creator'): Promise<User | undefined>;
   updateOnboardingState(userId: string, onboardingState: any): Promise<User | undefined>;
 
   // Creator operations
@@ -53,7 +92,7 @@ export interface IStorage {
   createReward(reward: any): Promise<Reward>;
   updateReward(id: string, updates: any): Promise<Reward>;
   deleteReward(id: string): Promise<void>;
-  
+
   // Atomic redemption operation
   redeemRewardAtomic(data: {
     userId: string;
@@ -105,13 +144,13 @@ export interface IStorage {
   updateCampaign(id: string, data: any): Promise<Campaign>;
   getCampaignRules(campaignId: string): Promise<CampaignRule[]>;
   createCampaignRule(data: any): Promise<CampaignRule>;
-  
+
   // Social Campaign Task operations
   getSocialCampaignTasks(campaignId: string): Promise<any[]>;
   createSocialCampaignTask(data: any): Promise<any>;
   updateSocialCampaignTask(id: string, data: any): Promise<any>;
   deleteSocialCampaignTask(id: string): Promise<void>;
-  
+
   // Campaign Participation operations
   createCampaignParticipation(data: any): Promise<any>;
   getCampaignParticipation(campaignId: string, memberId: string): Promise<any>;
@@ -123,49 +162,71 @@ export interface IStorage {
   getAllTasks(): Promise<Task[]>;
   getTask(id: string, tenantId?: string): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
-  updateTask(id: string, updates: Partial<InsertTask>, tenantId?: string): Promise<Task | undefined>;
+  updateTask(
+    id: string,
+    updates: Partial<InsertTask>,
+    tenantId?: string
+  ): Promise<Task | undefined>;
   deleteTask(id: string, tenantId?: string): Promise<void>;
-  
+
   // Task Template operations
   getTaskTemplates(tenantId?: string): Promise<TaskTemplate[]>;
   getTaskTemplate(id: string, tenantId?: string): Promise<TaskTemplate | undefined>;
   createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate>;
-  updateTaskTemplate(id: string, updates: Partial<InsertTaskTemplate>, tenantId?: string): Promise<TaskTemplate | undefined>;
+  updateTaskTemplate(
+    id: string,
+    updates: Partial<InsertTaskTemplate>,
+    tenantId?: string
+  ): Promise<TaskTemplate | undefined>;
   deleteTaskTemplate(id: string, tenantId?: string): Promise<void>;
-  
+
   // Task Assignment operations
   getTaskAssignments(campaignId: string): Promise<TaskAssignment[]>;
   getCampaignTasks(campaignId: string): Promise<Task[]>;
-  assignTaskToCampaign(taskId: string, campaignId: string, tenantId: string): Promise<TaskAssignment>;
+  assignTaskToCampaign(
+    taskId: string,
+    campaignId: string,
+    tenantId: string
+  ): Promise<TaskAssignment>;
   unassignTaskFromCampaign(taskId: string, campaignId: string, tenantId: string): Promise<void>;
-  
+
   // Task Completion operations
   getTaskCompletion(id: string): Promise<TaskCompletion | undefined>;
-  getTaskCompletionByUserAndTask(userId: string, taskId: string, campaignId?: string | null): Promise<TaskCompletion | undefined>;
+  getTaskCompletionByUserAndTask(
+    userId: string,
+    taskId: string,
+    campaignId?: string | null
+  ): Promise<TaskCompletion | undefined>;
   getUserTaskCompletions(userId: string, tenantId?: string): Promise<any[]>;
   getTaskCompletions(taskId: string): Promise<TaskCompletion[]>;
   getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]>;
   createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion>;
-  updateTaskCompletion(id: string, updates: Partial<InsertTaskCompletion>): Promise<TaskCompletion | undefined>;
-  
+  updateTaskCompletion(
+    id: string,
+    updates: Partial<InsertTaskCompletion>
+  ): Promise<TaskCompletion | undefined>;
+
   // Reward Distribution operations
   getUserRewardDistributions(userId: string, tenantId?: string): Promise<RewardDistribution[]>;
   createRewardDistribution(distribution: InsertRewardDistribution): Promise<RewardDistribution>;
-  
+
   // Campaign Publishing operations
   publishCampaign(campaignId: string, tenantId: string): Promise<Campaign | undefined>;
   getPendingCampaigns(creatorId: string, tenantId?: string): Promise<Campaign[]>;
 
   // Creator Facebook Pages
-  upsertCreatorFacebookPages(creatorId: string, pages: Array<{
-    pageId: string;
-    name: string;
-    accessToken: string;
-    followersCount?: number;
-    fanCount?: number;
-    instagramBusinessAccountId?: string;
-    connectedInstagramAccountId?: string;
-  }>): Promise<number>;
+  upsertCreatorFacebookPages(
+    creatorId: string,
+    pages: Array<{
+      pageId: string;
+      name: string;
+      accessToken: string;
+      followersCount?: number;
+      fanCount?: number;
+      instagramBusinessAccountId?: string;
+      connectedInstagramAccountId?: string;
+    }>
+  ): Promise<number>;
   getCreatorFacebookPages(creatorId: string): Promise<any[]>;
 
   // Social OAuth token storage
@@ -210,9 +271,11 @@ export class DatabaseStorage implements IStorage {
     const usersWithFacebookId = await db
       .select()
       .from(users)
-      .where(sql`${users.profileData}->>'facebookData' IS NOT NULL AND ${users.profileData}->'facebookData'->>'id' = ${facebookId}`)
+      .where(
+        sql`${users.profileData}->>'facebookData' IS NOT NULL AND ${users.profileData}->'facebookData'->>'id' = ${facebookId}`
+      )
       .orderBy(desc(users.createdAt));
-    
+
     return usersWithFacebookId || [];
   }
 
@@ -220,32 +283,32 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users).orderBy(desc(users.createdAt));
   }
 
-  async updateUserType(userId: string, userType: "fan" | "creator"): Promise<User | undefined> {
+  async updateUserType(userId: string, userType: 'fan' | 'creator'): Promise<User | undefined> {
     try {
-      const role = userType === "creator" ? "customer_admin" : "customer_end_user";
-      
+      const role = userType === 'creator' ? 'customer_admin' : 'customer_end_user';
+
       // Reset onboarding state when switching user types
       // This ensures users go through the appropriate onboarding for their new type
       const resetOnboardingState = {
         currentStep: 0,
-        totalSteps: userType === "creator" ? 3 : 2,
+        totalSteps: userType === 'creator' ? 3 : 2,
         completedSteps: [],
         isCompleted: false,
-        lastOnboardingRoute: undefined
+        lastOnboardingRoute: undefined,
       };
-      
+
       const [updatedUser] = await db
         .update(users)
-        .set({ 
-          userType, 
+        .set({
+          userType,
           role,
-          onboardingState: resetOnboardingState
+          onboardingState: resetOnboardingState,
         })
         .where(eq(users.id, userId))
         .returning();
       return updatedUser;
     } catch (error) {
-      console.error("Error updating user type:", error);
+      console.error('Error updating user type:', error);
       return undefined;
     }
   }
@@ -259,24 +322,31 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updatedUser;
     } catch (error) {
-      console.error("Error updating onboarding state:", error);
+      console.error('Error updating onboarding state:', error);
       return undefined;
     }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser as any).returning();
+    const [user] = await db
+      .insert(users)
+      .values(insertUser as any)
+      .returning();
     return user;
   }
 
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
-    const [user] = await db.update(users).set(updates as any).where(eq(users.id, id)).returning();
+    const [user] = await db
+      .update(users)
+      .set(updates as any)
+      .where(eq(users.id, id))
+      .returning();
     return user || undefined;
   }
 
   // Creator operations
   async getCreator(id: string, tenantId?: string): Promise<Creator | undefined> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(creators.id, id), eq(creators.tenantId, tenantId))
       : eq(creators.id, id);
     const [creator] = await db.select().from(creators).where(conditions);
@@ -284,7 +354,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCreatorByUserId(userId: string, tenantId?: string): Promise<Creator | undefined> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(creators.userId, userId), eq(creators.tenantId, tenantId))
       : eq(creators.userId, userId);
     const [creator] = await db.select().from(creators).where(conditions);
@@ -292,39 +362,53 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCreator(insertCreator: InsertCreator): Promise<Creator> {
-    const [creator] = await db.insert(creators).values(insertCreator as any).returning();
+    const [creator] = await db
+      .insert(creators)
+      .values(insertCreator as any)
+      .returning();
     return creator;
   }
 
   async updateCreator(id: string, updates: Partial<InsertCreator>): Promise<Creator> {
-    const [updatedCreator] = await db.update(creators).set(updates as any).where(eq(creators.id, id)).returning();
-    
+    const [updatedCreator] = await db
+      .update(creators)
+      .set(updates as any)
+      .where(eq(creators.id, id))
+      .returning();
+
     // Auto-check verification status after update
     if (updatedCreator) {
       try {
         const { calculateCreatorVerification } = await import('@shared/creatorVerificationSchema');
         const creatorType = updatedCreator.category as 'athlete' | 'musician' | 'content_creator';
         const verificationData = calculateCreatorVerification(updatedCreator, creatorType);
-        
+
         // Auto-verify if profile is complete
         const shouldVerify = verificationData.profileComplete && !updatedCreator.isVerified;
         const shouldUnverify = !verificationData.profileComplete && updatedCreator.isVerified;
-        
-        if (shouldVerify || shouldUnverify || JSON.stringify(verificationData) !== JSON.stringify(updatedCreator.verificationData)) {
-          const [finalCreator] = await db.update(creators)
+
+        if (
+          shouldVerify ||
+          shouldUnverify ||
+          JSON.stringify(verificationData) !== JSON.stringify(updatedCreator.verificationData)
+        ) {
+          const [finalCreator] = await db
+            .update(creators)
             .set({
               isVerified: shouldVerify ? true : shouldUnverify ? false : updatedCreator.isVerified,
-              verificationData: verificationData as any
+              verificationData: verificationData as any,
             })
             .where(eq(creators.id, id))
             .returning();
-          
+
           if (shouldVerify) {
             console.log(`✅ Auto-verified creator: ${updatedCreator.displayName} (${id})`);
           } else if (shouldUnverify) {
-            console.log(`⚠️  Removed verification from creator: ${updatedCreator.displayName} (${id})`);
+            console.log(
+              `⚠️  Removed verification from creator: ${updatedCreator.displayName} (${id})`
+            );
           }
-          
+
           return finalCreator;
         }
       } catch (verificationError) {
@@ -332,7 +416,7 @@ export class DatabaseStorage implements IStorage {
         // Continue without verification check - don't fail the update
       }
     }
-    
+
     return updatedCreator;
   }
 
@@ -351,32 +435,48 @@ export class DatabaseStorage implements IStorage {
 
   async getLoyaltyProgramsByCreator(creatorId: string): Promise<LoyaltyProgram[]> {
     // First, try to find programs by creator_id directly
-    let programs = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creatorId));
-    
+    let programs = await db
+      .select()
+      .from(loyaltyPrograms)
+      .where(eq(loyaltyPrograms.creatorId, creatorId));
+
     // If no programs found, the creatorId might be a user_id - look up the creator and try again
     if (programs.length === 0) {
       const [creator] = await db.select().from(creators).where(eq(creators.userId, creatorId));
       if (creator) {
-        programs = await db.select().from(loyaltyPrograms).where(eq(loyaltyPrograms.creatorId, creator.id));
+        programs = await db
+          .select()
+          .from(loyaltyPrograms)
+          .where(eq(loyaltyPrograms.creatorId, creator.id));
       }
     }
-    
+
     return programs;
   }
 
   async createLoyaltyProgram(insertProgram: InsertLoyaltyProgram): Promise<LoyaltyProgram> {
-    const [program] = await db.insert(loyaltyPrograms).values(insertProgram as any).returning();
+    const [program] = await db
+      .insert(loyaltyPrograms)
+      .values(insertProgram as any)
+      .returning();
     return program;
   }
 
-  async updateLoyaltyProgram(id: string, updates: Partial<InsertLoyaltyProgram>): Promise<LoyaltyProgram> {
-    const [program] = await db.update(loyaltyPrograms).set(updates as any).where(eq(loyaltyPrograms.id, id)).returning();
+  async updateLoyaltyProgram(
+    id: string,
+    updates: Partial<InsertLoyaltyProgram>
+  ): Promise<LoyaltyProgram> {
+    const [program] = await db
+      .update(loyaltyPrograms)
+      .set(updates as any)
+      .where(eq(loyaltyPrograms.id, id))
+      .returning();
     return program;
   }
 
   // Reward operations
   async getReward(id: string, tenantId?: string): Promise<Reward | undefined> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(rewards.id, id), eq(rewards.tenantId, tenantId))
       : eq(rewards.id, id);
     const [reward] = await db.select().from(rewards).where(conditions);
@@ -384,7 +484,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRewardsByProgram(programId: string, tenantId?: string): Promise<Reward[]> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(rewards.programId, programId), eq(rewards.tenantId, tenantId))
       : eq(rewards.programId, programId);
     return await db.select().from(rewards).where(conditions);
@@ -392,24 +492,34 @@ export class DatabaseStorage implements IStorage {
 
   async getAllRewards(tenantId?: string): Promise<Reward[]> {
     const conditions = tenantId ? eq(rewards.tenantId, tenantId) : undefined;
-    return conditions 
+    return conditions
       ? await db.select().from(rewards).where(conditions)
       : await db.select().from(rewards);
   }
 
   async createReward(insertReward: InsertReward): Promise<Reward> {
-    const [reward] = await db.insert(rewards).values(insertReward as any).returning();
+    const [reward] = await db
+      .insert(rewards)
+      .values(insertReward as any)
+      .returning();
     return reward;
   }
 
   async updateReward(id: string, updates: Partial<InsertReward>): Promise<Reward> {
-    const [reward] = await db.update(rewards).set(updates as any).where(eq(rewards.id, id)).returning();
+    const [reward] = await db
+      .update(rewards)
+      .set(updates as any)
+      .where(eq(rewards.id, id))
+      .returning();
     return reward;
   }
 
   async deleteReward(id: string): Promise<void> {
     // Soft delete by setting isActive to false
-    await db.update(rewards).set({ isActive: false } as any).where(eq(rewards.id, id));
+    await db
+      .update(rewards)
+      .set({ isActive: false } as any)
+      .where(eq(rewards.id, id));
   }
 
   async redeemRewardAtomic(data: {
@@ -427,9 +537,11 @@ export class DatabaseStorage implements IStorage {
     // Use db.transaction for atomicity - all operations succeed or all fail
     return await db.transaction(async (tx) => {
       // Get fresh reward data with row lock to prevent race conditions
-      const [reward] = await tx.select().from(rewards)
+      const [reward] = await tx
+        .select()
+        .from(rewards)
         .where(and(eq(rewards.id, data.rewardId), eq(rewards.isActive, true)));
-      
+
       if (!reward) {
         throw new Error('Reward not found or inactive');
       }
@@ -438,13 +550,17 @@ export class DatabaseStorage implements IStorage {
       const totalCost = reward.pointsCost * data.entries;
 
       // Get fresh membership data with row lock and validate ownership
-      const [membership] = await tx.select().from(tenantMemberships)
-        .where(and(
-          eq(tenantMemberships.id, data.membershipId),
-          eq(tenantMemberships.userId, data.userId),  // IDOR prevention
-          eq(tenantMemberships.tenantId, reward.tenantId) // Tenant scoping
-        ));
-      
+      const [membership] = await tx
+        .select()
+        .from(tenantMemberships)
+        .where(
+          and(
+            eq(tenantMemberships.id, data.membershipId),
+            eq(tenantMemberships.userId, data.userId), // IDOR prevention
+            eq(tenantMemberships.tenantId, reward.tenantId) // Tenant scoping
+          )
+        );
+
       if (!membership) {
         throw new Error('Membership not found or access denied');
       }
@@ -458,18 +574,21 @@ export class DatabaseStorage implements IStorage {
 
       // Atomic conditional updates to prevent race conditions
       // 1. Update membership points with conditional check
-      const membershipUpdateResult = await tx.update(tenantMemberships)
+      const membershipUpdateResult = await tx
+        .update(tenantMemberships)
         .set({
           memberData: {
             ...membership.memberData,
-            points: (membership.memberData?.points || 0) - totalCost
-          }
+            points: (membership.memberData?.points || 0) - totalCost,
+          },
         } as any)
-        .where(and(
-          eq(tenantMemberships.id, data.membershipId),
-          // Conditional update - only succeed if sufficient points
-          sql`(${tenantMemberships.memberData}->>'points')::int >= ${totalCost}`
-        ))
+        .where(
+          and(
+            eq(tenantMemberships.id, data.membershipId),
+            // Conditional update - only succeed if sufficient points
+            sql`(${tenantMemberships.memberData}->>'points')::int >= ${totalCost}`
+          )
+        )
         .returning();
 
       if (membershipUpdateResult.length === 0) {
@@ -477,17 +596,20 @@ export class DatabaseStorage implements IStorage {
       }
 
       // 2. Update reward stock with conditional check
-      const rewardUpdateResult = await tx.update(rewards)
+      const rewardUpdateResult = await tx
+        .update(rewards)
         .set({
-          currentRedemptions: sql`${rewards.currentRedemptions} + ${data.entries}`
+          currentRedemptions: sql`${rewards.currentRedemptions} + ${data.entries}`,
         } as any)
-        .where(and(
-          eq(rewards.id, data.rewardId),
-          // Conditional update - only succeed if stock available
-          reward.maxRedemptions 
-            ? sql`${rewards.currentRedemptions} + ${data.entries} <= ${reward.maxRedemptions}`
-            : sql`true`
-        ))
+        .where(
+          and(
+            eq(rewards.id, data.rewardId),
+            // Conditional update - only succeed if stock available
+            reward.maxRedemptions
+              ? sql`${rewards.currentRedemptions} + ${data.entries} <= ${reward.maxRedemptions}`
+              : sql`true`
+          )
+        )
         .returning();
 
       if (rewardUpdateResult.length === 0) {
@@ -495,37 +617,42 @@ export class DatabaseStorage implements IStorage {
       }
 
       // 3. Find or create fan program within transaction
-      let fanProgram = await tx.select().from(fanPrograms)
+      let fanProgram = await tx
+        .select()
+        .from(fanPrograms)
         .where(and(eq(fanPrograms.fanId, data.userId), eq(fanPrograms.programId, reward.programId)))
-        .then(rows => rows[0]);
+        .then((rows) => rows[0]);
 
       if (!fanProgram) {
-        const [newFanProgram] = await tx.insert(fanPrograms)
+        const [newFanProgram] = await tx
+          .insert(fanPrograms)
           .values({
             tenantId: reward.tenantId,
             fanId: data.userId,
             programId: reward.programId,
             currentPoints: 0,
-            totalPointsEarned: 0
+            totalPointsEarned: 0,
           } as any)
           .returning();
         fanProgram = newFanProgram;
       }
 
       // 4. Create audit trail - reward redemption record
-      const [rewardRedemption] = await tx.insert(rewardRedemptions)
+      const [rewardRedemption] = await tx
+        .insert(rewardRedemptions)
         .values({
           rewardId: reward.id,
           fanId: data.userId,
           pointsSpent: totalCost,
           quantity: data.entries,
           status: 'completed',
-          redeemedAt: new Date()
+          redeemedAt: new Date(),
         } as any)
         .returning();
 
       // 5. Create point transaction for audit trail
-      const [pointTransaction] = await tx.insert(pointTransactions)
+      const [pointTransaction] = await tx
+        .insert(pointTransactions)
         .values({
           tenantId: reward.tenantId,
           fanProgramId: fanProgram.id,
@@ -534,8 +661,8 @@ export class DatabaseStorage implements IStorage {
           source: 'reward_redemption',
           metadata: {
             rewardId: reward.id,
-            redemptionId: rewardRedemption.id
-          }
+            redemptionId: rewardRedemption.id,
+          },
         } as any)
         .returning();
 
@@ -544,14 +671,16 @@ export class DatabaseStorage implements IStorage {
         updatedReward: rewardUpdateResult[0],
         fanProgram,
         pointTransaction,
-        rewardRedemption
+        rewardRedemption,
       };
     });
   }
 
   // Fan program operations
   async getFanProgram(fanId: string, programId: string): Promise<FanProgram | undefined> {
-    const [fanProgram] = await db.select().from(fanPrograms)
+    const [fanProgram] = await db
+      .select()
+      .from(fanPrograms)
       .where(and(eq(fanPrograms.fanId, fanId), eq(fanPrograms.programId, programId)));
     return fanProgram || undefined;
   }
@@ -566,56 +695,84 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateFanProgram(id: string, updates: Partial<InsertFanProgram>): Promise<FanProgram> {
-    const [fanProgram] = await db.update(fanPrograms).set(updates).where(eq(fanPrograms.id, id)).returning();
+    const [fanProgram] = await db
+      .update(fanPrograms)
+      .set(updates)
+      .where(eq(fanPrograms.id, id))
+      .returning();
     return fanProgram;
   }
 
   // Point transaction operations
-  async createPointTransaction(insertTransaction: InsertPointTransaction): Promise<PointTransaction> {
-    const [transaction] = await db.insert(pointTransactions).values(insertTransaction as any).returning();
+  async createPointTransaction(
+    insertTransaction: InsertPointTransaction
+  ): Promise<PointTransaction> {
+    const [transaction] = await db
+      .insert(pointTransactions)
+      .values(insertTransaction as any)
+      .returning();
     return transaction;
   }
 
   async getPointTransactionsByFanProgram(fanProgramId: string): Promise<PointTransaction[]> {
-    return await db.select().from(pointTransactions)
+    return await db
+      .select()
+      .from(pointTransactions)
       .where(eq(pointTransactions.fanProgramId, fanProgramId))
       .orderBy(desc(pointTransactions.createdAt));
   }
 
   // Reward redemption operations
-  async createRewardRedemption(insertRedemption: InsertRewardRedemption): Promise<RewardRedemption> {
-    const [redemption] = await db.insert(rewardRedemptions).values(insertRedemption as any).returning();
+  async createRewardRedemption(
+    insertRedemption: InsertRewardRedemption
+  ): Promise<RewardRedemption> {
+    const [redemption] = await db
+      .insert(rewardRedemptions)
+      .values(insertRedemption as any)
+      .returning();
     return redemption;
   }
 
   async getRewardRedemptionsByUser(fanId: string): Promise<RewardRedemption[]> {
-    return await db.select().from(rewardRedemptions)
+    return await db
+      .select()
+      .from(rewardRedemptions)
       .where(eq(rewardRedemptions.fanId, fanId))
       .orderBy(desc(rewardRedemptions.redeemedAt));
   }
 
   async getRewardRedemptionsByProgram(programId: string): Promise<RewardRedemption[]> {
-    const rows = await db.select({ redemption: rewardRedemptions })
+    const rows = await db
+      .select({ redemption: rewardRedemptions })
       .from(rewardRedemptions)
       .innerJoin(rewards, eq(rewardRedemptions.rewardId, rewards.id))
       .where(eq(rewards.programId, programId))
       .orderBy(desc(rewardRedemptions.redeemedAt));
-    return rows.map(r => r.redemption);
+    return rows.map((r) => r.redemption);
   }
 
-  async updateRewardRedemption(id: string, updates: Partial<InsertRewardRedemption>): Promise<RewardRedemption> {
-    const [redemption] = await db.update(rewardRedemptions).set(updates as any)
-      .where(eq(rewardRedemptions.id, id)).returning();
+  async updateRewardRedemption(
+    id: string,
+    updates: Partial<InsertRewardRedemption>
+  ): Promise<RewardRedemption> {
+    const [redemption] = await db
+      .update(rewardRedemptions)
+      .set(updates as any)
+      .where(eq(rewardRedemptions.id, id))
+      .returning();
     return redemption;
   }
 
   // Tenant operations
   async createTenant(data: InsertTenant): Promise<Tenant> {
-    const [tenant] = await db.insert(tenants).values({
-      ...data,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    } as any).returning();
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      .returning();
     return tenant;
   }
 
@@ -630,10 +787,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined> {
-    const [tenant] = await db.update(tenants).set({
-      ...data,
-      updatedAt: new Date()
-    } as any).where(eq(tenants.id, id)).returning();
+    const [tenant] = await db
+      .update(tenants)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(tenants.id, id))
+      .returning();
     return tenant;
   }
 
@@ -643,38 +804,58 @@ export class DatabaseStorage implements IStorage {
 
   // Tenant Membership operations
   async createTenantMembership(data: InsertTenantMembership): Promise<TenantMembership> {
-    const [membership] = await db.insert(tenantMemberships).values({
-      ...data,
-      joinedAt: new Date(),
-      lastActiveAt: new Date()
-    } as any).returning();
+    const [membership] = await db
+      .insert(tenantMemberships)
+      .values({
+        ...data,
+        joinedAt: new Date(),
+        lastActiveAt: new Date(),
+      } as any)
+      .returning();
     return membership;
   }
 
   async getTenantMembers(tenantId: string): Promise<TenantMembership[]> {
-    return await db.select().from(tenantMemberships).where(eq(tenantMemberships.tenantId, tenantId));
+    return await db
+      .select()
+      .from(tenantMemberships)
+      .where(eq(tenantMemberships.tenantId, tenantId));
   }
 
   async getUserMemberships(userId: string): Promise<TenantMembership[]> {
     return await db.select().from(tenantMemberships).where(eq(tenantMemberships.userId, userId));
   }
 
-  async getUserTenantMembership(userId: string, tenantId: string): Promise<TenantMembership | undefined> {
-    const [membership] = await db.select().from(tenantMemberships)
+  async getUserTenantMembership(
+    userId: string,
+    tenantId: string
+  ): Promise<TenantMembership | undefined> {
+    const [membership] = await db
+      .select()
+      .from(tenantMemberships)
       .where(and(eq(tenantMemberships.userId, userId), eq(tenantMemberships.tenantId, tenantId)));
     return membership || undefined;
   }
 
-  async updateUserTenantMembership(userId: string, tenantId: string, updates: Partial<InsertTenantMembership>): Promise<TenantMembership> {
-    const [membership] = await db.update(tenantMemberships)
+  async updateUserTenantMembership(
+    userId: string,
+    tenantId: string,
+    updates: Partial<InsertTenantMembership>
+  ): Promise<TenantMembership> {
+    const [membership] = await db
+      .update(tenantMemberships)
       .set(updates as any)
       .where(and(eq(tenantMemberships.userId, userId), eq(tenantMemberships.tenantId, tenantId)))
       .returning();
     return membership;
   }
 
-  async updateTenantMembership(id: string, updates: Partial<InsertTenantMembership>): Promise<TenantMembership> {
-    const [membership] = await db.update(tenantMemberships)
+  async updateTenantMembership(
+    id: string,
+    updates: Partial<InsertTenantMembership>
+  ): Promise<TenantMembership> {
+    const [membership] = await db
+      .update(tenantMemberships)
       .set(updates as any)
       .where(eq(tenantMemberships.id, id))
       .returning();
@@ -691,33 +872,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.tenantId, tenantId))
       : eq(campaigns.creatorId, creatorId);
     return await db.select().from(campaigns).where(conditions);
   }
 
   async getActiveCampaignsByCreator(creatorId: string, tenantId?: string): Promise<Campaign[]> {
-    const conditions = tenantId 
-      ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'active'), eq(campaigns.tenantId, tenantId))
+    const conditions = tenantId
+      ? and(
+          eq(campaigns.creatorId, creatorId),
+          eq(campaigns.status, 'active'),
+          eq(campaigns.tenantId, tenantId)
+        )
       : and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'active'));
     return await db.select().from(campaigns).where(conditions);
   }
 
   async getAllActiveCampaigns(tenantId?: string): Promise<Campaign[]> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(campaigns.status, 'active'), eq(campaigns.tenantId, tenantId))
       : eq(campaigns.status, 'active');
     return await db.select().from(campaigns).where(conditions);
   }
 
   async createCampaign(data: InsertCampaign): Promise<Campaign> {
-    const [row] = await db.insert(campaigns).values(data as any).returning();
+    const [row] = await db
+      .insert(campaigns)
+      .values(data as any)
+      .returning();
     return row;
   }
 
   async updateCampaign(id: string, data: Partial<InsertCampaign>): Promise<Campaign> {
-    const [row] = await db.update(campaigns).set(data as any).where(eq(campaigns.id, id)).returning();
+    const [row] = await db
+      .update(campaigns)
+      .set(data as any)
+      .where(eq(campaigns.id, id))
+      .returning();
     return row;
   }
 
@@ -726,51 +918,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCampaignRule(data: InsertCampaignRule): Promise<CampaignRule> {
-    const [row] = await db.insert(campaignRules).values(data as any).returning();
-    return row;
-  }
-
-  // Social Campaign Task operations
-  async getSocialCampaignTasks(campaignId: string): Promise<any[]> {
-    return await db.select().from(socialCampaignTasks)
-      .where(eq(socialCampaignTasks.campaignId, campaignId))
-      .orderBy(socialCampaignTasks.displayOrder, socialCampaignTasks.createdAt);
-  }
-
-  async createSocialCampaignTask(data: any): Promise<any> {
-    const [row] = await db.insert(socialCampaignTasks).values(data as any).returning();
-    return row;
-  }
-
-  async updateSocialCampaignTask(id: string, data: any): Promise<any> {
-    const [row] = await db.update(socialCampaignTasks)
-      .set({ ...data, updatedAt: new Date() } as any)
-      .where(eq(socialCampaignTasks.id, id))
+    const [row] = await db
+      .insert(campaignRules)
+      .values(data as any)
       .returning();
     return row;
   }
 
-  async deleteSocialCampaignTask(id: string): Promise<void> {
-    await db.delete(socialCampaignTasks).where(eq(socialCampaignTasks.id, id));
-  }
+  // socialCampaignTasks CRUD removed — table dropped in migration 0043
 
   // Creator Facebook Pages - Optimized batch upsert (fixes N+1 query)
-  async upsertCreatorFacebookPages(creatorId: string, pages: Array<{
-    pageId: string;
-    name: string;
-    accessToken: string;
-    followersCount?: number;
-    fanCount?: number;
-    instagramBusinessAccountId?: string;
-    connectedInstagramAccountId?: string;
-  }>): Promise<number> {
+  async upsertCreatorFacebookPages(
+    creatorId: string,
+    pages: Array<{
+      pageId: string;
+      name: string;
+      accessToken: string;
+      followersCount?: number;
+      fanCount?: number;
+      instagramBusinessAccountId?: string;
+      connectedInstagramAccountId?: string;
+    }>
+  ): Promise<number> {
     if (pages.length === 0) return 0;
-    
+
     const now = new Date();
-    
+
     // Batch upsert using ON CONFLICT DO UPDATE
     // This is a single query instead of 2*N queries
-    const values = pages.map(p => ({
+    const values = pages.map((p) => ({
       creatorId,
       pageId: p.pageId,
       name: p.name,
@@ -780,13 +956,19 @@ export class DatabaseStorage implements IStorage {
       instagramBusinessAccountId: p.instagramBusinessAccountId || null,
       connectedInstagramAccountId: p.connectedInstagramAccountId || null,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     }));
-    
+
     // Use raw SQL for proper ON CONFLICT handling with Drizzle
     await db.execute(sql`
       INSERT INTO creator_facebook_pages (creator_id, page_id, name, access_token, followers_count, fan_count, instagram_business_account_id, connected_instagram_account_id, created_at, updated_at)
-      VALUES ${sql.join(values.map(v => sql`(${v.creatorId}, ${v.pageId}, ${v.name}, ${v.accessToken}, ${v.followersCount}, ${v.fanCount}, ${v.instagramBusinessAccountId}, ${v.connectedInstagramAccountId}, ${v.createdAt}, ${v.updatedAt})`), sql`, `)}
+      VALUES ${sql.join(
+        values.map(
+          (v) =>
+            sql`(${v.creatorId}, ${v.pageId}, ${v.name}, ${v.accessToken}, ${v.followersCount}, ${v.fanCount}, ${v.instagramBusinessAccountId}, ${v.connectedInstagramAccountId}, ${v.createdAt}, ${v.updatedAt})`
+        ),
+        sql`, `
+      )}
       ON CONFLICT (creator_id, page_id) DO UPDATE SET
         name = EXCLUDED.name,
         access_token = EXCLUDED.access_token,
@@ -796,12 +978,15 @@ export class DatabaseStorage implements IStorage {
         connected_instagram_account_id = EXCLUDED.connected_instagram_account_id,
         updated_at = EXCLUDED.updated_at
     `);
-    
+
     return pages.length;
   }
 
   async getCreatorFacebookPages(creatorId: string): Promise<any[]> {
-    return await db.select().from(creatorFacebookPages).where(eq(creatorFacebookPages.creatorId, creatorId));
+    return await db
+      .select()
+      .from(creatorFacebookPages)
+      .where(eq(creatorFacebookPages.creatorId, creatorId));
   }
 
   // Campaign Participation operations
@@ -811,13 +996,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCampaignParticipation(campaignId: string, memberId: string): Promise<any> {
-    const [participation] = await db.select().from(campaignParticipations)
-      .where(and(eq(campaignParticipations.campaignId, campaignId), eq(campaignParticipations.memberId, memberId)));
+    const [participation] = await db
+      .select()
+      .from(campaignParticipations)
+      .where(
+        and(
+          eq(campaignParticipations.campaignId, campaignId),
+          eq(campaignParticipations.memberId, memberId)
+        )
+      );
     return participation || undefined;
   }
 
   async updateCampaignParticipation(id: string, data: any): Promise<any> {
-    const [participation] = await db.update(campaignParticipations)
+    const [participation] = await db
+      .update(campaignParticipations)
       .set(data)
       .where(eq(campaignParticipations.id, id))
       .returning();
@@ -826,14 +1019,16 @@ export class DatabaseStorage implements IStorage {
 
   // Task operations (new workflow)
   async getTasks(creatorId: string, tenantId?: string): Promise<Task[]> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(tasks.creatorId, creatorId), eq(tasks.tenantId, tenantId))
       : eq(tasks.creatorId, creatorId);
     return await db.select().from(tasks).where(conditions).orderBy(desc(tasks.createdAt));
   }
 
   async getTasksByTenantId(tenantId: string): Promise<Task[]> {
-    return await db.select().from(tasks)
+    return await db
+      .select()
+      .from(tasks)
       .where(eq(tasks.tenantId, tenantId))
       .orderBy(desc(tasks.createdAt));
   }
@@ -843,7 +1038,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTask(id: string, tenantId?: string): Promise<Task | undefined> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
       : eq(tasks.id, id);
     const [task] = await db.select().from(tasks).where(conditions);
@@ -853,24 +1048,32 @@ export class DatabaseStorage implements IStorage {
   async createTask(task: InsertTask): Promise<Task> {
     const taskData = {
       ...task,
-      hashtags: task.hashtags ? Array.from(task.hashtags as string[]) : null
+      hashtags: task.hashtags ? Array.from(task.hashtags as string[]) : null,
     };
-    const [newTask] = await db.insert(tasks).values(taskData as any).returning();
+    const [newTask] = await db
+      .insert(tasks)
+      .values(taskData as any)
+      .returning();
     return newTask;
   }
 
-  async updateTask(id: string, updates: Partial<InsertTask>, tenantId?: string): Promise<Task | undefined> {
+  async updateTask(
+    id: string,
+    updates: Partial<InsertTask>,
+    tenantId?: string
+  ): Promise<Task | undefined> {
     const updateData = {
       ...updates,
       hashtags: updates.hashtags ? Array.from(updates.hashtags as string[]) : updates.hashtags,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
-    const conditions = tenantId 
+
+    const conditions = tenantId
       ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
       : eq(tasks.id, id);
-    
-    const [task] = await db.update(tasks)
+
+    const [task] = await db
+      .update(tasks)
       .set(updateData as any)
       .where(conditions)
       .returning();
@@ -878,7 +1081,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTask(id: string, tenantId?: string): Promise<void> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(tasks.id, id), eq(tasks.tenantId, tenantId))
       : eq(tasks.id, id);
     await db.delete(tasks).where(conditions);
@@ -887,24 +1090,25 @@ export class DatabaseStorage implements IStorage {
   // Task Template operations
   async getTaskTemplates(tenantId?: string): Promise<TaskTemplate[]> {
     // Get both global templates and tenant-specific templates
-    const conditions = tenantId 
+    const conditions = tenantId
       ? sql`${taskTemplates.isGlobal} = true OR ${taskTemplates.tenantId} = ${tenantId}`
       : sql`${taskTemplates.isGlobal} = true`;
-    
-    return await db.select()
+
+    return await db
+      .select()
       .from(taskTemplates)
       .where(conditions)
       .orderBy(desc(taskTemplates.createdAt));
   }
 
   async getTaskTemplate(id: string, tenantId?: string): Promise<TaskTemplate | undefined> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(
-          eq(taskTemplates.id, id), 
+          eq(taskTemplates.id, id),
           sql`${taskTemplates.isGlobal} = true OR ${taskTemplates.tenantId} = ${tenantId}`
         )
       : and(eq(taskTemplates.id, id), eq(taskTemplates.isGlobal, true));
-    
+
     const [template] = await db.select().from(taskTemplates).where(conditions);
     return template;
   }
@@ -914,13 +1118,18 @@ export class DatabaseStorage implements IStorage {
     return newTemplate;
   }
 
-  async updateTaskTemplate(id: string, updates: Partial<InsertTaskTemplate>, tenantId?: string): Promise<TaskTemplate | undefined> {
+  async updateTaskTemplate(
+    id: string,
+    updates: Partial<InsertTaskTemplate>,
+    tenantId?: string
+  ): Promise<TaskTemplate | undefined> {
     // Only allow updates to templates the user owns (global templates if admin, tenant templates if tenant admin)
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(taskTemplates.id, id), eq(taskTemplates.tenantId, tenantId))
       : and(eq(taskTemplates.id, id), eq(taskTemplates.isGlobal, true));
-    
-    const [template] = await db.update(taskTemplates)
+
+    const [template] = await db
+      .update(taskTemplates)
       .set({ ...updates, updatedAt: new Date() })
       .where(conditions)
       .returning();
@@ -929,55 +1138,68 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTaskTemplate(id: string, tenantId?: string): Promise<void> {
     // Only allow deletion of templates the user owns
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(taskTemplates.id, id), eq(taskTemplates.tenantId, tenantId))
       : and(eq(taskTemplates.id, id), eq(taskTemplates.isGlobal, true));
-    
+
     await db.delete(taskTemplates).where(conditions);
   }
 
   // Task Assignment operations
   async getTaskAssignments(campaignId: string): Promise<TaskAssignment[]> {
-    return await db.select().from(taskAssignments)
+    return await db
+      .select()
+      .from(taskAssignments)
       .where(eq(taskAssignments.campaignId, campaignId))
       .orderBy(taskAssignments.displayOrder);
   }
 
   async getCampaignTasks(campaignId: string): Promise<Task[]> {
     const result = await db
-      .select({ 
+      .select({
         task: tasks,
-        assignment: taskAssignments 
+        assignment: taskAssignments,
       })
       .from(taskAssignments)
       .innerJoin(tasks, eq(taskAssignments.taskId, tasks.id))
-      .where(and(
-        eq(taskAssignments.campaignId, campaignId),
-        eq(taskAssignments.isActive, true)
-      ))
+      .where(and(eq(taskAssignments.campaignId, campaignId), eq(taskAssignments.isActive, true)))
       .orderBy(taskAssignments.displayOrder);
-    
-    return result.map(r => r.task);
+
+    return result.map((r) => r.task);
   }
 
-  async assignTaskToCampaign(taskId: string, campaignId: string, tenantId: string): Promise<TaskAssignment> {
-    const [assignment] = await db.insert(taskAssignments).values({
-      taskId,
-      campaignId,
-      tenantId,
-      displayOrder: 1,
-      isActive: true
-    }).returning();
+  async assignTaskToCampaign(
+    taskId: string,
+    campaignId: string,
+    tenantId: string
+  ): Promise<TaskAssignment> {
+    const [assignment] = await db
+      .insert(taskAssignments)
+      .values({
+        taskId,
+        campaignId,
+        tenantId,
+        displayOrder: 1,
+        isActive: true,
+      })
+      .returning();
     return assignment;
   }
 
-  async unassignTaskFromCampaign(taskId: string, campaignId: string, tenantId: string): Promise<void> {
-    await db.delete(taskAssignments)
-      .where(and(
-        eq(taskAssignments.taskId, taskId),
-        eq(taskAssignments.campaignId, campaignId),
-        eq(taskAssignments.tenantId, tenantId)
-      ));
+  async unassignTaskFromCampaign(
+    taskId: string,
+    campaignId: string,
+    tenantId: string
+  ): Promise<void> {
+    await db
+      .delete(taskAssignments)
+      .where(
+        and(
+          eq(taskAssignments.taskId, taskId),
+          eq(taskAssignments.campaignId, campaignId),
+          eq(taskAssignments.tenantId, tenantId)
+        )
+      );
   }
 
   // Task Completion operations
@@ -988,26 +1210,23 @@ export class DatabaseStorage implements IStorage {
 
   /**
    * Get task completion by user and task, optionally scoped by campaign context.
-   * 
+   *
    * @param userId - The user's ID
    * @param taskId - The task's ID
    * @param campaignId - Optional campaign ID. If provided, looks for campaign-context completions.
    *                     If not provided, looks for standalone-context completions (or null for backwards compatibility).
-   * 
+   *
    * This enables the campaign override model where:
    * - Standalone completion: completionContext = 'standalone', campaignId = null
    * - Campaign completion: completionContext = 'campaign', campaignId = <specific campaign>
    * - Each context is independently deduped
    */
   async getTaskCompletionByUserAndTask(
-    userId: string, 
-    taskId: string, 
+    userId: string,
+    taskId: string,
     campaignId?: string | null
   ): Promise<TaskCompletion | undefined> {
-    const baseConditions = [
-      eq(taskCompletions.userId, userId),
-      eq(taskCompletions.taskId, taskId),
-    ];
+    const baseConditions = [eq(taskCompletions.userId, userId), eq(taskCompletions.taskId, taskId)];
 
     let contextCondition;
     if (campaignId) {
@@ -1024,18 +1243,22 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    const [completion] = await db.select().from(taskCompletions)
+    const [completion] = await db
+      .select()
+      .from(taskCompletions)
       .where(and(...baseConditions, contextCondition))
       .limit(1);
     return completion;
   }
 
   async getUserTaskCompletions(userId: string, tenantId?: string): Promise<any[]> {
-    const conditions = tenantId 
+    const conditions = tenantId
       ? and(eq(taskCompletions.userId, userId), eq(taskCompletions.tenantId, tenantId))
       : eq(taskCompletions.userId, userId);
-    
-    const completions = await db.select().from(taskCompletions)
+
+    const completions = await db
+      .select()
+      .from(taskCompletions)
       .where(conditions)
       .orderBy(desc(taskCompletions.lastActivityAt));
 
@@ -1044,14 +1267,14 @@ export class DatabaseStorage implements IStorage {
     const { inArray } = await import('drizzle-orm');
 
     // ✅ OPTIMIZATION: Batch fetch all tasks first to avoid N+1 query
-    const taskIds = [...new Set(completions.map(c => c.taskId))];
+    const taskIds = [...new Set(completions.map((c) => c.taskId))];
     let tasksMap = new Map();
-    
+
     if (taskIds.length > 0) {
       const tasksData = await db.query.tasks.findMany({
-        where: inArray(tasks.id, taskIds)
+        where: inArray(tasks.id, taskIds),
       });
-      tasksMap = new Map(tasksData.map(t => [t.id, t]));
+      tasksMap = new Map(tasksData.map((t) => [t.id, t]));
     }
 
     // Enrich completions with eligibility using cached task data
@@ -1079,11 +1302,13 @@ export class DatabaseStorage implements IStorage {
             ...completion,
             isAvailableAgain: eligibility.isEligible,
             nextAvailableAt: eligibility.nextAvailableAt,
-            timeRemaining: eligibility.isEligible ? null : await taskFrequencyService.getTimeUntilAvailable({
-              userId,
-              taskId: completion.taskId,
-              tenantId: completion.tenantId,
-            }),
+            timeRemaining: eligibility.isEligible
+              ? null
+              : await taskFrequencyService.getTimeUntilAvailable({
+                  userId,
+                  taskId: completion.taskId,
+                  tenantId: completion.tenantId,
+                }),
           };
         }
 
@@ -1095,51 +1320,64 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTaskCompletions(taskId: string): Promise<TaskCompletion[]> {
-    return await db.select().from(taskCompletions)
+    return await db
+      .select()
+      .from(taskCompletions)
       .where(eq(taskCompletions.taskId, taskId))
       .orderBy(desc(taskCompletions.startedAt));
   }
 
   async getTaskCompletionsByProgram(programId: string): Promise<TaskCompletion[]> {
     console.log(`[Storage] Getting task completions for program ${programId}`);
-    
+
     // First check what tasks exist for this program
     const programTasks = await db
       .select({ id: tasks.id, name: tasks.name, programId: tasks.programId })
       .from(tasks)
       .where(eq(tasks.programId, programId));
-    console.log(`[Storage] Found ${programTasks.length} tasks for program ${programId}:`, programTasks);
-    
+    console.log(
+      `[Storage] Found ${programTasks.length} tasks for program ${programId}:`,
+      programTasks
+    );
+
     const rows = await db
       .select({ task_completions: taskCompletions, task: tasks })
       .from(taskCompletions)
       .innerJoin(tasks, eq(taskCompletions.taskId, tasks.id))
       .where(eq(tasks.programId, programId))
       .orderBy(desc(taskCompletions.completedAt));
-    
-    console.log(`[Storage] Found ${rows.length} completions for program ${programId}:`, 
-      rows.map(r => ({ 
-        completionId: r.task_completions.id, 
+
+    console.log(
+      `[Storage] Found ${rows.length} completions for program ${programId}:`,
+      rows.map((r) => ({
+        completionId: r.task_completions.id,
         status: r.task_completions.status,
         taskId: r.task_completions.taskId,
-        taskProgramId: r.task?.programId 
+        taskProgramId: r.task?.programId,
       }))
     );
-    
-    return rows.map(r => r.task_completions) as TaskCompletion[];
+
+    return rows.map((r) => r.task_completions) as TaskCompletion[];
   }
 
   async createTaskCompletion(completion: InsertTaskCompletion): Promise<TaskCompletion> {
-    const [newCompletion] = await db.insert(taskCompletions).values({
-      ...completion,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+    const [newCompletion] = await db
+      .insert(taskCompletions)
+      .values({
+        ...completion,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
     return newCompletion;
   }
 
-  async updateTaskCompletion(id: string, updates: Partial<InsertTaskCompletion>): Promise<TaskCompletion | undefined> {
-    const [updated] = await db.update(taskCompletions)
+  async updateTaskCompletion(
+    id: string,
+    updates: Partial<InsertTaskCompletion>
+  ): Promise<TaskCompletion | undefined> {
+    const [updated] = await db
+      .update(taskCompletions)
       .set({
         ...updates,
         updatedAt: new Date(),
@@ -1150,20 +1388,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Reward Distribution operations
-  async getUserRewardDistributions(userId: string, tenantId?: string): Promise<RewardDistribution[]> {
-    const conditions = tenantId 
+  async getUserRewardDistributions(
+    userId: string,
+    tenantId?: string
+  ): Promise<RewardDistribution[]> {
+    const conditions = tenantId
       ? and(eq(rewardDistributions.userId, userId), eq(rewardDistributions.tenantId, tenantId))
       : eq(rewardDistributions.userId, userId);
-    return await db.select().from(rewardDistributions)
+    return await db
+      .select()
+      .from(rewardDistributions)
       .where(conditions)
       .orderBy(desc(rewardDistributions.createdAt));
   }
 
-  async createRewardDistribution(distribution: InsertRewardDistribution): Promise<RewardDistribution> {
-    const [newDistribution] = await db.insert(rewardDistributions).values({
-      ...distribution,
-      createdAt: new Date(),
-    }).returning();
+  async createRewardDistribution(
+    distribution: InsertRewardDistribution
+  ): Promise<RewardDistribution> {
+    const [newDistribution] = await db
+      .insert(rewardDistributions)
+      .values({
+        ...distribution,
+        createdAt: new Date(),
+      })
+      .returning();
     return newDistribution;
   }
 
@@ -1175,7 +1423,8 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Campaign must have at least 1 task assigned before publishing');
     }
 
-    const [campaign] = await db.update(campaigns)
+    const [campaign] = await db
+      .update(campaigns)
       .set({ status: 'active', updatedAt: new Date() })
       .where(and(eq(campaigns.id, campaignId), eq(campaigns.tenantId, tenantId)))
       .returning();
@@ -1183,8 +1432,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingCampaigns(creatorId: string, tenantId?: string): Promise<Campaign[]> {
-    const conditions = tenantId 
-      ? and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'pending_tasks'), eq(campaigns.tenantId, tenantId))
+    const conditions = tenantId
+      ? and(
+          eq(campaigns.creatorId, creatorId),
+          eq(campaigns.status, 'pending_tasks'),
+          eq(campaigns.tenantId, tenantId)
+        )
       : and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'pending_tasks'));
     return await db.select().from(campaigns).where(conditions).orderBy(desc(campaigns.createdAt));
   }
@@ -1204,35 +1457,41 @@ export class DatabaseStorage implements IStorage {
         platformUserId: accountData.user?.id || accountData.id,
         username: accountData.user?.username || accountData.username,
         displayName: accountData.user?.name || accountData.name || accountData.displayName,
-        profileUrl: accountData.user?.profileUrl || `https://twitter.com/${accountData.user?.username}`,
+        profileUrl:
+          accountData.user?.profileUrl || `https://twitter.com/${accountData.user?.username}`,
         followers: accountData.user?.followersCount || accountData.followersCount || 0,
         metadata: JSON.stringify(accountData),
         connectedAt: new Date(),
-        isActive: true
+        isActive: true,
       };
 
-      console.log(`[Storage] Saving social account for user ${user.id}:`, { platform, username: socialAccountData.username });
+      console.log(`[Storage] Saving social account for user ${user.id}:`, {
+        platform,
+        username: socialAccountData.username,
+      });
       // Persist under users.profileData.socialConnections
       const profileData: any = (user as any).profileData || {};
       const socialConnections = Array.isArray(profileData.socialConnections)
         ? profileData.socialConnections
         : [];
       const filtered = socialConnections.filter((acc: any) => acc.platform !== platform);
-      const updatedConnections = [...filtered, {
-        platform: socialAccountData.platform,
-        platformUserId: socialAccountData.platformUserId,
-        username: socialAccountData.username,
-        displayName: socialAccountData.displayName,
-        profileUrl: socialAccountData.profileUrl,
-        followers: socialAccountData.followers,
-        metadata: socialAccountData.metadata,
-        connectedAt: socialAccountData.connectedAt,
-        isActive: socialAccountData.isActive
-      }];
+      const updatedConnections = [
+        ...filtered,
+        {
+          platform: socialAccountData.platform,
+          platformUserId: socialAccountData.platformUserId,
+          username: socialAccountData.username,
+          displayName: socialAccountData.displayName,
+          profileUrl: socialAccountData.profileUrl,
+          followers: socialAccountData.followers,
+          metadata: socialAccountData.metadata,
+          connectedAt: socialAccountData.connectedAt,
+          isActive: socialAccountData.isActive,
+        },
+      ];
       const nextProfileData = { ...profileData, socialConnections: updatedConnections };
       await this.updateUser(user.id, { profileData: nextProfileData } as any);
       console.log(`[Storage] Social account saved successfully:`, socialAccountData);
-      
     } catch (error) {
       console.error(`[Storage] Failed to save social account:`, error);
       throw error;
@@ -1250,9 +1509,10 @@ export class DatabaseStorage implements IStorage {
       const connections = Array.isArray(profileData.socialConnections)
         ? profileData.socialConnections
         : [];
-      console.log(`[Storage] Getting social accounts for user ${user.id} -> ${connections.length} found`);
+      console.log(
+        `[Storage] Getting social accounts for user ${user.id} -> ${connections.length} found`
+      );
       return connections;
-      
     } catch (error) {
       console.error(`[Storage] Failed to get social accounts:`, error);
       return [];
@@ -1274,20 +1534,21 @@ export class DatabaseStorage implements IStorage {
 
       // Remove the connection for this platform
       const updatedConnections = connections.filter((conn: any) => conn.platform !== platform);
-      
-      console.log(`[Storage] Removing ${platform} connection for user ${user.id}. Before: ${connections.length}, After: ${updatedConnections.length}`);
+
+      console.log(
+        `[Storage] Removing ${platform} connection for user ${user.id}. Before: ${connections.length}, After: ${updatedConnections.length}`
+      );
 
       // Update user with new connections
       const updatedProfileData = {
         ...profileData,
-        socialConnections: updatedConnections
+        socialConnections: updatedConnections,
       };
 
       await this.updateUser(user.id, { profileData: updatedProfileData } as any);
-      
+
       console.log(`[Storage] Successfully removed ${platform} connection for user ${user.id}`);
       return true;
-      
     } catch (error) {
       console.error(`[Storage] Failed to remove social account:`, error);
       return false;
@@ -1302,14 +1563,17 @@ export class DatabaseStorage implements IStorage {
       }
 
       const profileData: any = (user as any).profileData || {};
-      const socialTokens = profileData.socialTokens && typeof profileData.socialTokens === 'object'
-        ? profileData.socialTokens
-        : {};
+      const socialTokens =
+        profileData.socialTokens && typeof profileData.socialTokens === 'object'
+          ? profileData.socialTokens
+          : {};
 
       // Encrypt sensitive tokens before storage
       const secureTokenBundle = {
         ...tokenBundle,
-        refresh_token: tokenBundle.refresh_token ? encryptToken(tokenBundle.refresh_token) : tokenBundle.refresh_token,
+        refresh_token: tokenBundle.refresh_token
+          ? encryptToken(tokenBundle.refresh_token)
+          : tokenBundle.refresh_token,
         // Keep access_token unencrypted for easier debugging (it's short-lived)
       };
 
@@ -1317,7 +1581,9 @@ export class DatabaseStorage implements IStorage {
 
       const nextProfileData = { ...profileData, socialTokens };
       await this.updateUser(user.id, { profileData: nextProfileData } as any);
-      console.log(`[Storage] Saved ${platform} token bundle for user ${user.id} (refresh_token encrypted)`);
+      console.log(
+        `[Storage] Saved ${platform} token bundle for user ${user.id} (refresh_token encrypted)`
+      );
     } catch (error) {
       console.error(`[Storage] Failed to save ${platform} token bundle:`, error);
       throw error;
@@ -1329,17 +1595,20 @@ export class DatabaseStorage implements IStorage {
       const user = await this.getUser(userId);
       if (!user) return undefined;
       const profileData: any = (user as any).profileData || {};
-      const socialTokens = profileData.socialTokens && typeof profileData.socialTokens === 'object'
-        ? profileData.socialTokens
-        : {};
-      
+      const socialTokens =
+        profileData.socialTokens && typeof profileData.socialTokens === 'object'
+          ? profileData.socialTokens
+          : {};
+
       const tokenBundle = socialTokens[platform];
       if (!tokenBundle) return undefined;
 
       // Decrypt sensitive tokens when retrieving
       return {
         ...tokenBundle,
-        refresh_token: tokenBundle.refresh_token ? decryptToken(tokenBundle.refresh_token) : tokenBundle.refresh_token,
+        refresh_token: tokenBundle.refresh_token
+          ? decryptToken(tokenBundle.refresh_token)
+          : tokenBundle.refresh_token,
       };
     } catch (error) {
       console.error(`[Storage] Failed to get ${platform} token bundle:`, error);
