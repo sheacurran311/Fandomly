@@ -93,6 +93,9 @@ import AdminAnalytics from '@/pages/admin-dashboard/analytics';
 import AdminReputation from '@/pages/admin-dashboard/reputation';
 import AdminReviewQueue from '@/pages/admin-dashboard/review-queue';
 import AgencyDashboard from '@/pages/agency-dashboard';
+import ReputationPage from '@/pages/reputation';
+import CreatorTokenPage from '@/pages/creator-dashboard/token';
+import StakingPage from '@/pages/staking';
 
 function RedirectTo({ href }: { href: string }) {
   useEffect(() => {
@@ -145,6 +148,7 @@ function Router() {
       <Route path="/creator-dashboard/nil" component={CreatorNIL} />
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
       <Route path="/creator-dashboard/campaign-builder" component={CampaignBuilderNew} />
+      <Route path="/creator-dashboard/token" component={CreatorTokenPage} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
       <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
@@ -163,6 +167,9 @@ function Router() {
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
       <Route path="/fan-dashboard/billing" component={BillingPage} />
       <Route path="/fan-dashboard/settings" component={FanSettings} />
+      {/* Blockchain UI Pages */}
+      <Route path="/reputation" component={ReputationPage} />
+      <Route path="/staking" component={StakingPage} />
       <Route path="/fan-onboarding/profile" component={FanOnboardingProfile} />
       <Route path="/fan-onboarding/choose-creators" component={FanChooseCreators} />
       <Route path="/profile" component={Profile} />

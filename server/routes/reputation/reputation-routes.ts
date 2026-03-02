@@ -129,6 +129,74 @@ export function registerReputationRoutes(app: Express) {
     }
   );
 
+  /**
+   * GET /api/reputation/me/history
+   * Get the authenticated user's score change history.
+   */
+  app.get(
+    '/api/reputation/me/history',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        // Get current + previous score from reputation_scores
+        const record = await db
+          .select({
+            offChainScore: reputationScores.offChainScore,
+            previousScore: reputationScores.previousScore,
+            lastCalculatedAt: reputationScores.lastCalculatedAt,
+          })
+          .from(reputationScores)
+          .where(eq(reputationScores.userId, userId));
+
+        // Build history from sync log entries
+        const logs = await db
+          .select({
+            syncType: reputationSyncLog.syncType,
+            usersUpdated: reputationSyncLog.usersUpdated,
+            completedAt: reputationSyncLog.completedAt,
+          })
+          .from(reputationSyncLog)
+          .where(eq(reputationSyncLog.status, 'completed'))
+          .orderBy(desc(reputationSyncLog.completedAt))
+          .limit(20);
+
+        const history = [];
+
+        // Show the most recent score change if available
+        if (record.length > 0 && record[0].lastCalculatedAt) {
+          history.push({
+            date: record[0].lastCalculatedAt,
+            oldScore: record[0].previousScore ?? 0,
+            newScore: record[0].offChainScore,
+            syncType: 'Score update',
+          });
+        }
+
+        // Add completed sync events
+        for (const log of logs) {
+          if (log.completedAt) {
+            history.push({
+              date: log.completedAt,
+              oldScore: 0,
+              newScore: 0,
+              syncType: `${log.syncType} sync (${log.usersUpdated ?? 0} users)`,
+            });
+          }
+        }
+
+        return res.json({ history });
+      } catch (error) {
+        console.error('[ReputationRoutes] Error fetching history:', error);
+        return res.status(500).json({ error: 'Failed to fetch reputation history' });
+      }
+    }
+  );
+
   // ==========================================================================
   // ADMIN: Trigger sync, view logs
   // ==========================================================================

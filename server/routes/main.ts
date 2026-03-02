@@ -44,6 +44,7 @@ import { registerHealthRoutes } from './health/health-routes';
 import { registerParticleAuthRoutes } from './auth/particle-routes';
 import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
 import { registerReputationRoutes } from './reputation/reputation-routes';
+import { registerBlockchainRoutes } from './blockchain/blockchain-routes';
 import {
   insertUserSchema,
   insertCreatorSchema,
@@ -4431,6 +4432,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Reputation Oracle routes (score query, admin sync, stats)
   registerReputationRoutes(app);
+
+  // Register Blockchain routes (token factory, staking multipliers)
+  registerBlockchainRoutes(app);
 
   // ============================================================================
   // CAMPAIGN BUILDER: Draft & Task Assignment Endpoints (legacy)
