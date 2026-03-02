@@ -1,57 +1,59 @@
-import { useState, useEffect, useMemo } from "react";
-import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Heart, 
-  Share2, 
-  Users,
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import {
+  Heart,
+  Share2,
   Trophy,
   Target,
   Gift,
   User,
   Megaphone,
   CheckSquare,
-  ExternalLink,
   Twitter,
   Instagram,
   MessageCircle,
-  Globe
-} from "lucide-react";
-import type { Program, Creator, Task, Campaign } from "@shared/schema";
-import { FanTaskCard } from "@/components/tasks/FanTaskCard";
-import { useUserTaskCompletions } from "@/hooks/useTaskCompletion";
-import { ActivityFeed } from "@/components/program/activity-feed";
-import { 
+  Globe,
+} from 'lucide-react';
+import type { Program, Task, Campaign } from '@shared/schema';
+import { FanTaskCard } from '@/components/tasks/FanTaskCard';
+import { useUserTaskCompletions } from '@/hooks/useTaskCompletion';
+import { ActivityFeed } from '@/components/program/activity-feed';
+import {
   YourStatsWidget,
-  LeaderboardWidget, 
-  ActiveCampaignsWidget, 
+  LeaderboardWidget,
+  ActiveCampaignsWidget,
   ActiveTasksWidget,
-  FanStatsWidget 
-} from "@/components/program/widgets";
-import { transformImageUrl } from "@/lib/image-utils";
-import { getThemeColors, isDarkTheme } from "@/lib/theme-utils";
-import { useAuth } from "@/hooks/use-auth";
+  FanStatsWidget,
+} from '@/components/program/widgets';
+import { transformImageUrl } from '@/lib/image-utils';
+import { getThemeColors, isDarkTheme } from '@/lib/theme-utils';
+import { useAuth } from '@/hooks/use-auth';
+import { VerifiedBadgeNFT } from '@/components/creator/VerifiedBadgeNFT';
+
+interface ProgramCreator {
+  id: string;
+  displayName: string;
+  bio?: string;
+  imageUrl?: string;
+  bannerImage?: string;
+  verified?: boolean;
+  socialLinks?: {
+    twitter?: string;
+    instagram?: string;
+    discord?: string;
+    facebook?: string;
+  };
+}
 
 interface ProgramPublicData extends Program {
-  creator: {
-    id: string;
-    displayName: string;
-    bio?: string;
-    imageUrl?: string;
-    bannerImage?: string;
-    socialLinks?: {
-      twitter?: string;
-      instagram?: string;
-      discord?: string;
-      facebook?: string;
-    };
-  };
+  creator: ProgramCreator;
   campaigns: Campaign[];
   tasks: Task[];
 }
@@ -61,8 +63,10 @@ export default function ProgramPublic() {
   const slug = params.slug;
   const programId = params.programId; // For preview mode
   const isPreviewMode = !!programId; // Preview uses programId instead of slug
-  
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'campaigns' | 'tasks' | 'rewards'>('dashboard');
+
+  const [activeTab, setActiveTab] = useState<
+    'dashboard' | 'profile' | 'campaigns' | 'tasks' | 'rewards'
+  >('dashboard');
   const [isEnrolled, setIsEnrolled] = useState(false);
 
   // Fetch program public data (or preview data)
@@ -93,7 +97,11 @@ export default function ProgramPublic() {
 
     const root = document.documentElement;
     const theme = programData.pageConfig?.theme;
-    const brandColors = programData.pageConfig?.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
+    const brandColors = programData.pageConfig?.brandColors || {
+      primary: '#8B5CF6',
+      secondary: '#EC4899',
+      accent: '#F59E0B',
+    };
 
     console.log('🎨 [FRONTEND] Applying theme CSS variables');
     console.log('🎨 [FRONTEND] Theme object:', theme);
@@ -210,12 +218,22 @@ export default function ProgramPublic() {
       }
 
       // Spacing scale
-      if (theme.layout?.spacing && typeof theme.layout.spacing === 'object' && theme.layout.spacing !== null && 'scale' in theme.layout.spacing) {
-        root.style.setProperty('--spacing-scale', String((theme.layout.spacing as { scale?: number }).scale));
+      if (
+        theme.layout?.spacing &&
+        typeof theme.layout.spacing === 'object' &&
+        theme.layout.spacing !== null &&
+        'scale' in theme.layout.spacing
+      ) {
+        root.style.setProperty(
+          '--spacing-scale',
+          String((theme.layout.spacing as { scale?: number }).scale)
+        );
       }
 
       // Shadows
-      const shadow = theme.layout?.shadow as { sm?: string; md?: string; lg?: string; xl?: string; inner?: string } | undefined;
+      const shadow = theme.layout?.shadow as
+        | { sm?: string; md?: string; lg?: string; xl?: string; inner?: string }
+        | undefined;
       if (shadow) {
         root.style.setProperty('--shadow-sm', shadow.sm ?? '');
         root.style.setProperty('--shadow-md', shadow.md ?? '');
@@ -288,6 +306,91 @@ export default function ProgramPublic() {
     };
   }, [programData]);
 
+  // Derive values from programData (always computed, even if null, for hooks stability)
+  const creator = programData?.creator;
+  const campaigns = programData?.campaigns;
+  const tasks = programData?.tasks;
+
+  // Prioritize program-specific images over creator profile images
+  const bannerImage = programData?.pageConfig?.headerImage || creator?.bannerImage;
+  const profileImage = programData?.pageConfig?.logo || creator?.imageUrl;
+
+  const brandColors = useMemo(
+    () =>
+      programData?.pageConfig?.brandColors || {
+        primary: '#8B5CF6',
+        secondary: '#EC4899',
+        accent: '#F59E0B',
+      },
+    [programData?.pageConfig?.brandColors]
+  );
+  const socialLinks = programData?.pageConfig?.socialLinks || creator?.socialLinks || {};
+
+  // Get visibility settings from pageConfig
+  const visibility = programData?.pageConfig?.visibility || {
+    showProfile: true,
+    showCampaigns: true,
+    showTasks: true,
+    showRewards: true,
+    showLeaderboard: true,
+    showActivityFeed: true,
+    showFanWidget: true,
+  };
+
+  const activeCampaigns = campaigns?.filter((c) => c.status === 'active') ?? [];
+  const activeTasks = tasks?.filter((t) => !t.isDraft && t.isActive) ?? [];
+
+  // Transform image URLs
+  const profileImageUrl = transformImageUrl(profileImage);
+  const bannerImageUrl = transformImageUrl(bannerImage);
+
+  // Get theme colors
+  const themeColors = getThemeColors(programData?.pageConfig?.theme);
+  const isThemeDark = isDarkTheme(programData?.pageConfig?.theme);
+
+  // Memoize style objects to prevent unnecessary re-renders
+  const styles = useMemo(
+    () => ({
+      container: { backgroundColor: themeColors.background },
+      gradientBanner: {
+        background: `linear-gradient(135deg, ${brandColors.primary || '#6366f1'}, ${brandColors.secondary || '#8b5cf6'})`,
+      },
+      gradientOverlay: { color: themeColors.background },
+      avatar: { borderColor: themeColors.background, backgroundColor: themeColors.background },
+      textPrimary: { color: themeColors.text.primary },
+      textSecondary: { color: themeColors.text.secondary },
+      textTertiary: { color: themeColors.text.tertiary },
+      primaryBadge: {
+        backgroundColor: brandColors.primary + '20',
+        color: brandColors.primary,
+        borderColor: brandColors.primary + '40',
+      },
+      secondaryBadge: {
+        backgroundColor: brandColors.secondary + '20',
+        color: brandColors.secondary,
+        borderColor: brandColors.secondary + '40',
+      },
+      accentBadge: {
+        backgroundColor: brandColors.accent + '20',
+        color: brandColors.accent,
+        borderColor: brandColors.accent + '40',
+      },
+      outlineButton: {
+        borderColor: isThemeDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+        color: themeColors.text.primary,
+      },
+      tabsList: {
+        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+        borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+      },
+      card: {
+        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+        borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb',
+      },
+    }),
+    [themeColors, brandColors, isThemeDark]
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
@@ -299,13 +402,15 @@ export default function ProgramPublic() {
     );
   }
 
-  if (!programData) {
+  if (!programData || !creator) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">🔍</div>
           <h2 className="text-2xl font-bold text-white mb-2">Program Not Found</h2>
-          <p className="text-gray-400 mb-6">The program page you're looking for doesn't exist.</p>
+          <p className="text-gray-400 mb-6">
+            The program page you&apos;re looking for doesn&apos;t exist.
+          </p>
           <Link href="/find-creators">
             <Button variant="outline" className="border-brand-primary text-brand-primary">
               Browse Creators
@@ -316,77 +421,6 @@ export default function ProgramPublic() {
     );
   }
 
-  const { creator, campaigns, tasks } = programData;
-  
-  // Prioritize program-specific images over creator profile images
-  const bannerImage = programData.pageConfig?.headerImage || creator.bannerImage;
-  const profileImage = programData.pageConfig?.logo || creator.imageUrl;
-  
-  const brandColors = programData.pageConfig?.brandColors || { primary: '#8B5CF6', secondary: '#EC4899', accent: '#F59E0B' };
-  const socialLinks = programData.pageConfig?.socialLinks || creator.socialLinks || {};
-  
-  // Get visibility settings from pageConfig
-  const visibility = programData.pageConfig?.visibility || {
-    showProfile: true,
-    showCampaigns: true,
-    showTasks: true,
-    showRewards: true,
-    showLeaderboard: true,
-    showActivityFeed: true,
-    showFanWidget: true,
-  };
-
-  const activeCampaigns = campaigns.filter(c => c.status === 'active');
-  const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
-
-  // Transform image URLs
-  const profileImageUrl = transformImageUrl(profileImage);
-  const bannerImageUrl = transformImageUrl(bannerImage);
-
-  // Get theme colors
-  const themeColors = getThemeColors(programData.pageConfig?.theme);
-  const isThemeDark = isDarkTheme(programData.pageConfig?.theme);
-
-  // Memoize style objects to prevent unnecessary re-renders
-  const styles = useMemo(() => ({
-    container: { backgroundColor: themeColors.background },
-    gradientBanner: {
-      background: `linear-gradient(135deg, ${brandColors.primary || '#6366f1'}, ${brandColors.secondary || '#8b5cf6'})`
-    },
-    gradientOverlay: { color: themeColors.background },
-    avatar: { borderColor: themeColors.background, backgroundColor: themeColors.background },
-    textPrimary: { color: themeColors.text.primary },
-    textSecondary: { color: themeColors.text.secondary },
-    textTertiary: { color: themeColors.text.tertiary },
-    primaryBadge: {
-      backgroundColor: brandColors.primary + '20',
-      color: brandColors.primary,
-      borderColor: brandColors.primary + '40',
-    },
-    secondaryBadge: {
-      backgroundColor: brandColors.secondary + '20',
-      color: brandColors.secondary,
-      borderColor: brandColors.secondary + '40',
-    },
-    accentBadge: {
-      backgroundColor: brandColors.accent + '20',
-      color: brandColors.accent,
-      borderColor: brandColors.accent + '40',
-    },
-    outlineButton: {
-      borderColor: isThemeDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-      color: themeColors.text.primary,
-    },
-    tabsList: {
-      backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-      borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-    },
-    card: {
-      backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
-      borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'
-    },
-  }), [themeColors, brandColors, isThemeDark]);
-
   // Debug logging
   console.log('[ProgramPublic] Image URLs:', {
     programLogo: programData.pageConfig?.logo,
@@ -394,12 +428,12 @@ export default function ProgramPublic() {
     creatorImage: creator.imageUrl,
     creatorBanner: creator.bannerImage,
     finalProfile: profileImageUrl,
-    finalBanner: bannerImageUrl
+    finalBanner: bannerImageUrl,
   });
   console.log('[ProgramPublic] Theme:', {
     theme: programData.pageConfig?.theme,
     colors: themeColors,
-    isDark: isThemeDark
+    isDark: isThemeDark,
   });
   console.log('[ProgramPublic] Brand Colors Injected:', brandColors);
 
@@ -408,19 +442,12 @@ export default function ProgramPublic() {
       {/* Hero Banner Section */}
       <div className="relative h-64 md:h-80 bg-gradient-to-r from-brand-primary to-brand-secondary overflow-hidden">
         {bannerImageUrl ? (
-          <img 
-            src={bannerImageUrl} 
-            className="w-full h-full object-cover" 
-            alt="Program banner"
-          />
+          <img src={bannerImageUrl} className="w-full h-full object-cover" alt="Program banner" />
         ) : (
-          <div 
-            className="w-full h-full" 
-            style={styles.gradientBanner}
-          />
+          <div className="w-full h-full" style={styles.gradientBanner} />
         )}
-        <div 
-          className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-current" 
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-current"
           style={styles.gradientOverlay}
         ></div>
       </div>
@@ -428,30 +455,21 @@ export default function ProgramPublic() {
       {/* Profile Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
         <div className="flex flex-col md:flex-row items-center md:items-end gap-6 mb-6">
-          <Avatar 
-            className="w-32 h-32 border-4 shadow-xl" 
-            style={styles.avatar}
-          >
+          <Avatar className="w-32 h-32 border-4 shadow-xl" style={styles.avatar}>
             <AvatarImage src={profileImageUrl || undefined} alt={creator.displayName} />
             <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-3xl font-bold">
               {programData.name.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          
+
           <div className="flex-1 text-center md:text-left pb-4">
-            <h1 
-              className="text-3xl md:text-4xl font-bold mb-2"
-              style={styles.textPrimary}
-            >
+            <h1 className="text-3xl md:text-4xl font-bold mb-2" style={styles.textPrimary}>
               {programData.name}
             </h1>
-            <p 
-              className="mb-4 max-w-2xl"
-              style={styles.textSecondary}
-            >
+            <p className="mb-4 max-w-2xl" style={styles.textSecondary}>
               {programData.description}
             </p>
-            
+
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
               <Badge style={styles.primaryBadge}>
                 <Trophy className="h-3 w-3 mr-1" />
@@ -468,15 +486,19 @@ export default function ProgramPublic() {
             </div>
 
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-              <Button 
+              <Button
                 onClick={() => setIsEnrolled(!isEnrolled)}
-                className={isEnrolled ? "" : "text-white"}
-                style={isEnrolled ? {
-                  backgroundColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                  color: themeColors.text.primary
-                } : {
-                  backgroundColor: brandColors.primary,
-                }}
+                className={isEnrolled ? '' : 'text-white'}
+                style={
+                  isEnrolled
+                    ? {
+                        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                        color: themeColors.text.primary,
+                      }
+                    : {
+                        backgroundColor: brandColors.primary,
+                      }
+                }
               >
                 {isEnrolled ? (
                   <>
@@ -490,9 +512,9 @@ export default function ProgramPublic() {
                   </>
                 )}
               </Button>
-              <Button 
-                variant="outline" 
-                style={{...styles.outlineButton, backgroundColor: 'transparent'}}
+              <Button
+                variant="outline"
+                style={{ ...styles.outlineButton, backgroundColor: 'transparent' }}
                 className="hover:opacity-80"
               >
                 <Share2 className="h-4 w-4 mr-2" />
@@ -501,8 +523,8 @@ export default function ProgramPublic() {
 
               {/* Social Links */}
               {socialLinks.twitter && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="hover:bg-brand-primary/10"
                   style={styles.textTertiary}
@@ -512,8 +534,8 @@ export default function ProgramPublic() {
                 </Button>
               )}
               {socialLinks.instagram && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="hover:bg-brand-primary/10"
                   style={styles.textTertiary}
@@ -523,8 +545,8 @@ export default function ProgramPublic() {
                 </Button>
               )}
               {socialLinks.discord && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="hover:bg-brand-primary/10"
                   style={styles.textTertiary}
@@ -534,12 +556,14 @@ export default function ProgramPublic() {
                 </Button>
               )}
               {(socialLinks as { website?: string }).website && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="hover:bg-brand-primary/10"
                   style={styles.textTertiary}
-                  onClick={() => window.open((socialLinks as { website?: string }).website, '_blank')}
+                  onClick={() =>
+                    window.open((socialLinks as { website?: string }).website, '_blank')
+                  }
                 >
                   <Globe className="h-5 w-5" />
                 </Button>
@@ -549,13 +573,10 @@ export default function ProgramPublic() {
         </div>
 
         {/* Tab Navigation */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mt-8">
-          <TabsList 
-            className="w-full justify-start border-b"
-            style={styles.tabsList}
-          >
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as string)} className="mt-8">
+          <TabsList className="w-full justify-start border-b" style={styles.tabsList}>
             {visibility.showActivityFeed && (
-              <TabsTrigger 
+              <TabsTrigger
                 value="dashboard"
                 style={styles.textSecondary}
                 className="data-[state=active]:text-white"
@@ -571,7 +592,7 @@ export default function ProgramPublic() {
               </TabsTrigger>
             )}
             {visibility.showProfile && (
-              <TabsTrigger 
+              <TabsTrigger
                 value="profile"
                 style={styles.textSecondary}
                 className="data-[state=active]:text-white"
@@ -588,7 +609,7 @@ export default function ProgramPublic() {
               </TabsTrigger>
             )}
             {visibility.showCampaigns && (
-              <TabsTrigger 
+              <TabsTrigger
                 value="campaigns"
                 style={styles.textSecondary}
                 className="data-[state=active]:text-white"
@@ -605,7 +626,7 @@ export default function ProgramPublic() {
               </TabsTrigger>
             )}
             {visibility.showTasks && (
-              <TabsTrigger 
+              <TabsTrigger
                 value="tasks"
                 style={styles.textSecondary}
                 className="data-[state=active]:text-white"
@@ -622,7 +643,7 @@ export default function ProgramPublic() {
               </TabsTrigger>
             )}
             {visibility.showRewards && (
-              <TabsTrigger 
+              <TabsTrigger
                 value="rewards"
                 style={styles.textSecondary}
                 className="data-[state=active]:text-white"
@@ -645,8 +666,8 @@ export default function ProgramPublic() {
             {/* Main Feed (2/3 width) */}
             <div className="lg:col-span-2 space-y-6">
               <TabsContent value="dashboard" className="mt-0">
-                <ActivityFeed 
-                  programId={programData.id} 
+                <ActivityFeed
+                  programId={programData.id}
                   creatorName={creator.displayName}
                   creatorAvatar={creator.imageUrl ?? undefined}
                 />
@@ -657,12 +678,15 @@ export default function ProgramPublic() {
               </TabsContent>
 
               <TabsContent value="campaigns" className="mt-0">
-                <CampaignsTab campaigns={campaigns} pointsName={programData.pointsName ?? 'Points'} />
+                <CampaignsTab
+                  campaigns={campaigns ?? []}
+                  pointsName={programData.pointsName ?? 'Points'}
+                />
               </TabsContent>
 
               <TabsContent value="tasks" className="mt-0">
-                <TasksTab 
-                  tasks={tasks} 
+                <TasksTab
+                  tasks={tasks ?? []}
                   pointsName={programData.pointsName ?? 'Points'}
                   themeColors={themeColors}
                   brandColors={brandColors}
@@ -685,16 +709,11 @@ export default function ProgramPublic() {
                 brandColors={brandColors}
                 isThemeDark={isThemeDark}
               />
-              
+
               {visibility.showFanWidget && (
-                <FanStatsWidget 
-                  fanCount={0} 
-                  activeCampaigns={activeCampaigns.length}
-                />
+                <FanStatsWidget fanCount={0} activeCampaigns={activeCampaigns.length} />
               )}
-              {visibility.showLeaderboard && (
-                <LeaderboardWidget programId={programData.id} />
-              )}
+              {visibility.showLeaderboard && <LeaderboardWidget programId={programData.id} />}
               {visibility.showCampaigns && activeCampaigns.length > 0 && (
                 <ActiveCampaignsWidget campaigns={campaigns} />
               )}
@@ -710,11 +729,13 @@ export default function ProgramPublic() {
 }
 
 // Profile Tab Component
-function ProfileTab({ program, creator }: { program: ProgramPublicData; creator: any }) {
+function ProfileTab({ program, creator }: { program: ProgramPublicData; creator: ProgramCreator }) {
   const { user } = useAuth();
-  
+
   // Fetch social task completions for the current user
-  const { data: socialCompletions = {} } = useQuery<Record<string, { completed: boolean; completedAt?: Date }>>({
+  const { data: socialCompletions = {} } = useQuery<
+    Record<string, { completed: boolean; completedAt?: Date }>
+  >({
     queryKey: [`/api/programs/${program.id}/social-task-completions`],
     enabled: !!user?.id,
   });
@@ -746,7 +767,9 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
             </div>
           )}
 
-          {profileVisibility.showBio && program.description && <Separator className="bg-gray-200" />}
+          {profileVisibility.showBio && program.description && (
+            <Separator className="bg-gray-200" />
+          )}
 
           {/* Program Stats */}
           <div>
@@ -789,9 +812,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                 <h3 className="text-gray-900 font-semibold text-lg">{creator.displayName}</h3>
                 {/* Show verification badge only if enabled */}
                 {profileVisibility.showVerificationBadge && creator.verified && (
-                  <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
-                    ✓ Verified
-                  </Badge>
+                  <VerifiedBadgeNFT isVerified={true} size="md" />
                 )}
               </div>
               {/* Show bio only if enabled */}
@@ -807,12 +828,14 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
               <Separator className="bg-gray-200" />
               <div>
                 <h4 className="text-gray-900 font-semibold mb-3">Connect with Creator</h4>
-                <p className="text-sm text-gray-600 mb-3">Follow on social media to support the creator and earn rewards!</p>
+                <p className="text-sm text-gray-600 mb-3">
+                  Follow on social media to support the creator and earn rewards!
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {creator.socialLinks.twitter && (
                     <div className="relative">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         className={`border-gray-300 text-gray-700 hover:bg-gray-50 ${
                           socialCompletions.twitter?.completed ? 'border-green-300 bg-green-50' : ''
@@ -830,18 +853,22 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       {!socialCompletions.twitter?.completed && user && (
                         <span className="absolute -top-2 -right-2 flex h-5 w-5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">!</span>
+                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">
+                            !
+                          </span>
                         </span>
                       )}
                     </div>
                   )}
                   {creator.socialLinks.instagram && (
                     <div className="relative">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         className={`border-gray-300 text-gray-700 hover:bg-gray-50 ${
-                          socialCompletions.instagram?.completed ? 'border-green-300 bg-green-50' : ''
+                          socialCompletions.instagram?.completed
+                            ? 'border-green-300 bg-green-50'
+                            : ''
                         }`}
                         onClick={() => window.open(creator.socialLinks.instagram, '_blank')}
                       >
@@ -856,15 +883,17 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       {!socialCompletions.instagram?.completed && user && (
                         <span className="absolute -top-2 -right-2 flex h-5 w-5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">!</span>
+                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">
+                            !
+                          </span>
                         </span>
                       )}
                     </div>
                   )}
                   {creator.socialLinks.discord && (
                     <div className="relative">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         className={`border-gray-300 text-gray-700 hover:bg-gray-50 ${
                           socialCompletions.discord?.completed ? 'border-green-300 bg-green-50' : ''
@@ -882,23 +911,27 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       {!socialCompletions.discord?.completed && user && (
                         <span className="absolute -top-2 -right-2 flex h-5 w-5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">!</span>
+                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">
+                            !
+                          </span>
                         </span>
                       )}
                     </div>
                   )}
                   {creator.socialLinks.facebook && (
                     <div className="relative">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         className={`border-gray-300 text-gray-700 hover:bg-gray-50 ${
-                          socialCompletions.facebook?.completed ? 'border-green-300 bg-green-50' : ''
+                          socialCompletions.facebook?.completed
+                            ? 'border-green-300 bg-green-50'
+                            : ''
                         }`}
                         onClick={() => window.open(creator.socialLinks.facebook, '_blank')}
                       >
                         <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                         </svg>
                         Facebook
                         {socialCompletions.facebook?.completed && (
@@ -910,14 +943,16 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       {!socialCompletions.facebook?.completed && user && (
                         <span className="absolute -top-2 -right-2 flex h-5 w-5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">!</span>
+                          <span className="relative inline-flex rounded-full h-5 w-5 bg-brand-primary items-center justify-center text-white text-xs font-bold">
+                            !
+                          </span>
                         </span>
                       )}
                     </div>
                   )}
                   {creator.socialLinks.website && (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       className="border-gray-300 text-gray-700 hover:bg-gray-50"
                       onClick={() => window.open(creator.socialLinks.website, '_blank')}
@@ -943,15 +978,26 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
         <Card className="bg-white border border-gray-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-gray-900">Reward Tiers</CardTitle>
-            <p className="text-sm text-gray-600 mt-1">Unlock exclusive benefits as you earn more points</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Unlock exclusive benefits as you earn more points
+            </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {program.tiers.map((tier) => (
-                <div key={tier.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                <div
+                  key={tier.id}
+                  className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                >
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-gray-900 font-semibold text-lg">{tier.name}</h4>
-                    <Badge style={{ backgroundColor: tier.color + '20', color: tier.color, borderColor: tier.color + '40' }}>
+                    <Badge
+                      style={{
+                        backgroundColor: tier.color + '20',
+                        color: tier.color,
+                        borderColor: tier.color + '40',
+                      }}
+                    >
                       {tier.minPoints}+ {program.pointsName}
                     </Badge>
                   </div>
@@ -974,8 +1020,14 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
 }
 
 // Campaigns Tab Component
-function CampaignsTab({ campaigns, pointsName }: { campaigns: Campaign[]; pointsName: string }) {
-  const activeCampaigns = campaigns.filter(c => c.status === 'active');
+function CampaignsTab({
+  campaigns,
+  pointsName: _pointsName,
+}: {
+  campaigns: Campaign[];
+  pointsName: string;
+}) {
+  const activeCampaigns = campaigns.filter((c) => c.status === 'active');
 
   return (
     <div className="space-y-4">
@@ -989,16 +1041,17 @@ function CampaignsTab({ campaigns, pointsName }: { campaigns: Campaign[]; points
         </Card>
       ) : (
         activeCampaigns.map((campaign) => (
-          <Card key={campaign.id} className="bg-white/5 border-white/10 hover:border-brand-primary/30 transition-colors">
+          <Card
+            key={campaign.id}
+            className="bg-white/5 border-white/10 hover:border-brand-primary/30 transition-colors"
+          >
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-white mb-2">{campaign.name}</h3>
                   <p className="text-gray-300 mb-4">{campaign.description}</p>
                 </div>
-                <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                  Active
-                </Badge>
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
               </div>
 
               <div className="flex items-center gap-4 text-sm text-gray-400">
@@ -1033,36 +1086,49 @@ function TasksTab({
   pointsName,
   themeColors,
   brandColors,
-  isThemeDark
+  isThemeDark,
 }: {
   tasks: Task[];
   pointsName: string;
-  themeColors: any;
-  brandColors: any;
+  themeColors: {
+    text: { primary: string; secondary: string; tertiary: string };
+    card: { background: string; border: string };
+  };
+  brandColors: { primary: string; secondary: string; accent: string };
   isThemeDark: boolean;
 }) {
-  const { user } = useAuth();
-  const activeTasks = tasks.filter(t => !t.isDraft && t.isActive);
+  const activeTasks = tasks.filter((t) => !t.isDraft && t.isActive);
+
+  // Compute styles from theme props
+  const styles = useMemo(
+    () => ({
+      card: {
+        backgroundColor: isThemeDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+        borderColor: isThemeDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb',
+      },
+      textPrimary: { color: themeColors.text.primary },
+      textSecondary: { color: themeColors.text.secondary },
+      textTertiary: { color: themeColors.text.tertiary },
+    }),
+    [themeColors, isThemeDark]
+  );
 
   // Fetch task completions for the current user
   const { data: completionsData } = useUserTaskCompletions();
   const completions = completionsData?.completions || [];
 
   // Create a map of task completions by task ID for quick lookup
-  const completionMap = new Map(
-    completions.map(c => [c.taskId, c])
-  );
+  const completionMap = new Map(completions.map((c) => [c.taskId, c]));
 
   return (
     <div className="space-y-4">
       {activeTasks.length === 0 ? (
-        <Card
-          className="shadow-sm"
-          style={styles.card}
-        >
+        <Card className="shadow-sm" style={styles.card}>
           <CardContent className="p-12 text-center">
             <CheckSquare className="h-16 w-16 mx-auto mb-4" style={styles.textTertiary} />
-            <h3 className="text-lg font-medium mb-2" style={styles.textPrimary}>No Tasks Available</h3>
+            <h3 className="text-lg font-medium mb-2" style={styles.textPrimary}>
+              No Tasks Available
+            </h3>
             <p style={styles.textSecondary}>Check back soon for new tasks!</p>
           </CardContent>
         </Card>
@@ -1087,15 +1153,16 @@ function TasksTab({
 }
 
 // Rewards Tab Component
-function RewardsTab({ programId }: { programId: string }) {
+function RewardsTab({ programId: _programId }: { programId: string }) {
   return (
     <Card className="bg-white/5 border-white/10">
       <CardContent className="p-12 text-center">
         <Gift className="h-16 w-16 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-white mb-2">Rewards Coming Soon</h3>
-        <p className="text-gray-400">Earn points by completing tasks and campaigns to unlock exclusive rewards!</p>
+        <p className="text-gray-400">
+          Earn points by completing tasks and campaigns to unlock exclusive rewards!
+        </p>
       </CardContent>
     </Card>
   );
 }
-

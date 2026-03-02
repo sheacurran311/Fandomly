@@ -38,10 +38,14 @@ export function VerifiedBadgeNFT({
             <ShieldCheck className={cn(sizeClasses[size], 'text-brand-primary')} />
           </span>
         </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
+        <TooltipContent side="top" className="text-xs max-w-[220px]">
           <p className="font-semibold">Verified Creator</p>
+          <p className="text-gray-400 mt-0.5">
+            This creator has a complete profile, connected social accounts, and an active program on
+            Fandomly.
+          </p>
           {hasBadgeNFT && (
-            <p className="text-gray-400 mt-0.5">Badge NFT minted on Fandomly Chain</p>
+            <p className="text-gray-400 mt-0.5">Badge credential minted on Fandomly Chain</p>
           )}
         </TooltipContent>
       </Tooltip>
