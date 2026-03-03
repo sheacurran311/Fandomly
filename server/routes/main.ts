@@ -13,7 +13,7 @@ import { registerGoogleAuthRoutes } from './auth/google-routes';
 import { registerAuthRoutes } from './auth/auth-routes';
 import { registerAdminRoutes } from './admin/admin-routes';
 import { registerAdminAnalyticsRoutes } from './admin/admin-analytics-routes';
-import { registerDynamicAnalyticsRoutes } from './media/dynamic-analytics-routes';
+// Dynamic Analytics removed — Particle Network replaced Dynamic Labs
 import { registerTwitterVerificationRoutes } from './social/twitter-verification-routes';
 import { registerReferralRoutes } from './points/referral-routes';
 import { registerPointsRoutes } from './points/points-routes';
@@ -2698,8 +2698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAdminRoutes(app);
   registerAdminAnalyticsRoutes(app);
 
-  // Register Dynamic Analytics routes
-  registerDynamicAnalyticsRoutes(app);
+  // Dynamic Analytics routes removed — replaced by admin analytics
 
   // Register Twitter verification routes
   registerTwitterVerificationRoutes(app);
