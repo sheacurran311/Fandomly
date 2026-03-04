@@ -20,6 +20,10 @@ exposeLocalhost = true
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5488
+externalPort = 3000
+
 [env]
 PORT = "5000"
 
@@ -39,9 +43,12 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "fuser -k 5000/tcp 5488/tcp 2>/dev/null; pkill -f 'tsx.*server/index' 2>/dev/null; pkill -f 'dev-ws-proxy' 2>/dev/null; sleep 2; npm run dev"
 waitForPort = 5000
 
 [agent]
