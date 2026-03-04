@@ -28,7 +28,7 @@ app.use(
           'https://www.googletagmanager.com',
           'https://replit.com', // For Replit dev banner
         ],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://fonts.googleapis.com'],
         imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         connectSrc: ["'self'", 'https:', 'wss:'],

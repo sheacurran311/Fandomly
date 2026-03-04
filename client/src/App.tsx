@@ -11,7 +11,7 @@ import { AuthModalProvider } from '@/hooks/use-auth-modal';
 // Particle Network - Feature-flagged Web3 auth (wraps above AuthProvider)
 import { ParticleProvider } from '@/contexts/particle-provider';
 import ParticleAuthListener from '@/components/auth/particle-auth-listener';
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { initTikTokErrorHandler } from '@/lib/tiktok-error-handler';
 import Navigation from '@/components/layout/navigation';
 import Footer from '@/components/layout/footer';
@@ -268,12 +268,15 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ParticleProvider>
-          <AuthProvider>
-            <ParticleAuthListener />
-            <TooltipProvider>
-              <AuthModalProvider>
-                <NewAuthRouter>
+        <Suspense fallback={null}>
+          <ParticleProvider>
+            <AuthProvider>
+              <Suspense fallback={null}>
+                <ParticleAuthListener />
+              </Suspense>
+              <TooltipProvider>
+                <AuthModalProvider>
+                  <NewAuthRouter>
                   <div className="min-h-screen bg-brand-dark-bg">
                     {/* Skip to main content link for accessibility */}
                     <a
@@ -294,6 +297,7 @@ function App() {
             </TooltipProvider>
           </AuthProvider>
         </ParticleProvider>
+        </Suspense>
       </QueryClientProvider>
     </ErrorBoundary>
   );

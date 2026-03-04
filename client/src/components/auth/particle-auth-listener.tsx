@@ -14,10 +14,12 @@
  *         <App />
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, startTransition } from 'react';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
 import { useAccount, useDisconnect, useParticleAuth } from '@particle-network/connectkit';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * This component is rendered inside ConnectKitProvider.
@@ -35,9 +37,11 @@ function ParticleAuthListenerInner() {
     logout: fandomlyLogout,
     isAuthenticated: isFandomlyAuthed,
   } = useAuth();
+  const [, setLocation] = useLocation();
   const { address, isConnected } = useAccount();
   const { getUserInfo } = useParticleAuth();
   const { disconnect } = useDisconnect();
+  const { toast } = useToast();
   const bridgingRef = useRef(false);
   const logoutInProgressRef = useRef(false);
 
@@ -57,20 +61,72 @@ function ParticleAuthListenerInner() {
       const result = await loginWithParticle(token, address);
       if (!result.success) {
         console.error('[Particle Auth Listener] Bridge failed:', result.message);
+        toast({
+          title: 'Sign-in failed',
+          description: result.message || 'Could not connect your account. Please try again.',
+          variant: 'destructive',
+        });
         disconnect();
+        return;
+      }
+
+      // Route the user after successful login:
+      //  - New users (userType pending) → /user-type-selection (onboarding entry)
+      //  - Returning users → respect postAuthRedirect or go to their dashboard
+      const user = result.user;
+      const isNewUser = result.isNewUser || !user?.userType || user?.userType === 'pending';
+
+      if (isNewUser) {
+        // Clear any stale redirect — new users must choose their type first
+        try { sessionStorage.removeItem('postAuthRedirect'); } catch { /* noop */ }
+        setLocation('/user-type-selection');
+        return;
+      }
+
+      // Returning user — check for a stored redirect (e.g. they tried to reach a dashboard)
+      try {
+        const postAuthRedirect = sessionStorage.getItem('postAuthRedirect');
+        if (postAuthRedirect) {
+          sessionStorage.removeItem('postAuthRedirect');
+          setLocation(postAuthRedirect);
+          return;
+        }
+      } catch { /* noop */ }
+
+      // Default: send to their dashboard
+      if (user?.userType === 'creator') {
+        setLocation('/creator-dashboard');
+      } else if (user?.userType === 'fan') {
+        // Fan may still need onboarding
+        if (!user?.onboardingState?.isCompleted) {
+          const resumeRoute = user?.onboardingState?.lastOnboardingRoute || '/fan-onboarding/profile';
+          setLocation(resumeRoute);
+        } else {
+          setLocation('/fan-dashboard');
+        }
+      } else {
+        // Unknown type — fallback to type selection
+        setLocation('/user-type-selection');
       }
     } catch (error) {
       console.warn('[Particle Auth Listener] Bridge error (clearing stale session):', error);
+      toast({
+        title: 'Sign-in error',
+        description: 'An unexpected error occurred during sign-in. Please try again.',
+        variant: 'destructive',
+      });
       disconnect();
     } finally {
       bridgingRef.current = false;
     }
-  }, [isConnected, address, isFandomlyAuthed, getUserInfo, loginWithParticle, disconnect]);
+  }, [isConnected, address, isFandomlyAuthed, getUserInfo, loginWithParticle, disconnect, setLocation]);
 
   // Bridge when Particle connects and Fandomly is not yet authenticated
   useEffect(() => {
     if (isConnected && address && !isFandomlyAuthed) {
-      bridgeAuth();
+      startTransition(() => {
+        bridgeAuth();
+      });
     }
   }, [isConnected, address, isFandomlyAuthed, bridgeAuth]);
 

@@ -61,7 +61,7 @@ export default function Login() {
         {particleEnabled ? (
           <div
             data-particle-connect-btn
-            className="[&_button]:w-full [&_button]:h-12 [&_button]:rounded-xl [&_button]:font-semibold"
+            className="[&>div]:w-full [&>div]:h-12 [&>div]:rounded-xl [&>div]:font-semibold"
           >
             <Suspense
               fallback={

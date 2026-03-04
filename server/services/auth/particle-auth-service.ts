@@ -168,27 +168,24 @@ export async function handleParticleCallback(
     // particleUserId column may not exist yet (pre-migration)
   }
 
-  // Try email match if no Particle match found (C2: prevent silent account takeover)
+  // Try email match if no Particle match found
   if (!existingUser && email) {
     const [byEmail] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (byEmail) {
-      // If the existing user already has a Particle ID, it's a different Particle account
-      // If they don't have one, we must NOT auto-link -- require explicit account linking
+      // If the existing user already has a different Particle ID, it's a different account
       if (byEmail.particleUserId && byEmail.particleUserId !== particleUuid) {
         return { success: false, error: 'Email already associated with a different account' };
       }
-      if (!byEmail.particleUserId) {
-        console.warn('[Particle Auth] Email match found but no Particle link:', {
-          email,
-          existingUserId: byEmail.id,
-          particleUuid,
-        });
-        return {
-          success: false,
-          error: 'Email already registered. Please link your Particle account from settings.',
-        };
-      }
+      // Auto-link: existing user found by email with no Particle ID yet.
+      // This covers the migration path where a user registered via legacy auth
+      // (Google OAuth, etc.) and is now logging in with Particle for the first time.
+      // We link their Particle ID to the existing account transparently.
+      console.info('[Particle Auth] Auto-linking Particle account to existing email user:', {
+        email,
+        existingUserId: byEmail.id,
+        particleUuid,
+      });
       existingUser = byEmail;
     }
   }

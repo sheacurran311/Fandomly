@@ -54,22 +54,79 @@ export function createParticleConfig() {
     appId,
 
     appearance: {
+      // Layout and UX preferences
       connectorsOrder: ['email', 'social', 'wallet'],
       splitEmailAndPhone: false,
       collapseWalletList: true,
       hideContinueButton: false,
       language: 'en-US',
       mode: 'dark',
+
+      // Fandomly logo — shown at the top of the ConnectKit modal.
+      // NOTE: The Particle dashboard "Branding" section only applies to the legacy
+      // @particle-network/authkit SDK. For ConnectKit (@particle-network/connectkit),
+      // all visual customization must be done here via `appearance.logo` and
+      // `appearance.theme`. See:
+      // https://developers.particle.network/social-logins/configuration/appearance/auth.md
+      logo: typeof window !== 'undefined'
+        ? `${window.location.origin}/fandomly-logo.png`
+        : 'https://fandomly.io/fandomly-logo.png',
+
+      // Fandomly brand theme for the ConnectKit modal.
+      // Brand colors: #e10698 (primary pink), #14feee (secondary cyan), #0a0118 (dark bg)
       theme: {
-        '--pcm-accent-color': '#8B5CF6',
-        '--pcm-body-background': '#0F0F23',
-        '--pcm-body-background-secondary': '#1A1A3E',
-        '--pcm-body-color': '#FFFFFF',
-        '--pcm-body-color-secondary': '#A0AEC0',
-        '--pcm-primary-button-background': '#8B5CF6',
-        '--pcm-primary-button-color': '#FFFFFF',
-        '--pcm-primary-button-hover-background': '#7C3AED',
-        '--pcm-button-border-color': '#2D2D5E',
+        // Modal overlay
+        '--pcm-overlay-background': 'rgba(10, 1, 24, 0.85)',
+        '--pcm-overlay-backdrop-filter': 'blur(8px)',
+        '--pcm-modal-box-shadow': '0px 0px 32px rgba(225, 6, 152, 0.25)',
+
+        // Modal / card backgrounds
+        '--pcm-body-background': '#0f0520',
+        '--pcm-body-background-secondary': '#1a0a30',
+        '--pcm-body-background-tertiary': '#220d3c',
+
+        // Text
+        '--pcm-body-color': '#ffffff',
+        '--pcm-body-color-secondary': '#b3a8c8',
+        '--pcm-body-color-tertiary': '#6b5f82',
+
+        // Action / accent / focus
+        '--pcm-body-action-color': '#e10698',
+        '--pcm-accent-color': '#e10698',
+        '--pcm-focus-color': '#14feee',
+
+        // Buttons (shared)
+        '--pcm-button-font-weight': '600',
+        '--pcm-button-hover-shadow': '0px 4px 16px rgba(225, 6, 152, 0.35)',
+        '--pcm-button-border-color': 'rgba(225, 6, 152, 0.3)',
+
+        // Primary button — hot pink background, white text
+        '--pcm-primary-button-color': '#ffffff',
+        '--pcm-primary-button-background': '#e10698',
+        // Note: Particle SDK has a known typo "bankground" — include both spellings
+        // for the primary button until Particle corrects it upstream.
+        '--pcm-primary-button-bankground': '#e10698',
+        '--pcm-primary-button-hover-background': '#c0057f',
+
+        // Secondary button — subtle dark with pink border
+        '--pcm-secondary-button-color': '#e10698',
+        '--pcm-secondary-button-background': 'rgba(225, 6, 152, 0.1)',
+        '--pcm-secondary-button-hover-background': 'rgba(225, 6, 152, 0.2)',
+
+        // Border radius — matches Fandomly's rounded-xl design language
+        '--pcm-rounded-sm': '6px',
+        '--pcm-rounded-md': '10px',
+        '--pcm-rounded-lg': '14px',
+        '--pcm-rounded-xl': '18px',
+        '--pcm-rounded-full': '9999px',
+
+        // Status colors
+        '--pcm-success-color': '#14feee',
+        '--pcm-warning-color': '#F59E0A',
+        '--pcm-error-color': '#ff4d6d',
+
+        // Wallet label
+        '--pcm-wallet-label-color': '#14feee',
       },
     },
 

@@ -74,18 +74,18 @@ function DevAccessPanel() {
       </div>
       <p className="text-sm text-gray-500 mb-4">
         Already have access?{' '}
-        <span className="text-[#8B5CF6]">Sign in to your dashboard.</span>
+        <span className="text-brand-primary">Sign in to your dashboard.</span>
       </p>
 
       {particleEnabled ? (
         <div
           data-particle-connect-btn
-          className="[&_button]:w-full [&_button]:h-11 [&_button]:rounded-xl [&_button]:font-semibold [&_button]:text-sm"
+          className="[&>div]:w-full [&>div]:h-11 [&>div]:rounded-xl [&>div]:font-semibold [&>div]:text-sm"
         >
           <Suspense
             fallback={
-              <div className="h-11 w-full rounded-xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/30 flex items-center justify-center">
-                <Loader2 className="w-4 h-4 animate-spin text-[#8B5CF6]" />
+              <div className="h-11 w-full rounded-xl bg-brand-primary/20 border border-brand-primary/30 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 animate-spin text-brand-primary" />
               </div>
             }
           >
@@ -94,7 +94,7 @@ function DevAccessPanel() {
         </div>
       ) : (
         <Link href="/login">
-          <button className="w-full h-11 rounded-xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/30 text-[#8B5CF6] hover:bg-[#8B5CF6]/30 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
+          <button className="w-full h-11 rounded-xl bg-brand-primary/20 border border-brand-primary/30 text-brand-primary hover:bg-brand-primary/30 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
             <LogIn className="w-4 h-4" />
             Sign in to Dashboard
           </button>
@@ -511,14 +511,14 @@ export default function Home() {
           Only visible when running in full-app mode (not production LANDING_ONLY build).
           Reminds developers that this is the development environment and auth is active. */}
       {!__LANDING_ONLY__ && (
-        <div className="bg-[#8B5CF6]/10 border-b border-[#8B5CF6]/20 px-4 py-2 text-center">
-          <p className="text-xs text-[#8B5CF6] font-medium">
+        <div className="bg-brand-primary/10 border-b border-brand-primary/20 px-4 py-2 text-center">
+          <p className="text-xs text-brand-primary font-medium">
             Development environment — full app active.{' '}
-            <Link href="/login" className="underline hover:text-purple-300 transition-colors">
+            <Link href="/login" className="underline hover:text-brand-secondary transition-colors">
               Sign in
             </Link>{' '}
             or{' '}
-            <Link href="/creator-dashboard" className="underline hover:text-purple-300 transition-colors">
+            <Link href="/creator-dashboard" className="underline hover:text-brand-secondary transition-colors">
               go to dashboard
             </Link>
           </p>
