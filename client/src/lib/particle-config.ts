@@ -1,5 +1,6 @@
 import { createConfig } from '@particle-network/connectkit';
 import { authWalletConnectors } from '@particle-network/connectkit/auth';
+import { evmWalletConnectors } from '@particle-network/connectkit/evm';
 import { wallet, EntryPosition } from '@particle-network/connectkit/wallet';
 import { defineChain } from '@particle-network/connectkit/chains';
 
@@ -32,6 +33,9 @@ const projectId = import.meta.env.VITE_PARTICLE_PROJECT_ID;
 const clientKey = import.meta.env.VITE_PARTICLE_CLIENT_KEY;
 const appId = import.meta.env.VITE_PARTICLE_APP_ID;
 
+// Public project identifier — safe for frontend use (not a secret)
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+
 export function isParticleConfigured(): boolean {
   return Boolean(projectId && clientKey && appId);
 }
@@ -40,7 +44,7 @@ export function createParticleConfig() {
   if (!projectId || !clientKey || !appId) {
     throw new Error(
       'Particle Network credentials not configured. ' +
-      'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID in .env'
+      'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID.'
     );
   }
 
@@ -50,7 +54,7 @@ export function createParticleConfig() {
     appId,
 
     appearance: {
-      connectorsOrder: ['email', 'social'],
+      connectorsOrder: ['email', 'social', 'wallet'],
       splitEmailAndPhone: false,
       collapseWalletList: true,
       hideContinueButton: false,
@@ -70,6 +74,7 @@ export function createParticleConfig() {
     },
 
     walletConnectors: [
+      // Social + email login (primary auth path)
       authWalletConnectors({
         authTypes: ['email', 'google', 'apple', 'twitter', 'discord'],
         fiatCoin: 'USD',
@@ -77,6 +82,16 @@ export function createParticleConfig() {
           promptMasterPasswordSettingWhenLogin: 0,
           promptPaymentPasswordSettingWhenSign: 1,
         },
+      }),
+      // EVM wallet connectors: MetaMask, Coinbase, WalletConnect, etc.
+      evmWalletConnectors({
+        metadata: {
+          name: 'Fandomly',
+          description: 'Elevate Your Brand. Reward Your Community.',
+          url: typeof window !== 'undefined' ? window.location.origin : 'https://fandomly.io',
+          icon: typeof window !== 'undefined' ? `${window.location.origin}/favicon.ico` : '',
+        },
+        ...(walletConnectProjectId ? { walletConnectProjectId } : {}),
       }),
     ],
 

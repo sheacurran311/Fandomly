@@ -5,6 +5,30 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 /**
+ * Patches @particle-network/evm-connectors (and related) to use optional
+ * chaining when calling provider.on(). Some environments (Replit preview,
+ * certain browser extensions) expose a partial window.ethereum that is
+ * missing the EventEmitter interface. Without this patch the injected-wallet
+ * connector's setup() throws "provider.on is not a function" and corrupts
+ * the ConnectKitProvider context.
+ */
+function patchParticleEvmProviderPlugin(): Plugin {
+  return {
+    name: 'patch-particle-evm-provider',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.includes('@particle-network') && !id.includes('evm-connector')) return null;
+      if (!code.includes('provider.on(') && !code.includes('provider.removeListener(')) return null;
+      const patched = code
+        .replace(/\bprovider\.on\(/g, 'provider?.on?.(')
+        .replace(/\bprovider\.removeListener\(/g, 'provider?.removeListener?.(')
+        .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
+      return { code: patched, map: null };
+    },
+  };
+}
+
+/**
  * Particle Network SDK pulls in @aws-sdk and @smithy (for Cognito auth)
  * which use Node.js-only imports (node:fs, node:path, etc.).
  * These code paths are never executed in the browser — the SDK uses them
@@ -52,6 +76,7 @@ function serverOnlyStubPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [
+    patchParticleEvmProviderPlugin(),
     serverOnlyStubPlugin(),
     nodePolyfills({
       include: ['process', 'buffer', 'util', 'stream', 'events', 'crypto'],
@@ -70,6 +95,11 @@ export default defineConfig({
       : []),
   ],
   resolve: {
+    // Force all packages to use the same React instance.
+    // Without this, Vite's dep optimization may bundle separate React copies
+    // for packages that list React as a peerDependency (e.g. Particle Network),
+    // causing "Invalid hook call" warnings.
+    dedupe: ['react', 'react-dom'],
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
@@ -83,7 +113,29 @@ export default defineConfig({
     __LANDING_ONLY__: JSON.stringify(process.env.LANDING_ONLY === 'true'),
   },
   optimizeDeps: {
-    include: ['buffer']
+    include: ['buffer'],
+    esbuildOptions: {
+      plugins: [
+        {
+          name: 'patch-particle-evm-provider',
+          setup(build: any) {
+            // Patch Particle's EVM connector source during dep optimization so
+            // provider.on() calls use optional chaining. This prevents the
+            // "provider.on is not a function" crash in environments with a
+            // partial window.ethereum (Replit preview, some browser extensions).
+            build.onLoad({ filter: /evm-connectors/ }, async (args: any) => {
+              const { readFileSync } = await import('node:fs');
+              const src = readFileSync(args.path, 'utf8');
+              const patched = src
+                .replace(/\bprovider\.on\(/g, 'provider?.on?.(')
+                .replace(/\bprovider\.removeListener\(/g, 'provider?.removeListener?.(')
+                .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
+              return { contents: patched, loader: 'js' };
+            });
+          },
+        },
+      ],
+    },
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {

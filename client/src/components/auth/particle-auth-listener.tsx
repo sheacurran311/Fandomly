@@ -55,7 +55,8 @@ function ParticleAuthListenerInner() {
         disconnect();
       }
     } catch (error) {
-      console.error('[Particle Auth Listener] Error bridging auth:', error);
+      console.warn('[Particle Auth Listener] Bridge error (clearing stale session):', error);
+      disconnect();
     } finally {
       bridgingRef.current = false;
     }
