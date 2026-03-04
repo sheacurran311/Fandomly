@@ -531,6 +531,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Clear all queries
     queryClient.clear();
+
+    // Notify ParticleAuthListener to also disconnect the Particle session.
+    // This prevents the auth bridge from re-authenticating on the next render
+    // when Particle's session is still active after a Fandomly logout.
+    try {
+      window.dispatchEvent(new CustomEvent('auth:fandomly-logout'));
+    } catch {
+      // noop
+    }
   }, [setAccessToken, queryClient]);
 
   // Clear link required state

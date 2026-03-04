@@ -23,6 +23,11 @@ import { useAccount, useDisconnect, useParticleAuth } from '@particle-network/co
  * This component is rendered inside ConnectKitProvider.
  * It uses Particle's React hooks to detect login/logout events and
  * bridges them to Fandomly's JWT auth system automatically.
+ *
+ * Bidirectional session sync:
+ *   - Particle connects  → bridge session to Fandomly JWT
+ *   - Particle disconnects → log out of Fandomly
+ *   - Fandomly logout → disconnect Particle (via 'auth:fandomly-logout' event)
  */
 function ParticleAuthListenerInner() {
   const {
@@ -79,6 +84,28 @@ function ParticleAuthListenerInner() {
       });
     }
   }, [isConnected, isFandomlyAuthed, fandomlyLogout]);
+
+  // Handle Fandomly logout → disconnect Particle session.
+  // auth-context.tsx dispatches 'auth:fandomly-logout' from logout() after
+  // clearing the JWT state. We respond by calling Particle disconnect() so
+  // the Particle session is fully cleared and the bridge won't re-fire.
+  useEffect(() => {
+    const handleFandomlyLogout = () => {
+      if (isConnected && !logoutInProgressRef.current) {
+        logoutInProgressRef.current = true;
+        try {
+          disconnect();
+        } finally {
+          logoutInProgressRef.current = false;
+        }
+      }
+    };
+
+    window.addEventListener('auth:fandomly-logout', handleFandomlyLogout);
+    return () => {
+      window.removeEventListener('auth:fandomly-logout', handleFandomlyLogout);
+    };
+  }, [isConnected, disconnect]);
 
   return null;
 }

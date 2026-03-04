@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   motion,
   useScroll,
@@ -21,6 +21,7 @@ import {
   BarChart3,
   Palette,
   Zap,
+  LogIn,
 } from 'lucide-react';
 import {
   SiFacebook,
@@ -35,6 +36,73 @@ import {
 } from 'react-icons/si';
 import { Link } from 'wouter';
 import { SectionGeometry } from '@/components/landing/section-geometry';
+import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+
+// Lazy-load Particle ConnectButton only when needed (not in LANDING_ONLY mode)
+const ParticleConnectButton = lazy(() =>
+  import('@particle-network/connectkit').then((mod) => ({
+    default: mod.ConnectButton,
+  }))
+);
+
+// Build-time flag — true in production landing-only mode, false in dev/full-app mode
+declare const __LANDING_ONLY__: boolean;
+
+// ============================================================
+// DEV ACCESS PANEL — only shown in full-app mode (LANDING_ONLY=false)
+// Shows the Particle ConnectButton so developers and early access users
+// can sign in directly from the landing page without navigating to /login.
+// This panel is NOT rendered in production (LANDING_ONLY=true builds).
+// ============================================================
+function DevAccessPanel() {
+  const particleEnabled = isParticleAuthEnabled();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.55 }}
+      className="mt-6 pt-6 border-t border-white/[0.08]"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/[0.08]" />
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wider px-2 flex items-center gap-1.5">
+          <LogIn className="w-3 h-3" />
+          Early Access
+        </span>
+        <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/[0.08]" />
+      </div>
+      <p className="text-sm text-gray-500 mb-4">
+        Already have access?{' '}
+        <span className="text-[#8B5CF6]">Sign in to your dashboard.</span>
+      </p>
+
+      {particleEnabled ? (
+        <div
+          data-particle-connect-btn
+          className="[&_button]:w-full [&_button]:h-11 [&_button]:rounded-xl [&_button]:font-semibold [&_button]:text-sm"
+        >
+          <Suspense
+            fallback={
+              <div className="h-11 w-full rounded-xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/30 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 animate-spin text-[#8B5CF6]" />
+              </div>
+            }
+          >
+            <ParticleConnectButton label="Sign in with Fandomly" />
+          </Suspense>
+        </div>
+      ) : (
+        <Link href="/login">
+          <button className="w-full h-11 rounded-xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/30 text-[#8B5CF6] hover:bg-[#8B5CF6]/30 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
+            <LogIn className="w-4 h-4" />
+            Sign in to Dashboard
+          </button>
+        </Link>
+      )}
+    </motion.div>
+  );
+}
 
 // Kick doesn't have an official simple-icons entry, so we use a custom SVG
 function KickIcon({ className }: { className?: string }) {
@@ -439,6 +507,24 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0118] overflow-x-hidden selection:bg-[#e10698]/30 selection:text-white">
+      {/* ===== DEV-MODE ENVIRONMENT BANNER =====
+          Only visible when running in full-app mode (not production LANDING_ONLY build).
+          Reminds developers that this is the development environment and auth is active. */}
+      {!__LANDING_ONLY__ && (
+        <div className="bg-[#8B5CF6]/10 border-b border-[#8B5CF6]/20 px-4 py-2 text-center">
+          <p className="text-xs text-[#8B5CF6] font-medium">
+            Development environment — full app active.{' '}
+            <Link href="/login" className="underline hover:text-purple-300 transition-colors">
+              Sign in
+            </Link>{' '}
+            or{' '}
+            <Link href="/creator-dashboard" className="underline hover:text-purple-300 transition-colors">
+              go to dashboard
+            </Link>
+          </p>
+        </div>
+      )}
+
       {/* ===== HERO ===== */}
       <section
         ref={heroRef}
@@ -513,6 +599,9 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.4 }}
             >
               <LandingSignup variant="hero" />
+              {/* In full-app (dev) mode, show a sign-in panel below the beta signup.
+                  In production LANDING_ONLY mode this is tree-shaken away entirely. */}
+              {!__LANDING_ONLY__ && <DevAccessPanel />}
             </motion.div>
           </div>
 

@@ -75,8 +75,23 @@ export function createParticleConfig() {
 
     walletConnectors: [
       // Social + email login (primary auth path)
+      // Full list of Particle-supported SocialAuthTypes:
+      // facebook, google, apple, twitter, discord, github, twitch, microsoft, linkedin
+      // Note: TikTok, YouTube, Spotify are NOT auth providers in Particle — they are
+      // handled as post-login social account linking flows on the social dashboard pages.
       authWalletConnectors({
-        authTypes: ['email', 'google', 'apple', 'twitter', 'discord'],
+        authTypes: [
+          'email',
+          'google',
+          'apple',
+          'twitter',
+          'discord',
+          'facebook',
+          'github',
+          'twitch',
+          'microsoft',
+          'linkedin',
+        ],
         fiatCoin: 'USD',
         promptSettingConfig: {
           promptMasterPasswordSettingWhenLogin: 0,

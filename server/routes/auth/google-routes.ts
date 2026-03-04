@@ -8,6 +8,17 @@ import {
 
 /**
  * Register Google OAuth routes
+ *
+ * @deprecated These routes are legacy fallbacks from before Particle Network was integrated.
+ * When VITE_PARTICLE_PROJECT_ID is set, Particle ConnectKit handles all authentication
+ * (including Google via its native Google social auth connector). These routes remain
+ * for two reasons:
+ *   1. Fallback when Particle env vars are not configured
+ *   2. Backward compatibility for users who originally authenticated via Google OAuth
+ *      and may have existing sessions that go through this code path
+ *
+ * Do NOT remove these routes unless all users have been migrated to Particle auth
+ * and there is no longer a need for a non-Particle fallback path.
  */
 export function registerGoogleAuthRoutes(app: Express) {
   

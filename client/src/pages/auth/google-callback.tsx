@@ -4,8 +4,18 @@ import { useAuth } from '@/contexts/auth-context';
 
 /**
  * Google OAuth callback page
- * Handles the redirect from Google OAuth and exchanges the code for tokens.
- * 
+ *
+ * @deprecated This page handles the legacy Google OAuth redirect flow that was used
+ * before Particle Network ConnectKit was integrated. When Particle is configured,
+ * Google sign-in is handled natively by Particle ConnectKit's Google social auth
+ * connector and this page is not reached.
+ *
+ * This page is kept as a fallback for:
+ *   1. Environments where VITE_PARTICLE_PROJECT_ID is not set
+ *   2. Backward compatibility for any session that was initiated via the old Google flow
+ *
+ * Do NOT remove until all Google OAuth users are fully migrated to Particle auth.
+ *
  * After auth, routes users based on their stored type:
  * - New users / pending type → /user-type-selection (ALWAYS)
  * - Existing creators → /creator-dashboard or /creator-type-selection
