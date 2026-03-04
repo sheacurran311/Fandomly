@@ -946,6 +946,9 @@ export const pointTransactions = pgTable(
       referralId?: string;
       postUrl?: string;
     }>(),
+    expiresAt: timestamp('expires_at'),
+    isExpired: boolean('is_expired').default(false),
+    expiredAt: timestamp('expired_at'),
     createdAt: timestamp('created_at').defaultNow(),
   },
   (table) => [
@@ -1966,6 +1969,9 @@ export const platformPointsTransactions = pgTable('platform_points_transactions'
   source: varchar('source').notNull(), // 'task_completion' | 'daily_bonus' | 'referral' | 'admin_grant'
   description: text('description'),
   metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  expiresAt: timestamp('expires_at'),
+  isExpired: boolean('is_expired').default(false),
+  expiredAt: timestamp('expired_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
