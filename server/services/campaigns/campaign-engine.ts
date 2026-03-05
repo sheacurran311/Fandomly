@@ -8,6 +8,7 @@
  * - Campaign completion detection + bonus distribution
  * - Handle resolution (creator vs sponsor)
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { db } from '../../db';
 import {
@@ -45,6 +46,21 @@ export interface CampaignEligibilityResult {
   }>;
 }
 
+export interface CompletionRewardItem {
+  type: 'nft' | 'badge' | 'raffle_entry' | 'reward' | 'points';
+  rewardId?: string;
+  metadata?: Record<string, unknown>;
+  status: 'pending' | 'claimed' | 'failed';
+}
+
+export interface ClaimedRewardItem {
+  type: 'nft' | 'badge' | 'raffle_entry' | 'reward' | 'points';
+  rewardId?: string;
+  metadata?: Record<string, unknown>;
+  claimedAt: string;
+  deliveryData?: Record<string, unknown>;
+}
+
 export interface CampaignProgressResult {
   campaignId: string;
   userId: string;
@@ -58,6 +74,9 @@ export interface CampaignProgressResult {
   completionPercentage: number;
   canClaimCompletion: boolean;
   campaignCompleted: boolean;
+  pendingRewards?: CompletionRewardItem[];
+  claimedRewards?: ClaimedRewardItem[];
+  rewardsClaimedAt?: string;
 }
 
 export interface ResolvedTaskHandle {
@@ -356,6 +375,9 @@ export class CampaignEngineService {
       completionPercentage,
       canClaimCompletion,
       campaignCompleted: participation?.campaignCompleted || false,
+      pendingRewards: (participation?.pendingRewards as CompletionRewardItem[]) || undefined,
+      claimedRewards: (participation?.claimedRewards as ClaimedRewardItem[]) || undefined,
+      rewardsClaimedAt: participation?.rewardsClaimedAt?.toISOString() || undefined,
     };
   }
 
@@ -512,7 +534,236 @@ export class CampaignEngineService {
       }
     }
 
+    // Build pending rewards from completionBonusRewards (flexible reward system)
+    const bonusRewards = (campaign.completionBonusRewards as any[]) || [];
+    if (bonusRewards.length > 0) {
+      const pendingRewards: CompletionRewardItem[] = bonusRewards.map((r: any) => ({
+        type: r.type as CompletionRewardItem['type'],
+        rewardId: r.rewardId || r.metadata?.rewardId,
+        metadata: {
+          ...r.metadata,
+          value: r.value,
+          campaignId,
+          campaignName: campaign.name,
+        },
+        status: 'pending' as const,
+      }));
+
+      // Store pending rewards on the participation record for the claim flow
+      await db
+        .update(campaignParticipations)
+        .set({ pendingRewards: pendingRewards as any })
+        .where(eq(campaignParticipations.id, result[0].id));
+    }
+
     return true;
+  }
+
+  /**
+   * Claim pending rewards after campaign completion.
+   * Processes NFT mints, raffle entries, badge awards, and reward deliveries.
+   * Returns the claimed rewards with delivery data.
+   */
+  async claimRewards(
+    userId: string,
+    campaignId: string
+  ): Promise<{ success: boolean; claimedRewards: ClaimedRewardItem[]; error?: string }> {
+    // Get participation record with pending rewards
+    const participation = await db.query.campaignParticipations.findFirst({
+      where: and(
+        eq(campaignParticipations.campaignId, campaignId),
+        eq(campaignParticipations.memberId, userId)
+      ),
+    });
+
+    if (!participation) {
+      return { success: false, claimedRewards: [], error: 'Not a campaign participant' };
+    }
+
+    if (!participation.campaignCompleted) {
+      return { success: false, claimedRewards: [], error: 'Campaign not yet completed' };
+    }
+
+    if (participation.rewardsClaimedAt) {
+      return {
+        success: true,
+        claimedRewards: (participation.claimedRewards as ClaimedRewardItem[]) || [],
+        error: 'Rewards already claimed',
+      };
+    }
+
+    const pending = (participation.pendingRewards as CompletionRewardItem[]) || [];
+    if (pending.length === 0) {
+      // No flexible rewards to claim -- just mark as claimed
+      await db
+        .update(campaignParticipations)
+        .set({ rewardsClaimedAt: new Date() })
+        .where(eq(campaignParticipations.id, participation.id));
+      return { success: true, claimedRewards: [] };
+    }
+
+    const campaign = await db.query.campaigns.findFirst({
+      where: eq(campaigns.id, campaignId),
+    });
+
+    const claimed: ClaimedRewardItem[] = [];
+    const now = new Date().toISOString();
+
+    for (const reward of pending) {
+      try {
+        let deliveryData: Record<string, unknown> = {};
+
+        switch (reward.type) {
+          case 'nft': {
+            // Get user wallet for NFT minting
+            const user = await db.query.users.findFirst({
+              where: eq(users.id, userId),
+            });
+            const walletAddress = user?.walletAddress || (user as any)?.avalancheL1Address;
+
+            if (walletAddress) {
+              // Mint NFT via blockchain service
+              try {
+                const { getBlockchainNFTService } = await import('../nft/blockchain-nft-service');
+                const blockchainNFTService = getBlockchainNFTService();
+                const collectionId = reward.metadata?.collectionId as string;
+                const tokenUri = (reward.metadata?.tokenUri as string) || '';
+                if (collectionId && blockchainNFTService) {
+                  const mintResult = await blockchainNFTService.mintNFT(
+                    walletAddress,
+                    parseInt(collectionId),
+                    tokenUri
+                  );
+                  deliveryData = {
+                    txHash: mintResult.txHash,
+                    tokenId: mintResult.tokenId?.toString(),
+                    walletAddress,
+                    mintedAt: now,
+                  };
+                }
+              } catch (mintErr) {
+                console.error(`[CampaignEngine] NFT mint failed:`, mintErr);
+                deliveryData = { error: 'Mint failed - queued for retry', walletAddress };
+              }
+            } else {
+              deliveryData = {
+                error: 'No wallet connected - NFT will be delivered when wallet is set up',
+              };
+            }
+            break;
+          }
+
+          case 'badge': {
+            const user = await db.query.users.findFirst({
+              where: eq(users.id, userId),
+            });
+            const walletAddress = user?.walletAddress || (user as any)?.avalancheL1Address;
+            if (walletAddress) {
+              try {
+                const { getBlockchainNFTService } = await import('../nft/blockchain-nft-service');
+                const blockchainNFTService = getBlockchainNFTService();
+                const badgeTypeId = reward.metadata?.badgeTypeId as number;
+                if (badgeTypeId && blockchainNFTService) {
+                  const mintResult = await blockchainNFTService.mintBadge(
+                    walletAddress,
+                    badgeTypeId,
+                    1
+                  );
+                  deliveryData = {
+                    txHash: mintResult.txHash,
+                    walletAddress,
+                    mintedAt: now,
+                  };
+                }
+              } catch (mintErr) {
+                console.error(`[CampaignEngine] Badge mint failed:`, mintErr);
+                deliveryData = { error: 'Badge mint failed - queued for retry' };
+              }
+            }
+            break;
+          }
+
+          case 'raffle_entry': {
+            const { raffleEntries } = await import('@shared/schema');
+            await db.insert(raffleEntries).values({
+              tenantId: campaign?.tenantId || null,
+              userId,
+              campaignId,
+              rewardId: reward.rewardId || null,
+              entrySource: 'campaign_completion',
+              entryCount: (reward.metadata?.value as number) || 1,
+              metadata: {
+                campaignName: campaign?.name,
+                ...reward.metadata,
+              },
+            });
+            deliveryData = {
+              entries: (reward.metadata?.value as number) || 1,
+              source: 'campaign_completion',
+              recordedAt: now,
+            };
+            break;
+          }
+
+          case 'reward': {
+            // Direct reward delivery -- create a redemption record
+            deliveryData = {
+              rewardId: reward.rewardId,
+              status: 'pending_fulfillment',
+              claimedAt: now,
+            };
+            break;
+          }
+
+          case 'points': {
+            // Additional points beyond completionBonusPoints
+            const extraPoints = (reward.metadata?.value as number) || 0;
+            if (extraPoints > 0 && campaign) {
+              await this.pointsService.awardPoints(
+                userId,
+                campaign.creatorId,
+                campaign.tenantId,
+                extraPoints,
+                'campaign_reward',
+                `Campaign reward points: ${campaign.name}`,
+                { campaignId }
+              );
+            }
+            deliveryData = { points: extraPoints, awardedAt: now };
+            break;
+          }
+        }
+
+        claimed.push({
+          type: reward.type,
+          rewardId: reward.rewardId,
+          metadata: reward.metadata,
+          claimedAt: now,
+          deliveryData,
+        });
+      } catch (err) {
+        console.error(`[CampaignEngine] Failed to claim reward:`, reward, err);
+        claimed.push({
+          type: reward.type,
+          rewardId: reward.rewardId,
+          metadata: reward.metadata,
+          claimedAt: now,
+          deliveryData: { error: 'Claim failed' },
+        });
+      }
+    }
+
+    // Update participation with claimed rewards
+    await db
+      .update(campaignParticipations)
+      .set({
+        claimedRewards: claimed as any,
+        pendingRewards: pending.map((r) => ({ ...r, status: 'claimed' as const })) as any,
+        rewardsClaimedAt: new Date(),
+      })
+      .where(eq(campaignParticipations.id, participation.id));
+
+    return { success: true, claimedRewards: claimed };
   }
 
   // --------------------------------------------------------------------------

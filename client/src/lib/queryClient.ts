@@ -1,4 +1,5 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { QueryClient, QueryFunction } from '@tanstack/react-query';
 
 // Store for JWT access token (in memory for security)
 let accessTokenStorage: string | null = null;
@@ -68,33 +69,96 @@ export function resetCsrfToken(): void {
  */
 export function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  
+
   // Use JWT access token if available
   const accessToken = getAccessToken();
   if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+    headers['Authorization'] = `Bearer ${accessToken}`;
   }
-  
+
   return headers;
+}
+
+/**
+ * Parse API error response and extract meaningful error message
+ */
+function parseApiError(
+  text: string,
+  status: number
+): { message: string; code?: string; details?: unknown } {
+  try {
+    const json = JSON.parse(text);
+    // Standardized API error format
+    if (json.error && json.code) {
+      return {
+        message: json.error,
+        code: json.code,
+        details: json.details,
+      };
+    }
+    // Legacy error format
+    if (json.error) {
+      return { message: json.error };
+    }
+    if (json.message) {
+      return { message: json.message };
+    }
+  } catch {
+    // Not valid JSON, return as-is
+  }
+  return { message: text || `Request failed with status ${status}` };
 }
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    
+    const errorInfo = parseApiError(text, res.status);
+
     // Check for token expiration
     if (res.status === 401) {
-      try {
-        const json = JSON.parse(text);
-        if (json.code === 'TOKEN_EXPIRED') {
-          // Trigger token refresh (handled by AuthContext)
-          window.dispatchEvent(new CustomEvent('auth:token-expired'));
-        }
-      } catch {}
+      if (errorInfo.code === 'TOKEN_EXPIRED') {
+        // Trigger token refresh (handled by AuthContext)
+        window.dispatchEvent(new CustomEvent('auth:token-expired'));
+      }
     }
-    
-    throw new Error(`${res.status}: ${text}`);
+
+    // Dispatch global API error event for toast notifications or error boundaries
+    window.dispatchEvent(
+      new CustomEvent('api-error', {
+        detail: {
+          message: errorInfo.message,
+          code: errorInfo.code,
+          status: res.status,
+          details: errorInfo.details,
+        },
+      })
+    );
+
+    // Create error with parsed message
+    const error = new Error(errorInfo.message);
+    (error as any).code = errorInfo.code;
+    (error as any).status = res.status;
+    (error as any).details = errorInfo.details;
+    throw error;
   }
+}
+
+/**
+ * Global API error handler utility
+ * Can be used to manually trigger error handling for caught errors
+ */
+export function handleApiError(error: unknown) {
+  const message = error instanceof Error ? error.message : 'An error occurred';
+  const code = (error as any)?.code;
+  const status = (error as any)?.status;
+  const details = (error as any)?.details;
+
+  // Dispatch custom event that error boundary or toast provider can listen to
+  window.dispatchEvent(
+    new CustomEvent('api-error', {
+      detail: { message, code, status, details },
+    })
+  );
 }
 
 /** Methods that mutate server state and need CSRF protection */
@@ -118,10 +182,10 @@ async function addCsrfHeader(headers: Record<string, string>, method: string): P
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown | undefined
 ): Promise<Response> {
-  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
-  
+  const headers: Record<string, string> = data ? { 'Content-Type': 'application/json' } : {};
+
   // Add auth + CSRF headers
   Object.assign(headers, getAuthHeaders());
   await addCsrfHeader(headers, method);
@@ -130,7 +194,7 @@ export async function apiRequest(
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: 'include',
   });
 
   // On CSRF rejection, fetch a fresh token and retry once
@@ -143,7 +207,7 @@ export async function apiRequest(
         method,
         headers,
         body: data ? JSON.stringify(data) : undefined,
-        credentials: "include",
+        credentials: 'include',
       });
     }
   }
@@ -163,9 +227,12 @@ export async function fetchApi<T = unknown>(
     body?: string;
   }
 ): Promise<T> {
-  const method = options?.method || "GET";
-  const headers: Record<string, string> = { "Content-Type": "application/json", ...options?.headers };
-  
+  const method = options?.method || 'GET';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options?.headers,
+  };
+
   // Add auth + CSRF headers
   Object.assign(headers, getAuthHeaders());
   await addCsrfHeader(headers, method);
@@ -174,7 +241,7 @@ export async function fetchApi<T = unknown>(
     method,
     headers,
     body: options?.body,
-    credentials: "include",
+    credentials: 'include',
   });
 
   // On CSRF rejection, fetch a fresh token and retry once
@@ -187,32 +254,30 @@ export async function fetchApi<T = unknown>(
         method,
         headers,
         body: options?.body,
-        credentials: "include",
+        credentials: 'include',
       });
     }
   }
 
   await throwIfResNotOk(res);
-  return await res.json() as T;
+  return (await res.json()) as T;
 }
 
-type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
+type UnauthorizedBehavior = 'returnNull' | 'throw';
+export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
-    
+
     // Add auth headers
     Object.assign(headers, getAuthHeaders());
 
-    const res = await fetch(queryKey.join("/") as string, {
+    const res = await fetch(queryKey.join('/') as string, {
       headers,
-      credentials: "include",
+      credentials: 'include',
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+    if (unauthorizedBehavior === 'returnNull' && res.status === 401) {
       return null;
     }
 
@@ -223,10 +288,22 @@ export const getQueryFn: <T>(options: {
 // Default stale time of 5 minutes for queries
 const DEFAULT_STALE_TIME = 5 * 60 * 1000;
 
+/**
+ * React Query Client with standardized error handling
+ *
+ * API errors are automatically dispatched as 'api-error' events.
+ * Listen to these events in your toast provider or error boundary:
+ *
+ * @example
+ * window.addEventListener('api-error', (e: CustomEvent) => {
+ *   const { message, code, status } = e.detail;
+ *   toast.error(message);
+ * });
+ */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: 'throw' }),
       refetchInterval: false,
       refetchOnWindowFocus: true,
       staleTime: DEFAULT_STALE_TIME,

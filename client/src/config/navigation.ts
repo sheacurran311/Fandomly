@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   BarChart3,
   Users,
@@ -21,6 +22,7 @@ import {
   Plus,
   Image,
   Coins,
+  Store,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -171,6 +173,12 @@ export const fanNavItems: NavigationItem[] = [
     icon: Gift,
     color: 'text-emerald-400',
     submenu: [
+      {
+        label: 'Rewards Store',
+        href: '/fan-dashboard/rewards-store',
+        icon: Store,
+        color: 'text-brand-primary',
+      },
       {
         label: 'Achievements',
         href: '/fan-dashboard/achievements',

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useAuth } from '@/hooks/use-auth';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import AchievementBadge from '@/components/achievements/achievement-badge';
@@ -439,12 +440,15 @@ export default function FanAchievements() {
                 {achievements.map((achievement: Achievement) => (
                   <AchievementBadge
                     key={achievement.id}
-                    achievement={achievement}
-                    userAchievement={{
-                      progress: achievement.progress || 0,
-                      completed: achievement.isUnlocked || false,
-                      claimed: achievement.isClaimed || false,
-                    }}
+                    achievement={achievement as any}
+                    userAchievement={
+                      {
+                        progress: achievement.progress || 0,
+                        completed: achievement.isUnlocked || false,
+                        claimed: achievement.isClaimed || false,
+                        achievementId: achievement.id,
+                      } as any
+                    }
                     onClaim={() => console.log('Claiming achievement:', achievement.id)}
                   />
                 ))}
@@ -468,12 +472,15 @@ export default function FanAchievements() {
                 {completedAchievements.map((achievement: Achievement) => (
                   <AchievementBadge
                     key={achievement.id}
-                    achievement={achievement}
-                    userAchievement={{
-                      progress: achievement.progress || 0,
-                      completed: true,
-                      claimed: achievement.isClaimed || false,
-                    }}
+                    achievement={achievement as any}
+                    userAchievement={
+                      {
+                        progress: achievement.progress || 0,
+                        completed: true,
+                        claimed: achievement.isClaimed || false,
+                        achievementId: achievement.id,
+                      } as any
+                    }
                     onClaim={() => console.log('Claiming achievement:', achievement.id)}
                   />
                 ))}
@@ -499,12 +506,15 @@ export default function FanAchievements() {
                 {inProgressAchievements.map((achievement: Achievement) => (
                   <AchievementBadge
                     key={achievement.id}
-                    achievement={achievement}
-                    userAchievement={{
-                      progress: achievement.progress || 0,
-                      completed: false,
-                      claimed: false,
-                    }}
+                    achievement={achievement as any}
+                    userAchievement={
+                      {
+                        progress: achievement.progress || 0,
+                        completed: false,
+                        claimed: false,
+                        achievementId: achievement.id,
+                      } as any
+                    }
                     onClaim={() => console.log('Claiming achievement:', achievement.id)}
                   />
                 ))}
@@ -528,12 +538,15 @@ export default function FanAchievements() {
                 {availableAchievements.map((achievement: Achievement) => (
                   <AchievementBadge
                     key={achievement.id}
-                    achievement={achievement}
-                    userAchievement={{
-                      progress: 0,
-                      completed: false,
-                      claimed: false,
-                    }}
+                    achievement={achievement as any}
+                    userAchievement={
+                      {
+                        progress: 0,
+                        completed: false,
+                        claimed: false,
+                        achievementId: achievement.id,
+                      } as any
+                    }
                     showProgress={false}
                   />
                 ))}

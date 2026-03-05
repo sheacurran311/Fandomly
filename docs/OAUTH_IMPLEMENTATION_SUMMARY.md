@@ -3,9 +3,11 @@
 ## ✅ Completed Changes
 
 ### 1. Created YouTube Auth Service
+
 **File:** `server/services/auth/youtube-auth.ts`
 
 New dedicated service for YouTube OAuth with:
+
 - `exchangeYouTubeCode()` - Token exchange using GOOGLE_YOUTUBE_CLIENT_ID
 - `refreshYouTubeTokens()` - Token refresh using GOOGLE_YOUTUBE_CLIENT_ID
 - `getYouTubeAuthUrl()` - Generate OAuth URL with YouTube scopes
@@ -14,6 +16,7 @@ New dedicated service for YouTube OAuth with:
 **Scopes:** `youtube.readonly`, `openid`, `email`, `profile`
 
 ### 2. Updated Social Routes
+
 **File:** `server/routes/social/social-routes.ts`
 
 - `exchangeYouTubeToken()` now imports and uses `exchangeYouTubeCode()` from youtube-auth service
@@ -21,6 +24,7 @@ New dedicated service for YouTube OAuth with:
 - Endpoints remain the same (backward compatible)
 
 ### 3. Updated Frontend YouTube Integration
+
 **File:** `client/src/lib/social-integrations.ts`
 
 - Changed to use `VITE_GOOGLE_YOUTUBE_CLIENT_ID` instead of `VITE_GOOGLE_CLIENT_ID`
@@ -28,9 +32,11 @@ New dedicated service for YouTube OAuth with:
 - New scopes: `youtube.readonly openid email profile`
 
 ### 4. Created Documentation
+
 **File:** `server/services/auth/README.md`
 
 Comprehensive guide covering:
+
 - OAuth configuration for both clients
 - Environment variables
 - User flows
@@ -43,6 +49,7 @@ Comprehensive guide covering:
 ## 🔧 Required Environment Variables
 
 ### Backend (.env)
+
 You need to add these NEW environment variables:
 
 ```bash
@@ -56,6 +63,7 @@ GOOGLE_CLIENT_SECRET=your-basic-auth-client-secret
 ```
 
 ### Frontend (.env)
+
 You need to add this NEW environment variable:
 
 ```bash
@@ -74,12 +82,14 @@ VITE_YOUTUBE_REDIRECT_URI=https://fandomly.ai/youtube-callback
 ## 🎯 Google Cloud Console Configuration
 
 ### Basic Auth Client (Already Configured)
+
 - Client ID → `GOOGLE_CLIENT_ID`
 - Client Secret → `GOOGLE_CLIENT_SECRET`
 - Callback URL: `https://fandomly.ai/google-callback`
 - Scopes: `openid`, `email`, `profile`
 
 ### YouTube OAuth Client (Already Created)
+
 - Client ID → `GOOGLE_YOUTUBE_CLIENT_ID` & `VITE_GOOGLE_YOUTUBE_CLIENT_ID`
 - Client Secret → `GOOGLE_YOUTUBE_CLIENT_SECRET`
 - Callback URL: `https://fandomly.ai/youtube-callback`
@@ -92,8 +102,9 @@ VITE_YOUTUBE_REDIRECT_URI=https://fandomly.ai/youtube-callback
 ## 🔄 How It Works Now
 
 ### Basic Sign-In Flow (All Users)
+
 ```
-User → "Sign in with Google" 
+User → "Sign in with Google"
      → Google OAuth (GOOGLE_CLIENT_ID)
      → Consent: email, profile only
      → /google-callback
@@ -101,6 +112,7 @@ User → "Sign in with Google"
 ```
 
 ### YouTube Connection Flow (Creators Only)
+
 ```
 Creator (already signed in) → "Connect YouTube"
      → Google OAuth (GOOGLE_YOUTUBE_CLIENT_ID)
@@ -115,6 +127,7 @@ Creator (already signed in) → "Connect YouTube"
 ## ✅ Testing Checklist
 
 ### Backend Testing
+
 - [ ] Set `GOOGLE_YOUTUBE_CLIENT_ID` and `GOOGLE_YOUTUBE_CLIENT_SECRET` in `.env`
 - [ ] Restart server
 - [ ] Check logs: No "YouTube OAuth credentials not configured" errors
@@ -122,6 +135,7 @@ Creator (already signed in) → "Connect YouTube"
 - [ ] Test YouTube token refresh: POST to `/api/social/youtube/refresh`
 
 ### Frontend Testing
+
 - [ ] Set `VITE_GOOGLE_YOUTUBE_CLIENT_ID` in `.env`
 - [ ] Rebuild frontend (if needed)
 - [ ] Test YouTube connection flow:
@@ -131,6 +145,7 @@ Creator (already signed in) → "Connect YouTube"
   - Connection succeeds
 
 ### Scope Verification
+
 - [ ] Basic sign-in shows ONLY: email, profile permissions
 - [ ] YouTube connect shows: email, profile, "View your YouTube account"
 - [ ] Fans never see YouTube permissions
@@ -141,21 +156,26 @@ Creator (already signed in) → "Connect YouTube"
 ## 🚨 Important Notes
 
 ### Backward Compatibility
+
 - ✅ Existing routes unchanged
 - ✅ Existing tokens continue working
 - ✅ No database migrations needed
 - ✅ Users don't need to re-authenticate immediately
 
 ### When Tokens Expire
+
 When existing YouTube tokens expire, users will need to re-authenticate using the new YouTube OAuth client. This is expected and will happen automatically the first time they try to use a YouTube feature after token expiry.
 
 ### Scope Changes
+
 Removed `youtube.channel-memberships.creator` scope because:
+
 - Not used in current codebase
 - No API calls require it
 - Reduces requested permissions
 
 If you need membership features in the future:
+
 1. Add the scope back to `youtube-auth.ts` line 143
 2. Update `social-integrations.ts` line 365
 3. Re-submit for Google verification (it's a sensitive scope)
@@ -176,17 +196,20 @@ If you need membership features in the future:
 ## 🐛 Troubleshooting
 
 ### "YouTube OAuth credentials not configured"
+
 - Check `GOOGLE_YOUTUBE_CLIENT_ID` and `GOOGLE_YOUTUBE_CLIENT_SECRET` are set
 - Restart the server
 - Verify no typos in variable names
 
 ### "redirect_uri_mismatch"
+
 - Verify callback URLs in Google Cloud Console exactly match:
   - Basic Auth: `https://fandomly.ai/google-callback`
   - YouTube: `https://fandomly.ai/youtube-callback`
 - Case-sensitive, must include https://, no trailing slash
 
 ### YouTube API 403 Errors
+
 - Check YouTube Data API v3 is enabled in Google Cloud Console
 - Verify tokens aren't expired
 - Confirm `youtube.readonly` scope is in consent screen
@@ -196,6 +219,7 @@ If you need membership features in the future:
 ## 📚 Documentation
 
 Full documentation available in:
+
 - **OAuth Guide:** `server/services/auth/README.md`
 - **YouTube Auth Service:** `server/services/auth/youtube-auth.ts`
 - **Basic Auth Service:** `server/services/auth/google-auth.ts`

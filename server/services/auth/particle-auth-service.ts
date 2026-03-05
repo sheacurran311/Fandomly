@@ -113,9 +113,8 @@ export async function handleParticleCallback(
   particleUuid: string,
   userEmail?: string | null,
   userName?: string | null,
-  userAvatar?: string | null,
+  userAvatar?: string | null
 ): Promise<ParticleAuthResult> {
-
   // 1. Validate wallet address format
   if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     return { success: false, error: 'Invalid wallet address format' };

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Request } from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { doubleCsrf } from 'csrf-csrf';
@@ -28,7 +28,12 @@ app.use(
           'https://www.googletagmanager.com',
           'https://replit.com', // For Replit dev banner
         ],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://fonts.googleapis.com'],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://accounts.google.com',
+          'https://fonts.googleapis.com',
+        ],
         imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         connectSrc: ["'self'", 'https:', 'wss:'],
@@ -68,7 +73,7 @@ const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   },
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-  getTokenFromRequest: (req) => req.headers['x-csrf-token'] as string,
+  getCsrfTokenFromRequest: (req: Request) => req.headers['x-csrf-token'] as string,
 });
 
 // Expose CSRF token endpoint for frontend

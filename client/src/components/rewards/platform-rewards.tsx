@@ -1,22 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchApi } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Coins, 
-  Gift, 
-  Star, 
-  Clock, 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useQuery } from '@tanstack/react-query';
+import { fetchApi } from '@/lib/queryClient';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Coins,
+  Gift,
+  Star,
+  Clock,
   TrendingUp,
   Sparkles,
   Twitter,
   Instagram,
   Facebook,
-  Youtube
-} from "lucide-react";
-import { FaDiscord, FaTwitch, FaSpotify, FaTiktok } from "react-icons/fa";
+  Youtube,
+} from 'lucide-react';
+import { FaDiscord, FaTwitch, FaSpotify, FaTiktok } from 'react-icons/fa';
 
 interface PointTransaction {
   id: string;
@@ -29,30 +29,70 @@ interface PointTransaction {
 // Helper to get icon and color for each source
 const getSourceInfo = (source: string, metadata?: Record<string, any>) => {
   const platform = metadata?.platform || source;
-  
+
   switch (platform) {
     case 'twitter':
       return { icon: Twitter, color: 'text-blue-400', bgColor: 'bg-blue-400/20', label: 'Twitter' };
     case 'instagram':
-      return { icon: Instagram, color: 'text-pink-400', bgColor: 'bg-pink-400/20', label: 'Instagram' };
+      return {
+        icon: Instagram,
+        color: 'text-pink-400',
+        bgColor: 'bg-pink-400/20',
+        label: 'Instagram',
+      };
     case 'discord':
-      return { icon: FaDiscord, color: 'text-purple-400', bgColor: 'bg-purple-400/20', label: 'Discord' };
+      return {
+        icon: FaDiscord,
+        color: 'text-purple-400',
+        bgColor: 'bg-purple-400/20',
+        label: 'Discord',
+      };
     case 'facebook':
-      return { icon: Facebook, color: 'text-blue-500', bgColor: 'bg-blue-500/20', label: 'Facebook' };
+      return {
+        icon: Facebook,
+        color: 'text-blue-500',
+        bgColor: 'bg-blue-500/20',
+        label: 'Facebook',
+      };
     case 'youtube':
       return { icon: Youtube, color: 'text-red-400', bgColor: 'bg-red-400/20', label: 'YouTube' };
     case 'spotify':
-      return { icon: FaSpotify, color: 'text-green-400', bgColor: 'bg-green-400/20', label: 'Spotify' };
+      return {
+        icon: FaSpotify,
+        color: 'text-green-400',
+        bgColor: 'bg-green-400/20',
+        label: 'Spotify',
+      };
     case 'twitch':
-      return { icon: FaTwitch, color: 'text-purple-500', bgColor: 'bg-purple-500/20', label: 'Twitch' };
+      return {
+        icon: FaTwitch,
+        color: 'text-purple-500',
+        bgColor: 'bg-purple-500/20',
+        label: 'Twitch',
+      };
     case 'tiktok':
       return { icon: FaTiktok, color: 'text-white', bgColor: 'bg-gray-700', label: 'TikTok' };
     case 'platform_task_completion':
-      return { icon: Star, color: 'text-yellow-400', bgColor: 'bg-yellow-400/20', label: 'Platform Task' };
+      return {
+        icon: Star,
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-400/20',
+        label: 'Platform Task',
+      };
     case 'social_connection_reward':
-      return { icon: Sparkles, color: 'text-green-400', bgColor: 'bg-green-400/20', label: 'Social Connection' };
+      return {
+        icon: Sparkles,
+        color: 'text-green-400',
+        bgColor: 'bg-green-400/20',
+        label: 'Social Connection',
+      };
     default:
-      return { icon: Coins, color: 'text-brand-primary', bgColor: 'bg-brand-primary/20', label: 'Platform Points' };
+      return {
+        icon: Coins,
+        color: 'text-brand-primary',
+        bgColor: 'bg-brand-primary/20',
+        label: 'Platform Points',
+      };
   }
 };
 
@@ -63,7 +103,7 @@ const formatDate = (dateString: string) => {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
@@ -90,8 +130,8 @@ export default function PlatformRewards() {
     },
   });
 
-  const balance = balanceData?.balance || 0;
-  const transactions: PointTransaction[] = transactionsData?.transactions || [];
+  const balance = (balanceData as any)?.balance || 0;
+  const transactions: PointTransaction[] = (transactionsData as any)?.transactions || [];
 
   return (
     <div className="space-y-6">
@@ -144,7 +184,7 @@ export default function PlatformRewards() {
                 Connect Twitter, Instagram, Discord, and more to earn points instantly.
               </p>
             </div>
-            
+
             <div className="p-4 rounded-lg bg-white/5 border border-white/10">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
@@ -169,18 +209,20 @@ export default function PlatformRewards() {
           <CardTitle className="text-white flex items-center gap-2">
             <Gift className="h-5 w-5 text-pink-400" />
             Platform Rewards
-            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 ml-2">Coming Soon</Badge>
+            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 ml-2">
+              Coming Soon
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Alert className="border-brand-primary/30 bg-brand-primary/10">
             <Sparkles className="h-4 w-4 text-brand-primary" />
             <AlertDescription className="text-gray-300">
-              Soon you'll be able to redeem your platform points for exclusive rewards, 
+              Soon you&apos;ll be able to redeem your platform points for exclusive rewards,
               discounts, and special perks. Stay tuned!
             </AlertDescription>
           </Alert>
-          
+
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 opacity-50">
             <div className="p-4 rounded-lg bg-white/5 border border-white/10 text-center">
               <Gift className="h-8 w-8 text-pink-400 mx-auto mb-2" />
@@ -216,7 +258,9 @@ export default function PlatformRewards() {
             <div className="text-center py-8">
               <Coins className="h-12 w-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400">No points activity yet</p>
-              <p className="text-sm text-gray-500 mt-1">Connect your social accounts to start earning!</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Connect your social accounts to start earning!
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -224,12 +268,14 @@ export default function PlatformRewards() {
                 const sourceInfo = getSourceInfo(tx.source, tx.metadata);
                 const Icon = sourceInfo.icon;
                 return (
-                  <div 
-                    key={tx.id || index} 
+                  <div
+                    key={tx.id || index}
                     className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full ${sourceInfo.bgColor} flex items-center justify-center`}>
+                      <div
+                        className={`w-10 h-10 rounded-full ${sourceInfo.bgColor} flex items-center justify-center`}
+                      >
                         <Icon className={`h-5 w-5 ${sourceInfo.color}`} />
                       </div>
                       <div>
@@ -252,4 +298,3 @@ export default function PlatformRewards() {
     </div>
   );
 }
-

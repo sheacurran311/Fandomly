@@ -12,10 +12,9 @@
 import { getReputationOracle } from '../services/reputation/reputation-oracle-service';
 
 class ReputationSyncJob {
-  private intervalId: NodeJS.Timer | null = null;
+  private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
 
-  // Run every hour (matches the batch cadence described in the architecture)
   private readonly RUN_INTERVAL_MS = 60 * 60 * 1000;
 
   start() {
@@ -66,10 +65,8 @@ class ReputationSyncJob {
         return;
       }
 
-      // Step 1: Run full batch sync (recalculate + push on-chain)
       const result = await oracle.runBatchSync();
 
-      // Step 2: Process any threshold crossings that happened during recalculation
       const thresholdsSynced = await oracle.processPendingThresholds();
 
       const duration = Date.now() - startTime;

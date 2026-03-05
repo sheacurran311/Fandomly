@@ -1,6 +1,7 @@
-import { createRoot } from "react-dom/client";
-import App from "./App";
-import "./index.css";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './index.css';
 
 // Patch any existing window.ethereum to be EIP-1193 compliant.
 // Some environments (Replit preview, partial browser extensions) expose a
@@ -20,10 +21,12 @@ import "./index.css";
 // is injected after load and is non-configurable (e.g. Replit preview).
 // Social logins, WalletConnect, and Coinbase Wallet are unaffected.
 window.addEventListener('unhandledrejection', (event) => {
-  if (typeof event.reason?.message === 'string' &&
-      event.reason.message.includes('provider.on is not a function')) {
+  if (
+    typeof event.reason?.message === 'string' &&
+    event.reason.message.includes('provider.on is not a function')
+  ) {
     event.preventDefault();
   }
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById('root')!).render(<App />);

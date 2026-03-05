@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createConfig } from '@particle-network/connectkit';
 import { authWalletConnectors } from '@particle-network/connectkit/auth';
 import { evmWalletConnectors } from '@particle-network/connectkit/evm';
@@ -44,7 +45,7 @@ export function createParticleConfig() {
   if (!projectId || !clientKey || !appId) {
     throw new Error(
       'Particle Network credentials not configured. ' +
-      'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID.'
+        'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID.'
     );
   }
 
@@ -68,9 +69,10 @@ export function createParticleConfig() {
       // all visual customization must be done here via `appearance.logo` and
       // `appearance.theme`. See:
       // https://developers.particle.network/social-logins/configuration/appearance/auth.md
-      logo: typeof window !== 'undefined'
-        ? `${window.location.origin}/fandomly-logo.png`
-        : 'https://fandomly.io/fandomly-logo.png',
+      logo:
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/fandomly-logo.png`
+          : 'https://fandomly.io/fandomly-logo.png',
 
       // Fandomly brand theme for the ConnectKit modal.
       // Brand colors: #e10698 (primary pink), #14feee (secondary cyan), #0a0118 (dark bg)

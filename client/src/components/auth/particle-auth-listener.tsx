@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Particle Auth Listener
  *
@@ -18,7 +19,12 @@ import { useEffect, useRef, useCallback, startTransition } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
-import { useAccount, useDisconnect, useParticleAuth, useWallets } from '@particle-network/connectkit';
+import {
+  useAccount,
+  useDisconnect,
+  useParticleAuth,
+  useWallets,
+} from '@particle-network/connectkit';
 import { useToast } from '@/hooks/use-toast';
 
 /**
@@ -55,11 +61,14 @@ function ParticleAuthListenerInner() {
           sessionStorage.removeItem(key);
         }
       }
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only bridge for Particle social logins — not for external wallets (MetaMask, WalletConnect, etc.)
-  const isParticleSocialLogin = connector?.walletConnectorType === 'particleAuth' ||
+  const isParticleSocialLogin =
+    connector?.walletConnectorType === 'particleAuth' ||
     primaryWallet?.connector?.walletConnectorType === 'particleAuth';
 
   const bridgeAuth = useCallback(async () => {
@@ -98,7 +107,9 @@ function ParticleAuthListenerInner() {
       }
 
       if (!userInfo?.token) {
-        console.warn('[Particle Auth Listener] No token after polling — wallet may not be a social login');
+        console.warn(
+          '[Particle Auth Listener] No token after polling — wallet may not be a social login'
+        );
         return;
       }
 
@@ -107,8 +118,17 @@ function ParticleAuthListenerInner() {
       const email = userInfo.email ?? null;
       const name = userInfo.name ?? null;
       const avatar = userInfo.avatar ?? null;
+      // eslint-disable-next-line no-console
       console.info('[Particle Auth Listener] userInfo keys:', Object.keys(userInfo));
-      console.info('[Particle Auth Listener] uuid:', uuid, '| token length:', token?.length, '| token prefix:', token?.slice?.(0, 30));
+      // eslint-disable-next-line no-console
+      console.info(
+        '[Particle Auth Listener] uuid:',
+        uuid,
+        '| token length:',
+        token?.length,
+        '| token prefix:',
+        token?.slice?.(0, 30)
+      );
 
       const result = await loginWithParticle(token, address, uuid, email, name, avatar);
       if (!result.success) {
@@ -119,7 +139,11 @@ function ParticleAuthListenerInner() {
           variant: 'destructive',
         });
         // Clear bridge lock so user can retry
-        try { sessionStorage.removeItem(`particle_bridge_${address}`); } catch { /* noop */ }
+        try {
+          sessionStorage.removeItem(`particle_bridge_${address}`);
+        } catch {
+          /* noop */
+        }
         disconnect();
         return;
       }
@@ -132,7 +156,11 @@ function ParticleAuthListenerInner() {
 
       if (isNewUser) {
         // Clear any stale redirect — new users must choose their type first
-        try { sessionStorage.removeItem('postAuthRedirect'); } catch { /* noop */ }
+        try {
+          sessionStorage.removeItem('postAuthRedirect');
+        } catch {
+          /* noop */
+        }
         setLocation('/user-type-selection');
         return;
       }
@@ -145,14 +173,17 @@ function ParticleAuthListenerInner() {
           setLocation(postAuthRedirect);
           return;
         }
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
 
       // Default: send to their dashboard
       if (user?.userType === 'creator') {
         setLocation('/creator-dashboard');
       } else if (user?.userType === 'fan') {
         if (!user?.onboardingState?.isCompleted) {
-          const resumeRoute = user?.onboardingState?.lastOnboardingRoute || '/fan-onboarding/profile';
+          const resumeRoute =
+            user?.onboardingState?.lastOnboardingRoute || '/fan-onboarding/profile';
           setLocation(resumeRoute);
         } else {
           setLocation('/fan-dashboard');
@@ -163,18 +194,30 @@ function ParticleAuthListenerInner() {
     } catch (error) {
       console.warn('[Particle Auth Listener] Bridge error (clearing stale session):', error);
       toast({
-          title: 'Sign-in error',
-          description: 'An unexpected error occurred during sign-in. Please try again.',
-          variant: 'destructive',
-        });
-        // Clear bridge lock so the user can retry
-        try { sessionStorage.removeItem(`particle_bridge_${address}`); } catch { /* noop */ }
-        disconnect();
+        title: 'Sign-in error',
+        description: 'An unexpected error occurred during sign-in. Please try again.',
+        variant: 'destructive',
+      });
+      // Clear bridge lock so the user can retry
+      try {
+        sessionStorage.removeItem(`particle_bridge_${address}`);
+      } catch {
+        /* noop */
+      }
+      disconnect();
     } finally {
       bridgingRef.current = false;
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }, [isConnected, address, isFandomlyAuthed, getUserInfo, loginWithParticle, disconnect, setLocation, toast]);
+  }, [
+    isConnected,
+    address,
+    isFandomlyAuthed,
+    getUserInfo,
+    loginWithParticle,
+    disconnect,
+    setLocation,
+    toast,
+  ]);
 
   // Bridge when Particle social login connects and Fandomly is not yet authenticated
   useEffect(() => {
@@ -192,7 +235,11 @@ function ParticleAuthListenerInner() {
       logoutInProgressRef.current = true;
       // Clear any bridge lock so the next login attempt can proceed
       if (address) {
-        try { sessionStorage.removeItem(`particle_bridge_${address}`); } catch { /* noop */ }
+        try {
+          sessionStorage.removeItem(`particle_bridge_${address}`);
+        } catch {
+          /* noop */
+        }
       }
       Promise.resolve(fandomlyLogout()).finally(() => {
         logoutInProgressRef.current = false;

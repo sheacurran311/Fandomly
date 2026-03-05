@@ -30,8 +30,19 @@ interface ContentCreatorDetails {
 }
 
 const CONTENT_TYPES = [
-  'Creative Video', 'Podcast', 'Influencer', 'Gaming', 'Educational', 'Comedy',
-  'Lifestyle', 'Fashion', 'Beauty', 'Fitness', 'Food', 'Travel', 'Technology',
+  'Creative Video',
+  'Podcast',
+  'Influencer',
+  'Gaming',
+  'Educational',
+  'Comedy',
+  'Lifestyle',
+  'Fashion',
+  'Beauty',
+  'Fitness',
+  'Food',
+  'Travel',
+  'Technology',
 ];
 
 interface ProgramCreatorDetailsProps {
@@ -280,18 +291,27 @@ export function ProgramCreatorDetails({
             <p className="text-xs text-gray-400">What type of content do you create?</p>
             <div className="flex flex-wrap gap-2">
               {CONTENT_TYPES.map((type) => {
-                const selected = Array.isArray((creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType)
-                  ? (creatorDetails?.contentCreator as ContentCreatorDetails).contentType!.includes(type)
+                const selected = Array.isArray(
+                  (creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType
+                )
+                  ? (creatorDetails?.contentCreator as ContentCreatorDetails).contentType!.includes(
+                      type
+                    )
                   : false;
                 return (
                   <button
                     key={type}
                     type="button"
                     onClick={() => {
-                      const current = Array.isArray((creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType)
-                        ? (creatorDetails?.contentCreator as ContentCreatorDetails).contentType ?? []
+                      const current = Array.isArray(
+                        (creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType
+                      )
+                        ? ((creatorDetails?.contentCreator as ContentCreatorDetails).contentType ??
+                          [])
                         : [];
-                      const next = selected ? current.filter((t) => t !== type) : [...current, type];
+                      const next = selected
+                        ? current.filter((t) => t !== type)
+                        : [...current, type];
                       onCreatorDetailsChange({
                         ...creatorDetails,
                         contentCreator: {
@@ -315,7 +335,9 @@ export function ProgramCreatorDetails({
           <div className="space-y-2">
             <Label className="text-white">Bio / Description / About Me</Label>
             <Textarea
-              value={String((creatorDetails?.contentCreator as ContentCreatorDetails)?.aboutMe ?? '')}
+              value={String(
+                (creatorDetails?.contentCreator as ContentCreatorDetails)?.aboutMe ?? ''
+              )}
               onChange={(e) =>
                 onCreatorDetailsChange({
                   ...creatorDetails,
@@ -372,9 +394,7 @@ export function ProgramCreatorDetails({
           </div>
           <div className="space-y-2">
             <Label className="text-white">Main Content Platforms</Label>
-            <p className="text-xs text-gray-400">
-              Auto-selected from your connected integrations
-            </p>
+            <p className="text-xs text-gray-400">Auto-selected from your connected integrations</p>
             <div className="flex flex-wrap gap-2">
               {connectedPlatformIds.length > 0 ? (
                 connectedPlatformIds.map((platformId) => (

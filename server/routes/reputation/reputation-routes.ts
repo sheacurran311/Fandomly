@@ -18,7 +18,7 @@ import {
 } from '../../services/reputation/reputation-score-calculator';
 import { db } from '../../db';
 import { eq, desc, sql } from 'drizzle-orm';
-import { reputationScores, reputationSyncLog, creators } from '@shared/schema';
+import { reputationScores, reputationSyncLog, creators, users } from '@shared/schema';
 import { REPUTATION_THRESHOLDS } from '@shared/blockchain-config';
 
 /**
@@ -242,6 +242,7 @@ export function registerReputationRoutes(app: Express) {
   /**
    * POST /api/admin/reputation/sync
    * Trigger a manual batch sync (admin only).
+   * Alias for /api/admin/reputation/sync-batch for backwards compatibility.
    */
   app.post(
     '/api/admin/reputation/sync',
@@ -265,6 +266,108 @@ export function registerReputationRoutes(app: Express) {
       } catch (error) {
         console.error('[ReputationRoutes] Sync error:', error);
         return res.status(500).json({ error: 'Batch sync failed' });
+      }
+    }
+  );
+
+  /**
+   * POST /api/reputation/sync-batch
+   * Admin-only endpoint to trigger a batch sync of all user scores to the blockchain.
+   * This endpoint:
+   * 1. Queries all users with wallet addresses
+   * 2. Calculates their reputation scores based on activity
+   * 3. Calls the ReputationRegistry contract's batchUpdateScores function
+   * 4. Logs the sync results
+   */
+  app.post(
+    '/api/reputation/sync-batch',
+    authenticateUser,
+    requireFandomlyAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const oracle = getReputationOracle();
+        if (!oracle) {
+          return res.status(503).json({ error: 'Reputation oracle not configured' });
+        }
+
+        console.log('[ReputationRoutes] Starting batch sync of all user scores...');
+        const result = await oracle.runBatchSync();
+
+        console.log(
+          `[ReputationRoutes] Batch sync completed: ${result.usersUpdated}/${result.usersProcessed} users synced, ${result.usersFailed} failed`
+        );
+
+        return res.json({
+          success: true,
+          usersProcessed: result.usersProcessed,
+          usersUpdated: result.usersUpdated,
+          usersFailed: result.usersFailed,
+          txHashes: result.txHashes,
+        });
+      } catch (error) {
+        console.error('[ReputationRoutes] Batch sync error:', error);
+        return res.status(500).json({ error: 'Batch sync failed' });
+      }
+    }
+  );
+
+  /**
+   * POST /api/reputation/sync/:userId
+   * Sync a specific user's score to chain.
+   * Recalculates the user's score and immediately pushes it to the blockchain.
+   */
+  app.post(
+    '/api/reputation/sync/:userId',
+    authenticateUser,
+    requireFandomlyAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { userId } = req.params;
+        const oracle = getReputationOracle();
+        if (!oracle) {
+          return res.status(503).json({ error: 'Reputation oracle not configured' });
+        }
+
+        console.log(`[ReputationRoutes] Syncing score for user ${userId}...`);
+
+        // Recalculate the user's score
+        const { score, breakdown } = await oracle.recalculateUser(userId);
+
+        // Get user's wallet address
+        const userRecord = await db.query.users.findFirst({
+          where: eq(users.id, userId),
+        });
+
+        if (!userRecord?.walletAddress) {
+          return res.status(400).json({
+            error: 'User does not have a wallet address',
+            userId,
+            score,
+          });
+        }
+
+        // Push to blockchain
+        const txHash = await oracle.pushSingleScore(
+          userRecord.walletAddress,
+          score,
+          `manual_sync_${userId}`
+        );
+
+        console.log(
+          `[ReputationRoutes] User ${userId} score synced to chain: ${score} (tx: ${txHash})`
+        );
+
+        return res.json({
+          success: true,
+          userId,
+          score,
+          breakdown,
+          txHash,
+          walletAddress: userRecord.walletAddress,
+        });
+      } catch (error) {
+        console.error('[ReputationRoutes] Single user sync error:', error);
+        return res.status(500).json({ error: 'Failed to sync user score' });
       }
     }
   );

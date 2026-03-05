@@ -44,8 +44,9 @@ export class PlatformPointsService {
         throw new Error('User not found');
       }
 
-      // Calculate new balance
-      const currentPoints = (user.profileData as Record<string, unknown>)?.fandomlyPoints || 0;
+      const currentPoints = Number(
+        (user.profileData as Record<string, unknown>)?.fandomlyPoints ?? 0
+      );
       const newBalance = currentPoints + points;
 
       // Create transaction record
@@ -57,9 +58,8 @@ export class PlatformPointsService {
         createdAt: new Date().toISOString(),
       };
 
-      // Get existing transactions (keep last 100 for MVP)
-      const existingTransactions =
-        (user.profileData as Record<string, unknown>)?.pointsTransactions || [];
+      const existingTransactions = ((user.profileData as Record<string, unknown>)
+        ?.pointsTransactions ?? []) as unknown[];
       const updatedTransactions = [transaction, ...existingTransactions].slice(0, 100);
 
       // Update user's platform points balance and transactions in profile_data (legacy)
@@ -121,7 +121,7 @@ export class PlatformPointsService {
         return 0;
       }
 
-      const points = (user.profileData as Record<string, unknown>)?.fandomlyPoints || 0;
+      const points = Number((user.profileData as Record<string, unknown>)?.fandomlyPoints ?? 0);
       return points;
     } catch (error) {
       console.error('[Platform Points] Error getting balance:', error);
@@ -250,7 +250,7 @@ export class PlatformPointsService {
       return topUsers.map((user) => ({
         userId: user.userId,
         username: user.username,
-        points: (user.profileData as Record<string, unknown>)?.fandomlyPoints || 0,
+        points: Number((user.profileData as Record<string, unknown>)?.fandomlyPoints ?? 0),
       }));
     } catch (error) {
       console.error('[Platform Points] Error getting leaderboard:', error);

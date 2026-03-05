@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
@@ -142,18 +143,23 @@ export default function CreatorTypeSelection() {
   }, [currentStep]);
 
   // Sync username from user when it loads
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (user?.username && !state.username) {
       setState((prev) => ({ ...prev, username: user.username }));
     }
   }, [user?.username, state.username]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Set smart defaults when creator type changes
   const selectCreatorType = useCallback(
     (type: CreatorType) => {
       const template = CREATOR_TEMPLATES[type];
       const displayName =
-        (user?.profileData as Record<string, string>)?.name || user?.username || state.username || 'Creator';
+        (user?.profileData as Record<string, string>)?.name ||
+        user?.username ||
+        state.username ||
+        'Creator';
       setState((prev) => ({
         ...prev,
         creatorType: type,
@@ -434,25 +440,20 @@ export default function CreatorTypeSelection() {
               <div className="space-y-6">
                 {/* Username */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Username
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
                   <Input
                     value={state.username}
-                    onChange={(e) =>
-                      setState((s) => ({ ...s, username: e.target.value }))
-                    }
+                    onChange={(e) => setState((s) => ({ ...s, username: e.target.value }))}
                     placeholder="e.g. yourname or yourname_creator"
                     maxLength={30}
                     className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base focus:border-brand-primary/60 focus:ring-brand-primary/20"
                   />
                   <p className="text-xs text-gray-500 mt-1.5">
-                    {state.username.length}/30 characters. Letters, numbers, underscores, dots, hyphens only.
+                    {state.username.length}/30 characters. Letters, numbers, underscores, dots,
+                    hyphens only.
                   </p>
                   {state.username.length > 0 && !isUsernameValid(state.username) && (
-                    <p className="text-xs text-amber-400 mt-1">
-                      Username must be 3–30 characters
-                    </p>
+                    <p className="text-xs text-amber-400 mt-1">Username must be 3–30 characters</p>
                   )}
                 </div>
 

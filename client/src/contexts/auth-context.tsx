@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+  useRef,
+} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { setAccessToken as setQueryClientToken } from '@/lib/queryClient';
-import { toast } from "@/hooks/use-toast";
+import { toast } from '@/hooks/use-toast';
 
 // Types
 export interface User {
@@ -37,11 +46,22 @@ export interface AuthContextType extends AuthState {
   // Actions
   login: (provider: 'google' | string) => Promise<void>;
   loginWithCallback: (provider: string, callbackData: SocialCallbackData) => Promise<AuthResult>;
-  loginWithParticle: (particleToken: string, walletAddress: string, particleUuid?: string, userEmail?: string | null, userName?: string | null, userAvatar?: string | null) => Promise<AuthResult>;
+  loginWithParticle: (
+    particleToken: string,
+    walletAddress: string,
+    particleUuid?: string,
+    userEmail?: string | null,
+    userName?: string | null,
+    userAvatar?: string | null
+  ) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   refreshUser: () => Promise<void>; // Reload user data from server
-  confirmAccountLink: (pendingLinkId: string, provider: string, callbackData: SocialCallbackData) => Promise<{ success: boolean; user?: any; message?: string }>;
+  confirmAccountLink: (
+    pendingLinkId: string,
+    provider: string,
+    callbackData: SocialCallbackData
+  ) => Promise<{ success: boolean; user?: any; message?: string }>;
 
   // Getters
   getAccessToken: () => string | null;
@@ -98,19 +118,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   });
   const [linkRequired, setLinkRequired] = useState<LinkRequiredResponse | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
-  
+
   const queryClient = useQueryClient();
 
   // Update access token in memory and sync with queryClient
   const setAccessToken = useCallback((token: string | null) => {
     accessTokenStorage = token;
     setQueryClientToken(token); // Sync with queryClient for API calls
-    setState(prev => ({ ...prev, accessToken: token }));
+    setState((prev) => ({ ...prev, accessToken: token }));
     if (token) {
       try {
         // Clear session-expired flag but keep postAuthRedirect for the router to use
         sessionStorage.removeItem('auth:session-expired');
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
@@ -119,35 +141,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return accessTokenStorage;
   }, []);
 
-  const handleRefreshFailure = useCallback((reason?: string) => {
-    setAccessToken(null);
-    setState(prev => ({
-      ...prev,
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: 'Session expired',
-    }));
-    try {
-      const alreadyNotified = sessionStorage.getItem('auth:session-expired') === 'true';
-      if (!alreadyNotified) {
-        toast({
-          title: "Session expired",
-          description: "Please sign in again to continue.",
-          variant: "destructive",
-        });
+  const handleRefreshFailure = useCallback(
+    (reason?: string) => {
+      setAccessToken(null);
+      setState((prev) => ({
+        ...prev,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Session expired',
+      }));
+      try {
+        const alreadyNotified = sessionStorage.getItem('auth:session-expired') === 'true';
+        if (!alreadyNotified) {
+          toast({
+            title: 'Session expired',
+            description: 'Please sign in again to continue.',
+            variant: 'destructive',
+          });
+        }
+        sessionStorage.setItem('auth:session-expired', 'true');
+        window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { reason } }));
+      } catch {
+        // ignore
       }
-      sessionStorage.setItem('auth:session-expired', 'true');
-      window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { reason } }));
-    } catch {}
-  }, [setAccessToken]);
+    },
+    [setAccessToken]
+  );
 
   // Refresh token (deduped while in flight)
   const refreshToken = useCallback(async () => {
     if (refreshPromiseRef.current) {
       return refreshPromiseRef.current;
     }
-    
+
     const refreshPromise = (async () => {
       try {
         const response = await fetch(`${API_BASE}/api/auth/refresh`, {
@@ -168,9 +195,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         const data = await response.json();
         setAccessToken(data.accessToken);
-        
+
         if (data.user) {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             user: data.user,
             isAuthenticated: true,
@@ -194,7 +221,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // noisy 401 errors in the browser console for unauthenticated visitors.
   const fetchCurrentUser = useCallback(async () => {
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      setState((prev) => ({ ...prev, isLoading: true }));
 
       const sessionResponse = await fetch(`${API_BASE}/api/auth/session`, {
         method: 'GET',
@@ -206,7 +233,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (data.authenticated) {
           setAccessToken(data.accessToken);
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             user: data.user,
             isAuthenticated: true,
@@ -218,7 +245,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         // No session — normal unauthenticated state
         console.log('[Auth] No existing session');
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isLoading: false,
           error: null,
@@ -229,7 +256,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('[Auth] Session check failed', error);
     }
 
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isLoading: false,
     }));
@@ -245,9 +272,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!state.isAuthenticated) return;
 
     // Refresh token every 20 minutes (assuming 24h token expiry)
-    const interval = setInterval(() => {
-      refreshToken();
-    }, 20 * 60 * 1000);
+    const interval = setInterval(
+      () => {
+        refreshToken();
+      },
+      20 * 60 * 1000
+    );
 
     return () => clearInterval(interval);
   }, [state.isAuthenticated, refreshToken]);
@@ -265,24 +295,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Login with provider — no userType parameter.
   // All users authenticate first, then choose their type on /user-type-selection.
-  const login = useCallback(async (
-    provider: 'google' | string
-  ) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+  const login = useCallback(async (provider: 'google' | string) => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
       if (provider === 'google') {
         // Get Google OAuth URL and redirect
         const redirectUri = `${window.location.origin}/auth/google/callback`;
-        
+
         const response = await fetch(
           `${API_BASE}/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
         );
-        
+
         if (!response.ok) {
           throw new Error('Failed to get Google auth URL');
         }
-        
+
         const { url } = await response.json();
         window.location.href = url;
       } else {
@@ -292,7 +320,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error: any) {
       console.error('[Auth] Login error:', error);
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isLoading: false,
         error: error.message || 'Login failed',
@@ -301,216 +329,229 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   // Login with callback data (after OAuth redirect/popup)
-  const loginWithCallback = useCallback(async (
-    provider: string,
-    callbackData: SocialCallbackData
-  ): Promise<AuthResult> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+  const loginWithCallback = useCallback(
+    async (provider: string, callbackData: SocialCallbackData): Promise<AuthResult> => {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    try {
-      let endpoint: string;
-      let body: any;
+      try {
+        let endpoint: string;
+        let body: any;
 
-      if (provider === 'google') {
-        endpoint = `${API_BASE}/api/auth/google/callback`;
-        body = {
-          code: callbackData.code,
-          redirect_uri: callbackData.redirect_uri,
-        };
-      } else {
-        // Generic social auth callback
-        endpoint = `${API_BASE}/api/auth/social/callback`;
-        body = {
-          provider,
-          access_token: callbackData.access_token,
-          platform_user_id: callbackData.platform_user_id,
-          email: callbackData.email,
-          username: callbackData.username,
-          display_name: callbackData.display_name,
-          profile_data: callbackData.profile_data,
-        };
-      }
+        if (provider === 'google') {
+          endpoint = `${API_BASE}/api/auth/google/callback`;
+          body = {
+            code: callbackData.code,
+            redirect_uri: callbackData.redirect_uri,
+          };
+        } else {
+          // Generic social auth callback
+          endpoint = `${API_BASE}/api/auth/social/callback`;
+          body = {
+            provider,
+            access_token: callbackData.access_token,
+            platform_user_id: callbackData.platform_user_id,
+            email: callbackData.email,
+            username: callbackData.username,
+            display_name: callbackData.display_name,
+            profile_data: callbackData.profile_data,
+          };
+        }
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data: AuthResult = await response.json();
-
-      // If the server returned an HTTP error, surface the actual error message
-      if (!response.ok) {
-        const serverMessage = data.message || data.error || `Server error ${response.status}`;
-        console.error('[Auth] Server returned error:', response.status, serverMessage);
-        throw new Error(serverMessage);
-      }
-
-      if (data.linkRequired) {
-        // Account linking required
-        setLinkRequired({
-          linkRequired: true,
-          existingProviders: data.existingProviders || [],
-          pendingLinkId: data.pendingLinkId || '',
-          message: data.message || 'Account linking required',
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
         });
-        setState(prev => ({ ...prev, isLoading: false }));
+
+        const data: AuthResult = await response.json();
+
+        // If the server returned an HTTP error, surface the actual error message
+        if (!response.ok) {
+          const serverMessage = data.message || data.error || `Server error ${response.status}`;
+          console.error('[Auth] Server returned error:', response.status, serverMessage);
+          throw new Error(serverMessage);
+        }
+
+        if (data.linkRequired) {
+          // Account linking required
+          setLinkRequired({
+            linkRequired: true,
+            existingProviders: data.existingProviders || [],
+            pendingLinkId: data.pendingLinkId || '',
+            message: data.message || 'Account linking required',
+          });
+          setState((prev) => ({ ...prev, isLoading: false }));
+          return data;
+        }
+
+        if (!data.success) {
+          throw new Error(data.message || 'Authentication failed');
+        }
+
+        // Success - update state
+        setAccessToken(data.accessToken || null);
+        setState((prev) => ({
+          ...prev,
+          user: data.user || null,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        }));
+
+        // Invalidate queries to refetch user data
+        queryClient.invalidateQueries();
+
         return data;
+      } catch (error: any) {
+        console.error('[Auth] Callback error:', error);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: error.message || 'Authentication failed',
+        }));
+        return { success: false, message: error.message };
       }
-
-      if (!data.success) {
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      // Success - update state
-      setAccessToken(data.accessToken || null);
-      setState(prev => ({
-        ...prev,
-        user: data.user || null,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      }));
-
-      // Invalidate queries to refetch user data
-      queryClient.invalidateQueries();
-
-      return data;
-    } catch (error: any) {
-      console.error('[Auth] Callback error:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message || 'Authentication failed',
-      }));
-      return { success: false, message: error.message };
-    }
-  }, [setAccessToken, queryClient]);
+    },
+    [setAccessToken, queryClient]
+  );
 
   // Login with Particle Connect token (called after Particle modal completes)
-  const loginWithParticle = useCallback(async (
-    particleToken: string,
-    walletAddress: string,
-    particleUuid?: string,
-    userEmail?: string | null,
-    userName?: string | null,
-    userAvatar?: string | null,
-  ): Promise<AuthResult> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+  const loginWithParticle = useCallback(
+    async (
+      particleToken: string,
+      walletAddress: string,
+      particleUuid?: string,
+      userEmail?: string | null,
+      userName?: string | null,
+      userAvatar?: string | null
+    ): Promise<AuthResult> => {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    try {
-      const response = await fetch(`${API_BASE}/api/auth/particle/callback`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar }),
-      });
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/particle/callback`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            particleToken,
+            walletAddress,
+            particleUuid,
+            userEmail,
+            userName,
+            userAvatar,
+          }),
+        });
 
-      const data: AuthResult = await response.json();
+        const data: AuthResult = await response.json();
 
-      if (!response.ok) {
-        const serverMessage = data.message || data.error || `Server error ${response.status}`;
-        throw new Error(serverMessage);
+        if (!response.ok) {
+          const serverMessage = data.message || data.error || `Server error ${response.status}`;
+          throw new Error(serverMessage);
+        }
+
+        if (!data.success) {
+          throw new Error(data.message || 'Particle authentication failed');
+        }
+
+        // Success - update state (same as loginWithCallback)
+        setAccessToken(data.accessToken || null);
+        setState((prev) => ({
+          ...prev,
+          user: data.user || null,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        }));
+
+        queryClient.invalidateQueries();
+        return data;
+      } catch (error: any) {
+        console.error('[Auth] Particle login error:', error);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: error.message || 'Particle authentication failed',
+        }));
+        return { success: false, message: error.message };
       }
-
-      if (!data.success) {
-        throw new Error(data.message || 'Particle authentication failed');
-      }
-
-      // Success - update state (same as loginWithCallback)
-      setAccessToken(data.accessToken || null);
-      setState(prev => ({
-        ...prev,
-        user: data.user || null,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      }));
-
-      queryClient.invalidateQueries();
-      return data;
-    } catch (error: any) {
-      console.error('[Auth] Particle login error:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message || 'Particle authentication failed',
-      }));
-      return { success: false, message: error.message };
-    }
-  }, [setAccessToken, queryClient]);
+    },
+    [setAccessToken, queryClient]
+  );
 
   // Confirm account link — returns the linked user so callers can redirect appropriately
-  const confirmAccountLink = useCallback(async (
-    pendingLinkId: string,
-    provider: string,
-    callbackData: SocialCallbackData
-  ): Promise<{ success: boolean; user?: any; message?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+  const confirmAccountLink = useCallback(
+    async (
+      pendingLinkId: string,
+      provider: string,
+      callbackData: SocialCallbackData
+    ): Promise<{ success: boolean; user?: any; message?: string }> => {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    try {
-      let endpoint: string;
-      let body: any;
+      try {
+        let endpoint: string;
+        let body: any;
 
-      if (provider === 'google') {
-        endpoint = `${API_BASE}/api/auth/google/link`;
-        body = {
-          pending_link_id: pendingLinkId,
-          code: callbackData.code,
-          redirect_uri: callbackData.redirect_uri,
-        };
-      } else {
-        endpoint = `${API_BASE}/api/auth/social/link`;
-        body = {
-          pending_link_id: pendingLinkId,
-          access_token: callbackData.access_token,
-          provider,
-          platform_user_id: callbackData.platform_user_id,
-          profile_data: callbackData.profile_data,
-        };
+        if (provider === 'google') {
+          endpoint = `${API_BASE}/api/auth/google/link`;
+          body = {
+            pending_link_id: pendingLinkId,
+            code: callbackData.code,
+            redirect_uri: callbackData.redirect_uri,
+          };
+        } else {
+          endpoint = `${API_BASE}/api/auth/social/link`;
+          body = {
+            pending_link_id: pendingLinkId,
+            access_token: callbackData.access_token,
+            provider,
+            platform_user_id: callbackData.platform_user_id,
+            profile_data: callbackData.profile_data,
+          };
+        }
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to link account');
+        }
+
+        setAccessToken(data.accessToken);
+        setState((prev) => ({
+          ...prev,
+          user: data.user,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        }));
+        setLinkRequired(null);
+
+        queryClient.invalidateQueries();
+
+        return { success: true, user: data.user };
+      } catch (error: any) {
+        console.error('[Auth] Link error:', error);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: error.message || 'Failed to link account',
+        }));
+        return { success: false, message: error.message };
       }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to link account');
-      }
-
-      setAccessToken(data.accessToken);
-      setState(prev => ({
-        ...prev,
-        user: data.user,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      }));
-      setLinkRequired(null);
-
-      queryClient.invalidateQueries();
-
-      return { success: true, user: data.user };
-    } catch (error: any) {
-      console.error('[Auth] Link error:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message || 'Failed to link account',
-      }));
-      return { success: false, message: error.message };
-    }
-  }, [setAccessToken, queryClient]);
+    },
+    [setAccessToken, queryClient]
+  );
 
   // Logout
   const logout = useCallback(async () => {
@@ -562,7 +603,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await fetch(`${API_BASE}/api/auth/me`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessTokenStorage}`,
+          Authorization: `Bearer ${accessTokenStorage}`,
           'Content-Type': 'application/json',
         },
       });
@@ -577,7 +618,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const data = await response.json();
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         user: data.user,
         error: null,
@@ -604,11 +645,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     clearLinkRequired,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 // Hook to use auth context

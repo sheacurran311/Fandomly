@@ -1,5 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from '@db';
-import { taskCompletions, manualReviewQueue, verificationAttempts, users, tasks, socialConnections, loyaltyPrograms } from '@shared/schema';
+import {
+  taskCompletions,
+  manualReviewQueue,
+  verificationAttempts,
+  socialConnections,
+  loyaltyPrograms,
+} from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { twitterVerification } from './twitter-verification';
 import { tiktokVerification } from './tiktok-verification';
@@ -8,20 +15,17 @@ import { websiteVisitVerification } from './website-visit-verification';
 import { pollQuizVerification } from './poll-quiz-verification';
 import { validateProofUrl } from '../../middleware/upload';
 import { multiplierService } from '../multiplier-service';
-import { checkInService } from '../check-in-service';
 import { creatorPointsService } from '../points/points-service';
 
 // New verification services for loyalty engine
-import { codeService } from './code-service';
 import { commentFetcher } from './comment-fetcher';
-import { repostVerifier } from './repost-verifier';
-import { starterPackService } from './starter-pack-service';
 import { discordVerification } from './platforms/discord-verification';
 import { twitchVerification } from './platforms/twitch-verification';
 import { spotifyVerification } from './platforms/spotify-verification';
 import { youtubeVerification } from './platforms/youtube-verification';
 import { kickVerification } from './platforms/kick-verification';
 import { patreonVerification } from './platforms/patreon-verification';
+import { facebookVerification } from './platforms/facebook-verification';
 import { getTaskVerificationInfo } from '@shared/taskTemplates';
 
 export interface UnifiedVerificationRequest {
@@ -43,7 +47,8 @@ export interface UnifiedVerificationRequest {
 
   // Sprint 2: Interactive task data
   trackingToken?: string; // For website_visit tasks
-  responses?: Array<{ // For poll/quiz tasks
+  responses?: Array<{
+    // For poll/quiz tasks
     questionId: string;
     questionText: string;
     selectedOptions: number[];
@@ -94,7 +99,10 @@ export class UnifiedVerificationService {
 
     try {
       // Validate proof URL if provided (skip for interactive task types)
-      if (proofUrl && !['website_visit', 'poll', 'quiz', 'check_in'].includes(taskType.toLowerCase())) {
+      if (
+        proofUrl &&
+        !['website_visit', 'poll', 'quiz', 'check_in'].includes(taskType.toLowerCase())
+      ) {
         const urlValidation = validateProofUrl(proofUrl, platform);
         if (!urlValidation.valid) {
           return {
@@ -164,7 +172,8 @@ export class UnifiedVerificationService {
           verified: false,
           requiresManualReview: true,
           completionId: completion.id,
-          message: 'Task submitted for manual review. You will be notified when reviewed (usually within 24-48 hours).',
+          message:
+            'Task submitted for manual review. You will be notified when reviewed (usually within 24-48 hours).',
           metadata: (verificationResult as { metadata?: Record<string, unknown> }).metadata,
         };
       }
@@ -190,7 +199,9 @@ export class UnifiedVerificationService {
         verified: false,
         requiresManualReview: false,
         completionId: completion.id,
-        message: (verificationResult as { reason?: string }).reason || 'Verification failed. Please try again.',
+        message:
+          (verificationResult as { reason?: string }).reason ||
+          'Verification failed. Please try again.',
         metadata: (verificationResult as { metadata?: Record<string, unknown> }).metadata,
       };
     } catch (error: any) {
@@ -223,7 +234,16 @@ export class UnifiedVerificationService {
       selectedOptions: number[];
     }>;
   }) {
-    const { platform, taskType, taskSettings, proofUrl, screenshotUrl, userId, trackingToken, responses } = params;
+    const {
+      platform,
+      taskType,
+      taskSettings,
+      proofUrl,
+      screenshotUrl,
+      userId,
+      trackingToken,
+      responses,
+    } = params;
 
     // Sprint 2: Check task type first for interactive/auto-verified tasks
     switch (taskType.toLowerCase()) {
@@ -267,7 +287,7 @@ export class UnifiedVerificationService {
 
     // Get verification info for this task type
     const verificationInfo = getTaskVerificationInfo(taskType);
-    
+
     // ================================================================
     // STARTER PACK TASKS (T3 - Honor System)
     // ================================================================
@@ -285,7 +305,7 @@ export class UnifiedVerificationService {
         },
       };
     }
-    
+
     // ================================================================
     // CODE-IN-COMMENT VERIFICATION (T2)
     // ================================================================
@@ -303,7 +323,7 @@ export class UnifiedVerificationService {
         },
       };
     }
-    
+
     // ================================================================
     // CODE-IN-REPOST VERIFICATION (T2 - Twitter Quote Tweets)
     // ================================================================
@@ -319,7 +339,7 @@ export class UnifiedVerificationService {
         },
       };
     }
-    
+
     // ================================================================
     // GROUP GOALS (Hashtag-based)
     // ================================================================
@@ -419,9 +439,12 @@ export class UnifiedVerificationService {
         // TikTok verification - mostly T3 (manual) or T2 (code)
         let userTikTokUsername: string | undefined;
         if (taskType === 'tiktok_post') {
-          const [tiktokConn] = await db.select().from(socialConnections).where(
-            and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'tiktok'))
-          );
+          const [tiktokConn] = await db
+            .select()
+            .from(socialConnections)
+            .where(
+              and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'tiktok'))
+            );
           userTikTokUsername = tiktokConn?.platformUsername ?? undefined;
         }
 
@@ -444,19 +467,30 @@ export class UnifiedVerificationService {
         });
 
       case 'facebook':
+        // Try API-based verification first for supported task types
+        if (taskType === 'facebook_like_page' || taskType === 'facebook_join_group') {
+          return await facebookVerification.verifyTask({
+            fanUserId: userId,
+            taskType,
+            taskSettings: taskSettings || {},
+          });
+        }
+
         // Facebook comment tasks - try code-based verification if contentId is available
-        if ((taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo') && 
-            taskSettings?.contentId) {
+        if (
+          (taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo') &&
+          taskSettings?.contentId
+        ) {
           try {
             // Try to get the creator's Facebook access token
             const creatorConnection = await db.query.socialConnections.findFirst({
               where: and(
                 eq(socialConnections.userId, taskSettings.creatorUserId || ''),
                 eq(socialConnections.platform, 'facebook'),
-                eq(socialConnections.isActive, true),
+                eq(socialConnections.isActive, true)
               ),
             });
-            
+
             if (creatorConnection?.accessToken) {
               // Attempt code-based verification
               const codeResult = await commentFetcher.verifyCodeInComments({
@@ -466,7 +500,7 @@ export class UnifiedVerificationService {
                 fanId: userId,
                 creatorAccessToken: creatorConnection.accessToken,
               });
-              
+
               if (codeResult.verified) {
                 return {
                   verified: true,
@@ -481,13 +515,14 @@ export class UnifiedVerificationService {
                   },
                 };
               }
-              
+
               // Code not found yet - fall through to manual review
               return {
                 verified: false,
                 requiresManualReview: true,
                 confidence: 'medium' as const,
-                reason: 'Verification code not found in comments yet. Please make sure you included your unique code in your comment.',
+                reason:
+                  'Verification code not found in comments yet. Please make sure you included your unique code in your comment.',
                 metadata: {
                   verificationTier: 'T2',
                   verificationMethod: 'code_in_comment',
@@ -498,18 +533,13 @@ export class UnifiedVerificationService {
             console.error('[Verification] Facebook code verification error:', error);
           }
         }
-        
-        // Fallback: manual review for Facebook tasks without code verification
-        return {
-          verified: false,
-          requiresManualReview: true,
-          confidence: 'medium' as const,
-          reason: 'Facebook tasks require manual review',
-          metadata: {
-            verificationTier: 'T3',
-            verificationMethod: 'manual',
-          },
-        };
+
+        // For other Facebook tasks, use the Facebook verification service
+        return await facebookVerification.verifyTask({
+          fanUserId: userId,
+          taskType,
+          taskSettings: taskSettings || {},
+        });
 
       default:
         return {
@@ -543,17 +573,17 @@ export class UnifiedVerificationService {
       userId,
       taskId,
       tenantId,
-      proofUrl,
-      screenshotUrl,
-      proofNotes,
+      proofUrl: _proofUrl,
+      screenshotUrl: _screenshotUrl,
+      proofNotes: _proofNotes,
       verificationResult,
     } = params;
 
     const status = verificationResult.verified
-      ? 'completed'  // Changed from 'verified' to match client expectations
+      ? 'completed' // Changed from 'verified' to match client expectations
       : verificationResult.requiresManualReview
-      ? 'pending_review'
-      : 'rejected';
+        ? 'pending_review'
+        : 'rejected';
 
     const completionData = {
       userId,
@@ -562,7 +592,9 @@ export class UnifiedVerificationService {
       status,
       verifiedAt: (verificationResult as { verified?: boolean }).verified ? new Date() : null,
       completedAt: (verificationResult as { verified?: boolean }).verified ? new Date() : null,
-      completionData: { metadata: (verificationResult as { metadata?: unknown }).metadata || {} } as Record<string, unknown>,
+      completionData: {
+        metadata: (verificationResult as { metadata?: unknown }).metadata || {},
+      } as Record<string, unknown>,
       updatedAt: new Date(),
     };
 
@@ -708,7 +740,10 @@ export class UnifiedVerificationService {
         completionData: {
           ...((completion.completionData as Record<string, unknown>) || {}),
           metadata: {
-            ...(((completion.completionData as Record<string, unknown>)?.metadata as Record<string, unknown>) || {}),
+            ...(((completion.completionData as Record<string, unknown>)?.metadata as Record<
+              string,
+              unknown
+            >) || {}),
             multiplierApplied: multiplierResult.finalMultiplier,
             multiplierBreakdown: multiplierResult.breakdown,
             basePoints: basePoints,
@@ -736,9 +771,13 @@ export class UnifiedVerificationService {
             `Task completed: ${task.name}`,
             { taskId: taskId, taskCompletionId: taskCompletionId }
           );
-          console.log(`[Points] Awarded ${pointsToAward} creator points to user ${completion.userId} for task ${task.name}`);
+          console.log(
+            `[Points] Awarded ${pointsToAward} creator points to user ${completion.userId} for task ${task.name}`
+          );
         } else {
-          console.warn(`[Points] No loyalty program found for tenant ${task.tenantId}, skipping points award to user balance`);
+          console.warn(
+            `[Points] No loyalty program found for tenant ${task.tenantId}, skipping points award to user balance`
+          );
         }
       } catch (pointsError) {
         // Log but don't fail the verification - points on completion record are already saved
@@ -791,11 +830,11 @@ export class UnifiedVerificationService {
     const highPriorityTypes = ['purchase', 'subscription', 'referral_complete'];
     const urgentTypes = ['time_limited', 'event'];
 
-    if (urgentTypes.some(type => taskType.includes(type))) {
+    if (urgentTypes.some((type) => taskType.includes(type))) {
       return 'urgent';
     }
 
-    if (highPriorityTypes.some(type => taskType.includes(type))) {
+    if (highPriorityTypes.some((type) => taskType.includes(type))) {
       return 'high';
     }
 

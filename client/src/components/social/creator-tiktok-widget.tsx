@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,11 +21,6 @@ export default function CreatorTikTokWidget() {
   const [userInfo, setUserInfo] = useState<TikTokUserInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Only show for creators
-  if (user?.userType !== 'creator') {
-    return null;
-  }
-
   useEffect(() => {
     // Attempt to fetch stored connection
     const loadStatus = async () => {
@@ -32,9 +28,9 @@ export default function CreatorTikTokWidget() {
         const response = await fetch('/api/social-connections/tiktok', {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -43,28 +39,30 @@ export default function CreatorTikTokWidget() {
             setIsConnected(true);
             const conn = data.connection;
             const profile = conn.profileData;
-            
+
             console.log('[TikTok Widget] Profile data:', profile);
-            
+
             // Extract display name from multiple possible locations
-            const displayName = 
-              profile?.display_name || 
+            const displayName =
+              profile?.display_name ||
               profile?.username ||
-              conn.platformDisplayName || 
-              conn.platformUsername || 
+              conn.platformDisplayName ||
+              conn.platformUsername ||
               'Connected';
-            
-            const followerCount = 
-              profile?.follower_count || 
-              profile?.followers || 
-              0;
-            
-            console.log('[TikTok Widget] Extracted - displayName:', displayName, 'followers:', followerCount);
-            
+
+            const followerCount = profile?.follower_count || profile?.followers || 0;
+
+            console.log(
+              '[TikTok Widget] Extracted - displayName:',
+              displayName,
+              'followers:',
+              followerCount
+            );
+
             setUserInfo({
               open_id: profile?.open_id || conn.platformUserId || '',
               display_name: displayName,
-              follower_count: followerCount
+              follower_count: followerCount,
             });
           } else {
             setIsConnected(false);
@@ -84,15 +82,15 @@ export default function CreatorTikTokWidget() {
     try {
       setIsConnecting(true);
       setError(null);
-      await socialManager.getAPI('tiktok').secureLogin();
+      await (socialManager as any).getAPI('tiktok').secureLogin();
       // Reload status after connection
       setTimeout(async () => {
         const response = await fetch('/api/social-connections/tiktok', {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -103,7 +101,7 @@ export default function CreatorTikTokWidget() {
         }
         setIsConnecting(false);
       }, 1000);
-    } catch (err) {
+    } catch {
       setError('Failed to connect');
       setIsConnecting(false);
     }
@@ -115,16 +113,16 @@ export default function CreatorTikTokWidget() {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ platform: 'tiktok' }),
-        credentials: 'include'
+        credentials: 'include',
       });
       if (response.ok) {
         setIsConnected(false);
         setUserInfo(null);
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -163,7 +161,9 @@ export default function CreatorTikTokWidget() {
                 <Users className="h-4 w-4 text-purple-400" />
                 <div>
                   <p className="text-xs text-gray-400">Followers</p>
-                  <p className="text-sm font-medium text-white">{(userInfo.follower_count || 0).toLocaleString()}</p>
+                  <p className="text-sm font-medium text-white">
+                    {(userInfo.follower_count || 0).toLocaleString()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -179,18 +179,18 @@ export default function CreatorTikTokWidget() {
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="flex-1 border-white/20 text-gray-300 hover:bg-white/10"
               onClick={() => window.open(`https://tiktok.com/@${userInfo.display_name}`, '_blank')}
             >
               <ExternalLink className="h-3 w-3 mr-1" />
               Profile
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="border-white/20 text-white hover:bg-white/10"
               onClick={disconnectTikTok}
             >
@@ -208,6 +208,11 @@ export default function CreatorTikTokWidget() {
     );
   }
 
+  // Only show for creators
+  if (user?.userType !== 'creator') {
+    return null;
+  }
+
   return (
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
       <CardHeader className="pb-3">
@@ -223,11 +228,9 @@ export default function CreatorTikTokWidget() {
           </div>
           <p className="text-sm text-gray-300 mb-2">Connect your TikTok account</p>
           <p className="text-xs text-gray-400 mb-2">Share content and grow your audience</p>
-          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
-            +500 Points
-          </Badge>
+          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
         </div>
-        <Button 
+        <Button
           className="w-full bg-black text-white hover:bg-black/80"
           onClick={connectTikTok}
           disabled={isConnecting}
@@ -257,4 +260,3 @@ export default function CreatorTikTokWidget() {
     </Card>
   );
 }
-

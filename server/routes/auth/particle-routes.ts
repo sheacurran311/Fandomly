@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Particle Network Auth Routes
  *
@@ -30,7 +31,8 @@ export function registerParticleAuthRoutes(app: Express) {
    */
   app.post('/api/auth/particle/callback', async (req: Request, res: Response) => {
     try {
-      const { particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar } = req.body;
+      const { particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar } =
+        req.body;
 
       if (!particleUuid) {
         return res.status(400).json({
@@ -53,7 +55,7 @@ export function registerParticleAuthRoutes(app: Express) {
         particleUuid,
         userEmail,
         userName,
-        userAvatar,
+        userAvatar
       );
 
       if (!result.success) {
@@ -92,9 +94,7 @@ export function registerParticleAuthRoutes(app: Express) {
    * Used by the client to determine which auth flow to show.
    */
   app.get('/api/auth/particle/status', (_req: Request, res: Response) => {
-    const enabled = Boolean(
-      process.env.PARTICLE_PROJECT_ID && process.env.PARTICLE_SERVER_KEY
-    );
+    const enabled = Boolean(process.env.PARTICLE_PROJECT_ID && process.env.PARTICLE_SERVER_KEY);
 
     return res.json({
       enabled,

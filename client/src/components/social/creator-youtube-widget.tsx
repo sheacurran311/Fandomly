@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,11 +21,6 @@ export default function CreatorYouTubeWidget() {
   const [userInfo, setUserInfo] = useState<YouTubeUserInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Only show for creators
-  if (user?.userType !== 'creator') {
-    return null;
-  }
-
   useEffect(() => {
     // Attempt to fetch stored connection
     const loadStatus = async () => {
@@ -32,9 +28,9 @@ export default function CreatorYouTubeWidget() {
         const response = await fetch('/api/social-connections/youtube', {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -43,30 +39,32 @@ export default function CreatorYouTubeWidget() {
             setIsConnected(true);
             const conn = data.connection;
             const profile = conn.profileData;
-            
+
             console.log('[YouTube Widget] Profile data:', profile);
-            
+
             // Extract channel title from multiple possible locations
-            const channelTitle = 
-              profile?.title || 
+            const channelTitle =
+              profile?.title ||
               profile?.name ||
               profile?.channelTitle ||
-              conn.platformDisplayName || 
-              conn.platformUsername || 
+              conn.platformDisplayName ||
+              conn.platformUsername ||
               'Connected';
-            
-            const subscriberCount = 
-              profile?.subscriberCount || 
-              profile?.followers || 
-              profile?.follower_count || 
-              0;
-            
-            console.log('[YouTube Widget] Extracted - channelTitle:', channelTitle, 'subscribers:', subscriberCount);
-            
+
+            const subscriberCount =
+              profile?.subscriberCount || profile?.followers || profile?.follower_count || 0;
+
+            console.log(
+              '[YouTube Widget] Extracted - channelTitle:',
+              channelTitle,
+              'subscribers:',
+              subscriberCount
+            );
+
             setUserInfo({
               id: profile?.id || conn.platformUserId || '',
               title: channelTitle,
-              subscriberCount: subscriberCount
+              subscriberCount: subscriberCount,
             });
           } else {
             setIsConnected(false);
@@ -86,15 +84,15 @@ export default function CreatorYouTubeWidget() {
     try {
       setIsConnecting(true);
       setError(null);
-      await socialManager.getAPI('youtube').secureLogin();
+      await (socialManager as any).getAPI('youtube').secureLogin();
       // Reload status after connection
       setTimeout(async () => {
         const response = await fetch('/api/social-connections/youtube', {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -105,7 +103,7 @@ export default function CreatorYouTubeWidget() {
         }
         setIsConnecting(false);
       }, 1000);
-    } catch (err) {
+    } catch {
       setError('Failed to connect');
       setIsConnecting(false);
     }
@@ -117,16 +115,16 @@ export default function CreatorYouTubeWidget() {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ platform: 'youtube' }),
-        credentials: 'include'
+        credentials: 'include',
       });
       if (response.ok) {
         setIsConnected(false);
         setUserInfo(null);
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -165,7 +163,9 @@ export default function CreatorYouTubeWidget() {
                 <Users className="h-4 w-4 text-red-400" />
                 <div>
                   <p className="text-xs text-gray-400">Subscribers</p>
-                  <p className="text-sm font-medium text-white">{(userInfo.subscriberCount || 0).toLocaleString()}</p>
+                  <p className="text-sm font-medium text-white">
+                    {(userInfo.subscriberCount || 0).toLocaleString()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -181,18 +181,18 @@ export default function CreatorYouTubeWidget() {
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="flex-1 border-white/20 text-gray-300 hover:bg-white/10"
               onClick={() => window.open('https://youtube.com', '_blank')}
             >
               <ExternalLink className="h-3 w-3 mr-1" />
               Channel
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="border-white/20 text-white hover:bg-white/10"
               onClick={disconnectYouTube}
             >
@@ -210,6 +210,11 @@ export default function CreatorYouTubeWidget() {
     );
   }
 
+  // Only show for creators
+  if (user?.userType !== 'creator') {
+    return null;
+  }
+
   return (
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
       <CardHeader className="pb-3">
@@ -225,11 +230,9 @@ export default function CreatorYouTubeWidget() {
           </div>
           <p className="text-sm text-gray-300 mb-2">Connect your YouTube channel</p>
           <p className="text-xs text-gray-400 mb-2">Engage with your video audience</p>
-          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
-            +500 Points
-          </Badge>
+          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
         </div>
-        <Button 
+        <Button
           className="w-full bg-red-600 text-white hover:bg-red-700"
           onClick={connectYouTube}
           disabled={isConnecting}
@@ -259,4 +262,3 @@ export default function CreatorYouTubeWidget() {
     </Card>
   );
 }
-

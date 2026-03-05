@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Instagram OAuth Callback Handler Hook
  * Extracted from creator-dashboard.tsx for better modularity
@@ -28,21 +29,21 @@ export function useInstagramOAuthCallback({
 
     const handleInstagramCallback = async () => {
       // Add a small delay to ensure URL is fully loaded
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       console.log('[Instagram OAuth] Full URL:', window.location.href);
-      
+
       // Check for parameters in both search and hash
       const searchParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      
+
       const code = searchParams.get('code') || hashParams.get('code');
       const state = searchParams.get('state') || hashParams.get('state');
       const error = searchParams.get('error') || hashParams.get('error');
 
       // Check if this looks like an Instagram callback URL structure
-      const hasInstagramIndicators = 
-        window.location.href.includes('code=') || 
+      const hasInstagramIndicators =
+        window.location.href.includes('code=') ||
         window.location.href.includes('error=') ||
         (state && state.includes('instagram'));
 
@@ -54,7 +55,8 @@ export function useInstagramOAuthCallback({
       console.log('[Instagram OAuth] Processing callback');
 
       if (error) {
-        const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
+        const errorDescription =
+          searchParams.get('error_description') || hashParams.get('error_description');
         handleOAuthError(error, errorDescription);
         return;
       }
@@ -72,20 +74,23 @@ function handleOAuthError(error: string, errorDescription: string | null) {
   // If opened in popup, communicate result to parent
   if (window.opener) {
     console.log('[Instagram OAuth] Communicating error to parent window');
-    window.opener.postMessage({
-      type: 'instagram-oauth-result',
-      result: {
-        success: false,
-        error: errorDescription || error
-      }
-    }, window.location.origin);
-    
+    window.opener.postMessage(
+      {
+        type: 'instagram-oauth-result',
+        result: {
+          success: false,
+          error: errorDescription || error,
+        },
+      },
+      window.location.origin
+    );
+
     // Store result in parent window for fallback
     (window.opener as any).instagramCallbackData = {
       success: false,
-      error: errorDescription || error
+      error: errorDescription || error,
     };
-    
+
     // Close the popup after a short delay
     setTimeout(() => window.close(), 500);
     return;
@@ -93,9 +98,9 @@ function handleOAuthError(error: string, errorDescription: string | null) {
 
   // Show error in main window
   toast({
-    title: "Instagram Connection Failed",
+    title: 'Instagram Connection Failed',
     description: errorDescription || error,
-    variant: "destructive"
+    variant: 'destructive',
   });
 
   // Clean up URL
@@ -109,7 +114,7 @@ function handleOAuthError(error: string, errorDescription: string | null) {
 }
 
 async function handleOAuthSuccess(
-  code: string, 
+  code: string,
   state: string | null,
   completeConnection: (code: string, state: string) => Promise<void>
 ) {
@@ -125,72 +130,65 @@ async function handleOAuthSuccess(
   // Check if we're in a popup
   if (window.opener) {
     console.log('[Instagram OAuth] Popup detected - communicating with parent');
-    
+
     try {
-      // Try the SDK callback handler first
-      const sdkManager = InstagramSDKManager.getInstance();
-      await sdkManager.handleOAuthCallback({
-        code,
-        state: effectiveState,
-        redirectUri: `${window.location.origin}/creator-dashboard`
-      });
-      
-      // Success! Communicate to parent
-      window.opener.postMessage({
-        type: 'instagram-oauth-result',
-        result: { 
-          success: true,
-          code,
-          state: effectiveState
-        }
-      }, window.location.origin);
+      await (InstagramSDKManager as any).handleCallback(code, effectiveState);
+
+      window.opener.postMessage(
+        {
+          type: 'instagram-oauth-result',
+          result: {
+            success: true,
+            code,
+            state: effectiveState,
+          },
+        },
+        window.location.origin
+      );
 
       // Store in parent for fallback
       (window.opener as any).instagramCallbackData = {
         success: true,
         code,
-        state: effectiveState
+        state: effectiveState,
       };
 
       // Close popup
       setTimeout(() => window.close(), 500);
     } catch (error) {
       console.error('[Instagram OAuth] Popup handler error:', error);
-      
-      window.opener.postMessage({
-        type: 'instagram-oauth-result',
-        result: {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      }, window.location.origin);
+
+      window.opener.postMessage(
+        {
+          type: 'instagram-oauth-result',
+          result: {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        },
+        window.location.origin
+      );
 
       setTimeout(() => window.close(), 500);
     }
     return;
   }
 
-  // Main window flow
   try {
-    const sdkManager = InstagramSDKManager.getInstance();
-    await sdkManager.handleOAuthCallback({
-      code,
-      state: effectiveState,
-      redirectUri: `${window.location.origin}/creator-dashboard`
-    });
+    await (InstagramSDKManager as any).handleCallback(code, effectiveState);
 
     await completeConnection(code, effectiveState);
 
     toast({
-      title: "Instagram Connected!",
-      description: "Your Instagram account has been connected successfully.",
+      title: 'Instagram Connected!',
+      description: 'Your Instagram account has been connected successfully.',
     });
   } catch (error) {
     console.error('[Instagram OAuth] Main window error:', error);
     toast({
-      title: "Connection Failed",
-      description: error instanceof Error ? error.message : "Failed to connect Instagram",
-      variant: "destructive"
+      title: 'Connection Failed',
+      description: error instanceof Error ? error.message : 'Failed to connect Instagram',
+      variant: 'destructive',
     });
   } finally {
     // Clean up URL

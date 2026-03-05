@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Social Media Integration APIs
 import FacebookSDK, { type FacebookPage } from './facebook';
 import { KickAPI } from './kick';
@@ -1159,7 +1160,7 @@ export class SocialIntegrationManager {
       case 'kick':
         return '#'; // Kick uses popup flow via secureLogin()
       case 'patreon':
-        return this.patreon.getAuthUrl();
+        return '#'; // Patreon uses popup flow via secureLogin()
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }

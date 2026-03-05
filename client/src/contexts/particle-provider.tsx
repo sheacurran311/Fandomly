@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode, useMemo } from 'react';
 import { isParticleConfigured, createParticleConfig } from '@/lib/particle-config';
 import { ConnectKitProvider } from '@particle-network/connectkit';
@@ -27,9 +28,5 @@ export function ParticleProvider({ children }: ParticleProviderProps) {
     return <>{children}</>;
   }
 
-  return (
-    <ConnectKitProvider config={config}>
-      {children}
-    </ConnectKitProvider>
-  );
+  return <ConnectKitProvider config={config}>{children}</ConnectKitProvider>;
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
@@ -62,7 +63,7 @@ export default function GoogleCallback() {
 
         if (result.success) {
           const user = result.user;
-          
+
           // New user OR user without a type → MUST go to type selection
           if (result.isNewUser || !user?.userType || user.userType === 'pending') {
             setLocation('/user-type-selection');
@@ -135,13 +136,11 @@ export default function GoogleCallback() {
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
         <div className="bg-brand-card rounded-lg p-8 max-w-md w-full">
           <h2 className="text-2xl font-bold text-white mb-4">Account Found</h2>
-          <p className="text-gray-300 mb-6">
-            {linkRequired.message}
-          </p>
+          <p className="text-gray-300 mb-6">{linkRequired.message}</p>
           <p className="text-gray-400 text-sm mb-6">
             Existing login method: {linkRequired.existingProviders.join(', ')}
           </p>
-          
+
           <div className="flex gap-4">
             <button
               onClick={handleConfirmLink}
@@ -158,10 +157,8 @@ export default function GoogleCallback() {
               Cancel
             </button>
           </div>
-          
-          {error && (
-            <p className="text-red-500 text-sm mt-4">{error}</p>
-          )}
+
+          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </div>
       </div>
     );

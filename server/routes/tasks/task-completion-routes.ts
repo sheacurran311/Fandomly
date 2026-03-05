@@ -3,6 +3,10 @@ import { z } from 'zod';
 import type { IStorage } from '../../core/storage';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
 import { taskFrequencyService } from '../../services/task-frequency-service';
+import { pointsMultiplierService } from '../../services/points/multiplier-service';
+import { db } from '../../db';
+import { fanPrograms } from '@shared/schema';
+import { sql, and, eq } from 'drizzle-orm';
 
 // Validation schemas
 const startTaskSchema = z.object({
@@ -136,7 +140,10 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         // Check if user is program owner/admin or just a participant
         const isOwner = program.creatorId === req.user.id;
-        const membership = await storage.getUserTenantMembership(req.user.id, program.tenantId || '');
+        const membership = await storage.getUserTenantMembership(
+          req.user.id,
+          program.tenantId || ''
+        );
         const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
 
         let completions;
@@ -185,7 +192,17 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         const { db } = await import('../../db');
         const { eq, desc } = await import('drizzle-orm');
-        const { taskCompletions, tasks } = await import('@shared/schema');
+        const { taskCompletions, tasks, tenantMemberships } = await import('@shared/schema');
+
+        // Verify user has access to this tenant
+        const [membership] = await db
+          .select()
+          .from(tenantMemberships)
+          .where(
+            and(eq(tenantMemberships.userId, req.user.id), eq(tenantMemberships.tenantId, tenantId))
+          )
+          .limit(1);
+        const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
 
         // Get completions for tasks belonging to this tenant
         let rows = await db
@@ -473,8 +490,15 @@ export function createTaskCompletionRoutes(storage: IStorage) {
           return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Calculate rewards
-        const pointsToAward = task.pointsToReward || 0;
+        // Calculate rewards with multipliers
+        const basePoints = task.pointsToReward || 0;
+        const { multiplier, breakdown } = await pointsMultiplierService.calculateMultiplier({
+          userId: req.user.id,
+          taskId: task.id,
+          campaignId: existingCompletion.campaignId || undefined,
+          tenantId: task.tenantId || undefined,
+        });
+        const pointsToAward = Math.round(basePoints * multiplier);
         const now = new Date();
 
         // Update completion to completed
@@ -504,8 +528,32 @@ export function createTaskCompletionRoutes(storage: IStorage) {
           metadata: {
             taskName: task.name,
             taskType: task.taskType,
+            basePoints,
+            multiplier,
+            multiplierBreakdown: breakdown,
           },
         });
+
+        // Update fan program points balance
+        if (pointsToAward > 0 && task.tenantId) {
+          // Find the fan's program for this tenant
+          const [fanProgram] = await db
+            .select()
+            .from(fanPrograms)
+            .where(and(eq(fanPrograms.fanId, req.user.id), eq(fanPrograms.tenantId, task.tenantId)))
+            .limit(1);
+
+          if (fanProgram) {
+            await db
+              .update(fanPrograms)
+              .set({
+                currentPoints: sql`${fanPrograms.currentPoints} + ${pointsToAward}`,
+                totalPointsEarned: sql`${fanPrograms.totalPointsEarned} + ${pointsToAward}`,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              } as any)
+              .where(eq(fanPrograms.id, fanProgram.id));
+          }
+        }
 
         res.json({
           completion: updatedCompletion,

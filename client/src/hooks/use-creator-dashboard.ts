@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './use-auth';
 
@@ -52,15 +53,15 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       const [fansResult, completionsResult, redemptionsResult] = await Promise.all([
         // Fetch fans for this program
         fetch(`/api/fan-programs/program/${program.id}`)
-          .then(res => res.ok ? res.json() : [])
+          .then((res) => (res.ok ? res.json() : []))
           .catch(() => []),
         // Fetch task completions for this program
         fetch(`/api/task-completions/program/${program.id}`)
-          .then(res => res.ok ? res.json() : [])
+          .then((res) => (res.ok ? res.json() : []))
           .catch(() => []),
         // Fetch reward redemptions for this program
         fetch(`/api/reward-redemptions/program/${program.id}`)
-          .then(res => res.ok ? res.json() : [])
+          .then((res) => (res.ok ? res.json() : []))
           .catch(() => []),
       ]);
 
@@ -99,31 +100,30 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     // ====================
     let tasksCompleted = 0;
     const processedTenantIds = new Set<string>();
-    
+
     for (const data of programDataResults) {
-      const programCompleted = data.completions.filter((c: any) =>
-        c.status === 'completed' || c.status === 'claimed'
+      const programCompleted = data.completions.filter(
+        (c: any) => c.status === 'completed' || c.status === 'claimed'
       ).length;
       tasksCompleted += programCompleted;
-      
+
       if (data.completions.length > 0) {
         processedTenantIds.add(data.tenantId);
       }
     }
-    
+
     // Fallback: If no completions found via programId, try by tenantId in parallel
     if (tasksCompleted === 0 && programs.length > 0) {
-      const uniqueTenantIds = [...new Set(programs.map((p: any) => p.tenantId))].filter(
-        (id: any) => !processedTenantIds.has(id)
-      );
-      
+      const tenantIdSet = new Set<string>((programs as any[]).map((p) => String(p.tenantId)));
+      const uniqueTenantIds = [...tenantIdSet].filter((id) => !processedTenantIds.has(id));
+
       const tenantCompletionPromises = uniqueTenantIds.map(async (tenantId: string) => {
         try {
           const response = await fetch(`/api/task-completions/tenant/${tenantId}`);
           if (response.ok) {
             const completions = await response.json();
-            return completions.filter((c: any) =>
-              c.status === 'completed' || c.status === 'claimed'
+            return completions.filter(
+              (c: any) => c.status === 'completed' || c.status === 'claimed'
             ).length;
           }
         } catch {
@@ -131,7 +131,7 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         }
         return 0;
       });
-      
+
       const tenantCompletionCounts = await Promise.all(tenantCompletionPromises);
       tasksCompleted = tenantCompletionCounts.reduce((sum, count) => sum + count, 0);
     }
@@ -148,7 +148,7 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
     // CALCULATE PERCENTAGE CHANGES
     // ====================
     let fansChange = undefined;
-    let revenueChange = undefined;
+    const _revenueChange = undefined; // eslint-disable-line @typescript-eslint/no-unused-vars
     let tasksChange = undefined;
     let rewardsChange = undefined;
 
@@ -174,42 +174,45 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
         fansChange = {
           value: Math.abs(parseFloat(fansChangeValue.toFixed(1))),
           type: (fansChangeValue >= 0 ? 'increase' : 'decrease') as 'increase' | 'decrease',
-          period: 'vs last month'
+          period: 'vs last month',
         };
       }
 
       // Historical tasks completed (before 30 days ago) - use already-fetched data
       let previousTasksCompleted = 0;
       for (const data of programDataResults) {
-        previousTasksCompleted += data.completions.filter((c: any) =>
-          (c.status === 'completed' || c.status === 'claimed') &&
-          new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
+        previousTasksCompleted += data.completions.filter(
+          (c: any) =>
+            (c.status === 'completed' || c.status === 'claimed') &&
+            new Date(c.completedAt || c.updatedAt) < thirtyDaysAgo
         ).length;
       }
 
       if (previousTasksCompleted > 0 && tasksCompleted !== previousTasksCompleted) {
-        const tasksChangeValue = ((tasksCompleted - previousTasksCompleted) / previousTasksCompleted) * 100;
+        const tasksChangeValue =
+          ((tasksCompleted - previousTasksCompleted) / previousTasksCompleted) * 100;
         tasksChange = {
           value: Math.abs(parseFloat(tasksChangeValue.toFixed(1))),
           type: (tasksChangeValue >= 0 ? 'increase' : 'decrease') as 'increase' | 'decrease',
-          period: 'vs last month'
+          period: 'vs last month',
         };
       }
 
       // Historical rewards redeemed (before 30 days ago) - use already-fetched data
       let previousRewardsRedeemed = 0;
       for (const data of programDataResults) {
-        previousRewardsRedeemed += data.redemptions.filter((r: any) =>
-          new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
+        previousRewardsRedeemed += data.redemptions.filter(
+          (r: any) => new Date(r.redeemedAt || r.createdAt) < thirtyDaysAgo
         ).length;
       }
 
       if (previousRewardsRedeemed > 0 && rewardsRedeemed !== previousRewardsRedeemed) {
-        const rewardsChangeValue = ((rewardsRedeemed - previousRewardsRedeemed) / previousRewardsRedeemed) * 100;
+        const rewardsChangeValue =
+          ((rewardsRedeemed - previousRewardsRedeemed) / previousRewardsRedeemed) * 100;
         rewardsChange = {
           value: Math.abs(parseFloat(rewardsChangeValue.toFixed(1))),
           type: (rewardsChangeValue >= 0 ? 'increase' : 'decrease') as 'increase' | 'decrease',
-          period: 'vs last month'
+          period: 'vs last month',
         };
       }
     } catch (error) {
@@ -222,9 +225,9 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       tasksCompleted,
       rewardsRedeemed,
       fansChange,
-      revenueChange,
+      revenueChange: _revenueChange,
       tasksChange,
-      rewardsChange
+      rewardsChange,
     };
   } catch (error) {
     console.error('Failed to fetch creator stats:', error);
@@ -232,7 +235,7 @@ const fetchCreatorStats = async (creatorId: string): Promise<CreatorStats> => {
       totalFans: 0,
       totalRevenue: 0,
       tasksCompleted: 0,
-      rewardsRedeemed: 0
+      rewardsRedeemed: 0,
     };
   }
 };
@@ -263,7 +266,7 @@ const fetchCreatorActivity = async (
       description: activity.description,
       timestamp: formatRelativeTime(activity.timestamp),
       points: activity.points,
-      fan: activity.fanName || activity.fanId
+      fan: activity.fanName || activity.fanId,
     }));
   } catch (error) {
     console.error('Failed to fetch creator activity:', error);
@@ -274,7 +277,7 @@ const fetchCreatorActivity = async (
 // Helper function to format timestamps as relative time
 function formatRelativeTime(dateString: string | Date): string {
   if (!dateString) return 'Unknown';
-  
+
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -282,7 +285,7 @@ function formatRelativeTime(dateString: string | Date): string {
   const diffMinutes = Math.floor(diffSeconds / 60);
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);
-  
+
   if (diffSeconds < 60) return 'Just now';
   if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
@@ -297,7 +300,7 @@ function formatRelativeTime(dateString: string | Date): string {
 // Custom hooks
 export const useCreatorStats = () => {
   const { user } = useAuth();
-  
+
   return useQuery({
     queryKey: ['creatorStats', user?.id],
     queryFn: () => fetchCreatorStats(user?.id || ''),
@@ -307,7 +310,11 @@ export const useCreatorStats = () => {
   });
 };
 
-export const useCreatorActivity = (params?: { search?: string; type?: string; dateFilter?: string }) => {
+export const useCreatorActivity = (params?: {
+  search?: string;
+  type?: string;
+  dateFilter?: string;
+}) => {
   const { user } = useAuth();
 
   return useQuery({

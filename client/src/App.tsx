@@ -53,6 +53,7 @@ import FanPoints from '@/pages/fan-dashboard/points';
 import FanNotifications from '@/pages/fan-dashboard/notifications';
 import FanCampaignDetail from '@/pages/fan-dashboard/campaign-detail';
 import FanSettings from '@/pages/fan-dashboard/settings';
+import FanRewardsStore from '@/pages/fan-dashboard/rewards-store';
 // RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from '@/pages/fan-onboarding-profile';
 import FanChooseCreators from '@/pages/fan-choose-creators';
@@ -166,6 +167,7 @@ function Router() {
       />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
+      <Route path="/fan-dashboard/rewards-store" component={FanRewardsStore} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
       <Route path="/fan-dashboard/billing" component={BillingPage} />
       <Route path="/fan-dashboard/settings" component={FanSettings} />
@@ -277,26 +279,26 @@ function App() {
               <TooltipProvider>
                 <AuthModalProvider>
                   <NewAuthRouter>
-                  <div className="min-h-screen bg-brand-dark-bg">
-                    {/* Skip to main content link for accessibility */}
-                    <a
-                      href="#main-content"
-                      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-md focus:outline-none"
-                    >
-                      Skip to main content
-                    </a>
-                    {!isOnboardingRoute && <Navigation />}
-                    <main id="main-content" tabIndex={-1}>
-                      <Router />
-                    </main>
-                    {isPublicRoute && location !== '/' && <Footer />}
-                  </div>
-                  <Toaster />
-                </NewAuthRouter>
-              </AuthModalProvider>
-            </TooltipProvider>
-          </AuthProvider>
-        </ParticleProvider>
+                    <div className="min-h-screen bg-brand-dark-bg">
+                      {/* Skip to main content link for accessibility */}
+                      <a
+                        href="#main-content"
+                        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-md focus:outline-none"
+                      >
+                        Skip to main content
+                      </a>
+                      {!isOnboardingRoute && <Navigation />}
+                      <main id="main-content" tabIndex={-1}>
+                        <Router />
+                      </main>
+                      {isPublicRoute && location !== '/' && <Footer />}
+                    </div>
+                    <Toaster />
+                  </NewAuthRouter>
+                </AuthModalProvider>
+              </TooltipProvider>
+            </AuthProvider>
+          </ParticleProvider>
         </Suspense>
       </QueryClientProvider>
     </ErrorBoundary>

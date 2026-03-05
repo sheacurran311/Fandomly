@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,11 +22,6 @@ export default function CreatorSpotifyWidget() {
   const [userInfo, setUserInfo] = useState<SpotifyUserInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Only show for creators
-  if (user?.userType !== 'creator') {
-    return null;
-  }
-
   useEffect(() => {
     // Attempt to fetch stored connection
     const loadStatus = async () => {
@@ -33,9 +29,9 @@ export default function CreatorSpotifyWidget() {
         const response = await fetch('/api/social-connections/spotify', {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -44,30 +40,32 @@ export default function CreatorSpotifyWidget() {
             setIsConnected(true);
             const conn = data.connection;
             const profile = conn.profileData;
-            
+
             console.log('[Spotify Widget] Profile data:', profile);
-            
+
             // Extract display name from multiple possible locations
-            const displayName = 
-              profile?.display_name || 
+            const displayName =
+              profile?.display_name ||
               profile?.name ||
               profile?.username ||
-              conn.platformDisplayName || 
-              conn.platformUsername || 
+              conn.platformDisplayName ||
+              conn.platformUsername ||
               'Connected';
-            
-            const followerCount = 
-              profile?.followers?.total || 
-              profile?.followers || 
-              profile?.follower_count || 
-              0;
-            
-            console.log('[Spotify Widget] Extracted - displayName:', displayName, 'followers:', followerCount);
-            
+
+            const followerCount =
+              profile?.followers?.total || profile?.followers || profile?.follower_count || 0;
+
+            console.log(
+              '[Spotify Widget] Extracted - displayName:',
+              displayName,
+              'followers:',
+              followerCount
+            );
+
             setUserInfo({
               id: profile?.id || conn.platformUserId || '',
               display_name: displayName,
-              followers: followerCount
+              followers: followerCount,
             });
           } else {
             setIsConnected(false);
@@ -87,15 +85,15 @@ export default function CreatorSpotifyWidget() {
     try {
       setIsConnecting(true);
       setError(null);
-      await socialManager.getAPI('spotify').secureLogin();
+      await (socialManager as any).getAPI('spotify').secureLogin();
       // Reload status after connection
       setTimeout(async () => {
         const response = await fetch('/api/social-connections/spotify', {
           headers: {
             ...getAuthHeaders(),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          credentials: 'include'
+          credentials: 'include',
         });
         if (response.ok) {
           const data = await response.json();
@@ -106,7 +104,7 @@ export default function CreatorSpotifyWidget() {
         }
         setIsConnecting(false);
       }, 1000);
-    } catch (err) {
+    } catch {
       setError('Failed to connect');
       setIsConnecting(false);
     }
@@ -118,16 +116,16 @@ export default function CreatorSpotifyWidget() {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ platform: 'spotify' }),
-        credentials: 'include'
+        credentials: 'include',
       });
       if (response.ok) {
         setIsConnected(false);
         setUserInfo(null);
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -166,7 +164,9 @@ export default function CreatorSpotifyWidget() {
                 <Users className="h-4 w-4 text-green-400" />
                 <div>
                   <p className="text-xs text-gray-400">Followers</p>
-                  <p className="text-sm font-medium text-white">{(userInfo.followers || 0).toLocaleString()}</p>
+                  <p className="text-sm font-medium text-white">
+                    {(userInfo.followers || 0).toLocaleString()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -182,18 +182,18 @@ export default function CreatorSpotifyWidget() {
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="flex-1 border-white/20 text-gray-300 hover:bg-white/10"
               onClick={() => window.open('https://spotify.com', '_blank')}
             >
               <ExternalLink className="h-3 w-3 mr-1" />
               Profile
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="border-white/20 text-white hover:bg-white/10"
               onClick={disconnectSpotify}
             >
@@ -211,6 +211,11 @@ export default function CreatorSpotifyWidget() {
     );
   }
 
+  // Only show for creators
+  if (user?.userType !== 'creator') {
+    return null;
+  }
+
   return (
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
       <CardHeader className="pb-3">
@@ -226,11 +231,9 @@ export default function CreatorSpotifyWidget() {
           </div>
           <p className="text-sm text-gray-300 mb-2">Connect your Spotify account</p>
           <p className="text-xs text-gray-400 mb-2">Share your music with fans</p>
-          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
-            +500 Points
-          </Badge>
+          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">+500 Points</Badge>
         </div>
-        <Button 
+        <Button
           className="w-full bg-green-600 text-white hover:bg-green-700"
           onClick={connectSpotify}
           disabled={isConnecting}
@@ -260,4 +263,3 @@ export default function CreatorSpotifyWidget() {
     </Card>
   );
 }
-

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
 import { useFanStats } from '@/hooks/use-fan-dashboard';
@@ -6,6 +7,7 @@ import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Instagram,
   Twitter,
@@ -19,6 +21,7 @@ import {
   MessageSquare,
   Award,
   Video,
+  Edit as EditIcon,
 } from 'lucide-react';
 import { FaSpotify, FaPatreon } from 'react-icons/fa';
 import { SiKick } from 'react-icons/si';
@@ -33,6 +36,8 @@ import {
   useKickConnection,
   usePatreonConnection,
 } from '@/hooks/use-social-connection';
+import { useInstagramHandle } from '@/hooks/use-instagram-handle';
+import { useState } from 'react';
 
 export default function FanSocial() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -59,6 +64,11 @@ export default function FanSocial() {
   const discord = useDiscordConnection();
   const twitch = useTwitchConnection();
   const facebook = useFacebookConnection();
+  const instagram = useInstagramHandle();
+
+  // Local state for Instagram handle input
+  const [instagramHandleInput, setInstagramHandleInput] = useState('');
+  const [isEditingInstagram, setIsEditingInstagram] = useState(false);
 
   // Derive display values from hook state
   const twitterConnected = twitter.isConnected;
@@ -139,13 +149,13 @@ export default function FanSocial() {
     {
       platform: 'Instagram',
       icon: Instagram,
-      handle: '@yourhandle',
+      handle: instagram.isConnected && instagram.handle ? `@${instagram.handle}` : '@yourhandle',
       followers: 0,
-      connected: false,
+      connected: instagram.isConnected,
       color: 'text-pink-500',
       bgColor: 'bg-pink-500/20',
       buttonColor: 'border-pink-500/30 text-pink-500 hover:bg-pink-500/10',
-      description: 'Connect to participate in Instagram campaigns',
+      description: 'Add your Instagram handle to participate in campaigns',
     },
     {
       platform: 'Twitter',
@@ -276,6 +286,134 @@ export default function FanSocial() {
               {socialAccounts.map((account, index) => {
                 const Icon = account.icon;
 
+                // Special handling for Instagram (manual handle input)
+                if (account.platform === 'Instagram') {
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="flex items-center space-x-4 flex-1">
+                        <div
+                          className={`w-12 h-12 ${account.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
+                        >
+                          <Icon className={`h-6 w-6 ${account.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-white font-medium">{account.platform}</h4>
+                            {account.connected ? (
+                              <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Connected
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="border-gray-500/30 text-gray-400 text-xs"
+                              >
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Not Connected
+                              </Badge>
+                            )}
+                          </div>
+                          {account.connected && !isEditingInstagram ? (
+                            <p className="text-sm text-gray-400">{account.handle}</p>
+                          ) : (
+                            <>
+                              {(isEditingInstagram || !account.connected) && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="Enter handle (e.g. username)"
+                                    value={instagramHandleInput}
+                                    onChange={(e) => setInstagramHandleInput(e.target.value)}
+                                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-9 max-w-xs"
+                                    disabled={instagram.isSaving}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    className="bg-pink-500 hover:bg-pink-600 text-white"
+                                    onClick={async () => {
+                                      if (!instagramHandleInput.trim()) return;
+                                      const result =
+                                        await instagram.saveHandle(instagramHandleInput);
+                                      if (result.success) {
+                                        setInstagramHandleInput('');
+                                        setIsEditingInstagram(false);
+                                      }
+                                    }}
+                                    disabled={!instagramHandleInput.trim() || instagram.isSaving}
+                                  >
+                                    {instagram.isSaving ? 'Saving...' : 'Save'}
+                                  </Button>
+                                  {isEditingInstagram && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-white/20 text-gray-300 hover:bg-white/10"
+                                      onClick={() => {
+                                        setIsEditingInstagram(false);
+                                        setInstagramHandleInput('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                              {!account.connected && !isEditingInstagram && (
+                                <p className="text-xs text-gray-500 mt-1">{account.description}</p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        {account.connected ? (
+                          <div className="flex gap-2 items-center">
+                            <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                              Rewarded
+                            </Badge>
+                            {!isEditingInstagram && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-white/20 text-gray-300 hover:bg-white/10"
+                                onClick={() => {
+                                  setInstagramHandleInput(instagram.handle || '');
+                                  setIsEditingInstagram(true);
+                                }}
+                              >
+                                <EditIcon className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-white/20 text-gray-300 hover:bg-white/10"
+                              onClick={() => {
+                                instagram.disconnect();
+                                setIsEditingInstagram(false);
+                                setInstagramHandleInput('');
+                              }}
+                              data-testid="button-disconnect-instagram-fan"
+                            >
+                              <Unlink className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                            +500 Points
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Standard OAuth platforms
                 return (
                   <div
                     key={index}
@@ -372,8 +510,7 @@ export default function FanSocial() {
                               (account.platform === 'Discord' && discordConnecting) ||
                               (account.platform === 'Twitch' && twitchConnecting) ||
                               (account.platform === 'Kick' && kickConnecting) ||
-                              (account.platform === 'Patreon' && patreonConnecting) ||
-                              account.platform === 'Instagram'
+                              (account.platform === 'Patreon' && patreonConnecting)
                             }
                             data-testid={`button-connect-${account.platform.toLowerCase()}-fan`}
                           >
@@ -387,9 +524,7 @@ export default function FanSocial() {
                             (account.platform === 'Kick' && kickConnecting) ||
                             (account.platform === 'Patreon' && patreonConnecting)
                               ? 'Connecting...'
-                              : account.platform === 'Instagram'
-                                ? 'Coming Soon'
-                                : 'Connect'}
+                              : 'Connect'}
                           </Button>
                         </div>
                       )}

@@ -13,7 +13,7 @@ import { registerGoogleAuthRoutes } from './auth/google-routes';
 import { registerAuthRoutes } from './auth/auth-routes';
 import { registerAdminRoutes } from './admin/admin-routes';
 import { registerAdminAnalyticsRoutes } from './admin/admin-analytics-routes';
-// Dynamic Analytics removed — Particle Network replaced Dynamic Labs
+import { registerMultiplierRoutes } from './admin/multiplier-routes';
 import { registerTwitterVerificationRoutes } from './social/twitter-verification-routes';
 import { registerReferralRoutes } from './points/referral-routes';
 import { registerPointsRoutes } from './points/points-routes';
@@ -36,6 +36,8 @@ import { registerTwitterTaskRoutes } from './tasks/twitter-task-routes';
 import { registerYouTubeTaskRoutes } from './tasks/youtube-task-routes';
 import { registerSpotifyTaskRoutes } from './tasks/spotify-task-routes';
 import { registerTikTokTaskRoutes } from './tasks/tiktok-task-routes';
+import { registerQuizRoutes } from './tasks/quiz-routes';
+import { registerVisitTrackingRoutes } from './tasks/visit-tracking-routes';
 import { registerLeaderboardRoutes } from './programs/leaderboard-routes';
 import { registerBetaSignupRoutes } from './beta-signup-routes';
 import { registerVerificationAnalyticsRoutes } from './analytics/verification-analytics-routes';
@@ -47,6 +49,8 @@ import { registerParticleAuthRoutes } from './auth/particle-routes';
 import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
 import { registerReputationRoutes } from './reputation/reputation-routes';
 import { registerBlockchainRoutes } from './blockchain/blockchain-routes';
+import { registerBadgeRoutes } from './blockchain/badge-routes';
+import { errorHandler } from '../lib/api-errors';
 import {
   insertUserSchema,
   insertCreatorSchema,
@@ -256,7 +260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/creator-verification', creatorVerificationRoutes);
 
   // Register audit log routes (admin only)
-  app.use('/api/audit-logs', createAuditRoutes(storage));
+  app.use('/api/audit-logs', createAuditRoutes(storage as any));
 
   // Check username availability
   app.get('/api/auth/check-username/:username', async (req, res) => {
@@ -1074,7 +1078,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Content Creator-specific fields
             aboutMe: aboutMe || undefined,
             contentType: contentType || undefined,
-            mainContentPlatforms: Array.isArray(mainContentPlatforms) ? mainContentPlatforms : undefined,
+            mainContentPlatforms: Array.isArray(mainContentPlatforms)
+              ? mainContentPlatforms
+              : undefined,
             topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : undefined,
             // Brand-specific fields
             brandName: brandName || undefined,
@@ -2371,8 +2377,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentTier: fanProgram.currentTier,
         username: user?.username,
         email: user?.email,
-        fullName: user?.fullName,
-        avatarUrl: user?.avatarUrl,
+        fullName: user?.username,
+        avatar: user?.avatar,
       }));
 
       console.log(
@@ -2704,12 +2710,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSpotifyTaskRoutes(app);
   registerTikTokTaskRoutes(app);
 
+  // Register quiz/poll and website visit tracking routes
+  registerQuizRoutes(app);
+  registerVisitTrackingRoutes(app);
+
   // Register tenant routes
   registerTenantRoutes(app);
 
   // Register admin routes
   registerAdminRoutes(app);
   registerAdminAnalyticsRoutes(app);
+  registerMultiplierRoutes(app);
 
   // Dynamic Analytics routes removed — replaced by admin analytics
 
@@ -2785,7 +2796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Task Completion Routes
   const { createTaskCompletionRoutes } = await import('./tasks/task-completion-routes');
-  app.use('/api/task-completions', createTaskCompletionRoutes(storage));
+  app.use('/api/task-completions', createTaskCompletionRoutes(storage as any));
 
   // Creator Store Public API
   app.get('/api/store/:creatorUrl', async (req, res) => {
@@ -2864,6 +2875,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Blockchain routes (token factory, staking multipliers)
   registerBlockchainRoutes(app);
+
+  // Register Badge routes (badge claiming and viewing)
+  registerBadgeRoutes(app);
 
   // ============================================================================
   // CAMPAIGN BUILDER: Draft & Task Assignment Endpoints (legacy)
@@ -3349,6 +3363,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to fetch badge rewards' });
     }
   });
+
+  // Register global error handler (must be last middleware)
+  app.use(errorHandler);
 
   const httpServer = createServer(app);
   return httpServer;

@@ -1,16 +1,17 @@
 /**
  * Tier Progression Service
  * Sprint 5: Handles automatic tier upgrades/downgrades based on points
- * 
+ *
  * Features:
  * - Auto-upgrade users when point thresholds are crossed
  * - Auto-downgrade users when points drop (if configured)
  * - Track tier progression history
  * - Enforce tier-gated benefits
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { db } from '../db';
-import { sql, eq, and, desc, gte, lte, asc } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 interface TierConfig {
   id: string;
@@ -47,9 +48,8 @@ class TierProgressionService {
     fanProgramId: string,
     triggerReason: string = 'points_change'
   ): Promise<TierProgressionResult> {
-    // Get current fan program state
-    const [fanProgram] = await db.execute(sql`
-      SELECT 
+    const fanProgramResult = await db.execute(sql`
+      SELECT
         fp.id,
         fp.program_id,
         fp.points_balance,
@@ -62,12 +62,12 @@ class TierProgressionService {
       WHERE fp.id = ${fanProgramId}
     `);
 
-    if (!(fanProgram as any).rows?.[0]) {
+    if (!(fanProgramResult as any).rows?.[0]) {
       console.warn(`[TierProgression] Fan program not found: ${fanProgramId}`);
       return { changed: false };
     }
 
-    const program = (fanProgram as any).rows[0];
+    const program = (fanProgramResult as any).rows[0] as any;
     const currentPoints = program.lifetime_points || program.points_balance || 0;
 
     // Get all tiers for this loyalty program, ordered by min_points
@@ -118,9 +118,7 @@ class TierProgressionService {
     }
 
     const currentTierId = program.current_tier_id;
-    const currentTier = currentTierId 
-      ? tiers.find(t => t.id === currentTierId) 
-      : undefined;
+    const currentTier = currentTierId ? tiers.find((t) => t.id === currentTierId) : undefined;
 
     // Check if tier changed
     if (currentTierId === newTier.id) {
@@ -152,7 +150,9 @@ class TierProgressionService {
         (${fanProgramId}, ${currentTierId || null}, ${newTier.id}, ${progressionType}, ${triggerReason}, ${currentPoints})
     `);
 
-    console.log(`[TierProgression] User ${progressionType}: ${currentTier?.name || 'None'} -> ${newTier.name}`);
+    console.log(
+      `[TierProgression] User ${progressionType}: ${currentTier?.name || 'None'} -> ${newTier.name}`
+    );
 
     return {
       changed: true,
@@ -228,8 +228,8 @@ class TierProgressionService {
     pointsNeeded: number;
     currentPoints: number;
   }> {
-    const [fanProgram] = await db.execute(sql`
-      SELECT 
+    const fanProgramResult = await db.execute(sql`
+      SELECT
         fp.program_id,
         fp.points_balance,
         fp.lifetime_points,
@@ -238,11 +238,11 @@ class TierProgressionService {
       WHERE fp.id = ${fanProgramId}
     `);
 
-    if (!(fanProgram as any).rows?.[0]) {
+    if (!(fanProgramResult as any).rows?.[0]) {
       return { nextTier: null, pointsNeeded: 0, currentPoints: 0 };
     }
 
-    const program = (fanProgram as any).rows[0];
+    const program = (fanProgramResult as any).rows[0] as any;
     const currentPoints = program.lifetime_points || program.points_balance || 0;
 
     // Get all tiers ordered by min_points
@@ -283,14 +283,11 @@ class TierProgressionService {
   /**
    * Check if user has a specific benefit at their current tier
    */
-  async hasTierBenefit(
-    fanProgramId: string, 
-    benefitType: TierBenefit['type']
-  ): Promise<boolean> {
+  async hasTierBenefit(fanProgramId: string, benefitType: TierBenefit['type']): Promise<boolean> {
     const currentTier = await this.getCurrentTier(fanProgramId);
     if (!currentTier) return false;
 
-    return currentTier.benefits.some(b => b.type === benefitType);
+    return currentTier.benefits.some((b) => b.type === benefitType);
   }
 
   /**
@@ -312,7 +309,11 @@ class TierProgressionService {
         maxPoints: 999,
         tierOrder: 1,
         benefits: [
-          { type: 'custom' as const, name: 'Welcome Reward', description: 'A special welcome gift for joining' }
+          {
+            type: 'custom' as const,
+            name: 'Welcome Reward',
+            description: 'A special welcome gift for joining',
+          },
         ],
       },
       {
@@ -321,8 +322,17 @@ class TierProgressionService {
         maxPoints: 4999,
         tierOrder: 2,
         benefits: [
-          { type: 'bonus_points' as const, name: 'Points Bonus', description: '10% bonus points on all tasks', value: 10 },
-          { type: 'early_access' as const, name: 'Early Access', description: 'Early access to new content' }
+          {
+            type: 'bonus_points' as const,
+            name: 'Points Bonus',
+            description: '10% bonus points on all tasks',
+            value: 10,
+          },
+          {
+            type: 'early_access' as const,
+            name: 'Early Access',
+            description: 'Early access to new content',
+          },
         ],
       },
       {
@@ -331,9 +341,22 @@ class TierProgressionService {
         maxPoints: 14999,
         tierOrder: 3,
         benefits: [
-          { type: 'bonus_points' as const, name: 'Points Bonus', description: '25% bonus points on all tasks', value: 25 },
-          { type: 'early_access' as const, name: 'Priority Access', description: 'Priority access to events and content' },
-          { type: 'exclusive_content' as const, name: 'Exclusive Content', description: 'Access to Gold-tier exclusive content' }
+          {
+            type: 'bonus_points' as const,
+            name: 'Points Bonus',
+            description: '25% bonus points on all tasks',
+            value: 25,
+          },
+          {
+            type: 'early_access' as const,
+            name: 'Priority Access',
+            description: 'Priority access to events and content',
+          },
+          {
+            type: 'exclusive_content' as const,
+            name: 'Exclusive Content',
+            description: 'Access to Gold-tier exclusive content',
+          },
         ],
       },
       {
@@ -342,10 +365,27 @@ class TierProgressionService {
         maxPoints: null,
         tierOrder: 4,
         benefits: [
-          { type: 'bonus_points' as const, name: 'Points Bonus', description: '50% bonus points on all tasks', value: 50 },
-          { type: 'early_access' as const, name: 'VIP Access', description: 'VIP access to all events and content' },
-          { type: 'exclusive_content' as const, name: 'Premium Content', description: 'Access to all exclusive content' },
-          { type: 'custom' as const, name: 'Personal Perks', description: 'Special personalized perks and recognition' }
+          {
+            type: 'bonus_points' as const,
+            name: 'Points Bonus',
+            description: '50% bonus points on all tasks',
+            value: 50,
+          },
+          {
+            type: 'early_access' as const,
+            name: 'VIP Access',
+            description: 'VIP access to all events and content',
+          },
+          {
+            type: 'exclusive_content' as const,
+            name: 'Premium Content',
+            description: 'Access to all exclusive content',
+          },
+          {
+            type: 'custom' as const,
+            name: 'Personal Perks',
+            description: 'Special personalized perks and recognition',
+          },
         ],
       },
     ];
@@ -376,7 +416,9 @@ class TierProgressionService {
       }
     }
 
-    console.log(`[TierProgression] Created ${createdTiers.length} default tiers for program ${programId}`);
+    console.log(
+      `[TierProgression] Created ${createdTiers.length} default tiers for program ${programId}`
+    );
     return createdTiers;
   }
 }

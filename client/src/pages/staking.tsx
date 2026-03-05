@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Fan Staking Page — Stake creator tokens, earn FAN rewards.
  *
@@ -346,8 +347,7 @@ export default function StakingPage() {
   const { user } = useAuth();
   const { address } = useAccount();
   const userType = (user?.userType as 'fan' | 'creator') || 'fan';
-  const walletAddress =
-    address || ((user as Record<string, unknown>)?.avalancheL1Address as string | undefined);
+  const walletAddress = address || ((user as any)?.avalancheL1Address as string | undefined);
 
   const { data: reputation, isLoading: repLoading } = useQuery<ReputationData>({
     queryKey: ['/api/reputation/me'],

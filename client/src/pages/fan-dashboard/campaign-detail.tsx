@@ -1,4 +1,5 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRoute } from 'wouter';
 import DashboardLayout from '@/components/layout/dashboard-layout';
@@ -19,8 +20,6 @@ import {
 } from '@/hooks/useCampaignParticipation';
 import {
   Trophy,
-  Clock,
-  Target,
   Star,
   Calendar,
   ArrowLeft,
@@ -36,8 +35,15 @@ import {
   CheckCircle2,
   Circle,
   Timer,
+  Image,
+  Ticket,
+  Target,
+  Clock,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { useMutation } from '@tanstack/react-query';
+import { fetchApi, queryClient } from '@/lib/queryClient';
+import CompletionCelebration from '@/components/campaigns/completion-celebration';
 
 function getPlatformIcon(taskType: string) {
   if (taskType.startsWith('twitter')) return 'X';
@@ -72,6 +78,8 @@ export default function CampaignDetail() {
   const { toast } = useToast();
 
   const [accessCode, setAccessCode] = useState('');
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [claimedRewardsData, setClaimedRewardsData] = useState<any[]>([]);
 
   const { data: detailData, isLoading: detailLoading } = useCampaignDetail(campaignId);
   const { data: progressData } = useCampaignProgress(campaignId);
@@ -79,6 +87,40 @@ export default function CampaignDetail() {
   const joinCampaign = useJoinCampaign();
   const completeTask = useCompleteTaskInCampaign();
   const claimBonus = useClaimCompletionBonus();
+
+  const claimRewardsMutation = useMutation({
+    mutationFn: async () => {
+      if (!campaignId) throw new Error('No campaign');
+      return fetchApi(`/api/campaigns/v2/${campaignId}/claim-rewards`, {
+        method: 'POST',
+      }) as Promise<Record<string, unknown>>;
+    },
+    onSuccess: (data: any) => {
+      setClaimedRewardsData(data.claimedRewards || []);
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns/v2', campaignId, 'progress'] });
+    },
+  });
+
+  // Show celebration when campaign is completed and has pending rewards
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (
+      progressData?.campaignCompleted &&
+      !progressData?.completionBonusAwarded &&
+      !showCelebration
+    ) {
+      const pendingRewards = (progressData as any)?.pendingRewards;
+      const completionBonusRewards = (detailData?.campaign as any)?.completionBonusRewards;
+      if (
+        (pendingRewards && pendingRewards.length > 0) ||
+        (completionBonusRewards && completionBonusRewards.length > 0)
+      ) {
+        setShowCelebration(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressData?.campaignCompleted, progressData?.completionBonusAwarded]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const campaign = detailData?.campaign;
   const hasJoined = !!progressData;
@@ -113,11 +155,27 @@ export default function CampaignDetail() {
 
   const handleClaimBonus = async () => {
     if (!campaignId) return;
+    const completionBonusRewards = (detailData?.campaign as any)?.completionBonusRewards;
+    const hasBonusRewards = completionBonusRewards && completionBonusRewards.length > 0;
+
     try {
       await claimBonus.mutateAsync(campaignId);
-      toast({ title: 'Bonus claimed!', description: 'Completion bonus has been awarded!' });
+      if (hasBonusRewards) {
+        setShowCelebration(true);
+      } else {
+        toast({ title: 'Bonus claimed!', description: 'Completion bonus has been awarded!' });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Could not claim bonus';
+      toast({ title: 'Claim failed', description: msg, variant: 'destructive' });
+    }
+  };
+
+  const handleClaimRewards = async () => {
+    try {
+      await claimRewardsMutation.mutateAsync();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not claim rewards';
       toast({ title: 'Claim failed', description: msg, variant: 'destructive' });
     }
   };
@@ -199,10 +257,10 @@ export default function CampaignDetail() {
             <Star className="h-3 w-3 mr-1" />
             {campaign.totalPoints} total points
           </Badge>
-          {Number(campaignExt.campaignMultiplier) > 1 && (
+          {Number((campaignExt as any).campaignMultiplier) > 1 && (
             <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
               <Zap className="h-3 w-3 mr-1" />
-              {campaignExt.campaignMultiplier}x multiplier
+              {(campaignExt as any).campaignMultiplier}x multiplier
             </Badge>
           )}
         </div>
@@ -285,7 +343,7 @@ export default function CampaignDetail() {
                 <Alert className="bg-red-500/10 border-red-500/30 mb-4">
                   <AlertCircle className="h-4 w-4 text-red-400" />
                   <AlertDescription className="text-red-200">
-                    {eligibilityData.reasons.join('. ')}
+                    {String(eligibilityData.reasons.join('. '))}
                   </AlertDescription>
                 </Alert>
               )}
@@ -332,31 +390,98 @@ export default function CampaignDetail() {
                           Campaign Complete!
                         </p>
                         <p className="text-sm text-gray-300 mt-1">
-                          Claim your completion bonus of {campaignExt.completionBonusPoints || 0}{' '}
-                          points
+                          {(() => {
+                            const bonusRewards =
+                              ((campaignExt as any).completionBonusRewards as any[]) || [];
+                            const bonusPts = Number(
+                              (campaignExt as any).completionBonusPoints || 0
+                            );
+                            const parts: string[] = [];
+                            if (bonusPts > 0) parts.push(`${bonusPts} bonus points`);
+                            const nftCount = bonusRewards.filter(
+                              (r: any) => r.type === 'nft'
+                            ).length;
+                            const raffleCount = bonusRewards.filter(
+                              (r: any) => r.type === 'raffle_entry'
+                            ).length;
+                            const badgeCount = bonusRewards.filter(
+                              (r: any) => r.type === 'badge'
+                            ).length;
+                            if (nftCount) parts.push(`${nftCount} NFT${nftCount > 1 ? 's' : ''}`);
+                            if (raffleCount)
+                              parts.push(
+                                `${raffleCount} raffle entr${raffleCount > 1 ? 'ies' : 'y'}`
+                              );
+                            if (badgeCount)
+                              parts.push(`${badgeCount} badge${badgeCount > 1 ? 's' : ''}`);
+                            return parts.length > 0
+                              ? `Claim your rewards: ${parts.join(', ')}`
+                              : 'Claim your completion bonus';
+                          })()}
                         </p>
                       </div>
                       <Button
                         onClick={handleClaimBonus}
                         disabled={claimBonus.isPending}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-black"
+                        className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-semibold"
                       >
                         {claimBonus.isPending ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         ) : (
                           <Gift className="h-4 w-4 mr-2" />
                         )}
-                        Claim Bonus
+                        Claim Rewards
                       </Button>
                     </div>
                   </div>
                 )}
                 {progressData.completionBonusAwarded && (
-                  <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                    <p className="text-green-300 text-sm flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Completion bonus awarded! Congratulations!
-                    </p>
+                  <div className="mt-4 space-y-2">
+                    <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                      <p className="text-green-300 text-sm flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Completion bonus awarded! Congratulations!
+                      </p>
+                    </div>
+                    {/* Show claimed rewards */}
+                    {(() => {
+                      const claimed = (progressData as any)?.claimedRewards as any[] | undefined;
+                      if (!claimed || claimed.length === 0) return null;
+                      return (
+                        <div className="space-y-2">
+                          {claimed.map((reward: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                                {reward.type === 'nft' && (
+                                  <Image className="w-4 h-4 text-purple-400" />
+                                )}
+                                {reward.type === 'badge' && (
+                                  <Award className="w-4 h-4 text-blue-400" />
+                                )}
+                                {reward.type === 'raffle_entry' && (
+                                  <Ticket className="w-4 h-4 text-amber-400" />
+                                )}
+                                {reward.type === 'reward' && (
+                                  <Gift className="w-4 h-4 text-green-400" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-white text-sm font-medium">
+                                  {reward.metadata?.displayName ||
+                                    reward.metadata?.name ||
+                                    reward.type}
+                                </p>
+                                <p className="text-xs text-gray-400">Claimed</p>
+                              </div>
+                              <CheckCircle2 className="h-4 w-4 text-green-400" />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </CardContent>
@@ -524,7 +649,78 @@ export default function CampaignDetail() {
             </div>
           </>
         )}
+        {/* Completion Rewards display before tasks when has rewards */}
+        {hasJoined &&
+          campaign &&
+          (() => {
+            const bonusRewards = ((campaignExt as any).completionBonusRewards as any[]) || [];
+            if (bonusRewards.length === 0) return null;
+            return (
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <CardContent className="p-6">
+                  <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-amber-400" />
+                    Completion Rewards
+                  </h3>
+                  <p className="text-sm text-gray-400 mb-4">
+                    Complete all required tasks to earn these rewards
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {bonusRewards.map((reward: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                          {reward.type === 'nft' && <Image className="w-5 h-5 text-purple-400" />}
+                          {reward.type === 'raffle_entry' && (
+                            <Ticket className="w-5 h-5 text-amber-400" />
+                          )}
+                          {reward.type === 'badge' && <Award className="w-5 h-5 text-blue-400" />}
+                          {reward.type === 'reward' && <Gift className="w-5 h-5 text-green-400" />}
+                        </div>
+                        <div>
+                          <p className="text-white text-sm font-medium">
+                            {reward.metadata?.displayName || reward.metadata?.name || reward.type}
+                          </p>
+                          <Badge
+                            variant="secondary"
+                            className="text-xs bg-white/10 text-gray-300 border-white/20"
+                          >
+                            {reward.type === 'nft'
+                              ? 'NFT'
+                              : reward.type === 'raffle_entry'
+                                ? 'Raffle Entry'
+                                : reward.type === 'badge'
+                                  ? 'Badge'
+                                  : 'Reward'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
       </div>
+
+      {/* Completion Celebration Overlay */}
+      <CompletionCelebration
+        open={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        campaignName={campaign?.name || 'Campaign'}
+        bonusPoints={Number((campaignExt as any)?.completionBonusPoints || 0)}
+        pendingRewards={((progressData as any)?.pendingRewards || []).map((r: any) => ({
+          type: r.type,
+          rewardId: r.rewardId,
+          metadata: r.metadata,
+          status: r.status || 'pending',
+        }))}
+        onClaimRewards={handleClaimRewards}
+        isClaimingRewards={claimRewardsMutation.isPending}
+        claimedRewards={claimedRewardsData.length > 0 ? claimedRewardsData : undefined}
+      />
     </DashboardLayout>
   );
 }

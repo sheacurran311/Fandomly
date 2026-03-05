@@ -32,9 +32,8 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       try {
         if (event.origin !== window.location.origin) return;
         if (event.data?.type === 'twitter-pkce-request') {
-          const reqState = (event.data && (event.data as Record<string, unknown>).state) as
-            | string
-            | undefined;
+          const reqState = (event.data &&
+            (event.data as unknown as Record<string, unknown>).state) as string | undefined;
           let verifier: string | null = null;
           try {
             const rawMap = sessionStorage.getItem('twitter_pkce_map');
@@ -53,8 +52,9 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
           if (!verifier) {
             try {
               verifier =
-                ((window as Record<string, unknown>).__twitterPkceVerifier as string | null) ||
-                null;
+                ((window as unknown as Record<string, unknown>).__twitterPkceVerifier as
+                  | string
+                  | null) || null;
             } catch {
               // noop
             }
@@ -146,7 +146,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
 
     // Expose current app user type for popup OAuth state tagging
     try {
-      (window as Record<string, unknown>).__userType = user?.userType || null;
+      (window as unknown as Record<string, unknown>).__userType = user?.userType || null;
     } catch {
       // noop
     }

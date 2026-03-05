@@ -497,10 +497,13 @@ export class TwitterSDKManager {
     try {
       const redirectUri = getEnvRedirectUri();
 
-      const data = await fetchApi('/api/social/twitter/token', {
-        method: 'POST',
-        body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier }),
-      });
+      const data: { access_token?: string; refresh_token?: string } = await fetchApi(
+        '/api/social/twitter/token',
+        {
+          method: 'POST',
+          body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier }),
+        }
+      );
 
       if (!data?.access_token) return null;
 

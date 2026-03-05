@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   motion,
@@ -73,8 +74,7 @@ function DevAccessPanel() {
         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/[0.08]" />
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        Already have access?{' '}
-        <span className="text-brand-primary">Sign in to your dashboard.</span>
+        Already have access? <span className="text-brand-primary">Sign in to your dashboard.</span>
       </p>
 
       {particleEnabled ? (
@@ -518,7 +518,10 @@ export default function Home() {
               Sign in
             </Link>{' '}
             or{' '}
-            <Link href="/creator-dashboard" className="underline hover:text-brand-secondary transition-colors">
+            <Link
+              href="/creator-dashboard"
+              className="underline hover:text-brand-secondary transition-colors"
+            >
               go to dashboard
             </Link>
           </p>

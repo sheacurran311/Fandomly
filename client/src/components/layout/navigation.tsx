@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
