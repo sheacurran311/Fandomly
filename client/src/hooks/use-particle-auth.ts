@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Particle Auth Bridge Hook
  *
@@ -32,33 +33,10 @@ import { isParticleAuthEnabled } from '@/contexts/particle-provider';
  */
 export function useParticleAuthBridge() {
   const { loginWithParticle, logout, isAuthenticated } = useAuth();
-  const bridgingRef = useRef(false);
+  const _bridgingRef = useRef(false);
 
   useEffect(() => {
-    // Skip if Particle is not enabled
     if (!isParticleAuthEnabled()) return;
-
-    // Dynamically import Particle hooks to avoid bundling when disabled
-    let cleanup: (() => void) | undefined;
-
-    (async () => {
-      try {
-        const { useConnectKit } = await import('@particle-network/connectkit');
-
-        // We can't use React hooks inside an async function,
-        // so instead we'll listen for custom events dispatched by
-        // the ParticleAuthListener component (see below).
-        // This is a safety fallback — the primary bridge is the
-        // ParticleAuthListener component mounted in the provider tree.
-      } catch {
-        // Particle SDK not installed yet — expected during development
-        console.warn('[Particle Bridge] @particle-network/connectkit not available');
-      }
-    })();
-
-    return () => {
-      cleanup?.();
-    };
   }, [loginWithParticle, logout, isAuthenticated]);
 }
 

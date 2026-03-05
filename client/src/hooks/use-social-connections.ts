@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
@@ -27,21 +28,19 @@ export interface SocialConnection {
 
 export function useSocialConnections() {
   const { user } = useAuth();
-  const qc = useQueryClient();
+  const _qc = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery<{ connections: SocialConnection[] }>({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['/api/social-connections'],
     queryFn: async () => {
       const res = await fetchApi('/api/social-connections');
-      return res;
+      return res as { connections: SocialConnection[] };
     },
     enabled: !!user,
-    // Keep cached data for 30 seconds before considering stale,
-    // but explicit invalidation via invalidateSocialConnections() always works.
     staleTime: 30_000,
   });
 
-  const connections: SocialConnection[] = data?.connections ?? [];
+  const connections: SocialConnection[] = useMemo(() => (data as any)?.connections ?? [], [data]);
 
   const connectedPlatforms = useMemo(() => {
     const map = new Map<string, SocialConnection>();
@@ -51,12 +50,12 @@ export function useSocialConnections() {
 
   const isPlatformConnected = useCallback(
     (platform: string): boolean => connectedPlatforms.has(platform),
-    [connectedPlatforms],
+    [connectedPlatforms]
   );
 
   const getConnection = useCallback(
     (platform: string): SocialConnection | undefined => connectedPlatforms.get(platform),
-    [connectedPlatforms],
+    [connectedPlatforms]
   );
 
   return {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * use-blockchain — Shared React hooks for Fandomly Chain L1 contract interactions.
  *
@@ -149,12 +150,13 @@ export function useStakeInfo(userAddress: string | undefined, tokenAddress: stri
   return useQuery({
     queryKey: ['blockchain', 'stakeInfo', userAddress, tokenAddress],
     queryFn: async () => {
-      const info = (await publicClient.readContract({
+      const result = await publicClient.readContract({
         address: CONTRACTS.FanStaking as Address,
         abi: FAN_STAKING_ABI,
         functionName: 'getStakeInfo',
         args: [userAddress as Address, tokenAddress as Address],
-      })) as [bigint, bigint, bigint];
+      });
+      const info = result as unknown as [bigint, bigint, bigint];
       return {
         amount: formatUnits(info[0], 18),
         amountRaw: info[0],

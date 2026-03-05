@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Particle Connect Configuration for Fandomly
  *
@@ -63,7 +64,7 @@ export function createParticleConfig() {
   if (!projectId || !clientKey || !appId) {
     throw new Error(
       'Particle Network credentials not configured. ' +
-      'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID in .env'
+        'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID in .env'
     );
   }
 
@@ -76,14 +77,13 @@ export function createParticleConfig() {
       // Prioritize social logins (email first, then social, then wallets)
       connectorsOrder: ['email', 'social', 'wallet'],
       splitEmailAndPhone: false,
-      collapseWalletList: true,  // Most Fandomly users are Web2-native
+      collapseWalletList: true, // Most Fandomly users are Web2-native
       hideContinueButton: false,
       language: 'en-US',
-      mode: 'dark', // Match Fandomly's dark theme
+      mode: 'dark',
       theme: {
-        // Fandomly brand colors -- update these to match your design system
-        '--pcm-accent-color': '#8B5CF6',           // Purple accent
-        '--pcm-body-background': '#0F0F23',         // Dark background
+        '--pcm-accent-color': '#8B5CF6',
+        '--pcm-body-background': '#0F0F23',
         '--pcm-body-background-secondary': '#1A1A3E',
         '--pcm-body-color': '#FFFFFF',
         '--pcm-body-color-secondary': '#A0AEC0',
@@ -91,7 +91,7 @@ export function createParticleConfig() {
         '--pcm-primary-button-color': '#FFFFFF',
         '--pcm-primary-button-hover-background': '#7C3AED',
         '--pcm-button-border-color': '#2D2D5E',
-      },
+      } as any,
     },
 
     walletConnectors: [

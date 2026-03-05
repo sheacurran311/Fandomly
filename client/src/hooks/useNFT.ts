@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * useNFT — React Query hooks for Fandomly Chain L1 NFT operations.
  *
@@ -8,8 +9,37 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 
-// Re-export existing types (unchanged DB schema)
-export type { NftCollection, NftTemplate, NftMint, NftDelivery } from './useCrossmint';
+export interface NftCollection {
+  id: string;
+  name: string;
+  description?: string;
+  maxSupply: number;
+  pointsCost?: number;
+  imageUrl?: string;
+}
+
+export interface NftTemplate {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+export interface NftMint {
+  id: string;
+  templateId: string;
+  recipientAddress: string;
+  recipientUserId?: string;
+  tokenUri?: string;
+}
+
+export interface NftDelivery {
+  id: string;
+  mintId: string;
+  status: string;
+  deliveredAt?: string;
+}
 
 // ============================================================================
 // ADDITIONAL TYPES
