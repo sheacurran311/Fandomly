@@ -846,40 +846,10 @@ export default function CreatorProfileEditModal({
                 Content Creator Information
               </h3>
 
-              <div>
-                <Label className="text-gray-300">Content Type</Label>
-                <p className="text-xs text-gray-500 mt-1 mb-2">
-                  What type of content do you create?
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {contentTypes.map((type) => {
-                    const selected =
-                      Array.isArray(formData.contentType) && formData.contentType.includes(type);
-                    return (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => {
-                          const current = Array.isArray(formData.contentType)
-                            ? formData.contentType
-                            : [];
-                          const next = selected
-                            ? current.filter((t) => t !== type)
-                            : [...current, type];
-                          handleInputChange('contentType', next);
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          selected
-                            ? 'bg-brand-primary text-white border-2 border-brand-primary'
-                            : 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <SettingsContentTypeSelector
+                contentTypes={Array.isArray(formData.contentType) ? formData.contentType : []}
+                onChange={(next) => handleInputChange('contentType', next)}
+              />
 
               <div>
                 <Label htmlFor="aboutMe" className="text-gray-300">
@@ -962,5 +932,90 @@ export default function CreatorProfileEditModal({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const OTHER_PREFIX = 'Other: ';
+
+function SettingsContentTypeSelector({
+  contentTypes: selected,
+  onChange,
+}: {
+  contentTypes: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const otherEntry = selected.find((t) => t.startsWith(OTHER_PREFIX));
+  const hasOther = selected.includes('Other') || !!otherEntry;
+  const [otherText, setOtherText] = useState(
+    otherEntry ? otherEntry.slice(OTHER_PREFIX.length) : ''
+  );
+
+  const toggleType = (type: string) => {
+    if (type === 'Other') {
+      if (hasOther) {
+        onChange(selected.filter((t) => t !== 'Other' && !t.startsWith(OTHER_PREFIX)));
+        setOtherText('');
+      } else {
+        onChange([...selected, 'Other']);
+      }
+      return;
+    }
+    const isSelected = selected.includes(type);
+    onChange(isSelected ? selected.filter((t) => t !== type) : [...selected, type]);
+  };
+
+  const handleOtherTextChange = (text: string) => {
+    setOtherText(text);
+    const withoutOther = selected.filter((t) => t !== 'Other' && !t.startsWith(OTHER_PREFIX));
+    if (text.trim()) {
+      onChange([...withoutOther, `${OTHER_PREFIX}${text.trim()}`]);
+    } else {
+      onChange([...withoutOther, 'Other']);
+    }
+  };
+
+  return (
+    <div>
+      <Label className="text-gray-300">Content Type</Label>
+      <p className="text-xs text-gray-500 mt-1 mb-2">What type of content do you create?</p>
+      <div className="flex flex-wrap gap-2">
+        {contentTypes.map((type) => {
+          const isSelected = selected.includes(type);
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => toggleType(type)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                isSelected
+                  ? 'bg-brand-primary text-white border-2 border-brand-primary'
+                  : 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              {type}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => toggleType('Other')}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            hasOther
+              ? 'bg-brand-primary text-white border-2 border-brand-primary'
+              : 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
+          }`}
+        >
+          Other
+        </button>
+      </div>
+      {hasOther && (
+        <Input
+          value={otherText}
+          onChange={(e) => handleOtherTextChange(e.target.value)}
+          placeholder="Describe your content type..."
+          className="bg-gray-800 border-gray-600 text-white mt-2"
+        />
+      )}
+    </div>
   );
 }
