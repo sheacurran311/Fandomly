@@ -993,6 +993,9 @@ export const rewardRedemptions = pgTable('reward_redemptions', {
   trackingUrl: text('tracking_url'),
   fulfillmentNotes: text('fulfillment_notes'),
   redeemedAt: timestamp('redeemed_at').defaultNow(),
+  fulfilledAt: timestamp('fulfilled_at'),
+  fulfilledBy: varchar('fulfilled_by').references(() => users.id),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // Notifications - In-app notification system
@@ -3208,9 +3211,7 @@ export const nftMints = pgTable('nft_mints', {
   crossmintActionId: text('crossmint_action_id').unique().notNull(), // Crossmint's action ID for status tracking
 
   // Source Information
-  collectionId: varchar('collection_id')
-    .references(() => nftCollections.id)
-    .notNull(),
+  collectionId: varchar('collection_id').references(() => nftCollections.id), // nullable for badge mints (which use badgeTemplateId instead)
   templateId: varchar('template_id').references(() => nftTemplates.id), // null for badge mints
   badgeTemplateId: varchar('badge_template_id').references(() => fandomlyBadgeTemplates.id), // null for regular NFTs
 

@@ -1430,64 +1430,17 @@ function ProgramCustomizer({
       />
 
       {/* Publish Dialog */}
-      <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
-        <DialogContent className="bg-slate-900 border-white/10">
-          <DialogHeader>
-            <DialogTitle className="text-white">
-              {program.status === 'published' ? 'Update Published Program' : 'Publish Program'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            {program.status === 'published' && (
-              <Alert className="bg-green-500/10 border-green-500/30">
-                <Check className="h-4 w-4 text-green-400" />
-                <AlertDescription className="text-green-400">
-                  This program is already published at <strong>/programs/{program.slug}</strong>
-                </AlertDescription>
-              </Alert>
-            )}
-            <div>
-              <Label className="text-white">Public URL Slug</Label>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-gray-400 text-sm">/programs/</span>
-                <Input
-                  value={publishSlug}
-                  onChange={(e) =>
-                    setPublishSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))
-                  }
-                  className="bg-white/5 border-white/10 text-white"
-                  placeholder="my-loyalty-program"
-                />
-              </div>
-              <p className="text-xs text-gray-400 mt-1">
-                {program.status === 'published'
-                  ? 'Update the URL slug for your published program'
-                  : 'This will be your program&apos;s public URL'}
-              </p>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowPublishDialog(false)}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  onPublish(publishSlug);
-                  setShowPublishDialog(false);
-                }}
-                className="bg-brand-primary hover:bg-brand-primary/80"
-                disabled={!publishSlug}
-              >
-                <Rocket className="h-4 w-4 mr-2" />
-                {program.status === 'published' ? 'Update URL' : 'Publish Now'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PublishDialog
+        program={program}
+        publishSlug={publishSlug}
+        setPublishSlug={setPublishSlug}
+        showPublishDialog={showPublishDialog}
+        setShowPublishDialog={setShowPublishDialog}
+        onPublish={onPublish}
+        customizeData={customizeData}
+        creatorType={creatorType}
+        connectedPlatforms={connectedPlatforms}
+      />
     </div>
   );
 }
@@ -1569,6 +1522,171 @@ function CreateProgramModal({
             </Button>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type CreatorType = 'athlete' | 'musician' | 'content_creator';
+
+interface PublishRequirement {
+  label: string;
+  met: boolean;
+}
+
+function getPublishRequirements(
+  customizeData: Record<string, any>,
+  creatorType: CreatorType,
+  connectedPlatforms: Set<string>
+): PublishRequirement[] {
+  const reqs: PublishRequirement[] = [
+    { label: 'Program Name', met: !!customizeData.displayName?.trim() },
+    { label: 'Bio / Description', met: !!customizeData.bio?.trim() },
+    { label: 'Profile Image (Logo)', met: !!customizeData.logo },
+  ];
+
+  const cd = customizeData.creatorDetails || {};
+
+  if (creatorType === 'athlete') {
+    reqs.push({ label: 'Sport', met: !!cd.athlete?.sport });
+    reqs.push({
+      label: 'Education Level',
+      met: !!(cd.athlete?.education?.level || cd.athlete?.education),
+    });
+  } else if (creatorType === 'musician') {
+    reqs.push({ label: 'Artist / Band Name', met: !!cd.musician?.bandArtistName });
+    reqs.push({ label: 'Artist Type', met: !!cd.musician?.artistType });
+    reqs.push({ label: 'Music Genre', met: !!cd.musician?.musicGenre });
+    reqs.push({ label: 'Music Catalog URL', met: !!cd.musician?.musicCatalogUrl });
+  } else if (creatorType === 'content_creator') {
+    const cc = cd.contentCreator || {};
+    reqs.push({
+      label: 'Content Type',
+      met: Array.isArray(cc.contentType) ? cc.contentType.length > 0 : !!cc.contentType,
+    });
+    reqs.push({
+      label: 'Topics of Focus',
+      met: Array.isArray(cc.topicsOfFocus) ? cc.topicsOfFocus.length > 0 : !!cc.topicsOfFocus,
+    });
+    reqs.push({ label: 'About Me', met: !!cc.aboutMe?.trim() });
+  }
+
+  reqs.push({
+    label: 'At least 1 connected social account',
+    met: connectedPlatforms.size >= 1,
+  });
+
+  return reqs;
+}
+
+function PublishDialog({
+  program,
+  publishSlug,
+  setPublishSlug,
+  showPublishDialog,
+  setShowPublishDialog,
+  onPublish,
+  customizeData,
+  creatorType,
+  connectedPlatforms,
+}: {
+  program: ProgramWithDetails;
+  publishSlug: string;
+  setPublishSlug: (v: string) => void;
+  showPublishDialog: boolean;
+  setShowPublishDialog: (v: boolean) => void;
+  onPublish: (slug: string) => void;
+  customizeData: Record<string, any>;
+  creatorType: CreatorType;
+  connectedPlatforms: Set<string>;
+}) {
+  const isAlreadyPublished = program.status === 'published';
+  const requirements = getPublishRequirements(customizeData, creatorType, connectedPlatforms);
+  const allMet = requirements.every((r) => r.met);
+  const canPublish = isAlreadyPublished ? !!publishSlug : !!publishSlug && allMet;
+
+  return (
+    <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+      <DialogContent className="bg-slate-900 border-white/10">
+        <DialogHeader>
+          <DialogTitle className="text-white">
+            {isAlreadyPublished ? 'Update Published Program' : 'Publish Program'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-4">
+          {isAlreadyPublished && (
+            <Alert className="bg-green-500/10 border-green-500/30">
+              <Check className="h-4 w-4 text-green-400" />
+              <AlertDescription className="text-green-400">
+                This program is already published at <strong>/programs/{program.slug}</strong>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Publish Requirements Checklist (only for first publish) */}
+          {!isAlreadyPublished && (
+            <div className="space-y-2">
+              <Label className="text-white text-sm font-medium">Publish Requirements</Label>
+              <div className="space-y-1.5 bg-white/5 rounded-lg p-3">
+                {requirements.map((req) => (
+                  <div key={req.label} className="flex items-center gap-2 text-sm">
+                    {req.met ? (
+                      <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                    )}
+                    <span className={req.met ? 'text-gray-300' : 'text-red-300'}>{req.label}</span>
+                  </div>
+                ))}
+              </div>
+              {!allMet && (
+                <p className="text-xs text-red-400">
+                  Please complete all requirements before publishing.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <Label className="text-white">Public URL Slug</Label>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-gray-400 text-sm">/programs/</span>
+              <Input
+                value={publishSlug}
+                onChange={(e) =>
+                  setPublishSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))
+                }
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="my-loyalty-program"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {isAlreadyPublished
+                ? 'Update the URL slug for your published program'
+                : 'This will be your program&apos;s public URL'}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowPublishDialog(false)}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                onPublish(publishSlug);
+                setShowPublishDialog(false);
+              }}
+              className="bg-brand-primary hover:bg-brand-primary/80"
+              disabled={!canPublish}
+            >
+              <Rocket className="h-4 w-4 mr-2" />
+              {isAlreadyPublished ? 'Update URL' : 'Publish Now'}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

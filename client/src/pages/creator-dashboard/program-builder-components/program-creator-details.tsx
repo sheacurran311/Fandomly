@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -286,52 +287,20 @@ export function ProgramCreatorDetails({
       {/* Content Creator-specific fields */}
       {creatorType === 'content_creator' && (
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-white">Content Type</Label>
-            <p className="text-xs text-gray-400">What type of content do you create?</p>
-            <div className="flex flex-wrap gap-2">
-              {CONTENT_TYPES.map((type) => {
-                const selected = Array.isArray(
-                  (creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType
-                )
-                  ? (creatorDetails?.contentCreator as ContentCreatorDetails).contentType!.includes(
-                      type
-                    )
-                  : false;
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      const current = Array.isArray(
-                        (creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType
-                      )
-                        ? ((creatorDetails?.contentCreator as ContentCreatorDetails).contentType ??
-                          [])
-                        : [];
-                      const next = selected
-                        ? current.filter((t) => t !== type)
-                        : [...current, type];
-                      onCreatorDetailsChange({
-                        ...creatorDetails,
-                        contentCreator: {
-                          ...(creatorDetails?.contentCreator ?? {}),
-                          contentType: next,
-                        },
-                      });
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      selected
-                        ? 'bg-brand-primary text-white border-2 border-brand-primary'
-                        : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <ContentTypeSelector
+            contentTypes={
+              (creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType ?? []
+            }
+            onChange={(next) =>
+              onCreatorDetailsChange({
+                ...creatorDetails,
+                contentCreator: {
+                  ...(creatorDetails?.contentCreator ?? {}),
+                  contentType: next,
+                },
+              })
+            }
+          />
           <div className="space-y-2">
             <Label className="text-white">Bio / Description / About Me</Label>
             <Textarea
@@ -413,6 +382,94 @@ export function ProgramCreatorDetails({
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+const OTHER_PREFIX = 'Other: ';
+
+function ContentTypeSelector({
+  contentTypes: selected,
+  onChange,
+}: {
+  contentTypes: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const selectedArr = Array.isArray(selected) ? selected : [];
+  const otherEntry = selectedArr.find((t) => t.startsWith(OTHER_PREFIX));
+  const hasOther = selectedArr.includes('Other') || !!otherEntry;
+  const [otherText, setOtherText] = useState(
+    otherEntry ? otherEntry.slice(OTHER_PREFIX.length) : ''
+  );
+
+  const toggleType = (type: string) => {
+    if (type === 'Other') {
+      if (hasOther) {
+        // Remove "Other" and any "Other: ..." entries
+        onChange(selectedArr.filter((t) => t !== 'Other' && !t.startsWith(OTHER_PREFIX)));
+        setOtherText('');
+      } else {
+        onChange([...selectedArr, 'Other']);
+      }
+      return;
+    }
+    const isSelected = selectedArr.includes(type);
+    onChange(isSelected ? selectedArr.filter((t) => t !== type) : [...selectedArr, type]);
+  };
+
+  const handleOtherTextChange = (text: string) => {
+    setOtherText(text);
+    // Replace any existing Other/Other: entries with the new value
+    const withoutOther = selectedArr.filter((t) => t !== 'Other' && !t.startsWith(OTHER_PREFIX));
+    if (text.trim()) {
+      onChange([...withoutOther, `${OTHER_PREFIX}${text.trim()}`]);
+    } else {
+      onChange([...withoutOther, 'Other']);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-white">Content Type</Label>
+      <p className="text-xs text-gray-400">What type of content do you create?</p>
+      <div className="flex flex-wrap gap-2">
+        {CONTENT_TYPES.map((type) => {
+          const isSelected = selectedArr.includes(type);
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => toggleType(type)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                isSelected
+                  ? 'bg-brand-primary text-white border-2 border-brand-primary'
+                  : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+              }`}
+            >
+              {type}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => toggleType('Other')}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            hasOther
+              ? 'bg-brand-primary text-white border-2 border-brand-primary'
+              : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+          }`}
+        >
+          Other
+        </button>
+      </div>
+      {hasOther && (
+        <Input
+          value={otherText}
+          onChange={(e) => handleOtherTextChange(e.target.value)}
+          placeholder="Describe your content type..."
+          className="bg-white/10 border-white/20 text-white mt-2"
+        />
       )}
     </div>
   );
