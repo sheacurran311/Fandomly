@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getAuthHeaders } from '@/lib/queryClient';
+import { getAuthHeaders, getCsrfToken } from '@/lib/queryClient';
 import { ImageCropModal } from '@/components/ui/image-crop-modal';
 import { transformImageUrl } from '@/lib/image-utils';
 
@@ -107,11 +107,16 @@ export function ImageUpload({
           setUploadProgress((prev) => Math.min(prev + 10, 90));
         }, 200);
 
-        // Get auth headers (JWT auth)
+        // Get auth + CSRF headers (required for POST requests)
         const authHeaders = getAuthHeaders();
 
         if (Object.keys(authHeaders).length === 0) {
           throw new Error('Please log in to upload images');
+        }
+
+        const csrfToken = await getCsrfToken();
+        if (csrfToken) {
+          authHeaders['x-csrf-token'] = csrfToken;
         }
 
         const response = await fetch(endpoint, {

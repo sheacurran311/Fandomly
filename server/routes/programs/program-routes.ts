@@ -159,14 +159,26 @@ export function registerProgramRoutes(app: Express) {
         .where(eq(tasks.creatorId, creator.id))
         .orderBy(desc(tasks.createdAt));
 
-      res.json({
+      const payload = {
         ...program,
         campaigns: programCampaigns,
         tasks: programTasks,
-      });
+      };
+
+      // Sanitize for JSON: BigInt and other non-serializable values cause 500
+      const safePayload = JSON.parse(JSON.stringify(payload, (_key, value) =>
+        typeof value === "bigint" ? Number(value) : value
+      ));
+
+      res.json(safePayload);
     } catch (error) {
-      console.error("Error fetching program:", error);
-      res.status(500).json({ error: "Failed to fetch program" });
+      const err = error as Error;
+      console.error("Error fetching program:", err?.message ?? error);
+      console.error("Stack:", err?.stack);
+      res.status(500).json({
+        error: "Failed to fetch program",
+        details: err?.message ?? String(error),
+      });
     }
   });
 
@@ -300,8 +312,13 @@ export function registerProgramRoutes(app: Express) {
         return res.status(400).json({ error: "Validation error", details: error.errors });
       }
 
-      console.error("Error updating program:", error);
-      res.status(500).json({ error: "Failed to update program" });
+      const err = error as Error;
+      console.error("Error updating program:", err?.message ?? error);
+      console.error("Stack:", err?.stack);
+      res.status(500).json({
+        error: "Failed to update program",
+        details: err?.message ?? String(error),
+      });
     }
   });
 

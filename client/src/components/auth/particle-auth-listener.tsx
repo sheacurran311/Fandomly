@@ -46,13 +46,34 @@ function ParticleAuthListenerInner() {
   const bridgingRef = useRef(false);
   const logoutInProgressRef = useRef(false);
 
+  // On mount, clear any stale bridge locks left from a previous crash or hard reload.
+  // A stale lock would block the next legitimate login attempt.
+  useEffect(() => {
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith('particle_bridge_')) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch { /* noop */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Only bridge for Particle social logins — not for external wallets (MetaMask, WalletConnect, etc.)
   const isParticleSocialLogin = connector?.walletConnectorType === 'particleAuth' ||
     primaryWallet?.connector?.walletConnectorType === 'particleAuth';
 
   const bridgeAuth = useCallback(async () => {
+    // In-flight guard (ref) prevents double-call within same mount
     if (bridgingRef.current || isFandomlyAuthed || !isConnected || !address) return;
+
+    // Persistent guard (sessionStorage) prevents re-firing after Suspense remount
+    // or React StrictMode double-invoke with the same Particle session.
+    // Key includes address so a new login attempt with a different wallet can still proceed.
+    const lockKey = `particle_bridge_${address}`;
+    if (sessionStorage.getItem(lockKey) === 'bridging') return;
+
     bridgingRef.current = true;
+    sessionStorage.setItem(lockKey, 'bridging');
 
     try {
       // Wait for window.particle._internal to be populated by the Particle Auth SDK.
@@ -82,8 +103,14 @@ function ParticleAuthListenerInner() {
       }
 
       const token = userInfo.token;
+      const uuid = userInfo.uuid;
+      const email = userInfo.email ?? null;
+      const name = userInfo.name ?? null;
+      const avatar = userInfo.avatar ?? null;
+      console.info('[Particle Auth Listener] userInfo keys:', Object.keys(userInfo));
+      console.info('[Particle Auth Listener] uuid:', uuid, '| token length:', token?.length, '| token prefix:', token?.slice?.(0, 30));
 
-      const result = await loginWithParticle(token, address);
+      const result = await loginWithParticle(token, address, uuid, email, name, avatar);
       if (!result.success) {
         console.error('[Particle Auth Listener] Bridge failed:', result.message);
         toast({
@@ -91,6 +118,8 @@ function ParticleAuthListenerInner() {
           description: result.message || 'Could not connect your account. Please try again.',
           variant: 'destructive',
         });
+        // Clear bridge lock so user can retry
+        try { sessionStorage.removeItem(`particle_bridge_${address}`); } catch { /* noop */ }
         disconnect();
         return;
       }
@@ -134,11 +163,13 @@ function ParticleAuthListenerInner() {
     } catch (error) {
       console.warn('[Particle Auth Listener] Bridge error (clearing stale session):', error);
       toast({
-        title: 'Sign-in error',
-        description: 'An unexpected error occurred during sign-in. Please try again.',
-        variant: 'destructive',
-      });
-      disconnect();
+          title: 'Sign-in error',
+          description: 'An unexpected error occurred during sign-in. Please try again.',
+          variant: 'destructive',
+        });
+        // Clear bridge lock so the user can retry
+        try { sessionStorage.removeItem(`particle_bridge_${address}`); } catch { /* noop */ }
+        disconnect();
     } finally {
       bridgingRef.current = false;
     }
@@ -159,11 +190,15 @@ function ParticleAuthListenerInner() {
   useEffect(() => {
     if (!isConnected && isFandomlyAuthed && !logoutInProgressRef.current) {
       logoutInProgressRef.current = true;
+      // Clear any bridge lock so the next login attempt can proceed
+      if (address) {
+        try { sessionStorage.removeItem(`particle_bridge_${address}`); } catch { /* noop */ }
+      }
       Promise.resolve(fandomlyLogout()).finally(() => {
         logoutInProgressRef.current = false;
       });
     }
-  }, [isConnected, isFandomlyAuthed, fandomlyLogout]);
+  }, [isConnected, isFandomlyAuthed, fandomlyLogout, address]);
 
   // Handle Fandomly logout → disconnect Particle session.
   // auth-context.tsx dispatches 'auth:fandomly-logout' from logout() after

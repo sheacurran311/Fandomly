@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useSocialConnections } from "@/hooks/use-social-connections";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { LocationPicker } from "@/components/ui/location-picker";
 import { PersonalLinksInput } from "@/components/ui/personal-links-input";
@@ -66,6 +67,8 @@ const contentTypes = [
 export default function CreatorProfileEditModal({ isOpen, onClose, user, creator }: CreatorProfileEditModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { connections } = useSocialConnections();
+  const mainContentPlatformIds = connections.map((c) => c.platform).filter(Boolean);
 
   // Fetch the creator's program (the fan-facing "profile")
   const { data: programs } = useQuery<any[]>({
@@ -107,10 +110,8 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
     
     // Content Creator Fields
     contentType: [] as string[],
-    platforms: [] as string[],
+    aboutMe: "",
     topicsOfFocus: "",
-    sponsorships: "",
-    totalViews: "",
 
     // Brand Colors (from program.pageConfig)
     brandColors: {
@@ -160,16 +161,15 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
         bandArtistName: typeSpecificData?.musician?.bandArtistName || "",
         musicCatalogUrl: typeSpecificData?.musician?.musicCatalogUrl || "",
         
-        // Content Creator
-        contentType: typeSpecificData?.contentCreator?.contentType || user.profileData?.contentType || [],
-        platforms: typeSpecificData?.contentCreator?.platforms || user.profileData?.platforms || [],
-        topicsOfFocus: Array.isArray(typeSpecificData?.contentCreator?.topicsOfFocus) 
-          ? typeSpecificData.contentCreator.topicsOfFocus.join(", ") 
-          : (typeSpecificData?.contentCreator?.topicsOfFocus || ""),
-        sponsorships: Array.isArray(typeSpecificData?.contentCreator?.sponsorships)
-          ? typeSpecificData.contentCreator.sponsorships.join(", ")
-          : (typeSpecificData?.contentCreator?.sponsorships || ""),
-        totalViews: typeSpecificData?.contentCreator?.totalViews || "",
+        // Content Creator (merge from creator typeSpecificData and program pageConfig.creatorDetails)
+        contentType: typeSpecificData?.contentCreator?.contentType || pageConfig?.creatorDetails?.contentCreator?.contentType || user.profileData?.contentType || [],
+        aboutMe: typeSpecificData?.contentCreator?.aboutMe || pageConfig?.creatorDetails?.contentCreator?.aboutMe || program?.description || creator?.bio || "",
+        topicsOfFocus: (() => {
+          const fromCreator = typeSpecificData?.contentCreator?.topicsOfFocus;
+          const fromProgram = pageConfig?.creatorDetails?.contentCreator?.topicsOfFocus;
+          const arr = Array.isArray(fromCreator) ? fromCreator : Array.isArray(fromProgram) ? fromProgram : undefined;
+          return arr ? arr.join(", ") : (typeof fromCreator === "string" ? fromCreator : typeof fromProgram === "string" ? fromProgram : "") || "";
+        })(),
         
         // Brand Colors from program pageConfig
         brandColors: pageConfig?.brandColors || {
@@ -209,8 +209,7 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
           } : undefined,
           musicGenre: data.musicGenre,
           artistType: data.artistType,
-          contentType: data.contentType,
-          platforms: data.platforms
+          contentType: data.contentType
         }
       });
       
@@ -250,11 +249,10 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
         } else if (creatorType === 'content_creator') {
           typeSpecificData = {
             contentCreator: {
+              aboutMe: data.aboutMe,
               contentType: data.contentType,
-              platforms: data.platforms,
               topicsOfFocus: data.topicsOfFocus ? data.topicsOfFocus.split(',').map((t: string) => t.trim()) : [],
-              sponsorships: data.sponsorships ? data.sponsorships.split(',').map((s: string) => s.trim()) : [],
-              totalViews: data.totalViews
+              mainContentPlatforms: mainContentPlatformIds,
             }
           };
         }
@@ -269,14 +267,28 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
 
       // Update program (the fan-facing profile) with pageConfig data
       if (program?.id) {
+        const programDescription = creator?.category === 'content_creator' ? data.aboutMe : data.bio;
+        const creatorDetails =
+          creator?.category === 'content_creator'
+            ? {
+                ...(pageConfig?.creatorDetails ?? {}),
+                contentCreator: {
+                  aboutMe: data.aboutMe,
+                  contentType: data.contentType,
+                  topicsOfFocus: data.topicsOfFocus ? data.topicsOfFocus.split(',').map((t: string) => t.trim()) : [],
+                  mainContentPlatforms: mainContentPlatformIds,
+                },
+              }
+            : pageConfig?.creatorDetails;
         await apiRequest("PUT", `/api/programs/${program.id}`, {
           name: data.displayName,
-          description: data.bio,
+          description: programDescription,
           pageConfig: {
             ...pageConfig,
             headerImage: data.bannerImage,
             logo: data.avatar,
             location: data.location,
+            creatorDetails,
             brandColors: data.brandColors,
             visibility: {
               ...pageConfig?.visibility,
@@ -707,65 +719,73 @@ export default function CreatorProfileEditModal({ isOpen, onClose, user, creator
               </h3>
 
               <div>
-                <Label className="text-gray-300 mb-2 block">Content Types</Label>
+                <Label className="text-gray-300">Content Type</Label>
+                <p className="text-xs text-gray-500 mt-1 mb-2">What type of content do you create?</p>
                 <div className="flex flex-wrap gap-2">
-                  {contentTypes.map(type => (
-                    <Badge
-                      key={type}
-                      variant={formData.contentType.includes(type) ? "default" : "outline"}
-                      className={`cursor-pointer ${
-                        formData.contentType.includes(type)
-                          ? "bg-brand-primary hover:bg-brand-primary/80"
-                          : "bg-gray-800 hover:bg-gray-700"
-                      }`}
-                      onClick={() => {
-                        const types = formData.contentType.includes(type)
-                          ? formData.contentType.filter(t => t !== type)
-                          : [...formData.contentType, type];
-                        handleInputChange('contentType', types);
-                      }}
-                    >
-                      {type}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="topicsOfFocus" className="text-gray-300">Topics of Focus</Label>
-                  <Input
-                    id="topicsOfFocus"
-                    value={formData.topicsOfFocus}
-                    onChange={(e) => handleInputChange('topicsOfFocus', e.target.value)}
-                    className="bg-gray-800 border-gray-700 text-white"
-                    placeholder="Topics separated by commas"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">e.g., Gaming, Cooking, Travel</p>
-                </div>
-
-                <div>
-                  <Label htmlFor="totalViews" className="text-gray-300">Total Views</Label>
-                  <Input
-                    id="totalViews"
-                    value={formData.totalViews}
-                    onChange={(e) => handleInputChange('totalViews', e.target.value)}
-                    className="bg-gray-800 border-gray-700 text-white"
-                    placeholder="Total views across platforms"
-                  />
+                  {contentTypes.map((type) => {
+                    const selected = Array.isArray(formData.contentType) && formData.contentType.includes(type);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          const current = Array.isArray(formData.contentType) ? formData.contentType : [];
+                          const next = selected ? current.filter((t) => t !== type) : [...current, type];
+                          handleInputChange('contentType', next);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          selected
+                            ? 'bg-brand-primary text-white border-2 border-brand-primary'
+                            : 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="sponsorships" className="text-gray-300">Current Sponsorships</Label>
-                <Input
-                  id="sponsorships"
-                  value={formData.sponsorships}
-                  onChange={(e) => handleInputChange('sponsorships', e.target.value)}
+                <Label htmlFor="aboutMe" className="text-gray-300">Bio / Description / About Me</Label>
+                <Textarea
+                  id="aboutMe"
+                  value={formData.aboutMe}
+                  onChange={(e) => handleInputChange('aboutMe', e.target.value)}
                   className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="Brand partnerships separated by commas"
+                  placeholder="Tell fans about yourself..."
+                  rows={4}
                 />
-                <p className="text-xs text-gray-500 mt-1">e.g., Amazon, Skillshare, NordVPN</p>
+              </div>
+
+              <div>
+                <Label htmlFor="topicsOfFocus" className="text-gray-300">Topics of Focus</Label>
+                <Input
+                  id="topicsOfFocus"
+                  value={formData.topicsOfFocus}
+                  onChange={(e) => handleInputChange('topicsOfFocus', e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white"
+                  placeholder="Topics separated by commas"
+                />
+                <p className="text-xs text-gray-500 mt-1">e.g., Gaming, Cooking, Travel</p>
+              </div>
+
+              <div>
+                <Label className="text-gray-300">Main Content Platforms</Label>
+                <p className="text-xs text-gray-500 mt-1 mb-2">
+                  Auto-selected from your connected integrations (X, Instagram, TikTok, YouTube, etc.)
+                </p>
+                {mainContentPlatformIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {mainContentPlatformIds.map((platformId) => (
+                      <Badge key={platformId} variant="secondary" className="bg-brand-primary/20 text-brand-primary">
+                        {platformId === 'twitter' ? 'X' : platformId.charAt(0).toUpperCase() + platformId.slice(1)}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Connect platforms in Settings → Social to see them here.</p>
+                )}
               </div>
             </div>
           )}

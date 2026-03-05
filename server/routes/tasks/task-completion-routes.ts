@@ -129,14 +129,14 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         );
 
         // Verify user has access to this program (either as creator/admin or as a fan viewing their own)
-        const program = await storage.getProgram(programId);
+        const program = await storage.getLoyaltyProgram(programId);
         if (!program) {
           return res.status(404).json({ error: 'Program not found' });
         }
 
         // Check if user is program owner/admin or just a participant
         const isOwner = program.creatorId === req.user.id;
-        const membership = await storage.getTenantMembership(req.user.id, program.tenantId || '');
+        const membership = await storage.getUserTenantMembership(req.user.id, program.tenantId || '');
         const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
 
         let completions;
@@ -180,7 +180,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         );
 
         // Verify user has access to this tenant
-        const membership = await storage.getTenantMembership(req.user.id, tenantId);
+        const membership = await storage.getUserTenantMembership(req.user.id, tenantId);
         const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
 
         const { db } = await import('../../db');

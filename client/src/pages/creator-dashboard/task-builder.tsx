@@ -45,6 +45,7 @@ export default function TaskBuilder() {
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplateType | null>(null);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
+  const [hasInitialized, setHasInitialized] = useState(false);
   const isEditMode = !!params.id;
 
   // Fetch programs for the creator
@@ -106,7 +107,6 @@ export default function TaskBuilder() {
     isEditMode && existingTask?.campaignId ? existingTask.campaignId : undefined;
 
   // Sync derived values into state only once when task first loads
-  const [hasInitialized, setHasInitialized] = useState(false);
   if (existingTask && !hasInitialized) {
     setHasInitialized(true);
     if (derivedTemplate && !selectedTemplate) {

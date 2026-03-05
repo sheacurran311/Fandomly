@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/rules-of-hooks, react-hooks/exhaustive-deps */
+import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { useCreatorStats, useCreatorActivity } from '@/hooks/use-creator-dashboard';
 import { useContentAnalytics } from '@/hooks/use-analytics';
@@ -217,6 +218,7 @@ function ConnectedPlatformsRow() {
 }
 
 export default function CreatorDashboard() {
+  const [, setLocation] = useLocation();
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: creatorStats, isLoading: statsLoading, error: statsError } = useCreatorStats();
   const { data: recentActivity, isLoading: activityLoading } = useCreatorActivity();
@@ -691,7 +693,7 @@ export default function CreatorDashboard() {
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-3"
-                  onClick={() => (window.location.href = '/creator-dashboard/program-builder')}
+                  onClick={() => setLocation('/creator-dashboard/program-builder')}
                 >
                   Edit program
                   <ChevronRight className="h-3 w-3 ml-1" />
@@ -725,9 +727,7 @@ export default function CreatorDashboard() {
                       <Button
                         size="sm"
                         className="bg-brand-primary hover:bg-brand-primary/80"
-                        onClick={() =>
-                          (window.location.href = '/creator-dashboard/program-builder')
-                        }
+                        onClick={() => setLocation('/creator-dashboard/program-builder')}
                       >
                         <Rocket className="h-4 w-4 mr-1" />
                         Publish
@@ -742,7 +742,7 @@ export default function CreatorDashboard() {
                   {finalChecklist.map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => (window.location.href = item.link)}
+                      onClick={() => setLocation(item.link)}
                       className={`flex items-center gap-3 p-3 rounded-lg transition-colors text-left w-full ${
                         item.completed
                           ? 'bg-green-500/10 border border-green-500/20'

@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { MapPin } from 'lucide-react';
 
 type CreatorType = 'athlete' | 'musician' | 'content_creator';
@@ -22,9 +23,25 @@ interface MusicianDetails {
 }
 
 interface ContentCreatorDetails {
+  aboutMe?: string;
+  contentType?: string[];
   topicsOfFocus?: string[] | string;
-  platforms?: string[] | string;
-  sponsorships?: string;
+  mainContentPlatforms?: string[] | string;
+}
+
+const CONTENT_TYPES = [
+  'Creative Video', 'Podcast', 'Influencer', 'Gaming', 'Educational', 'Comedy',
+  'Lifestyle', 'Fashion', 'Beauty', 'Fitness', 'Food', 'Travel', 'Technology',
+];
+
+interface ProgramCreatorDetailsProps {
+  creatorType: CreatorType;
+  location: string;
+  creatorDetails: CreatorDetails;
+  onLocationChange: (location: string) => void;
+  onCreatorDetailsChange: (details: CreatorDetails) => void;
+  /** Connected platform IDs from social integrations (e.g. instagram, tiktok, twitter) - used to auto-select Main Content Platforms */
+  connectedPlatformIds?: string[];
 }
 
 interface CreatorDetails {
@@ -33,13 +50,16 @@ interface CreatorDetails {
   contentCreator?: ContentCreatorDetails;
 }
 
-interface ProgramCreatorDetailsProps {
-  creatorType: CreatorType;
-  location: string;
-  creatorDetails: CreatorDetails;
-  onLocationChange: (location: string) => void;
-  onCreatorDetailsChange: (details: CreatorDetails) => void;
-}
+const PLATFORM_LABELS: Record<string, string> = {
+  twitter: 'X',
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
+  spotify: 'Spotify',
+  discord: 'Discord',
+  twitch: 'Twitch',
+};
 
 export function ProgramCreatorDetails({
   creatorType,
@@ -47,6 +67,7 @@ export function ProgramCreatorDetails({
   creatorDetails,
   onLocationChange,
   onCreatorDetailsChange,
+  connectedPlatformIds = [],
 }: ProgramCreatorDetailsProps) {
   return (
     <div className="space-y-4">
@@ -255,6 +276,61 @@ export function ProgramCreatorDetails({
       {creatorType === 'content_creator' && (
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label className="text-white">Content Type</Label>
+            <p className="text-xs text-gray-400">What type of content do you create?</p>
+            <div className="flex flex-wrap gap-2">
+              {CONTENT_TYPES.map((type) => {
+                const selected = Array.isArray((creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType)
+                  ? (creatorDetails?.contentCreator as ContentCreatorDetails).contentType!.includes(type)
+                  : false;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      const current = Array.isArray((creatorDetails?.contentCreator as ContentCreatorDetails)?.contentType)
+                        ? (creatorDetails?.contentCreator as ContentCreatorDetails).contentType ?? []
+                        : [];
+                      const next = selected ? current.filter((t) => t !== type) : [...current, type];
+                      onCreatorDetailsChange({
+                        ...creatorDetails,
+                        contentCreator: {
+                          ...(creatorDetails?.contentCreator ?? {}),
+                          contentType: next,
+                        },
+                      });
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      selected
+                        ? 'bg-brand-primary text-white border-2 border-brand-primary'
+                        : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-white">Bio / Description / About Me</Label>
+            <Textarea
+              value={String((creatorDetails?.contentCreator as ContentCreatorDetails)?.aboutMe ?? '')}
+              onChange={(e) =>
+                onCreatorDetailsChange({
+                  ...creatorDetails,
+                  contentCreator: {
+                    ...(creatorDetails?.contentCreator ?? {}),
+                    aboutMe: e.target.value,
+                  },
+                })
+              }
+              placeholder="Tell fans about yourself..."
+              rows={4}
+              className="bg-white/10 border-white/20 text-white"
+            />
+          </div>
+          <div className="space-y-2">
             <Label className="text-white">Topics of Focus</Label>
             <Input
               value={
@@ -295,58 +371,26 @@ export function ProgramCreatorDetails({
             <p className="text-xs text-gray-400">Separate topics with commas</p>
           </div>
           <div className="space-y-2">
-            <Label className="text-white">Platforms</Label>
-            <Input
-              value={
-                Array.isArray((creatorDetails?.contentCreator as ContentCreatorDetails)?.platforms)
-                  ? (creatorDetails?.contentCreator as { platforms: string[] }).platforms.join(', ')
-                  : String(
-                      (creatorDetails?.contentCreator as ContentCreatorDetails)?.platforms ?? ''
-                    )
-              }
-              onChange={(e) =>
-                onCreatorDetailsChange({
-                  ...creatorDetails,
-                  contentCreator: {
-                    ...(creatorDetails?.contentCreator ?? {}),
-                    platforms: e.target.value.split(',').map((s: string) => s.trim()),
-                  },
-                })
-              }
-              onBlur={(e) =>
-                onCreatorDetailsChange({
-                  ...creatorDetails,
-                  contentCreator: {
-                    ...(creatorDetails?.contentCreator ?? {}),
-                    platforms: e.target.value
-                      .split(',')
-                      .map((s: string) => s.trim())
-                      .filter(Boolean),
-                  },
-                })
-              }
-              placeholder="e.g., YouTube, TikTok, Twitch (comma separated)"
-              className="bg-white/10 border-white/20 text-white"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-white">Sponsorships</Label>
-            <Input
-              value={String(
-                (creatorDetails?.contentCreator as ContentCreatorDetails)?.sponsorships ?? ''
+            <Label className="text-white">Main Content Platforms</Label>
+            <p className="text-xs text-gray-400">
+              Auto-selected from your connected integrations
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {connectedPlatformIds.length > 0 ? (
+                connectedPlatformIds.map((platformId) => (
+                  <span
+                    key={platformId}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-brand-primary/20 text-brand-primary border border-brand-primary/30"
+                  >
+                    {PLATFORM_LABELS[platformId] || platformId}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-500">
+                  Connect platforms in the Social section above
+                </span>
               )}
-              onChange={(e) =>
-                onCreatorDetailsChange({
-                  ...creatorDetails,
-                  contentCreator: {
-                    ...(creatorDetails?.contentCreator ?? {}),
-                    sponsorships: e.target.value,
-                  },
-                })
-              }
-              placeholder="Current brand partnerships"
-              className="bg-white/10 border-white/20 text-white"
-            />
+            </div>
           </div>
         </div>
       )}

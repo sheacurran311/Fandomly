@@ -80,11 +80,13 @@ export default function ProgramBuilderNew() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<ProgramWithDetails | null>(null);
 
-  // Fetch programs
-  const { data: programs = [], isLoading } = useQuery<Program[]>({
+  // Fetch programs (refetch aggressively so onboarding-created program appears immediately)
+  const { data: programs = [], isLoading, refetch: refetchPrograms } = useQuery<Program[]>({
     queryKey: ['/api/programs'],
     enabled: !!user,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   // Fetch selected program details
@@ -125,13 +127,21 @@ export default function ProgramBuilderNew() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sync query cache to local state
   }, [programDetails]);
 
-  // Select first program by default
+  // Select first program by default; refetch once if empty on mount (catches onboarding-created program)
   useEffect(() => {
     if (programs.length > 0 && !selectedProgram) {
       setSelectedProgram(programs[0]);
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initialize default selection
   }, [programs, selectedProgram]);
+
+  // When programs is empty after load, refetch once (handles direct nav from onboarding)
+  useEffect(() => {
+    if (!isLoading && programs.length === 0 && user?.id) {
+      const t = setTimeout(() => refetchPrograms(), 300);
+      return () => clearTimeout(t);
+    }
+  }, [isLoading, programs.length, user?.id, refetchPrograms]);
 
   // Create program mutation
   const createProgramMutation = useMutation({
@@ -620,6 +630,17 @@ function ProgramCustomizer({
   // Build the full save payload from current customizeData (or with overrides)
   const buildSaveData = (overrides: Partial<typeof customizeData> = {}) => {
     const merged = { ...customizeData, ...overrides };
+    // For content creators, auto-merge mainContentPlatforms from connected integrations
+    let creatorDetails = merged.creatorDetails;
+    if (creatorType === 'content_creator' && connectedPlatforms.size > 0) {
+      creatorDetails = {
+        ...creatorDetails,
+        contentCreator: {
+          ...(creatorDetails?.contentCreator ?? {}),
+          mainContentPlatforms: Array.from(connectedPlatforms),
+        },
+      };
+    }
     return {
       name: merged.displayName,
       pointsName: merged.pointsName,
@@ -631,7 +652,7 @@ function ProgramCustomizer({
         brandColors: merged.brandColors,
         socialLinks: merged.socialLinks,
         theme: merged.theme,
-        creatorDetails: merged.creatorDetails,
+        creatorDetails,
         location: merged.location,
         visibility: {
           showProfile: merged.showProfile,
@@ -849,6 +870,7 @@ function ProgramCustomizer({
               onCreatorDetailsChange={(creatorDetails) =>
                 setCustomizeData({ ...customizeData, creatorDetails })
               }
+              connectedPlatformIds={Array.from(connectedPlatforms)}
             />
           </CollapsibleSection>
 

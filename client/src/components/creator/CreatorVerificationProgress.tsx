@@ -108,7 +108,7 @@ export function CreatorVerificationProgress({
               </p>
               {showWizardButton && onStartWizard && (
                 <Button size="sm" className="w-full" onClick={onStartWizard}>
-                  Complete Profile <ArrowRight className="h-3 w-3 ml-2" />
+                  Verify Now <ArrowRight className="h-3 w-3 ml-2" />
                 </Button>
               )}
             </div>
@@ -142,7 +142,7 @@ export function CreatorVerificationProgress({
             </div>
             <div>
               <CardTitle>
-                {profileComplete ? 'Profile Verified!' : 'Complete Your Profile'}
+                {profileComplete ? 'Creator Verified!' : 'Creator Verification'}
               </CardTitle>
               <CardDescription>
                 {profileComplete
@@ -345,17 +345,19 @@ export function CreatorVerificationProgress({
             </div>
           </div>
 
-          {/* Platform Activity */}
+          {/* Platform Activity & Verification */}
           <div className="space-y-3">
             <h4 className="font-semibold text-sm flex items-center gap-2">
-              Platform Activity
+              Verification Requirements
               <Badge variant="secondary" className="text-xs">
                 {
-                  [isFieldComplete('activeProgram'), isFieldComplete('publishedTask')].filter(
-                    Boolean
-                  ).length
+                  [
+                    isFieldComplete('activeProgram'),
+                    isFieldComplete('publishedTask'),
+                    isFieldComplete('socialMedia'),
+                  ].filter(Boolean).length
                 }
-                /2
+                /4
               </Badge>
             </h4>
             <div className="space-y-2">
@@ -420,6 +422,20 @@ export function CreatorVerificationProgress({
                   </Badge>
                 )}
               </div>
+
+              {/* Paid Account (placeholder) */}
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-500/30 bg-gray-500/5 opacity-75">
+                <Lock className="h-5 w-5 text-gray-500 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Paid Account</p>
+                  <p className="text-xs text-gray-400">
+                    Creator verification requires a paid subscription (coming soon)
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-gray-300 border-gray-300">
+                  Coming Soon
+                </Badge>
+              </div>
             </div>
           </div>
         </div>
@@ -459,7 +475,7 @@ export function CreatorVerificationProgress({
             <div className="flex gap-3">
               <Button onClick={onStartWizard} className="flex-1" size="lg">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Complete Profile Now
+                Complete Verification
               </Button>
             </div>
           </>

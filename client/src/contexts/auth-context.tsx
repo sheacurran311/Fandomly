@@ -37,7 +37,7 @@ export interface AuthContextType extends AuthState {
   // Actions
   login: (provider: 'google' | string) => Promise<void>;
   loginWithCallback: (provider: string, callbackData: SocialCallbackData) => Promise<AuthResult>;
-  loginWithParticle: (particleToken: string, walletAddress: string) => Promise<AuthResult>;
+  loginWithParticle: (particleToken: string, walletAddress: string, particleUuid?: string, userEmail?: string | null, userName?: string | null, userAvatar?: string | null) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   refreshUser: () => Promise<void>; // Reload user data from server
@@ -393,7 +393,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Login with Particle Connect token (called after Particle modal completes)
   const loginWithParticle = useCallback(async (
     particleToken: string,
-    walletAddress: string
+    walletAddress: string,
+    particleUuid?: string,
+    userEmail?: string | null,
+    userName?: string | null,
+    userAvatar?: string | null,
   ): Promise<AuthResult> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -402,7 +406,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ particleToken, walletAddress }),
+        body: JSON.stringify({ particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar }),
       });
 
       const data: AuthResult = await response.json();

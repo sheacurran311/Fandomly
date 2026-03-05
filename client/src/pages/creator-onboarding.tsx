@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -184,9 +185,16 @@ const topicCategories = [
   { value: "policy", label: "Policy", parent: "politics" },
 ];
 
-const socialPlatforms = [
-  "Instagram", "TikTok", "YouTube", "Twitter/X", "Facebook", "Twitch", "Discord",
-  "Snapchat", "LinkedIn", "Pinterest", "Reddit", "Clubhouse", "OnlyFans", "Other"
+// Platform IDs match program builder / useSocialConnections (lowercase)
+const mainContentPlatformOptions = [
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'youtube', label: 'YouTube' },
+  { id: 'twitter', label: 'X (Twitter)' },
+  { id: 'facebook', label: 'Facebook' },
+  { id: 'twitch', label: 'Twitch' },
+  { id: 'discord', label: 'Discord' },
+  { id: 'spotify', label: 'Spotify' },
 ];
 
 const subscriptionTiers = [
@@ -287,9 +295,8 @@ export default function CreatorOnboardingPage() {
     contentType: '',
     topicsOfFocus: [] as string[], // Changed to array for multi-select
     customTopics: [] as string[], // For user-input topics
-    sponsorships: '',
-    totalViews: '',
-    platforms: [] as string[],
+    aboutMe: '',
+    mainContentPlatforms: [] as string[],
     
     // Branding
     primaryColor: '#6366f1',
@@ -917,32 +924,34 @@ export default function CreatorOnboardingPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="sponsorships" className="text-gray-300">Current Sponsors</Label>
-                    <Input
-                      id="sponsorships"
-                      value={formData.sponsorships}
-                      onChange={(e) => setFormData(prev => ({ ...prev, sponsorships: e.target.value }))}
-                      placeholder="List any current brand partnerships"
+                    <Label htmlFor="aboutMe" className="text-gray-300">Bio / Description / About Me</Label>
+                    <Textarea
+                      id="aboutMe"
+                      value={formData.aboutMe}
+                      onChange={(e) => setFormData(prev => ({ ...prev, aboutMe: e.target.value }))}
+                      placeholder="Tell your fans about yourself..."
+                      rows={4}
                       className="bg-white/10 border-white/20 text-white"
                     />
                   </div>
 
                   <div>
-                    <Label className="text-gray-300">Platforms You Regularly Post On *</Label>
+                    <Label className="text-gray-300">Main Content Platforms *</Label>
+                    <p className="text-sm text-gray-400 mb-2">Select the platforms where you regularly post content</p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {socialPlatforms.map((platform) => (
-                        <label key={platform} className="flex items-center space-x-2 text-gray-300">
+                      {mainContentPlatformOptions.map(({ id, label }) => (
+                        <label key={id} className="flex items-center space-x-2 text-gray-300">
                           <Checkbox
-                            checked={formData.platforms.includes(platform)}
+                            checked={formData.mainContentPlatforms.includes(id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setFormData(prev => ({ ...prev, platforms: [...prev.platforms, platform] }));
+                                setFormData(prev => ({ ...prev, mainContentPlatforms: [...prev.mainContentPlatforms, id] }));
                               } else {
-                                setFormData(prev => ({ ...prev, platforms: prev.platforms.filter(p => p !== platform) }));
+                                setFormData(prev => ({ ...prev, mainContentPlatforms: prev.mainContentPlatforms.filter(p => p !== id) }));
                               }
                             }}
                           />
-                          <span className="text-sm">{platform}</span>
+                          <span className="text-sm">{label}</span>
                         </label>
                       ))}
                     </div>

@@ -583,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const { creatorType } = req.body;
+        const { creatorType, username: proposedUsername } = req.body;
 
         // Validate creatorType
         if (!creatorType || !['athlete', 'musician', 'content_creator'].includes(creatorType)) {
@@ -613,6 +613,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           musician: 'Fan Credits',
           content_creator: 'Community Points',
         };
+
+        // Step 0: Update username if provided and valid
+        if (proposedUsername && proposedUsername !== user.username) {
+          if (proposedUsername.length < 3 || proposedUsername.length > 30) {
+            return res.status(400).json({ error: 'Username must be between 3 and 30 characters' });
+          }
+          if (!/^[a-zA-Z0-9_.-]+$/.test(proposedUsername)) {
+            return res.status(400).json({
+              error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
+            });
+          }
+          const existingByUsername = await storage.getUserByUsername(proposedUsername);
+          if (existingByUsername && existingByUsername.id !== userId) {
+            return res.status(400).json({ error: 'Username is already taken' });
+          }
+          await storage.updateUser(userId, { username: proposedUsername });
+          user.username = proposedUsername;
+        }
 
         // Step 1: Set userType to 'creator' and role to 'customer_admin'
         await storage.updateUser(userId, {
@@ -859,9 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           contentType,
           topicsOfFocus, // Now array for content creators
           customTopics, // New field for user-input topics
-          sponsorships,
-          totalViews,
-          platforms,
+          aboutMe,
+          mainContentPlatforms,
           primaryColor,
           secondaryColor,
           accentColor,
@@ -938,22 +955,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           typeSpecificData = {
             contentCreator: {
+              aboutMe: aboutMe || undefined,
               contentType: Array.isArray(contentType)
                 ? contentType
                 : typeof contentType === 'string'
                   ? contentType.split(',').map((s) => s.trim())
                   : [],
               topicsOfFocus: allTopics, // Combined array of predefined and custom topics
-              sponsorships: Array.isArray(sponsorships)
-                ? sponsorships
-                : typeof sponsorships === 'string'
-                  ? sponsorships.split(',').map((s) => s.trim())
-                  : [],
-              totalViews: totalViews || 'unknown',
-              platforms: Array.isArray(platforms)
-                ? platforms
-                : typeof platforms === 'string'
-                  ? platforms.split(',').map((s) => s.trim())
+              mainContentPlatforms: Array.isArray(mainContentPlatforms)
+                ? mainContentPlatforms
+                : typeof mainContentPlatforms === 'string'
+                  ? mainContentPlatforms.split(',').map((s) => s.trim())
                   : [],
             },
           };
@@ -1060,8 +1072,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             musicGenre: musicGenre || undefined,
             artistType: artistType || undefined,
             // Content Creator-specific fields
+            aboutMe: aboutMe || undefined,
             contentType: contentType || undefined,
-            platforms: platforms || undefined,
+            mainContentPlatforms: Array.isArray(mainContentPlatforms) ? mainContentPlatforms : undefined,
             topicsOfFocus: Array.isArray(topicsOfFocus) ? topicsOfFocus : undefined,
             // Brand-specific fields
             brandName: brandName || undefined,

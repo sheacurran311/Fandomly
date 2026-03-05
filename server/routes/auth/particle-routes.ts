@@ -30,12 +30,12 @@ export function registerParticleAuthRoutes(app: Express) {
    */
   app.post('/api/auth/particle/callback', async (req: Request, res: Response) => {
     try {
-      const { particleToken, walletAddress } = req.body;
+      const { particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar } = req.body;
 
-      if (!particleToken) {
+      if (!particleUuid) {
         return res.status(400).json({
           success: false,
-          error: 'Missing particleToken',
+          error: 'Missing particleUuid — required for token validation',
         });
       }
 
@@ -47,7 +47,14 @@ export function registerParticleAuthRoutes(app: Express) {
       }
 
       // Validate + bridge to Fandomly auth
-      const result = await handleParticleCallback(particleToken, walletAddress);
+      const result = await handleParticleCallback(
+        particleToken,
+        walletAddress,
+        particleUuid,
+        userEmail,
+        userName,
+        userAvatar,
+      );
 
       if (!result.success) {
         return res.status(401).json(result);

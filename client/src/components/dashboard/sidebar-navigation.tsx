@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
+import { transformImageUrl } from '@/lib/image-utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
@@ -44,6 +45,12 @@ export default function SidebarNavigation({
   });
   const program = programs[0];
   const programLogo = program?.pageConfig?.logo;
+  // Creators: program logo first, then Particle Auth / user avatar. Fans: user avatar only.
+  const avatarUrl =
+    transformImageUrl(programLogo) ||
+    transformImageUrl((user?.profileData as { avatar?: string })?.avatar) ||
+    transformImageUrl(user?.avatar) ||
+    null;
 
   const items = getNavigationItems(userType, isNILAthlete);
 
@@ -255,8 +262,8 @@ export default function SidebarNavigation({
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <Avatar className="h-9 w-9 border border-white/10">
-                  {programLogo ? (
-                    <AvatarImage src={programLogo} alt={user?.username || 'Profile'} />
+                  {avatarUrl ? (
+                    <AvatarImage src={avatarUrl} alt={user?.username || 'Profile'} />
                   ) : null}
                   <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
                     {(user?.username || 'U').charAt(0).toUpperCase()}
@@ -296,8 +303,8 @@ export default function SidebarNavigation({
             <div className="flex justify-center">
               <div className="relative">
                 <Avatar className="h-8 w-8 border border-white/10">
-                  {programLogo ? (
-                    <AvatarImage src={programLogo} alt={user?.username || 'Profile'} />
+                  {avatarUrl ? (
+                    <AvatarImage src={avatarUrl} alt={user?.username || 'Profile'} />
                   ) : null}
                   <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
                     {(user?.username || 'U').charAt(0).toUpperCase()}
