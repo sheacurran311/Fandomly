@@ -1817,92 +1817,100 @@ export const campaignParticipations = pgTable(
 );
 
 // Task Completions - Track fan progress on tasks
-export const taskCompletions = pgTable('task_completions', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  taskId: varchar('task_id')
-    .references(() => tasks.id, { onDelete: 'cascade' })
-    .notNull(),
-  userId: varchar('user_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
-    .notNull(),
+export const taskCompletions = pgTable(
+  'task_completions',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    taskId: varchar('task_id')
+      .references(() => tasks.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: varchar('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id)
+      .notNull(),
 
-  // Completion Status
-  status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed'
-  progress: integer('progress').default(0), // 0-100 percentage
+    // Completion Status
+    status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed'
+    progress: integer('progress').default(0), // 0-100 percentage
 
-  // Completion Data (task-specific tracking)
-  completionData: jsonb('completion_data').$type<{
-    // Check-in specific
-    currentStreak?: number;
-    lastCheckIn?: string; // ISO timestamp
-    streakMilestones?: Array<{
-      days: number;
-      completedAt: string;
-      pointsAwarded: number;
-    }>;
+    // Completion Data (task-specific tracking)
+    completionData: jsonb('completion_data').$type<{
+      // Check-in specific
+      currentStreak?: number;
+      lastCheckIn?: string; // ISO timestamp
+      streakMilestones?: Array<{
+        days: number;
+        completedAt: string;
+        pointsAwarded: number;
+      }>;
 
-    // Referral specific
-    referredUsers?: Array<{
-      userId: string;
-      username: string;
-      signupDate: string;
-      qualified: boolean;
-      pointsAwarded: number;
-    }>;
+      // Referral specific
+      referredUsers?: Array<{
+        userId: string;
+        username: string;
+        signupDate: string;
+        qualified: boolean;
+        pointsAwarded: number;
+      }>;
 
-    // Follower milestone specific
-    currentFollowers?: number;
-    milestonesReached?: Array<{
-      threshold: number;
-      reachedAt: string;
-      pointsAwarded: number;
-    }>;
+      // Follower milestone specific
+      currentFollowers?: number;
+      milestonesReached?: Array<{
+        threshold: number;
+        reachedAt: string;
+        pointsAwarded: number;
+      }>;
 
-    // Complete profile specific
-    fieldsCompleted?: string[];
-    fieldProgress?: Record<string, boolean>;
+      // Complete profile specific
+      fieldsCompleted?: string[];
+      fieldProgress?: Record<string, boolean>;
 
-    // Generic completion tracking
-    completedSteps?: number;
-    totalSteps?: number;
-    metadata?: Record<string, unknown>;
-  }>(),
+      // Generic completion tracking
+      completedSteps?: number;
+      totalSteps?: number;
+      metadata?: Record<string, unknown>;
+    }>(),
 
-  // Rewards Tracking
-  pointsEarned: integer('points_earned').default(0),
-  totalRewardsEarned: integer('total_rewards_earned').default(0), // For repeating tasks
+    // Rewards Tracking
+    pointsEarned: integer('points_earned').default(0),
+    totalRewardsEarned: integer('total_rewards_earned').default(0), // For repeating tasks
 
-  // Timing
-  startedAt: timestamp('started_at').defaultNow(),
-  completedAt: timestamp('completed_at'),
-  lastActivityAt: timestamp('last_activity_at').defaultNow(),
+    // Timing
+    startedAt: timestamp('started_at').defaultNow(),
+    completedAt: timestamp('completed_at'),
+    lastActivityAt: timestamp('last_activity_at').defaultNow(),
 
-  // Validation
-  verifiedAt: timestamp('verified_at'), // When completion was verified
-  verificationMethod: text('verification_method'), // 'auto' | 'manual' | 'api' | 'code_comment' | 'code_repost' | 'starter_pack'
+    // Validation
+    verifiedAt: timestamp('verified_at'), // When completion was verified
+    verificationMethod: text('verification_method'), // 'auto' | 'manual' | 'api' | 'code_comment' | 'code_repost' | 'starter_pack'
 
-  // Code-based verification tracking
-  verificationCodeId: varchar('verification_code_id'), // Link to verification code used
-  verificationCodeUsed: varchar('verification_code_used', { length: 8 }), // The actual code that was matched
-  verificationConfidence: text('verification_confidence'), // 'high' | 'medium' | 'low'
-  verificationTier: text('verification_tier'), // 'T1' | 'T2' | 'T3' (copied from task for reference)
+    // Code-based verification tracking
+    verificationCodeId: varchar('verification_code_id'), // Link to verification code used
+    verificationCodeUsed: varchar('verification_code_used', { length: 8 }), // The actual code that was matched
+    verificationConfidence: text('verification_confidence'), // 'high' | 'medium' | 'low'
+    verificationTier: text('verification_tier'), // 'T1' | 'T2' | 'T3' (copied from task for reference)
 
-  // Campaign association (for starter pack campaign exceptions)
-  campaignId: varchar('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
+    // Campaign association (for starter pack campaign exceptions)
+    campaignId: varchar('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
 
-  // Completion context - enables campaign-specific completions of one-time tasks
-  // 'standalone' = completed outside a campaign (default for backwards compatibility)
-  // 'campaign' = completed as part of a specific campaign (allows re-earning points via re-verification)
-  completionContext: text('completion_context').default('standalone'),
+    // Completion context - enables campaign-specific completions of one-time tasks
+    // 'standalone' = completed outside a campaign (default for backwards compatibility)
+    // 'campaign' = completed as part of a specific campaign (allows re-earning points via re-verification)
+    completionContext: text('completion_context').default('standalone'),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('task_completions_user_task_idx').on(table.userId, table.taskId),
+    index('task_completions_tenant_id_idx').on(table.tenantId),
+    index('task_completions_campaign_id_idx').on(table.campaignId),
+  ]
+);
 
 // Platform Task Completions - Track platform-wide task completions (separate from creator tasks)
 export const platformTaskCompletions = pgTable('platform_task_completions', {
@@ -1939,12 +1947,24 @@ export const platformTaskCompletions = pgTable('platform_task_completions', {
 
 // Manual Review Queue - Tasks requiring creator review (Instagram, Facebook, etc.)
 export const manualReviewQueue = pgTable('manual_review_queue', {
-  id: serial('id').primaryKey(),
-  taskCompletionId: integer('task_completion_id').notNull(),
-  tenantId: integer('tenant_id').notNull(),
-  creatorId: integer('creator_id').notNull(),
-  fanId: integer('fan_id').notNull(),
-  taskId: integer('task_id').notNull(),
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  taskCompletionId: varchar('task_completion_id')
+    .notNull()
+    .references(() => taskCompletions.id),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id),
+  creatorId: varchar('creator_id')
+    .notNull()
+    .references(() => creators.id),
+  fanId: varchar('fan_id')
+    .notNull()
+    .references(() => users.id),
+  taskId: varchar('task_id')
+    .notNull()
+    .references(() => tasks.id),
 
   // Platform and task info
   platform: varchar('platform', { length: 50 }).notNull(),
@@ -1963,7 +1983,7 @@ export const manualReviewQueue = pgTable('manual_review_queue', {
   // Review details
   submittedAt: timestamp('submitted_at').defaultNow(),
   reviewedAt: timestamp('reviewed_at'),
-  reviewedBy: integer('reviewed_by'),
+  reviewedBy: varchar('reviewed_by').references(() => users.id),
   reviewNotes: text('review_notes'),
 
   // Metadata
@@ -2372,7 +2392,6 @@ export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many 
   rewards: many(rewards),
   fanPrograms: many(fanPrograms),
   tasks: many(tasks),
-  taskCompletions: many(taskCompletions),
 }));
 
 export const rewardsRelations = relations(rewards, ({ one, many }) => ({
@@ -2385,6 +2404,29 @@ export const rewardsRelations = relations(rewards, ({ one, many }) => ({
     references: [loyaltyPrograms.id],
   }),
   redemptions: many(rewardRedemptions),
+}));
+
+export const manualReviewQueueRelations = relations(manualReviewQueue, ({ one }) => ({
+  taskCompletion: one(taskCompletions, {
+    fields: [manualReviewQueue.taskCompletionId],
+    references: [taskCompletions.id],
+  }),
+  task: one(tasks, {
+    fields: [manualReviewQueue.taskId],
+    references: [tasks.id],
+  }),
+  fan: one(users, {
+    fields: [manualReviewQueue.fanId],
+    references: [users.id],
+  }),
+  creator: one(creators, {
+    fields: [manualReviewQueue.creatorId],
+    references: [creators.id],
+  }),
+  tenant: one(tenants, {
+    fields: [manualReviewQueue.tenantId],
+    references: [tenants.id],
+  }),
 }));
 
 export const fanProgramsRelations = relations(fanPrograms, ({ one, many }) => ({
@@ -3208,7 +3250,7 @@ export const nftMints = pgTable('nft_mints', {
     .default(sql`gen_random_uuid()`),
 
   // Mint Operation Details
-  crossmintActionId: text('crossmint_action_id').unique().notNull(), // Crossmint's action ID for status tracking
+  crossmintActionId: text('crossmint_action_id').unique(), // Unique mint action ID (nullable for non-Crossmint mints)
 
   // Source Information
   collectionId: varchar('collection_id').references(() => nftCollections.id), // nullable for badge mints (which use badgeTemplateId instead)

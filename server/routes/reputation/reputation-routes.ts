@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Reputation API Routes
  *
@@ -338,7 +339,8 @@ export function registerReputationRoutes(app: Express) {
           where: eq(users.id, userId),
         });
 
-        if (!userRecord?.walletAddress) {
+        const walletAddr = (userRecord as any)?.avalancheL1Address || userRecord?.walletAddress;
+        if (!walletAddr) {
           return res.status(400).json({
             error: 'User does not have a wallet address',
             userId,
@@ -347,11 +349,7 @@ export function registerReputationRoutes(app: Express) {
         }
 
         // Push to blockchain
-        const txHash = await oracle.pushSingleScore(
-          userRecord.walletAddress,
-          score,
-          `manual_sync_${userId}`
-        );
+        const txHash = await oracle.pushSingleScore(walletAddr, score, `manual_sync_${userId}`);
 
         console.log(
           `[ReputationRoutes] User ${userId} score synced to chain: ${score} (tx: ${txHash})`
@@ -363,7 +361,7 @@ export function registerReputationRoutes(app: Express) {
           score,
           breakdown,
           txHash,
-          walletAddress: userRecord.walletAddress,
+          walletAddress: walletAddr,
         });
       } catch (error) {
         console.error('[ReputationRoutes] Single user sync error:', error);

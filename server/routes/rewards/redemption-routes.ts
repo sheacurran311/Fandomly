@@ -36,10 +36,11 @@ const redeemRewardSchema = z.object({
   quantity: z.number().min(1).max(10).default(1),
   shippingAddress: z
     .object({
-      name: z.string().min(1),
-      street: z.string().min(1),
+      fullName: z.string().min(1),
+      addressLine1: z.string().min(1),
+      addressLine2: z.string().optional(),
       city: z.string().min(1),
-      state: z.string().min(1),
+      stateProvince: z.string().min(1),
       postalCode: z.string().min(1),
       country: z.string().min(1),
     })
@@ -69,7 +70,7 @@ export function registerRedemptionRoutes(app: Express) {
       const offset = parseInt(req.query.offset as string) || 0;
 
       // Build query conditions
-      let conditions = sql`r.is_active = TRUE AND r.deleted_at IS NULL`;
+      let conditions = sql`r.is_active = TRUE`;
 
       if (programId) {
         conditions = sql`${conditions} AND r.program_id = ${programId}`;
@@ -81,13 +82,25 @@ export function registerRedemptionRoutes(app: Express) {
         conditions = sql`${conditions} AND r.category = ${category}`;
       }
 
-      // Get rewards with stock info
+      // Get rewards with stock info (use aliases for camelCase frontend compatibility)
       const rewardsResult = await db.execute(sql`
-        SELECT 
-          r.*,
-          COALESCE(r.stock_quantity, 0) as stock_remaining,
-          CASE WHEN r.stock_quantity IS NULL OR r.stock_quantity > 0 THEN TRUE ELSE FALSE END as in_stock,
-          COUNT(rr.id) FILTER (WHERE rr.user_id = ${userId}) as user_redemption_count
+        SELECT
+          r.id,
+          r.name,
+          r.description,
+          r.reward_type as "rewardType",
+          r.points_cost as "pointsCost",
+          r.image_url as "imageUrl",
+          r.stock_quantity as "stockCount",
+          r.is_active as "isActive",
+          r.program_id as "programId",
+          r.tenant_id as "tenantId",
+          r.category,
+          r.metadata,
+          r.created_at as "createdAt",
+          COALESCE(r.stock_quantity, 0) as "stockRemaining",
+          CASE WHEN r.stock_quantity IS NULL OR r.stock_quantity > 0 THEN TRUE ELSE FALSE END as "inStock",
+          COUNT(rr.id) FILTER (WHERE rr.fan_id = ${userId}) as "userRedemptionCount"
         FROM rewards r
         LEFT JOIN reward_redemptions rr ON rr.reward_id = r.id
         WHERE ${conditions}
@@ -97,7 +110,7 @@ export function registerRedemptionRoutes(app: Express) {
         OFFSET ${offset}
       `);
 
-      // If programId provided, get user's points balance
+      // Get user's points balance (auto-resolve program if not specified)
       let userBalance = 0;
       let userTier = null;
       if (programId) {
@@ -105,6 +118,18 @@ export function registerRedemptionRoutes(app: Express) {
           .select()
           .from(fanPrograms)
           .where(and(eq(fanPrograms.fanId, userId), eq(fanPrograms.programId, programId)))
+          .limit(1);
+
+        if (fanProgramResult[0]) {
+          userBalance = fanProgramResult[0].currentPoints || 0;
+          userTier = await tierProgressionService.getCurrentTier(fanProgramResult[0].id);
+        }
+      } else {
+        // Auto-resolve: get the first enrolled fan program to show balance
+        const fanProgramResult = await db
+          .select()
+          .from(fanPrograms)
+          .where(eq(fanPrograms.fanId, userId))
           .limit(1);
 
         if (fanProgramResult[0]) {
@@ -124,6 +149,7 @@ export function registerRedemptionRoutes(app: Express) {
         rewards: rewardsWithAffordability,
         pagination: { limit, offset },
         userBalance,
+        userPoints: userBalance,
         userTier,
       });
     } catch (error) {
@@ -325,6 +351,7 @@ export function registerRedemptionRoutes(app: Express) {
           .insert(rewardRedemptions)
           .values({
             userId,
+            fanId: userId,
             rewardId,
             programId: effectiveProgramId,
             tenantId: reward.tenantId || '',
@@ -582,7 +609,7 @@ export function registerRedemptionRoutes(app: Express) {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
 
-      let conditions = sql`rr.user_id = ${userId}`;
+      let conditions = sql`rr.fan_id = ${userId}`;
 
       if (status) {
         conditions = sql`${conditions} AND rr.status = ${status}`;
@@ -629,6 +656,67 @@ export function registerRedemptionRoutes(app: Express) {
   });
 
   /**
+   * GET /api/rewards/redemptions/pending
+   * Get pending redemptions for creator to fulfill
+   * NOTE: Must be registered BEFORE /:redemptionId to avoid route shadowing
+   */
+  app.get(
+    '/api/rewards/redemptions/pending',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const limit = parseInt(req.query.limit as string) || 50;
+        const offset = parseInt(req.query.offset as string) || 0;
+
+        // Get creator's tenant
+        const creator = await storage.getCreatorByUserId(userId);
+        if (!creator) {
+          return res.status(403).json({ error: 'Only creators can access pending redemptions' });
+        }
+
+        const redemptionsResult = await db.execute(sql`
+        SELECT
+          rr.*,
+          r.name as reward_name,
+          r.image_url as reward_image,
+          r.reward_type,
+          u.username,
+          u.email
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        INNER JOIN users u ON rr.fan_id = u.id
+        WHERE r.tenant_id = ${creator.tenantId}
+          AND rr.status = 'pending'
+        ORDER BY rr.created_at ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `);
+
+        const totalResult = await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM reward_redemptions rr
+        INNER JOIN rewards r ON rr.reward_id = r.id
+        WHERE r.tenant_id = ${creator.tenantId}
+          AND rr.status = 'pending'
+      `);
+
+        res.json({
+          redemptions: (redemptionsResult as any).rows || [],
+          pagination: {
+            limit,
+            offset,
+            total: parseInt((totalResult as any).rows?.[0]?.total || '0'),
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching pending redemptions:', error);
+        res.status(500).json({ error: 'Failed to fetch pending redemptions' });
+      }
+    }
+  );
+
+  /**
    * GET /api/rewards/redemptions/:redemptionId
    * Get specific redemption details
    */
@@ -647,7 +735,6 @@ export function registerRedemptionRoutes(app: Express) {
           r.description as reward_description,
           r.image_url as reward_image,
           r.reward_type,
-          r.redemption_instructions,
           lp.name as program_name
         FROM reward_redemptions rr
         INNER JOIN rewards r ON rr.reward_id = r.id
@@ -783,66 +870,6 @@ export function registerRedemptionRoutes(app: Express) {
       } catch (error) {
         console.error('Error fulfilling redemption:', error);
         res.status(500).json({ error: 'Failed to fulfill redemption' });
-      }
-    }
-  );
-
-  /**
-   * GET /api/rewards/redemptions/pending
-   * Get pending redemptions for creator to fulfill
-   */
-  app.get(
-    '/api/rewards/redemptions/pending',
-    authenticateUser,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const userId = req.user!.id;
-        const limit = parseInt(req.query.limit as string) || 50;
-        const offset = parseInt(req.query.offset as string) || 0;
-
-        // Get creator's tenant
-        const creator = await storage.getCreatorByUserId(userId);
-        if (!creator) {
-          return res.status(403).json({ error: 'Only creators can access pending redemptions' });
-        }
-
-        const redemptionsResult = await db.execute(sql`
-        SELECT 
-          rr.*,
-          r.name as reward_name,
-          r.image_url as reward_image,
-          r.reward_type,
-          u.username,
-          u.email
-        FROM reward_redemptions rr
-        INNER JOIN rewards r ON rr.reward_id = r.id
-        INNER JOIN users u ON rr.user_id = u.id
-        WHERE r.tenant_id = ${creator.tenantId}
-          AND rr.status = 'pending'
-        ORDER BY rr.created_at ASC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `);
-
-        const totalResult = await db.execute(sql`
-        SELECT COUNT(*) as total
-        FROM reward_redemptions rr
-        INNER JOIN rewards r ON rr.reward_id = r.id
-        WHERE r.tenant_id = ${creator.tenantId}
-          AND rr.status = 'pending'
-      `);
-
-        res.json({
-          redemptions: (redemptionsResult as any).rows || [],
-          pagination: {
-            limit,
-            offset,
-            total: parseInt((totalResult as any).rows?.[0]?.total || '0'),
-          },
-        });
-      } catch (error) {
-        console.error('Error fetching pending redemptions:', error);
-        res.status(500).json({ error: 'Failed to fetch pending redemptions' });
       }
     }
   );

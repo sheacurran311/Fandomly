@@ -56,21 +56,21 @@ const createMultiplierSchema = z.object({
 const updateMultiplierSchema = createMultiplierSchema.partial();
 
 /**
- * Check if user is admin for the tenant or platform admin
+ * Check if user is admin for the tenant or platform admin.
+ * Platform-wide multipliers (no tenantId) require fandomly_admin role.
+ * Tenant-scoped multipliers require admin/owner in THAT specific tenant.
  */
-async function isAdmin(userId: string, tenantId?: string): Promise<boolean> {
+async function isAdmin(
+  userId: string,
+  userRole: string | undefined,
+  tenantId?: string
+): Promise<boolean> {
   if (!tenantId) {
-    // Check if platform admin
-    const platformMembership = await db.query.tenantMemberships.findFirst({
-      where: and(
-        eq(tenantMemberships.userId, userId),
-        or(eq(tenantMemberships.role, 'admin'), eq(tenantMemberships.role, 'owner'))
-      ),
-    });
-    return !!platformMembership;
+    // Platform-wide multipliers require fandomly_admin role
+    return userRole === 'fandomly_admin';
   }
 
-  // Check if tenant admin
+  // Check if admin/owner in the SPECIFIC tenant
   const membership = await db.query.tenantMemberships.findFirst({
     where: and(
       eq(tenantMemberships.userId, userId),
@@ -97,7 +97,7 @@ export function registerMultiplierRoutes(app: Express) {
       const tenantId = req.query.tenantId as string | undefined;
 
       // Check admin access
-      const hasAccess = await isAdmin(userId, tenantId);
+      const hasAccess = await isAdmin(userId, req.user?.role, tenantId);
       if (!hasAccess) {
         return res.status(403).json({ error: 'Admin access required' });
       }
@@ -146,7 +146,7 @@ export function registerMultiplierRoutes(app: Express) {
         }
 
         // Check admin access for this multiplier's tenant
-        const hasAccess = await isAdmin(userId, multiplier.tenantId || undefined);
+        const hasAccess = await isAdmin(userId, req.user?.role, multiplier.tenantId || undefined);
         if (!hasAccess) {
           return res.status(403).json({ error: 'Admin access required' });
         }
@@ -182,7 +182,7 @@ export function registerMultiplierRoutes(app: Express) {
       const data = validation.data;
 
       // Check admin access
-      const hasAccess = await isAdmin(userId, data.tenantId);
+      const hasAccess = await isAdmin(userId, req.user?.role, data.tenantId);
       if (!hasAccess) {
         return res.status(403).json({ error: 'Admin access required' });
       }
@@ -238,7 +238,7 @@ export function registerMultiplierRoutes(app: Express) {
         }
 
         // Check admin access
-        const hasAccess = await isAdmin(userId, existing.tenantId || undefined);
+        const hasAccess = await isAdmin(userId, req.user?.role, existing.tenantId || undefined);
         if (!hasAccess) {
           return res.status(403).json({ error: 'Admin access required' });
         }
@@ -312,7 +312,7 @@ export function registerMultiplierRoutes(app: Express) {
         }
 
         // Check admin access
-        const hasAccess = await isAdmin(userId, existing.tenantId || undefined);
+        const hasAccess = await isAdmin(userId, req.user?.role, existing.tenantId || undefined);
         if (!hasAccess) {
           return res.status(403).json({ error: 'Admin access required' });
         }
