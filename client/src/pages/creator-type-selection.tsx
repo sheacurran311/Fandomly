@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
@@ -47,6 +48,7 @@ interface CreatorTypeOption {
 
 interface OnboardingState {
   creatorType: CreatorType | null;
+  username: string;
   programName: string;
   programDescription: string;
   pointsName: string;
@@ -125,6 +127,7 @@ export default function CreatorTypeSelection() {
   const [currentStep, setCurrentStep] = useState(0);
   const [state, setState] = useState<OnboardingState>({
     creatorType: null,
+    username: user?.username || '',
     programName: '',
     programDescription: '',
     pointsName: '',
@@ -139,12 +142,24 @@ export default function CreatorTypeSelection() {
     formRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep]);
 
+  // Sync username from user when it loads
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (user?.username && !state.username) {
+      setState((prev) => ({ ...prev, username: user.username }));
+    }
+  }, [user?.username, state.username]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
   // Set smart defaults when creator type changes
   const selectCreatorType = useCallback(
     (type: CreatorType) => {
       const template = CREATOR_TEMPLATES[type];
       const displayName =
-        (user?.profileData as Record<string, string>)?.name || user?.username || 'Creator';
+        (user?.profileData as Record<string, string>)?.name ||
+        user?.username ||
+        state.username ||
+        'Creator';
       setState((prev) => ({
         ...prev,
         creatorType: type,
@@ -153,7 +168,7 @@ export default function CreatorTypeSelection() {
         themeId: prev.themeId || template.defaultTheme,
       }));
     },
-    [user]
+    [user, state.username]
   );
 
   // API: create creator + tenant + program, then update program with user choices
@@ -164,7 +179,10 @@ export default function CreatorTypeSelection() {
       // Step 1: Atomic scaffold (tenant + creator + draft program)
       const result = await fetchApi('/api/auth/set-creator-type', {
         method: 'POST',
-        body: JSON.stringify({ creatorType: state.creatorType }),
+        body: JSON.stringify({
+          creatorType: state.creatorType,
+          username: state.username.trim() || undefined,
+        }),
       });
 
       const program = (result as Record<string, unknown>).program as
@@ -225,10 +243,15 @@ export default function CreatorTypeSelection() {
     },
   });
 
+  // Username validation: 3-30 chars, alphanumeric + _ . -
+  const isUsernameValid = (u: string) =>
+    u.length >= 3 && u.length <= 30 && /^[a-zA-Z0-9_.-]+$/.test(u);
+
   // Navigation helpers
   const canAdvance = () => {
     if (currentStep === 0) return !!state.creatorType;
-    if (currentStep === 1) return state.programName.trim().length > 0;
+    if (currentStep === 1)
+      return isUsernameValid(state.username) && state.programName.trim().length > 0;
     return true;
   };
 
@@ -408,13 +431,32 @@ export default function CreatorTypeSelection() {
           {currentStep === 1 && (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
               <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
-                Name your program
+                Choose your username & program
               </h1>
               <p className="text-gray-400 mb-8 text-lg">
-                This is what fans will see when they find your page. You can always change it later.
+                Pick a unique username and name your program. You can change these later.
               </p>
 
               <div className="space-y-6">
+                {/* Username */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
+                  <Input
+                    value={state.username}
+                    onChange={(e) => setState((s) => ({ ...s, username: e.target.value }))}
+                    placeholder="e.g. yourname or yourname_creator"
+                    maxLength={30}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base focus:border-brand-primary/60 focus:ring-brand-primary/20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {state.username.length}/30 characters. Letters, numbers, underscores, dots,
+                    hyphens only.
+                  </p>
+                  {state.username.length > 0 && !isUsernameValid(state.username) && (
+                    <p className="text-xs text-amber-400 mt-1">Username must be 3–30 characters</p>
+                  )}
+                </div>
+
                 {/* Program Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">

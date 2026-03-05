@@ -32,10 +32,10 @@ export const CREATOR_VERIFICATION_REQUIREMENTS = {
   ],
 
   contentCreator: [
+    'aboutMe', // Bio/Description/About Me
     'contentType', // Type of content (video, podcast, gaming, etc.)
     'topicsOfFocus', // Main topics
-    'totalViews', // View count range
-    'platforms', // Active platforms
+    'mainContentPlatforms', // Auto from integrations (X, Instagram, TikTok, etc.)
   ],
 
   // Social Media (At least 4 required)
@@ -159,14 +159,14 @@ export const CREATOR_FIELD_INFO: Record<
     description: 'Main topics you cover',
     category: 'contentCreator',
   },
-  totalViews: {
-    label: 'Total Views',
-    description: 'Approximate total view count',
+  aboutMe: {
+    label: 'Bio / Description / About Me',
+    description: 'Tell your fans about yourself',
     category: 'contentCreator',
   },
-  platforms: {
-    label: 'Platforms',
-    description: 'Where you create content',
+  mainContentPlatforms: {
+    label: 'Main Content Platforms',
+    description: 'Auto-selected from your connected integrations',
     category: 'contentCreator',
   },
 

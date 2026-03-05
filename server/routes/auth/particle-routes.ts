@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Particle Network Auth Routes
  *
@@ -30,12 +31,13 @@ export function registerParticleAuthRoutes(app: Express) {
    */
   app.post('/api/auth/particle/callback', async (req: Request, res: Response) => {
     try {
-      const { particleToken, walletAddress } = req.body;
+      const { particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar } =
+        req.body;
 
-      if (!particleToken) {
+      if (!particleUuid) {
         return res.status(400).json({
           success: false,
-          error: 'Missing particleToken',
+          error: 'Missing particleUuid — required for token validation',
         });
       }
 
@@ -47,7 +49,14 @@ export function registerParticleAuthRoutes(app: Express) {
       }
 
       // Validate + bridge to Fandomly auth
-      const result = await handleParticleCallback(particleToken, walletAddress);
+      const result = await handleParticleCallback(
+        particleToken,
+        walletAddress,
+        particleUuid,
+        userEmail,
+        userName,
+        userAvatar
+      );
 
       if (!result.success) {
         return res.status(401).json(result);
@@ -85,9 +94,7 @@ export function registerParticleAuthRoutes(app: Express) {
    * Used by the client to determine which auth flow to show.
    */
   app.get('/api/auth/particle/status', (_req: Request, res: Response) => {
-    const enabled = Boolean(
-      process.env.PARTICLE_PROJECT_ID && process.env.PARTICLE_SERVER_KEY
-    );
+    const enabled = Boolean(process.env.PARTICLE_PROJECT_ID && process.env.PARTICLE_SERVER_KEY);
 
     return res.json({
       enabled,

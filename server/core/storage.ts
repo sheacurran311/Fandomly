@@ -133,6 +133,7 @@ export interface IStorage {
   createTenantMembership(data: any): Promise<TenantMembership>;
   getTenantMembers(tenantId: string): Promise<TenantMembership[]>;
   getUserMemberships(userId: string): Promise<TenantMembership[]>;
+  getUserTenantMembership(userId: string, tenantId: string): Promise<TenantMembership | undefined>;
 
   // Campaign operations
   getCampaign(id: string, tenantId?: string): Promise<Campaign | undefined>;

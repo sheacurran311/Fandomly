@@ -46,6 +46,7 @@ export default function TaskBuilder() {
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplateType | null>(null);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
+  const [hasInitialized, setHasInitialized] = useState(false);
   const isEditMode = !!params.id;
 
   // Fetch programs for the creator

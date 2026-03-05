@@ -519,11 +519,10 @@ export const creators = pgTable(
 
       // Content Creator-specific data
       contentCreator?: {
-        contentType: string[]; // ["video", "podcast", "gaming", "lifestyle", etc.]
-        topicsOfFocus: string[];
-        sponsorships?: string[];
-        totalViews?: string; // "under_1k" | "1k_10k" | "10k_100k" | "100k_1m" | "over_1m"
-        platforms: string[]; // ["instagram", "tiktok", "youtube", "twitch", etc.]
+        aboutMe?: string; // Bio/Description/About Me
+        contentType?: string[]; // ["video", "podcast", "gaming", "lifestyle", etc.]
+        topicsOfFocus?: string[];
+        mainContentPlatforms?: string[]; // Auto from integrations: ["instagram", "tiktok", "twitter", "youtube", etc.]
       };
     }>(),
 
@@ -954,6 +953,9 @@ export const pointTransactions = pgTable(
       referralId?: string;
       postUrl?: string;
     }>(),
+    expiresAt: timestamp('expires_at'),
+    isExpired: boolean('is_expired').default(false),
+    expiredAt: timestamp('expired_at'),
     createdAt: timestamp('created_at').defaultNow(),
   },
   (table) => [
@@ -2002,6 +2004,9 @@ export const platformPointsTransactions = pgTable('platform_points_transactions'
   source: varchar('source').notNull(), // 'task_completion' | 'daily_bonus' | 'referral' | 'admin_grant'
   description: text('description'),
   metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  expiresAt: timestamp('expires_at'),
+  isExpired: boolean('is_expired').default(false),
+  expiredAt: timestamp('expired_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

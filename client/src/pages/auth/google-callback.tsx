@@ -1,11 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 
 /**
  * Google OAuth callback page
- * Handles the redirect from Google OAuth and exchanges the code for tokens.
- * 
+ *
+ * @deprecated This page handles the legacy Google OAuth redirect flow that was used
+ * before Particle Network ConnectKit was integrated. When Particle is configured,
+ * Google sign-in is handled natively by Particle ConnectKit's Google social auth
+ * connector and this page is not reached.
+ *
+ * This page is kept as a fallback for:
+ *   1. Environments where VITE_PARTICLE_PROJECT_ID is not set
+ *   2. Backward compatibility for any session that was initiated via the old Google flow
+ *
+ * Do NOT remove until all Google OAuth users are fully migrated to Particle auth.
+ *
  * After auth, routes users based on their stored type:
  * - New users / pending type → /user-type-selection (ALWAYS)
  * - Existing creators → /creator-dashboard or /creator-type-selection
@@ -52,7 +63,7 @@ export default function GoogleCallback() {
 
         if (result.success) {
           const user = result.user;
-          
+
           // New user OR user without a type → MUST go to type selection
           if (result.isNewUser || !user?.userType || user.userType === 'pending') {
             setLocation('/user-type-selection');
@@ -125,13 +136,11 @@ export default function GoogleCallback() {
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
         <div className="bg-brand-card rounded-lg p-8 max-w-md w-full">
           <h2 className="text-2xl font-bold text-white mb-4">Account Found</h2>
-          <p className="text-gray-300 mb-6">
-            {linkRequired.message}
-          </p>
+          <p className="text-gray-300 mb-6">{linkRequired.message}</p>
           <p className="text-gray-400 text-sm mb-6">
             Existing login method: {linkRequired.existingProviders.join(', ')}
           </p>
-          
+
           <div className="flex gap-4">
             <button
               onClick={handleConfirmLink}
@@ -148,10 +157,8 @@ export default function GoogleCallback() {
               Cancel
             </button>
           </div>
-          
-          {error && (
-            <p className="text-red-500 text-sm mt-4">{error}</p>
-          )}
+
+          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </div>
       </div>
     );

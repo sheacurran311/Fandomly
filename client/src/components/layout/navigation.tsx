@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -199,7 +200,7 @@ export default function Navigation() {
               ) : particleEnabled ? (
                 <div
                   data-particle-connect-btn
-                  className="[&_button]:rounded-xl [&_button]:font-semibold [&_button]:transition-all [&_button]:duration-200 [&_button]:hover:scale-105"
+                  className="[&>div]:rounded-xl [&>div]:font-semibold [&>div]:transition-all [&>div]:duration-200 [&>div]:hover:scale-105 [&>div]:min-w-[100px]"
                 >
                   <Suspense
                     fallback={
@@ -280,7 +281,7 @@ export default function Navigation() {
                   (particleEnabled ? (
                     <div
                       data-particle-connect-btn
-                      className="[&_button]:w-full [&_button]:rounded-xl [&_button]:font-semibold"
+                      className="[&>div]:w-full [&>div]:rounded-xl [&>div]:font-semibold"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       <Suspense

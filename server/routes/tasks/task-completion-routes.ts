@@ -140,17 +140,10 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         // Check if user is program owner/admin or just a participant
         const isOwner = program.creatorId === req.user.id;
-        const { tenantMemberships } = await import('@shared/schema');
-        const [membership] = await db
-          .select()
-          .from(tenantMemberships)
-          .where(
-            and(
-              eq(tenantMemberships.userId, req.user.id),
-              eq(tenantMemberships.tenantId, program.tenantId || '')
-            )
-          )
-          .limit(1);
+        const membership = await storage.getUserTenantMembership(
+          req.user.id,
+          program.tenantId || ''
+        );
         const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
 
         let completions;
@@ -192,6 +185,10 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         console.log(
           `[Task Completions API] Fetching completions for tenant ${tenantId}, user ${req.user.id}`
         );
+
+        // Verify user has access to this tenant
+        const membership = await storage.getUserTenantMembership(req.user.id, tenantId);
+        const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
 
         const { db } = await import('../../db');
         const { eq, desc } = await import('drizzle-orm');

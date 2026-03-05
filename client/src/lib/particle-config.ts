@@ -1,23 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/**
- * Particle Connect Configuration for Fandomly
- *
- * This configures Particle Network's Connect SDK to provide:
- * - Social login (Google, Apple, Twitter, Discord, email, phone)
- * - Automatic wallet creation on Fandomly Chain L1
- * - Embedded wallet UI for transaction management
- *
- * Dashboard: https://dashboard.particle.network
- * Docs: https://developers.particle.network/social-logins/connect/desktop/web
- */
-
 import { createConfig } from '@particle-network/connectkit';
 import { authWalletConnectors } from '@particle-network/connectkit/auth';
 import { evmWalletConnectors } from '@particle-network/connectkit/evm';
 import { wallet, EntryPosition } from '@particle-network/connectkit/wallet';
 import { defineChain } from '@particle-network/connectkit/chains';
 
-// --- Fandomly Chain L1 Definition ---
 export const fandomlyChain = defineChain({
   id: 31111,
   name: 'Fandomly Chain',
@@ -43,28 +30,22 @@ export const fandomlyChain = defineChain({
   testnet: true,
 });
 
-// --- Credentials from Particle Dashboard ---
 const projectId = import.meta.env.VITE_PARTICLE_PROJECT_ID;
 const clientKey = import.meta.env.VITE_PARTICLE_CLIENT_KEY;
 const appId = import.meta.env.VITE_PARTICLE_APP_ID;
 
-/**
- * Check if Particle Network is configured.
- * Returns false if credentials are missing (falls back to legacy auth).
- */
+// Public project identifier — safe for frontend use (not a secret)
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+
 export function isParticleConfigured(): boolean {
   return Boolean(projectId && clientKey && appId);
 }
 
-/**
- * Create the Particle Connect config.
- * Only call this if isParticleConfigured() returns true.
- */
 export function createParticleConfig() {
   if (!projectId || !clientKey || !appId) {
     throw new Error(
       'Particle Network credentials not configured. ' +
-        'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID in .env'
+        'Set VITE_PARTICLE_PROJECT_ID, VITE_PARTICLE_CLIENT_KEY, and VITE_PARTICLE_APP_ID.'
     );
   }
 
@@ -74,65 +55,127 @@ export function createParticleConfig() {
     appId,
 
     appearance: {
-      // Prioritize social logins (email first, then social, then wallets)
+      // Layout and UX preferences
       connectorsOrder: ['email', 'social', 'wallet'],
       splitEmailAndPhone: false,
-      collapseWalletList: true, // Most Fandomly users are Web2-native
+      collapseWalletList: true,
       hideContinueButton: false,
       language: 'en-US',
       mode: 'dark',
+
+      // Fandomly logo — shown at the top of the ConnectKit modal.
+      // NOTE: The Particle dashboard "Branding" section only applies to the legacy
+      // @particle-network/authkit SDK. For ConnectKit (@particle-network/connectkit),
+      // all visual customization must be done here via `appearance.logo` and
+      // `appearance.theme`. See:
+      // https://developers.particle.network/social-logins/configuration/appearance/auth.md
+      logo:
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/fandomly-logo.png`
+          : 'https://fandomly.io/fandomly-logo.png',
+
+      // Fandomly brand theme for the ConnectKit modal.
+      // Brand colors: #e10698 (primary pink), #14feee (secondary cyan), #0a0118 (dark bg)
       theme: {
-        '--pcm-accent-color': '#8B5CF6',
-        '--pcm-body-background': '#0F0F23',
-        '--pcm-body-background-secondary': '#1A1A3E',
-        '--pcm-body-color': '#FFFFFF',
-        '--pcm-body-color-secondary': '#A0AEC0',
-        '--pcm-primary-button-background': '#8B5CF6',
-        '--pcm-primary-button-color': '#FFFFFF',
-        '--pcm-primary-button-hover-background': '#7C3AED',
-        '--pcm-button-border-color': '#2D2D5E',
-      } as any,
+        // Modal overlay
+        '--pcm-overlay-background': 'rgba(10, 1, 24, 0.85)',
+        '--pcm-overlay-backdrop-filter': 'blur(8px)',
+        '--pcm-modal-box-shadow': '0px 0px 32px rgba(225, 6, 152, 0.25)',
+
+        // Modal / card backgrounds
+        '--pcm-body-background': '#0f0520',
+        '--pcm-body-background-secondary': '#1a0a30',
+        '--pcm-body-background-tertiary': '#220d3c',
+
+        // Text
+        '--pcm-body-color': '#ffffff',
+        '--pcm-body-color-secondary': '#b3a8c8',
+        '--pcm-body-color-tertiary': '#6b5f82',
+
+        // Action / accent / focus
+        '--pcm-body-action-color': '#e10698',
+        '--pcm-accent-color': '#e10698',
+        '--pcm-focus-color': '#14feee',
+
+        // Buttons (shared)
+        '--pcm-button-font-weight': '600',
+        '--pcm-button-hover-shadow': '0px 4px 16px rgba(225, 6, 152, 0.35)',
+        '--pcm-button-border-color': 'rgba(225, 6, 152, 0.3)',
+
+        // Primary button — hot pink background, white text
+        '--pcm-primary-button-color': '#ffffff',
+        '--pcm-primary-button-background': '#e10698',
+        // Note: Particle SDK has a known typo "bankground" — include both spellings
+        // for the primary button until Particle corrects it upstream.
+        '--pcm-primary-button-bankground': '#e10698',
+        '--pcm-primary-button-hover-background': '#c0057f',
+
+        // Secondary button — subtle dark with pink border
+        '--pcm-secondary-button-color': '#e10698',
+        '--pcm-secondary-button-background': 'rgba(225, 6, 152, 0.1)',
+        '--pcm-secondary-button-hover-background': 'rgba(225, 6, 152, 0.2)',
+
+        // Border radius — matches Fandomly's rounded-xl design language
+        '--pcm-rounded-sm': '6px',
+        '--pcm-rounded-md': '10px',
+        '--pcm-rounded-lg': '14px',
+        '--pcm-rounded-xl': '18px',
+        '--pcm-rounded-full': '9999px',
+
+        // Status colors
+        '--pcm-success-color': '#14feee',
+        '--pcm-warning-color': '#F59E0A',
+        '--pcm-error-color': '#ff4d6d',
+
+        // Wallet label
+        '--pcm-wallet-label-color': '#14feee',
+      },
     },
 
     walletConnectors: [
-      // Social login connectors (Particle Auth)
+      // Social + email login (primary auth path)
+      // Full list of Particle-supported SocialAuthTypes:
+      // facebook, google, apple, twitter, discord, github, twitch, microsoft, linkedin
+      // Note: TikTok, YouTube, Spotify are NOT auth providers in Particle — they are
+      // handled as post-login social account linking flows on the social dashboard pages.
       authWalletConnectors({
-        // Social providers available for login
-        // These replace our current 8 separate OAuth integrations
-        authTypes: ['email', 'google', 'apple', 'twitter', 'discord'],
+        authTypes: [
+          'email',
+          'google',
+          'apple',
+          'twitter',
+          'discord',
+          'facebook',
+          'github',
+          'twitch',
+          'microsoft',
+          'linkedin',
+        ],
         fiatCoin: 'USD',
         promptSettingConfig: {
-          // 0 = Never ask -- frictionless onboarding for fans
-          // Master password protects the wallet key
           promptMasterPasswordSettingWhenLogin: 0,
-          // Payment password required before signing transactions
           promptPaymentPasswordSettingWhenSign: 1,
         },
       }),
-
-      // EVM wallet connectors (MetaMask, WalletConnect, etc.)
-      // For Web3-native users who already have wallets
+      // EVM wallet connectors: MetaMask, Coinbase, WalletConnect, etc.
       evmWalletConnectors({
         metadata: {
           name: 'Fandomly',
-          icon: '', // TODO: Set to Fandomly icon URL
-          description: 'Creator loyalty and rewards platform',
-          url: 'https://fandomly.ai',
+          description: 'Elevate Your Brand. Reward Your Community.',
+          url: typeof window !== 'undefined' ? window.location.origin : 'https://fandomly.io',
+          icon: typeof window !== 'undefined' ? `${window.location.origin}/favicon.ico` : '',
         },
-        // Disable multi-injected provider discovery to simplify the modal
-        multiInjectedProviderDiscovery: false,
+        ...(walletConnectProjectId ? { walletConnectProjectId } : {}),
       }),
     ],
 
     plugins: [
-      // Embedded wallet modal -- shows balances, allows transfers, etc.
       wallet({
-        entryPosition: EntryPosition.BR, // Bottom-right button
+        entryPosition: EntryPosition.BR,
         visible: true,
       }),
     ],
 
-    // Only Fandomly Chain for now (add C-Chain or others later if needed)
     chains: [fandomlyChain],
   });
 }
