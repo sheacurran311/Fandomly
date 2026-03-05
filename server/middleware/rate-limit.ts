@@ -50,3 +50,15 @@ export const insightsLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many insight requests. Please wait a moment.' },
 });
+
+/**
+ * Auth rate limit: 10 requests per minute per IP
+ * Prevents brute-force login attempts and account enumeration.
+ */
+export const authRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' },
+});

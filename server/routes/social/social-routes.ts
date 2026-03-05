@@ -1,13 +1,15 @@
-import type { Express, Request, Response } from "express";
-import express from "express";
-import crypto from "crypto";
+/* eslint-disable @typescript-eslint/no-explicit-any, no-empty */
+import type { Express, Request, Response } from 'express';
+import express from 'express';
+import crypto from 'crypto';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
-import { URLSearchParams } from "url";
+import { URLSearchParams } from 'url';
 import { storage } from '../../core/storage';
 import { db } from '../../db';
-import { socialConnections, platformPointsTransactions } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { socialConnections, platformPointsTransactions } from '@shared/schema';
+import { eq, and, sql } from 'drizzle-orm';
 import { platformPointsService } from '../../services/points/platform-points-service';
+import { encryptToken } from '../../lib/token-encryption';
 
 // Points awarded for connecting a social account
 const SOCIAL_CONNECTION_POINTS = 500;
@@ -25,52 +27,58 @@ function pruneUsedCodes() {
 setInterval(pruneUsedCodes, 60 * 1000).unref();
 
 // Instagram Business Login token exchange
-async function exchangeInstagramToken(code: string, redirectUri: string, userType: string = 'creator') {
-  const clientId = userType === 'creator' ? process.env.INSTAGRAM_CREATOR_APP_ID : process.env.INSTAGRAM_CLIENT_ID;
-  const clientSecret = userType === 'creator' ? process.env.INSTAGRAM_APP_SECRET : process.env.INSTAGRAM_CLIENT_SECRET;
-  
+async function exchangeInstagramToken(
+  code: string,
+  redirectUri: string,
+  userType: string = 'creator'
+) {
+  const clientId =
+    userType === 'creator' ? process.env.INSTAGRAM_CREATOR_APP_ID : process.env.INSTAGRAM_CLIENT_ID;
+  const clientSecret =
+    userType === 'creator' ? process.env.INSTAGRAM_APP_SECRET : process.env.INSTAGRAM_CLIENT_SECRET;
+
   console.log('[Instagram Token Exchange] Request details:', {
     userType,
     clientId,
     hasClientSecret: !!clientSecret,
     redirectUri,
-    codeLength: code.length
+    codeLength: code.length,
   });
-  
+
   if (!clientSecret) {
     throw new Error(`Instagram client secret not configured for ${userType}`);
   }
-  
+
   const requestBody = {
     client_id: clientId!,
     client_secret: clientSecret,
     grant_type: 'authorization_code',
     redirect_uri: redirectUri,
-    code
+    code,
   };
-  
+
   console.log('[Instagram Token Exchange] Making request to Instagram API...');
   const response = await fetch('https://api.instagram.com/oauth/access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(requestBody).toString()
+    body: new URLSearchParams(requestBody).toString(),
   });
-  
+
   console.log('[Instagram Token Exchange] Instagram API response status:', response.status);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[Instagram Token Exchange] Instagram API error:', errorText);
     throw new Error(`Instagram token exchange failed: ${response.status} ${errorText}`);
   }
-  
+
   const result = await response.json();
   console.log('[Instagram Token Exchange] Success, received token data:', {
     hasAccessToken: !!result.access_token,
     hasData: !!result.data,
-    dataLength: result.data?.length
+    dataLength: result.data?.length,
   });
-  
+
   return result;
 }
 
@@ -83,7 +91,7 @@ async function exchangeTikTokToken(code: string, redirectUri?: string) {
     hasClientSecret: !!process.env.TIKTOK_CLIENT_SECRET,
     clientSecretLength: process.env.TIKTOK_CLIENT_SECRET?.length,
     redirectUri,
-    codeLength: code.length
+    codeLength: code.length,
   });
 
   if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) {
@@ -100,7 +108,7 @@ async function exchangeTikTokToken(code: string, redirectUri?: string) {
     client_secret: process.env.TIKTOK_CLIENT_SECRET,
     code,
     grant_type: 'authorization_code',
-    redirect_uri: redirectUri
+    redirect_uri: redirectUri,
   };
 
   console.log('[TikTok Token Exchange] Request body:', {
@@ -108,84 +116,85 @@ async function exchangeTikTokToken(code: string, redirectUri?: string) {
     hasClientSecret: !!requestBody.client_secret,
     code: requestBody.code.substring(0, 20) + '...',
     grant_type: requestBody.grant_type,
-    redirect_uri: requestBody.redirect_uri
+    redirect_uri: requestBody.redirect_uri,
   });
 
   console.log('[TikTok Token Exchange] Making request to TikTok API v2...');
   // TikTok API v2 uses /v2/oauth/token/ endpoint
   const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
     },
-    body: new URLSearchParams(requestBody).toString()
+    body: new URLSearchParams(requestBody).toString(),
   });
-  
+
   console.log('[TikTok Token Exchange] TikTok API response status:', response.status);
-  
+
   const result = await response.json();
-  
+
   console.log('[TikTok Token Exchange] Raw response:', JSON.stringify(result));
-  
+
   // TikTok API v2 response structure (per official docs):
   // Success: { access_token, open_id, refresh_token, expires_in, ... } (flat structure)
   // Error: { error, error_description, log_id }
-  
+
   if (result.error) {
     const errorMessage = result.error_description || result.error;
     console.error('[TikTok Token Exchange] TikTok API error:', {
       error: result.error,
       error_description: result.error_description,
-      log_id: result.log_id
+      log_id: result.log_id,
     });
     throw new Error(`TikTok token exchange failed: ${errorMessage}`);
   }
-  
+
   if (!result.access_token) {
     console.error('[TikTok Token Exchange] No access_token in response:', result);
     throw new Error('TikTok API did not return access_token');
   }
-  
+
   console.log('[TikTok Token Exchange] Success! Token data:', {
     hasAccessToken: !!result.access_token,
     hasOpenId: !!result.open_id,
     hasRefreshToken: !!result.refresh_token,
     expiresIn: result.expires_in,
-    scope: result.scope
+    scope: result.scope,
   });
-  
+
   // Return the result directly (access_token, open_id, refresh_token are at root level)
   return result;
 }
 
 // Twitter API v2 token exchange (PKCE + confidential client)
-async function exchangeTwitterToken(
-  code: string,
-  redirectUri: string,
-  codeVerifier: string
-) {
+async function exchangeTwitterToken(code: string, redirectUri: string, codeVerifier: string) {
   const clientId = process.env.TWITTER_CLIENT_ID!;
   const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
-  
+
   try {
-    console.log('[Twitter Server] CLIENT_ID fingerprint:', clientId.slice(0,6), '...', clientId.slice(-6));
+    console.log(
+      '[Twitter Server] CLIENT_ID fingerprint:',
+      clientId.slice(0, 6),
+      '...',
+      clientId.slice(-6)
+    );
     console.log('[Twitter Server] Using redirect_uri for exchange:', redirectUri);
     console.log('[Twitter Server] Auth mode: PKCE + confidential (Basic auth)');
   } catch {}
-  
+
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
-    code_verifier: codeVerifier
+    code_verifier: codeVerifier,
     // Using Basic auth instead of client_id/client_secret in body
   }).toString();
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded'
+    'Content-Type': 'application/x-www-form-urlencoded',
   };
-  
+
   // Add Basic auth for confidential client
   if (clientId && clientSecret) {
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
@@ -195,16 +204,18 @@ async function exchangeTwitterToken(
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
     headers,
-    body: params
+    body: params,
   });
 
   const text = await response.text();
   let json: any = null;
-  try { json = JSON.parse(text); } catch {}
+  try {
+    json = JSON.parse(text);
+  } catch {}
   return {
     ok: response.ok,
     status: response.status,
-    body: json ?? { error: 'invalid_response', error_description: text }
+    body: json ?? { error: 'invalid_response', error_description: text },
   };
 }
 
@@ -228,7 +239,7 @@ async function exchangeSpotifyToken(code: string, redirectUri: string) {
     hasClientId: !!process.env.SPOTIFY_CLIENT_ID,
     hasClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
     redirectUri,
-    codeLength: code.length
+    codeLength: code.length,
   });
 
   if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
@@ -237,56 +248,56 @@ async function exchangeSpotifyToken(code: string, redirectUri: string) {
 
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+      Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`,
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUri
-    }).toString()
+      redirect_uri: redirectUri,
+    }).toString(),
   });
-  
+
   console.log('[Spotify Token Exchange] Response status:', response.status);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[Spotify Token Exchange] Error:', errorText);
     throw new Error(`Spotify token exchange failed: ${response.status} ${errorText}`);
   }
-  
+
   return response.json();
 }
 
 // Spotify token refresh
 async function refreshSpotifyToken(refreshToken: string) {
   console.log('[Spotify Token Refresh] Refreshing token...');
-  
+
   if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
     throw new Error('Spotify client credentials not configured');
   }
 
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+      Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`,
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: refreshToken
-    }).toString()
+      refresh_token: refreshToken,
+    }).toString(),
   });
-  
+
   console.log('[Spotify Token Refresh] Response status:', response.status);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[Spotify Token Refresh] Error:', errorText);
     throw new Error(`Spotify token refresh failed: ${response.status}`);
   }
-  
+
   return response.json();
 }
 
@@ -296,11 +307,13 @@ async function exchangeDiscordToken(code: string, redirectUri: string) {
     hasClientId: !!process.env.DISCORD_CLIENT_ID,
     hasClientSecret: !!process.env.DISCORD_CLIENT_SECRET,
     redirectUri,
-    codeLength: code.length
+    codeLength: code.length,
   });
 
   if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET) {
-    throw new Error('Discord client credentials not configured. Required: DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET');
+    throw new Error(
+      'Discord client credentials not configured. Required: DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET'
+    );
   }
 
   const response = await fetch('https://discord.com/api/oauth2/token', {
@@ -313,8 +326,8 @@ async function exchangeDiscordToken(code: string, redirectUri: string) {
       client_secret: process.env.DISCORD_CLIENT_SECRET,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUri
-    }).toString()
+      redirect_uri: redirectUri,
+    }).toString(),
   });
 
   console.log('[Discord Token Exchange] Response status:', response.status);
@@ -334,8 +347,8 @@ async function getDiscordUser(accessToken: string) {
 
   const response = await fetch('https://discord.com/api/users/@me', {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   if (!response.ok) {
@@ -353,7 +366,7 @@ async function exchangeTwitchToken(code: string, redirectUri: string) {
     hasClientId: !!process.env.TWITCH_CLIENT_ID,
     hasClientSecret: !!process.env.TWITCH_CLIENT_SECRET,
     redirectUri,
-    codeLength: code.length
+    codeLength: code.length,
   });
 
   if (!process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET) {
@@ -370,8 +383,8 @@ async function exchangeTwitchToken(code: string, redirectUri: string) {
       client_secret: process.env.TWITCH_CLIENT_SECRET,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUri
-    }).toString()
+      redirect_uri: redirectUri,
+    }).toString(),
   });
 
   console.log('[Twitch Token Exchange] Response status:', response.status);
@@ -391,9 +404,9 @@ async function getTwitchUser(accessToken: string) {
 
   const response = await fetch('https://api.twitch.tv/helix/users', {
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Client-Id': process.env.TWITCH_CLIENT_ID!
-    }
+      Authorization: `Bearer ${accessToken}`,
+      'Client-Id': process.env.TWITCH_CLIENT_ID!,
+    },
   });
 
   if (!response.ok) {
@@ -409,82 +422,92 @@ async function getTwitchUser(accessToken: string) {
 // Get TikTok user info
 async function getTikTokUser(accessToken: string) {
   console.log('[TikTok User Info] Fetching user data...');
-  
+
   // TikTok API v2 uses GET request with query parameters
-  const fields = ['open_id', 'union_id', 'avatar_url', 'display_name', 'follower_count', 'following_count', 'likes_count', 'video_count'];
+  const fields = [
+    'open_id',
+    'union_id',
+    'avatar_url',
+    'display_name',
+    'follower_count',
+    'following_count',
+    'likes_count',
+    'video_count',
+  ];
   const url = `https://open.tiktokapis.com/v2/user/info/?fields=${fields.join(',')}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
-    headers: { 
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    }
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
   });
-  
+
   console.log('[TikTok User Info] Response status:', response.status);
-  
+
   const result = await response.json();
-  
+
   console.log('[TikTok User Info] Raw response:', JSON.stringify(result));
-  
+
   // TikTok Display API v2 response structure:
   // Success: { data: { user: { ... } }, error: { code: "ok", message: "", log_id: "..." } }
   // Error: { error: { code: "error_code", message: "...", log_id: "..." } }
   // Note: TikTok ALWAYS returns an "error" object, but code "ok" means success!
-  
+
   if (result.error && result.error.code !== 'ok') {
     const errorMessage = result.error.message || result.error.code || JSON.stringify(result.error);
     console.error('[TikTok User Info] TikTok API error:', result.error);
     throw new Error(`TikTok user info failed: ${errorMessage}`);
   }
-  
+
   // Display API actually does use nested structure
   if (!result.data || !result.data.user) {
     console.error('[TikTok User Info] Missing user data in response:', result);
     throw new Error('TikTok API did not return user data');
   }
-  
+
   console.log('[TikTok User Info] Success! User data:', {
     open_id: result.data.user.open_id,
     display_name: result.data.user.display_name,
-    follower_count: result.data.user.follower_count
+    follower_count: result.data.user.follower_count,
   });
-  
+
   // Return the full result (keeps data.user structure for callback)
   return result;
 }
 
 // Get Twitter user info
 async function getTwitterUser(accessToken: string) {
-  const response = await fetch('https://api.twitter.com/2/users/me?user.fields=id,name,username,public_metrics,profile_image_url,verified', {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
-  
+  const response = await fetch(
+    'https://api.twitter.com/2/users/me?user.fields=id,name,username,public_metrics,profile_image_url,verified',
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
   return response.json();
 }
 
 // Refresh Twitter tokens (PKCE + confidential client - rotation aware)
-async function refreshTwitterToken(
-  refreshToken: string
-) {
+async function refreshTwitterToken(refreshToken: string) {
   const clientId = process.env.TWITTER_CLIENT_ID!;
   const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
-  
+
   try {
     console.log('[Twitter Server] Refresh with auth mode: PKCE + confidential (Basic auth)');
   } catch {}
-  
+
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
-    refresh_token: refreshToken
+    refresh_token: refreshToken,
     // Using Basic auth instead of client_id/client_secret in body
   }).toString();
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded'
+    'Content-Type': 'application/x-www-form-urlencoded',
   };
-  
+
   // Add Basic auth for confidential client (consistent with exchange)
   if (clientId && clientSecret) {
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
@@ -494,16 +517,18 @@ async function refreshTwitterToken(
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
     headers,
-    body: params
+    body: params,
   });
 
   const text = await response.text();
   let json: any = null;
-  try { json = JSON.parse(text); } catch {}
+  try {
+    json = JSON.parse(text);
+  } catch {}
   return {
     ok: response.ok,
     status: response.status,
-    body: json ?? { error: 'invalid_response', error_description: text }
+    body: json ?? { error: 'invalid_response', error_description: text },
   };
 }
 
@@ -511,39 +536,42 @@ async function refreshTwitterToken(
 // Note: This requires access to the raw body buffer, which needs special middleware
 function verifyWebhookSignature(body: any, signature: string, rawBody?: Buffer): boolean {
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
-  
+
   if (!signature || !appSecret) {
-    console.log('[Instagram Webhooks] Signature verification skipped - missing signature or app secret:', {
-      hasSignature: !!signature,
-      hasAppSecret: !!appSecret
-    });
+    console.log(
+      '[Instagram Webhooks] Signature verification skipped - missing signature or app secret:',
+      {
+        hasSignature: !!signature,
+        hasAppSecret: !!appSecret,
+      }
+    );
     return false;
   }
-  
+
   // Use raw body if available, otherwise stringify (less reliable)
-  const bodyString = rawBody ? rawBody.toString('utf8') : 
-                     typeof body === 'string' ? body : JSON.stringify(body);
-  
-  const expectedSignature = crypto
-    .createHmac('sha256', appSecret)
-    .update(bodyString)
-    .digest('hex');
-    
+  const bodyString = rawBody
+    ? rawBody.toString('utf8')
+    : typeof body === 'string'
+      ? body
+      : JSON.stringify(body);
+
+  const expectedSignature = crypto.createHmac('sha256', appSecret).update(bodyString).digest('hex');
+
   const receivedSignature = signature.replace('sha256=', '');
-  
+
   console.log('[Instagram Webhooks] Signature comparison:', {
     expected: expectedSignature.substring(0, 10) + '...',
     received: receivedSignature.substring(0, 10) + '...',
     bodyType: rawBody ? 'buffer' : typeof body,
-    bodyLength: bodyString.length
+    bodyLength: bodyString.length,
   });
-  
+
   try {
     const isValid = crypto.timingSafeEqual(
       Buffer.from(expectedSignature, 'hex'),
       Buffer.from(receivedSignature, 'hex')
     );
-    
+
     console.log('[Instagram Webhooks] Signature verification:', isValid ? 'VALID' : 'INVALID');
     return isValid;
   } catch (error) {
@@ -553,24 +581,23 @@ function verifyWebhookSignature(body: any, signature: string, rawBody?: Buffer):
 }
 
 export function registerSocialRoutes(app: Express) {
-  
   // ===== Instagram Webhooks =====
-  
+
   // Test endpoint to verify webhook URL is accessible
   app.get('/webhooks/instagram/test', (req: Request, res: Response) => {
     console.log('[Instagram Webhooks] Test endpoint accessed');
-    res.json({ 
-      status: 'ok', 
+    res.json({
+      status: 'ok',
       message: 'Instagram webhook endpoint is accessible',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV,
       hasVerifyToken: !!process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
-      verifyTokenPreview: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN 
-        ? `${process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN.substring(0, 10)}...` 
-        : 'NOT_SET'
+      verifyTokenPreview: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+        ? `${process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN.substring(0, 10)}...`
+        : 'NOT_SET',
     });
   });
-  
+
   // Webhook verification endpoint (GET request from Meta)
   app.get('/webhooks/instagram', (req: Request, res: Response) => {
     console.log('\n========================================');
@@ -579,20 +606,20 @@ export function registerSocialRoutes(app: Express) {
     console.log('[Instagram Webhooks] Headers:', JSON.stringify(req.headers, null, 2));
     console.log('[Instagram Webhooks] Full query params:', JSON.stringify(req.query, null, 2));
     console.log('========================================\n');
-    
+
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-    
+
     const expectedToken = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
-    
+
     console.log('[Instagram Webhooks] Verification comparison:');
     console.log('  - Mode:', mode, '(expected: subscribe)');
     console.log('  - Token received:', token);
     console.log('  - Token expected:', expectedToken);
     console.log('  - Challenge:', challenge);
     console.log('  - Tokens match:', token === expectedToken);
-    
+
     // Check if a token and mode were sent
     if (mode && token) {
       // Check the mode and token sent are correct
@@ -610,7 +637,7 @@ export function registerSocialRoutes(app: Express) {
           expectedToken: expectedToken,
           tokenMatch: token === expectedToken,
           tokenLengthReceived: token?.length,
-          tokenLengthExpected: expectedToken?.length
+          tokenLengthExpected: expectedToken?.length,
         });
         res.sendStatus(403);
       }
@@ -626,94 +653,94 @@ export function registerSocialRoutes(app: Express) {
   app.post('/webhooks/instagram', async (req: Request, res: Response) => {
     console.log('[Instagram Webhooks] Event notification received');
     console.log('[Instagram Webhooks] Headers:', req.headers);
-    
+
     const body = req.body;
     console.log('[Instagram Webhooks] Body type:', typeof body);
     console.log('[Instagram Webhooks] Body:', JSON.stringify(body, null, 2));
-    
-    // Verify the request signature (temporarily disabled for testing)
+
+    // Verify the request signature from Meta
     const signature = req.headers['x-hub-signature-256'] as string;
-    console.log('[Instagram Webhooks] Signature header:', signature ? 'present' : 'missing');
-    
-    // Verify signature (temporarily disabled for testing)
-    if (signature) {
-      const isValidSignature = verifyWebhookSignature(req.body, signature);
-      if (!isValidSignature) {
-        console.warn('[Instagram Webhooks] ⚠️  Invalid signature - but processing anyway for testing');
-        // Temporarily allow invalid signatures for Meta's test webhooks
-        // return res.sendStatus(403);
-      } else {
-        console.log('[Instagram Webhooks] ✅ Signature verified successfully');
-      }
-    } else {
-      console.warn('[Instagram Webhooks] ⚠️  No signature header - processing anyway (development mode)');
+
+    if (!signature) {
+      console.error('[Instagram Webhooks] Missing signature header — rejecting request');
+      return res.sendStatus(400);
     }
-    
+
+    const isValidSignature = verifyWebhookSignature(req.body, signature);
+    if (!isValidSignature) {
+      console.error('[Instagram Webhooks] Invalid signature — rejecting request');
+      return res.sendStatus(403);
+    }
+
+    console.log('[Instagram Webhooks] Signature verified successfully');
+
     console.log('[Instagram Webhooks] Processing events...');
-    
+
     // Process the webhook payload
     if (body.object === 'instagram') {
-      for (const entry of (body.entry || [])) {
+      for (const entry of body.entry || []) {
         console.log('[Instagram Webhooks] Processing entry:', entry.id);
-        
+
         // Handle webhook changes
         if (entry.changes) {
           for (const change of entry.changes) {
             console.log('[Instagram Webhooks] Change event:', {
               field: change.field,
-              valueKeys: Object.keys(change.value || {})
+              valueKeys: Object.keys(change.value || {}),
             });
-            
+
             // Handle comment events (for nonce/keyword verification)
             if (change.field === 'comments' && change.value) {
-              const { handleInstagramCommentEvent } = await import('../../services/instagram-verification-service');
-              
+              const { handleInstagramCommentEvent } =
+                await import('../../services/instagram-verification-service');
+
               const commentEvent = {
                 comment_id: change.value.id || change.value.comment_id,
                 media_id: change.value.media?.id || change.value.media_id,
                 text: change.value.text || '',
                 from: {
                   id: change.value.from?.id || '',
-                  username: change.value.from?.username || ''
-                }
+                  username: change.value.from?.username || '',
+                },
               };
-              
+
               console.log('[Instagram Webhooks] 💬 Processing comment event:', {
                 comment_id: commentEvent.comment_id,
                 media_id: commentEvent.media_id,
-                username: commentEvent.from.username
+                username: commentEvent.from.username,
               });
-              
+
               try {
                 await handleInstagramCommentEvent(commentEvent);
               } catch (error) {
                 console.error('[Instagram Webhooks] Error processing comment:', error);
               }
             }
-            
+
             // Handle mention events (for story mention verification)
             if (change.field === 'mentions' && change.value) {
-              const { handleInstagramMentionEvent } = await import('../../services/instagram-verification-service');
-              
+              const { handleInstagramMentionEvent } =
+                await import('../../services/instagram-verification-service');
+
               const mentionEvent = {
                 mention_id: change.value.id || change.value.mention_id,
                 from: {
                   id: change.value.from?.id || change.value.sender?.id || '',
-                  username: change.value.from?.username || change.value.sender?.username || ''
+                  username: change.value.from?.username || change.value.sender?.username || '',
                 },
                 target: {
                   id: change.value.target?.id || entry.id,
-                  username: change.value.target?.username || ''
+                  username: change.value.target?.username || '',
                 },
-                caption: change.value.caption || change.value.text
+                caption: change.value.caption || change.value.text,
               };
-              
+
               console.log('[Instagram Webhooks] 👋 Processing mention event:', {
                 mention_id: mentionEvent.mention_id,
                 fan_username: mentionEvent.from.username,
-                creator_username: mentionEvent.target.username
+                creator_username: mentionEvent.target.username,
               });
-              
+
               try {
                 await handleInstagramMentionEvent(mentionEvent);
               } catch (error) {
@@ -724,64 +751,67 @@ export function registerSocialRoutes(app: Express) {
         }
       }
     }
-    
+
     // Acknowledge receipt of the event
     res.status(200).send('EVENT_RECEIVED');
   });
 
   // ===== Facebook deauthorization callback =====
-  app.post('/api/facebook/deauthorize', express.raw({ type: 'application/json' }), async (req, res) => {
-    try {
-      console.log('Facebook deauthorization callback received');
-      
-      // Parse the request body
-      const body = JSON.parse(req.body.toString());
-      const { user_id, app_id } = body;
-      
-      // Verify this is for our app
-      const expectedAppId = process.env.FACEBOOK_APP_ID;
-      if (app_id !== expectedAppId) {
-        console.warn('Deauthorization callback for wrong app ID:', app_id);
-        return res.status(400).json({ error: 'Invalid app ID' });
-      }
-      
-      console.log('Processing deauthorization for Facebook user:', user_id);
-      
-      // Find all users with this Facebook ID and clean up their data
-      const users = await storage.getUsersByFacebookId(user_id);
-      
-      for (const user of users) {
-        console.log('Cleaning up Facebook data for user:', user.id);
-        
-        // Remove Facebook data from user profile
-        const updatedProfileData = { ...user.profileData };
-        if (updatedProfileData?.facebookData) {
-          delete updatedProfileData.facebookData;
+  app.post(
+    '/api/facebook/deauthorize',
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
+      try {
+        console.log('Facebook deauthorization callback received');
+
+        // Parse the request body
+        const body = JSON.parse(req.body.toString());
+        const { user_id, app_id } = body;
+
+        // Verify this is for our app
+        const expectedAppId = process.env.FACEBOOK_APP_ID;
+        if (app_id !== expectedAppId) {
+          console.warn('Deauthorization callback for wrong app ID:', app_id);
+          return res.status(400).json({ error: 'Invalid app ID' });
         }
-        if ((updatedProfileData as any)?.socialConnections?.facebook) {
-          delete (updatedProfileData as any).socialConnections.facebook;
+
+        console.log('Processing deauthorization for Facebook user:', user_id);
+
+        // Find all users with this Facebook ID and clean up their data
+        const users = await storage.getUsersByFacebookId(user_id);
+
+        for (const user of users) {
+          console.log('Cleaning up Facebook data for user:', user.id);
+
+          // Remove Facebook data from user profile
+          const updatedProfileData = { ...user.profileData };
+          if (updatedProfileData?.facebookData) {
+            delete updatedProfileData.facebookData;
+          }
+          if ((updatedProfileData as any)?.socialConnections?.facebook) {
+            delete (updatedProfileData as any).socialConnections.facebook;
+          }
+
+          // Update user with cleaned profile data
+          await storage.updateUser(user.id, {
+            profileData: updatedProfileData,
+          });
+
+          // Log the deauthorization event
+          console.log('Facebook data removed for user:', user.id, 'Facebook ID:', user_id);
         }
-        
-        // Update user with cleaned profile data
-        await storage.updateUser(user.id, { 
-          profileData: updatedProfileData
+
+        // Facebook expects a 200 OK response with specific format
+        res.status(200).json({
+          url: `${process.env.FRONTEND_URL || 'https://fandomly.ai'}/data-deletion`,
+          confirmation_code: `deauth_${user_id}_${Date.now()}`,
         });
-        
-        // Log the deauthorization event
-        console.log('Facebook data removed for user:', user.id, 'Facebook ID:', user_id);
+      } catch (error) {
+        console.error('Facebook deauthorization callback error:', error);
+        res.status(500).json({ error: 'Failed to process deauthorization' });
       }
-      
-      // Facebook expects a 200 OK response with specific format
-      res.status(200).json({
-        url: `${process.env.FRONTEND_URL || 'https://fandomly.ai'}/data-deletion`,
-        confirmation_code: `deauth_${user_id}_${Date.now()}`
-      });
-      
-    } catch (error) {
-      console.error('Facebook deauthorization callback error:', error);
-      res.status(500).json({ error: 'Failed to process deauthorization' });
     }
-  });
+  );
 
   // ===== Facebook Graph API helpers and debug proxy =====
   const FB_API_VERSION = process.env.FACEBOOK_API_VERSION || 'v23.0';
@@ -818,7 +848,7 @@ export function registerSocialRoutes(app: Express) {
     const res = await fetch(url.toString(), {
       method,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: bodyParams.toString()
+      body: bodyParams.toString(),
     });
     return res.json();
   }
@@ -842,16 +872,18 @@ export function registerSocialRoutes(app: Express) {
   // Inspect a token via /debug_token (requires app credentials)
   app.get('/api/facebook/debug-token', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-      const inputToken = (req.query.token as string) || req.headers['x-fb-token'] as string;
+      const inputToken = (req.query.token as string) || (req.headers['x-fb-token'] as string);
       const appId = process.env.FACEBOOK_APP_ID;
       const appSecret = process.env.FACEBOOK_APP_SECRET;
-      if (!inputToken) return res.status(400).json({ error: 'token query param or x-fb-token header required' });
-      if (!appId || !appSecret) return res.status(400).json({ error: 'Server missing FACEBOOK_APP_ID/SECRET' });
+      if (!inputToken)
+        return res.status(400).json({ error: 'token query param or x-fb-token header required' });
+      if (!appId || !appSecret)
+        return res.status(400).json({ error: 'Server missing FACEBOOK_APP_ID/SECRET' });
       const appAccessToken = `${appId}|${appSecret}`;
       const url = new URL(`https://graph.facebook.com/${FB_API_VERSION}/debug_token`);
       url.search = new URLSearchParams({
         input_token: inputToken,
-        access_token: appAccessToken
+        access_token: appAccessToken,
       }).toString();
       const resp = await fetch(url.toString());
       const json = await resp.json();
@@ -883,7 +915,9 @@ export function registerSocialRoutes(app: Express) {
       const bearer = req.headers.authorization || '';
       const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
       if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
-      const fields = (req.query.fields as string) || 'id,name,access_token,category,followers_count,fan_count,instagram_business_account';
+      const fields =
+        (req.query.fields as string) ||
+        'id,name,access_token,category,followers_count,fan_count,instagram_business_account';
       const data = await callFacebookGraph('/me/accounts', 'GET', { fields, limit: '100' }, token);
       res.json(data);
     } catch (error) {
@@ -893,72 +927,96 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // GET page details
-  app.get('/api/facebook/pages/:pageId', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const bearer = req.headers.authorization || '';
-      const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
-      if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
-      const { pageId } = req.params;
-      const fields = (req.query.fields as string) || 'id,name,followers_count,fan_count,link,username,instagram_business_account';
-      const data = await callFacebookGraph(`/${pageId}`, 'GET', { fields }, token);
-      res.json(data);
-    } catch (error) {
-      console.error('Facebook page details error:', error);
-      res.status(500).json({ error: 'Failed to fetch page details' });
+  app.get(
+    '/api/facebook/pages/:pageId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const bearer = req.headers.authorization || '';
+        const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+        if (!token)
+          return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
+        const { pageId } = req.params;
+        const fields =
+          (req.query.fields as string) ||
+          'id,name,followers_count,fan_count,link,username,instagram_business_account';
+        const data = await callFacebookGraph(`/${pageId}`, 'GET', { fields }, token);
+        res.json(data);
+      } catch (error) {
+        console.error('Facebook page details error:', error);
+        res.status(500).json({ error: 'Failed to fetch page details' });
+      }
     }
-  });
+  );
 
   // GET page insights
-  app.get('/api/facebook/pages/:pageId/insights', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const bearer = req.headers.authorization || '';
-      const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
-      if (!token) return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
-      const { pageId } = req.params;
-      const metric = (req.query.metric as string) || 'page_engaged_users,page_post_engagements,page_fans,page_impressions';
-      const period = (req.query.period as string) || 'day';
-      const since = (req.query.since as string) || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const until = (req.query.until as string) || new Date().toISOString().split('T')[0];
-      const data = await callFacebookGraph(`/${pageId}/insights`, 'GET', { metric, period, since, until }, token);
-      res.json(data);
-    } catch (error) {
-      console.error('Facebook page insights error:', error);
-      res.status(500).json({ error: 'Failed to fetch page insights' });
+  app.get(
+    '/api/facebook/pages/:pageId/insights',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const bearer = req.headers.authorization || '';
+        const token = bearer.startsWith('Bearer ') ? bearer.slice(7) : '';
+        if (!token)
+          return res.status(401).json({ error: 'Authorization: Bearer <token> required' });
+        const { pageId } = req.params;
+        const metric =
+          (req.query.metric as string) ||
+          'page_engaged_users,page_post_engagements,page_fans,page_impressions';
+        const period = (req.query.period as string) || 'day';
+        const since =
+          (req.query.since as string) ||
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const until = (req.query.until as string) || new Date().toISOString().split('T')[0];
+        const data = await callFacebookGraph(
+          `/${pageId}/insights`,
+          'GET',
+          { metric, period, since, until },
+          token
+        );
+        res.json(data);
+      } catch (error) {
+        console.error('Facebook page insights error:', error);
+        res.status(500).json({ error: 'Failed to fetch page insights' });
+      }
     }
-  });
+  );
 
   // Instagram Business Login token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
   app.post('/api/social/instagram/token', async (req: Request, res: Response) => {
     try {
       const { code, redirect_uri, user_type = 'creator' } = req.body;
-      
+
       console.log('[Instagram API] Token exchange request:', {
         user_type,
         redirect_uri,
         code_length: code?.length,
-        has_code: !!code
+        has_code: !!code,
       });
-      
+
       if (!code || !redirect_uri) {
-        console.error('[Instagram API] Missing required parameters:', { code: !!code, redirect_uri: !!redirect_uri });
+        console.error('[Instagram API] Missing required parameters:', {
+          code: !!code,
+          redirect_uri: !!redirect_uri,
+        });
         return res.status(400).json({ error: 'code and redirect_uri are required' });
       }
-      
+
       console.log('[Instagram API] Calling exchangeInstagramToken...');
       const tokenData = await exchangeInstagramToken(code, redirect_uri, user_type);
-      console.log('[Instagram API] Token exchange response:', { 
+      console.log('[Instagram API] Token exchange response:', {
         has_data: !!tokenData.data,
         data_length: tokenData.data?.length,
-        has_access_token: !!(tokenData.data?.[0]?.access_token || tokenData.access_token)
+        has_access_token: !!(tokenData.data?.[0]?.access_token || tokenData.access_token),
       });
-      
+
       // The response from Instagram Business Login includes data array
       if (tokenData.data && tokenData.data.length > 0) {
         const tokenInfo = tokenData.data[0];
         const response = {
           access_token: tokenInfo.access_token,
           user_id: tokenInfo.user_id,
-          permissions: tokenInfo.permissions
+          permissions: tokenInfo.permissions,
         };
         console.log('[Instagram API] Sending formatted response');
         res.json(response);
@@ -968,92 +1026,104 @@ export function registerSocialRoutes(app: Express) {
       }
     } catch (error) {
       console.error('Instagram token exchange error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to exchange Instagram token',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });
 
   // Instagram messaging (for creators via Facebook Page token)
-  app.post('/api/social/instagram/send-message', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!accessToken) {
-        return res.status(401).json({ error: 'Access token required' });
+  app.post(
+    '/api/social/instagram/send-message',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const accessToken = req.headers.authorization?.replace('Bearer ', '');
+        if (!accessToken) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
+
+        const { text, recipient_id } = req.body;
+
+        if (!text || !recipient_id) {
+          return res.status(400).json({ error: 'text and recipient_id are required' });
+        }
+
+        // Send Instagram message using Graph API
+        const response = await fetch(`https://graph.instagram.com/v21.0/me/messages`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: JSON.stringify({ text }),
+            recipient: JSON.stringify({ id: recipient_id }),
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(
+            `Instagram API error: ${errorData.error?.message || response.statusText}`
+          );
+        }
+
+        const result = await response.json();
+        res.json({ success: true, message_id: result.message_id });
+      } catch (error) {
+        console.error('Instagram send message error:', error);
+        res.status(500).json({
+          error: 'Failed to send Instagram message',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
-
-      const { text, recipient_id } = req.body;
-      
-      if (!text || !recipient_id) {
-        return res.status(400).json({ error: 'text and recipient_id are required' });
-      }
-
-      // Send Instagram message using Graph API
-      const response = await fetch(`https://graph.instagram.com/v21.0/me/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: JSON.stringify({ text }),
-          recipient: JSON.stringify({ id: recipient_id })
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(`Instagram API error: ${errorData.error?.message || response.statusText}`);
-      }
-
-      const result = await response.json();
-      res.json({ success: true, message_id: result.message_id });
-    } catch (error) {
-      console.error('Instagram send message error:', error);
-      res.status(500).json({ 
-        error: 'Failed to send Instagram message',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
     }
-  });
+  );
 
   // Get Instagram Business Account info
-  app.get('/api/social/instagram/business-account', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!accessToken) {
-        return res.status(401).json({ error: 'Access token required' });
-      }
+  app.get(
+    '/api/social/instagram/business-account',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const accessToken = req.headers.authorization?.replace('Bearer ', '');
+        if (!accessToken) {
+          return res.status(401).json({ error: 'Access token required' });
+        }
 
-      // Get Instagram Business Account from Facebook Page
-      const response = await fetch(`https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url,followers_count,media_count,website,biography}&access_token=${accessToken}`);
-      
-      if (!response.ok) {
-        throw new Error(`Facebook API error: ${response.statusText}`);
-      }
+        // Get Instagram Business Account from Facebook Page
+        const response = await fetch(
+          `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url,followers_count,media_count,website,biography}&access_token=${accessToken}`
+        );
 
-      const data = await response.json();
-      
-      // Find page with Instagram Business Account
-      const pageWithInstagram = data.data?.find((page: any) => page.instagram_business_account);
-      
-      if (!pageWithInstagram) {
-        return res.status(404).json({ error: 'No Instagram Business Account found' });
-      }
+        if (!response.ok) {
+          throw new Error(`Facebook API error: ${response.statusText}`);
+        }
 
-      res.json({
-        page: {
-          id: pageWithInstagram.id,
-          name: pageWithInstagram.name
-        },
-        instagram_account: pageWithInstagram.instagram_business_account
-      });
-    } catch (error) {
-      console.error('Instagram business account error:', error);
-      res.status(500).json({ error: 'Failed to get Instagram Business Account' });
+        const data = await response.json();
+
+        // Find page with Instagram Business Account
+        const pageWithInstagram = data.data?.find((page: any) => page.instagram_business_account);
+
+        if (!pageWithInstagram) {
+          return res.status(404).json({ error: 'No Instagram Business Account found' });
+        }
+
+        res.json({
+          page: {
+            id: pageWithInstagram.id,
+            name: pageWithInstagram.name,
+          },
+          instagram_account: pageWithInstagram.instagram_business_account,
+        });
+      } catch (error) {
+        console.error('Instagram business account error:', error);
+        res.status(500).json({ error: 'Failed to get Instagram Business Account' });
+      }
     }
-  });
+  );
 
   // TikTok token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
   app.post('/api/social/tiktok/token', async (req: Request, res: Response) => {
@@ -1062,16 +1132,16 @@ export function registerSocialRoutes(app: Express) {
       if (!code) {
         return res.status(400).json({ error: 'code is required' });
       }
-      
+
       console.log('[TikTok Token Route] Processing token exchange');
       const tokenData = await exchangeTikTokToken(code, redirect_uri);
       // Token bundle is saved via the callback page's POST to /api/social-connections
       res.json(tokenData);
     } catch (error: any) {
       console.error('TikTok token exchange error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to exchange TikTok token',
-        message: error.message || 'Unknown error'
+        message: error.message || 'Unknown error',
       });
     }
   });
@@ -1086,7 +1156,7 @@ export function registerSocialRoutes(app: Express) {
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
-      
+
       const userData = await getTikTokUser(accessToken);
       res.json(userData);
     } catch (error) {
@@ -1106,12 +1176,14 @@ export function registerSocialRoutes(app: Express) {
         codeLength: code?.length || 0,
         redirect_uri,
         hasCodeVerifier: !!code_verifier,
-        verifierLength: code_verifier?.length || 0
+        verifierLength: code_verifier?.length || 0,
       });
 
       if (!code || !redirect_uri || !code_verifier) {
         console.log('[Twitter Token] Missing required parameters');
-        return res.status(400).json({ error: 'code, redirect_uri, and code_verifier are required' });
+        return res
+          .status(400)
+          .json({ error: 'code, redirect_uri, and code_verifier are required' });
       }
 
       // Check for duplicate code usage
@@ -1126,13 +1198,13 @@ export function registerSocialRoutes(app: Express) {
 
       console.log(`[Twitter Token] Calling exchangeTwitterToken...`);
       const result = await exchangeTwitterToken(code, redirect_uri, code_verifier);
-      console.log(`[Twitter Token] ${timestamp} exchange response:`, { 
-        status: result.status, 
-        ok: result.ok, 
+      console.log(`[Twitter Token] ${timestamp} exchange response:`, {
+        status: result.status,
+        ok: result.ok,
         hasAccessToken: !!result.body?.access_token,
         hasRefreshToken: !!result.body?.refresh_token,
         expiresIn: result.body?.expires_in,
-        scope: result.body?.scope
+        scope: result.body?.scope,
       });
       if (!result.ok) {
         // On failure, remove the code reservation so user can retry
@@ -1174,7 +1246,7 @@ export function registerSocialRoutes(app: Express) {
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
-      
+
       const userData = await getTwitterUser(accessToken);
       res.json(userData);
     } catch (error) {
@@ -1184,121 +1256,134 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Get stored Twitter token bundle for a user
-  app.get('/api/social/twitter/token-bundle', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const includeToken = req.query?.includeToken === 'true';
-      
-      console.log('[Twitter Token Bundle] Request params:', {
-        userId,
-        includeToken,
-        queryParams: req.query
-      });
-      
-      const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
-      if (!tokenBundle) {
-        return res.status(404).json({ error: 'No Twitter tokens found for user' });
-      }
+  app.get(
+    '/api/social/twitter/token-bundle',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const includeToken = req.query?.includeToken === 'true';
 
-      // Check if token needs refresh
-      const now = Date.now();
-      const needsRefresh = now >= (tokenBundle.expires_at - 60000); // Refresh 1 min early
+        console.log('[Twitter Token Bundle] Request params:', {
+          userId,
+          includeToken,
+          queryParams: req.query,
+        });
 
-      const response: any = {
-        hasTokens: true,
-        needsRefresh,
-        expiresAt: tokenBundle.expires_at,
-        scope: tokenBundle.scope,
-        receivedAt: tokenBundle.received_at
-      };
+        const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
+        if (!tokenBundle) {
+          return res.status(404).json({ error: 'No Twitter tokens found for user' });
+        }
 
-      // Only include access_token if explicitly requested (for testing)
-      if (includeToken) {
-        response.access_token = tokenBundle.access_token;
-        response.debug = {
-          bundleKeys: Object.keys(tokenBundle),
-          hasAccessToken: !!tokenBundle.access_token,
-          accessTokenLength: tokenBundle.access_token?.length || 0
+        // Check if token needs refresh
+        const now = Date.now();
+        const needsRefresh = now >= tokenBundle.expires_at - 60000; // Refresh 1 min early
+
+        const response: any = {
+          hasTokens: true,
+          needsRefresh,
+          expiresAt: tokenBundle.expires_at,
+          scope: tokenBundle.scope,
+          receivedAt: tokenBundle.received_at,
         };
-      }
 
-      res.json(response);
-    } catch (error) {
-      console.error('Twitter token bundle error:', error);
-      res.status(500).json({ error: 'Failed to get token bundle info' });
+        // Only include access_token if explicitly requested (for testing)
+        if (includeToken) {
+          response.access_token = tokenBundle.access_token;
+          response.debug = {
+            bundleKeys: Object.keys(tokenBundle),
+            hasAccessToken: !!tokenBundle.access_token,
+            accessTokenLength: tokenBundle.access_token?.length || 0,
+          };
+        }
+
+        res.json(response);
+      } catch (error) {
+        console.error('Twitter token bundle error:', error);
+        res.status(500).json({ error: 'Failed to get token bundle info' });
+      }
     }
-  });
+  );
 
   // Debug endpoint to see raw stored token data
-  app.get('/api/social/twitter/debug-tokens', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      
-      const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
-      if (!tokenBundle) {
-        return res.status(404).json({ error: 'No Twitter tokens found for user' });
-      }
+  app.get(
+    '/api/social/twitter/debug-tokens',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
 
-      res.json({
-        bundleKeys: Object.keys(tokenBundle),
-        hasAccessToken: !!tokenBundle.access_token,
-        hasRefreshToken: !!tokenBundle.refresh_token,
-        accessTokenLength: tokenBundle.access_token?.length || 0,
-        refreshTokenLength: tokenBundle.refresh_token?.length || 0,
-        tokenType: tokenBundle.token_type,
-        expiresIn: tokenBundle.expires_in,
-        scope: tokenBundle.scope,
-        receivedAt: tokenBundle.received_at,
-        expiresAt: tokenBundle.expires_at,
-        // Include first/last 4 chars of access_token for verification
-        accessTokenPreview: tokenBundle.access_token ? 
-          `${tokenBundle.access_token.substring(0, 4)}...${tokenBundle.access_token.substring(-4)}` : null
-      });
-    } catch (error) {
-      console.error('Twitter debug tokens error:', error);
-      res.status(500).json({ error: 'Failed to debug tokens' });
+        const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
+        if (!tokenBundle) {
+          return res.status(404).json({ error: 'No Twitter tokens found for user' });
+        }
+
+        res.json({
+          bundleKeys: Object.keys(tokenBundle),
+          hasAccessToken: !!tokenBundle.access_token,
+          hasRefreshToken: !!tokenBundle.refresh_token,
+          accessTokenLength: tokenBundle.access_token?.length || 0,
+          refreshTokenLength: tokenBundle.refresh_token?.length || 0,
+          tokenType: tokenBundle.token_type,
+          expiresIn: tokenBundle.expires_in,
+          scope: tokenBundle.scope,
+          receivedAt: tokenBundle.received_at,
+          expiresAt: tokenBundle.expires_at,
+          // Include first/last 4 chars of access_token for verification
+          accessTokenPreview: tokenBundle.access_token
+            ? `${tokenBundle.access_token.substring(0, 4)}...${tokenBundle.access_token.substring(-4)}`
+            : null,
+        });
+      } catch (error) {
+        console.error('Twitter debug tokens error:', error);
+        res.status(500).json({ error: 'Failed to debug tokens' });
+      }
     }
-  });
+  );
 
   // Proactive token refresh endpoint
-  app.post('/api/social/twitter/refresh-if-needed', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
+  app.post(
+    '/api/social/twitter/refresh-if-needed',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
 
-      const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
-      if (!tokenBundle?.refresh_token) {
-        return res.status(404).json({ error: 'No refresh token found' });
+        const tokenBundle = await storage.getSocialTokenBundle(userId, 'twitter');
+        if (!tokenBundle?.refresh_token) {
+          return res.status(404).json({ error: 'No refresh token found' });
+        }
+
+        const now = Date.now();
+        const needsRefresh = now >= tokenBundle.expires_at - 60000;
+
+        if (!needsRefresh) {
+          return res.json({ refreshed: false, message: 'Token still valid' });
+        }
+
+        console.log('[Twitter Proactive Refresh] Refreshing token for user:', userId);
+        const result = await refreshTwitterToken(tokenBundle.refresh_token);
+
+        if (!result.ok) {
+          return res.status(result.status).json(result.body);
+        }
+
+        // Persist rotated token bundle
+        const newTokenBundle = {
+          ...result.body,
+          received_at: Date.now(),
+          expires_at: Date.now() + Math.max(0, Number(result.body?.expires_in || 0) - 60) * 1000,
+        };
+        await storage.saveSocialTokenBundle(userId, 'twitter', newTokenBundle);
+
+        console.log('[Twitter Proactive Refresh] Token refreshed successfully');
+        res.json({ refreshed: true, expiresAt: newTokenBundle.expires_at });
+      } catch (error) {
+        console.error('Twitter proactive refresh error:', error);
+        res.status(500).json({ error: 'Failed to refresh token' });
       }
-
-      const now = Date.now();
-      const needsRefresh = now >= (tokenBundle.expires_at - 60000);
-
-      if (!needsRefresh) {
-        return res.json({ refreshed: false, message: 'Token still valid' });
-      }
-
-      console.log('[Twitter Proactive Refresh] Refreshing token for user:', userId);
-      const result = await refreshTwitterToken(tokenBundle.refresh_token);
-      
-      if (!result.ok) {
-        return res.status(result.status).json(result.body);
-      }
-
-      // Persist rotated token bundle
-      const newTokenBundle = {
-        ...result.body,
-        received_at: Date.now(),
-        expires_at: Date.now() + Math.max(0, (Number(result.body?.expires_in || 0) - 60)) * 1000
-      };
-      await storage.saveSocialTokenBundle(userId, 'twitter', newTokenBundle);
-      
-      console.log('[Twitter Proactive Refresh] Token refreshed successfully');
-      res.json({ refreshed: true, expiresAt: newTokenBundle.expires_at });
-    } catch (error) {
-      console.error('Twitter proactive refresh error:', error);
-      res.status(500).json({ error: 'Failed to refresh token' });
     }
-  });
+  );
 
   // YouTube token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
   app.post('/api/social/youtube/token', async (req: Request, res: Response) => {
@@ -1312,9 +1397,9 @@ export function registerSocialRoutes(app: Express) {
       res.json(tokenData);
     } catch (error: any) {
       console.error('YouTube token exchange error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to exchange YouTube token',
-        message: error.message || 'Unknown error'
+        message: error.message || 'Unknown error',
       });
     }
   });
@@ -1329,18 +1414,21 @@ export function registerSocialRoutes(app: Express) {
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
-      
+
       console.log('[YouTube Me Route] Fetching channel info');
-      const response = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      
+      const response = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true',
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[YouTube Me Route] Error:', errorText);
         return res.status(response.status).json({ error: 'Failed to fetch channel info' });
       }
-      
+
       const data = await response.json();
       res.json(data);
     } catch (error) {
@@ -1350,24 +1438,28 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // YouTube token refresh
-  app.post('/api/social/youtube/refresh', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const { refresh_token } = req.body;
-      if (!refresh_token) {
-        return res.status(400).json({ error: 'refresh_token required' });
+  app.post(
+    '/api/social/youtube/refresh',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { refresh_token } = req.body;
+        if (!refresh_token) {
+          return res.status(400).json({ error: 'refresh_token required' });
+        }
+
+        console.log('[YouTube Refresh Route] Refreshing token');
+        const tokenData = await refreshYouTubeToken(refresh_token);
+        res.json(tokenData);
+      } catch (error: any) {
+        console.error('YouTube token refresh error:', error);
+        res.status(500).json({
+          error: 'Failed to refresh YouTube token',
+          message: error.message || 'Unknown error',
+        });
       }
-      
-      console.log('[YouTube Refresh Route] Refreshing token');
-      const tokenData = await refreshYouTubeToken(refresh_token);
-      res.json(tokenData);
-    } catch (error: any) {
-      console.error('YouTube token refresh error:', error);
-      res.status(500).json({ 
-        error: 'Failed to refresh YouTube token',
-        message: error.message || 'Unknown error'
-      });
     }
-  });
+  );
 
   // Spotify token exchange (no auth required - OAuth code is the auth, popup windows don't share session)
   app.post('/api/social/spotify/token', async (req: Request, res: Response) => {
@@ -1381,9 +1473,9 @@ export function registerSocialRoutes(app: Express) {
       res.json(tokenData);
     } catch (error: any) {
       console.error('Spotify token exchange error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to exchange Spotify token',
-        message: error.message || 'Unknown error'
+        message: error.message || 'Unknown error',
       });
     }
   });
@@ -1398,18 +1490,18 @@ export function registerSocialRoutes(app: Express) {
       if (!accessToken) {
         return res.status(401).json({ error: 'Access token required' });
       }
-      
+
       console.log('[Spotify Me Route] Fetching user profile');
       const response = await fetch('https://api.spotify.com/v1/me', {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[Spotify Me Route] Error:', errorText);
         return res.status(response.status).json({ error: 'Failed to fetch profile' });
       }
-      
+
       const data = await response.json();
       res.json(data);
     } catch (error) {
@@ -1419,24 +1511,28 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Spotify token refresh
-  app.post('/api/social/spotify/refresh', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const { refresh_token } = req.body;
-      if (!refresh_token) {
-        return res.status(400).json({ error: 'refresh_token required' });
+  app.post(
+    '/api/social/spotify/refresh',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { refresh_token } = req.body;
+        if (!refresh_token) {
+          return res.status(400).json({ error: 'refresh_token required' });
+        }
+
+        console.log('[Spotify Refresh Route] Refreshing token');
+        const tokenData = await refreshSpotifyToken(refresh_token);
+        res.json(tokenData);
+      } catch (error: any) {
+        console.error('Spotify token refresh error:', error);
+        res.status(500).json({
+          error: 'Failed to refresh Spotify token',
+          message: error.message || 'Unknown error',
+        });
       }
-      
-      console.log('[Spotify Refresh Route] Refreshing token');
-      const tokenData = await refreshSpotifyToken(refresh_token);
-      res.json(tokenData);
-    } catch (error: any) {
-      console.error('Spotify token refresh error:', error);
-      res.status(500).json({ 
-        error: 'Failed to refresh Spotify token',
-        message: error.message || 'Unknown error'
-      });
     }
-  });
+  );
 
   // Discord token exchange (no auth required - OAuth code is the auth, connection saving requires auth)
   app.post('/api/social/discord/token', async (req, res) => {
@@ -1452,7 +1548,7 @@ export function registerSocialRoutes(app: Express) {
       console.error('Discord token exchange error:', error);
       res.status(500).json({
         error: 'Failed to exchange Discord token',
-        message: error.message || 'Unknown error'
+        message: error.message || 'Unknown error',
       });
     }
   });
@@ -1488,7 +1584,7 @@ export function registerSocialRoutes(app: Express) {
       console.error('Twitch token exchange error:', error);
       res.status(500).json({
         error: 'Failed to exchange Twitch token',
-        message: error.message || 'Unknown error'
+        message: error.message || 'Unknown error',
       });
     }
   });
@@ -1515,25 +1611,25 @@ export function registerSocialRoutes(app: Express) {
     try {
       const userId = req.user!.id;
       const { platform, accountData } = req.body;
-      
-      console.log(`[Social Connect] Request received:`, { 
-        userId, 
-        platform, 
+
+      console.log(`[Social Connect] Request received:`, {
+        userId,
+        platform,
         hasAccountData: !!accountData,
-        accountUsername: accountData?.user?.username 
+        accountUsername: accountData?.user?.username,
       });
-      
+
       if (!platform || !accountData) {
         return res.status(400).json({ error: 'Platform and account data are required' });
       }
-      
+
       // Save to BOTH systems for consistency
       // 1. Save to old storage system (users.profileData.socialConnections)
       await storage.saveSocialAccount(userId, platform, accountData);
-      
+
       // 2. Also save to socialConnections table for consistency across all pages
       let isNewConnection = false;
-      
+
       try {
         // Check if connection already exists in socialConnections table
         const existingConnection = await db.query.socialConnections.findFirst({
@@ -1543,11 +1639,18 @@ export function registerSocialRoutes(app: Express) {
           ),
         });
 
+        // Encrypt tokens if provided
+        const rawAccessToken = accountData.accessToken || accountData.access_token;
+        const rawRefreshToken = accountData.refreshToken || accountData.refresh_token;
+
         const connectionData = {
           platformUserId: accountData.user?.id || accountData.id,
           platformUsername: accountData.user?.username || accountData.username,
-          platformDisplayName: accountData.user?.name || accountData.name || accountData.displayName,
+          platformDisplayName:
+            accountData.user?.name || accountData.name || accountData.displayName,
           profileData: accountData,
+          ...(rawAccessToken ? { accessToken: encryptToken(rawAccessToken) } : {}),
+          ...(rawRefreshToken ? { refreshToken: encryptToken(rawRefreshToken) } : {}),
           lastSyncedAt: new Date(),
           isActive: true,
           updatedAt: new Date(),
@@ -1559,24 +1662,26 @@ export function registerSocialRoutes(app: Express) {
             .update(socialConnections)
             .set(connectionData)
             .where(eq(socialConnections.id, existingConnection.id));
-          console.log(`[Social Connect] Updated ${platform} in socialConnections table for user ${userId}`);
+          console.log(
+            `[Social Connect] Updated ${platform} in socialConnections table for user ${userId}`
+          );
         } else {
           // Create new connection
-          await db
-            .insert(socialConnections)
-            .values({
-              userId,
-              platform,
-              ...connectionData,
-            });
+          await db.insert(socialConnections).values({
+            userId,
+            platform,
+            ...connectionData,
+          });
           isNewConnection = true;
-          console.log(`[Social Connect] Created ${platform} in socialConnections table for user ${userId}`);
+          console.log(
+            `[Social Connect] Created ${platform} in socialConnections table for user ${userId}`
+          );
         }
       } catch (syncError) {
         console.error(`[Social Connect] Error syncing to socialConnections table:`, syncError);
         // Don't fail the request if the sync fails
       }
-      
+
       // Award platform points for new social connection (one-time per platform)
       // Check transaction history to prevent exploit via disconnect/reconnect
       let pointsAwarded = 0;
@@ -1602,22 +1707,26 @@ export function registerSocialRoutes(app: Express) {
               }
             );
             pointsAwarded = SOCIAL_CONNECTION_POINTS;
-            console.log(`[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`);
+            console.log(
+              `[Social Connect] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting ${platform}`
+            );
           } else {
-            console.log(`[Social Connect] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`);
+            console.log(
+              `[Social Connect] User ${userId} already received points for ${platform} - skipping (disconnect/reconnect protection)`
+            );
           }
         } catch (pointsError) {
           console.error(`[Social Connect] Error awarding points:`, pointsError);
           // Don't fail the connection if points award fails
         }
       }
-      
+
       console.log(`[Social Connect] Successfully saved ${platform} account for user ${userId}`);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: `${platform} account connected successfully`,
         pointsAwarded,
-        isNewConnection
+        isNewConnection,
       });
     } catch (error) {
       console.error('Social connect error:', error);
@@ -1638,82 +1747,91 @@ export function registerSocialRoutes(app: Express) {
   });
 
   // Get individual platform connection status
-  app.get('/api/social-connections/:platform', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { platform } = req.params;
+  app.get(
+    '/api/social-connections/:platform',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const { platform } = req.params;
 
-      const connection = await db.query.socialConnections.findFirst({
-        where: and(
-          eq(socialConnections.userId, userId),
-          eq(socialConnections.platform, platform)
-        ),
-      });
-      
-      if (connection && connection.isActive) {
-        res.json({
-          connected: true,
-          connection: {
-            id: connection.id,
-            platform: connection.platform,
-            platformUserId: connection.platformUserId,
-            platformUsername: connection.platformUsername,
-            platformDisplayName: connection.platformDisplayName,
-            profileData: connection.profileData,
-            connectedAt: connection.connectedAt,
-            lastSyncedAt: connection.lastSyncedAt,
-            isActive: connection.isActive,
-          }
+        const connection = await db.query.socialConnections.findFirst({
+          where: and(
+            eq(socialConnections.userId, userId),
+            eq(socialConnections.platform, platform)
+          ),
         });
-      } else {
+
+        if (connection && connection.isActive) {
+          res.json({
+            connected: true,
+            connection: {
+              id: connection.id,
+              platform: connection.platform,
+              platformUserId: connection.platformUserId,
+              platformUsername: connection.platformUsername,
+              platformDisplayName: connection.platformDisplayName,
+              profileData: connection.profileData,
+              connectedAt: connection.connectedAt,
+              lastSyncedAt: connection.lastSyncedAt,
+              isActive: connection.isActive,
+            },
+          });
+        } else {
+          res.json({ connected: false, connectionData: null });
+        }
+      } catch (error) {
+        console.error(`Get ${req.params.platform} connection status error:`, error);
         res.json({ connected: false, connectionData: null });
       }
-    } catch (error) {
-      console.error(`Get ${req.params.platform} connection status error:`, error);
-      res.json({ connected: false, connectionData: null });
     }
-  });
+  );
 
   // Disconnect social account (generic endpoint for all platforms)
-  app.post('/api/social-connections/disconnect', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { platform } = req.body;
-      
-      console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${userId}`);
-      
-      if (!platform) {
-        return res.status(400).json({ error: 'platform required' });
-      }
-
-      const platformLower = String(platform).toLowerCase();
-      
-      // 1. Remove from socialConnections table (PRIMARY - source of truth)
-      await db
-        .delete(socialConnections)
-        .where(
-          and(
-            eq(socialConnections.userId, userId),
-            eq(socialConnections.platform, platformLower)
-          )
-        );
-      console.log(`[Social Disconnect] Removed ${platformLower} from socialConnections table for user ${userId}`);
-      
-      // 2. Also remove from old storage (profileData.socialConnections) - best effort
+  app.post(
+    '/api/social-connections/disconnect',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
       try {
-        await storage.removeSocialAccount(userId, platformLower);
-        console.log(`[Social Disconnect] Also removed ${platformLower} from old storage system`);
-      } catch (storageErr) {
-        console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
+        const userId = req.user!.id;
+        const { platform } = req.body;
+
+        console.log(`[Social Disconnect] Request to disconnect ${platform} for user: ${userId}`);
+
+        if (!platform) {
+          return res.status(400).json({ error: 'platform required' });
+        }
+
+        const platformLower = String(platform).toLowerCase();
+
+        // 1. Remove from socialConnections table (PRIMARY - source of truth)
+        await db
+          .delete(socialConnections)
+          .where(
+            and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platformLower))
+          );
+        console.log(
+          `[Social Disconnect] Removed ${platformLower} from socialConnections table for user ${userId}`
+        );
+
+        // 2. Also remove from old storage (profileData.socialConnections) - best effort
+        try {
+          await storage.removeSocialAccount(userId, platformLower);
+          console.log(`[Social Disconnect] Also removed ${platformLower} from old storage system`);
+        } catch (storageErr) {
+          console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
+        }
+
+        console.log(
+          `[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`
+        );
+        res.json({ success: true, message: `${platformLower} account disconnected successfully` });
+      } catch (error) {
+        console.error('Social disconnect error:', error);
+        res.status(500).json({ error: 'Failed to disconnect social account' });
       }
-      
-      console.log(`[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`);
-      res.json({ success: true, message: `${platformLower} account disconnected successfully` });
-    } catch (error) {
-      console.error('Social disconnect error:', error);
-      res.status(500).json({ error: 'Failed to disconnect social account' });
     }
-  });
+  );
 
   // Disconnect social account - legacy endpoint
   // Used by use-twitter-connection, use-social-connection (DELETE /api/social/twitter, etc.)
@@ -1721,27 +1839,26 @@ export function registerSocialRoutes(app: Express) {
     try {
       const userId = req.user!.id;
       const platform = (req.params.platform || '').toLowerCase();
-      
-      console.log(`[Social Disconnect] DELETE request to disconnect ${platform} for user: ${userId}`);
-      
+
+      console.log(
+        `[Social Disconnect] DELETE request to disconnect ${platform} for user: ${userId}`
+      );
+
       // 1. Remove from socialConnections table (PRIMARY - source of truth)
       await db
         .delete(socialConnections)
-        .where(
-          and(
-            eq(socialConnections.userId, userId),
-            eq(socialConnections.platform, platform)
-          )
-        );
-      console.log(`[Social Disconnect] Removed ${platform} from socialConnections table for user ${userId}`);
-      
+        .where(and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)));
+      console.log(
+        `[Social Disconnect] Removed ${platform} from socialConnections table for user ${userId}`
+      );
+
       // 2. Also remove from old storage - best effort
       try {
         await storage.removeSocialAccount(userId, platform);
       } catch (storageErr) {
         console.warn(`[Social Disconnect] Old storage sync failed (non-fatal):`, storageErr);
       }
-      
+
       console.log(`[Social Disconnect] Successfully disconnected ${platform} for user ${userId}`);
       res.json({ success: true, message: `${platform} account disconnected successfully` });
     } catch (error) {

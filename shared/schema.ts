@@ -811,100 +811,108 @@ export const loyaltyPrograms = pgTable(
   (table) => [
     index('loyalty_programs_creator_id_idx').on(table.creatorId),
     index('loyalty_programs_tenant_id_idx').on(table.tenantId),
+    index('loyalty_programs_status_idx').on(table.status),
   ]
 );
 
-export const rewards = pgTable('rewards', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant
-  programId: varchar('program_id')
-    .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
-    .notNull(),
-  name: text('name').notNull(),
-  description: text('description'),
-  pointsCost: integer('points_cost').notNull(),
-  rewardType: text('reward_type').notNull(), // "traditional" | "nft" | "token" | "experience" | "raffle" | "physical" | "custom"
-  rewardData: jsonb('reward_data').$type<{
-    nftMetadata?: {
-      name: string;
-      description: string;
-      image: string;
-      attributes: Array<{ trait_type: string; value: string }>;
-      contractAddress?: string;
-      tokenId?: string;
-      blockchain: string; // "ethereum" | "solana" | "polygon" | "bsc"
-      rarity?: string;
-      collection?: string;
-    };
-    nftData?: {
-      collectionId?: string;
-      templateId?: string;
-      autoMintOnRedeem?: boolean;
-    };
-    tokenAmount?: string;
-    experienceDetails?: string;
-    downloadLink?: string;
-    couponCode?: string;
-    // New reward type data
-    raffleData?: {
-      prizeDescription: string;
-      prizeValue?: number;
-      entryPointsCost: number; // Points per entry (usually 1)
-      maxEntries?: number;
-      drawDate: string;
-      winnerSelectionMethod: 'random' | 'manual';
-    };
-    physicalData?: {
-      itemName: string;
-      itemDescription: string;
-      shippingRequired: boolean;
-      estimatedDeliveryDays?: number;
-      stockQuantity?: number;
-      weight?: number;
-      dimensions?: { length: number; width: number; height: number };
-      condition?: 'game-used' | 'new' | 'like-new' | 'sponsor-item';
-      quantity?: number;
-      photos?: string[];
-      approvalStatus?: 'pending' | 'approved' | 'rejected';
-      adminNotes?: string;
-      submittedAt?: string;
-      approvedAt?: string;
-    };
-    customData?: {
-      serviceName: string;
-      serviceDescription: string;
-      deliveryMethod: 'email' | 'platform' | 'video_call' | 'physical';
-      estimatedFulfillmentDays?: number;
-      customInstructions?: string;
-      requiresPersonalization: boolean;
-    };
-    videoData?: {
-      maxVideoDuration: number;
-      deliveryInstructions: string;
-      turnaroundDays: number;
-      requiresPersonalization: boolean;
-      personalizationInstructions?: string;
-      sampleVideoUrl?: string;
-    };
-  }>(),
-  maxRedemptions: integer('max_redemptions'),
-  currentRedemptions: integer('current_redemptions').default(0),
-  requiredTier: text('required_tier'),
-  stockQuantity: integer('stock_quantity'),
-  category: text('category'),
-  imageUrl: text('image_url'),
-  redemptionRules: jsonb('redemption_rules').$type<{
-    maxPerUser?: number;
-    cooldownHours?: number;
-    requiresTier?: string;
-  }>(),
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const rewards = pgTable(
+  'rewards',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant
+    programId: varchar('program_id')
+      .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
+      .notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    pointsCost: integer('points_cost').notNull(),
+    rewardType: text('reward_type').notNull(), // "traditional" | "nft" | "token" | "experience" | "raffle" | "physical" | "custom"
+    rewardData: jsonb('reward_data').$type<{
+      nftMetadata?: {
+        name: string;
+        description: string;
+        image: string;
+        attributes: Array<{ trait_type: string; value: string }>;
+        contractAddress?: string;
+        tokenId?: string;
+        blockchain: string; // "ethereum" | "solana" | "polygon" | "bsc"
+        rarity?: string;
+        collection?: string;
+      };
+      nftData?: {
+        collectionId?: string;
+        templateId?: string;
+        autoMintOnRedeem?: boolean;
+      };
+      tokenAmount?: string;
+      experienceDetails?: string;
+      downloadLink?: string;
+      couponCode?: string;
+      // New reward type data
+      raffleData?: {
+        prizeDescription: string;
+        prizeValue?: number;
+        entryPointsCost: number; // Points per entry (usually 1)
+        maxEntries?: number;
+        drawDate: string;
+        winnerSelectionMethod: 'random' | 'manual';
+      };
+      physicalData?: {
+        itemName: string;
+        itemDescription: string;
+        shippingRequired: boolean;
+        estimatedDeliveryDays?: number;
+        stockQuantity?: number;
+        weight?: number;
+        dimensions?: { length: number; width: number; height: number };
+        condition?: 'game-used' | 'new' | 'like-new' | 'sponsor-item';
+        quantity?: number;
+        photos?: string[];
+        approvalStatus?: 'pending' | 'approved' | 'rejected';
+        adminNotes?: string;
+        submittedAt?: string;
+        approvedAt?: string;
+      };
+      customData?: {
+        serviceName: string;
+        serviceDescription: string;
+        deliveryMethod: 'email' | 'platform' | 'video_call' | 'physical';
+        estimatedFulfillmentDays?: number;
+        customInstructions?: string;
+        requiresPersonalization: boolean;
+      };
+      videoData?: {
+        maxVideoDuration: number;
+        deliveryInstructions: string;
+        turnaroundDays: number;
+        requiresPersonalization: boolean;
+        personalizationInstructions?: string;
+        sampleVideoUrl?: string;
+      };
+    }>(),
+    maxRedemptions: integer('max_redemptions'),
+    currentRedemptions: integer('current_redemptions').default(0),
+    requiredTier: text('required_tier'),
+    stockQuantity: integer('stock_quantity'),
+    category: text('category'),
+    imageUrl: text('image_url'),
+    redemptionRules: jsonb('redemption_rules').$type<{
+      maxPerUser?: number;
+      cooldownHours?: number;
+      requiresTier?: string;
+    }>(),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('rewards_is_active_idx').on(table.isActive),
+    index('rewards_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 export const fanPrograms = pgTable('fan_programs', {
   id: varchar('id')
@@ -1817,92 +1825,102 @@ export const campaignParticipations = pgTable(
 );
 
 // Task Completions - Track fan progress on tasks
-export const taskCompletions = pgTable('task_completions', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  taskId: varchar('task_id')
-    .references(() => tasks.id, { onDelete: 'cascade' })
-    .notNull(),
-  userId: varchar('user_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
-    .notNull(),
+export const taskCompletions = pgTable(
+  'task_completions',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    taskId: varchar('task_id')
+      .references(() => tasks.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: varchar('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id)
+      .notNull(),
 
-  // Completion Status
-  status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed'
-  progress: integer('progress').default(0), // 0-100 percentage
+    // Completion Status
+    status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed'
+    progress: integer('progress').default(0), // 0-100 percentage
 
-  // Completion Data (task-specific tracking)
-  completionData: jsonb('completion_data').$type<{
-    // Check-in specific
-    currentStreak?: number;
-    lastCheckIn?: string; // ISO timestamp
-    streakMilestones?: Array<{
-      days: number;
-      completedAt: string;
-      pointsAwarded: number;
-    }>;
+    // Completion Data (task-specific tracking)
+    completionData: jsonb('completion_data').$type<{
+      // Check-in specific
+      currentStreak?: number;
+      lastCheckIn?: string; // ISO timestamp
+      streakMilestones?: Array<{
+        days: number;
+        completedAt: string;
+        pointsAwarded: number;
+      }>;
 
-    // Referral specific
-    referredUsers?: Array<{
-      userId: string;
-      username: string;
-      signupDate: string;
-      qualified: boolean;
-      pointsAwarded: number;
-    }>;
+      // Referral specific
+      referredUsers?: Array<{
+        userId: string;
+        username: string;
+        signupDate: string;
+        qualified: boolean;
+        pointsAwarded: number;
+      }>;
 
-    // Follower milestone specific
-    currentFollowers?: number;
-    milestonesReached?: Array<{
-      threshold: number;
-      reachedAt: string;
-      pointsAwarded: number;
-    }>;
+      // Follower milestone specific
+      currentFollowers?: number;
+      milestonesReached?: Array<{
+        threshold: number;
+        reachedAt: string;
+        pointsAwarded: number;
+      }>;
 
-    // Complete profile specific
-    fieldsCompleted?: string[];
-    fieldProgress?: Record<string, boolean>;
+      // Complete profile specific
+      fieldsCompleted?: string[];
+      fieldProgress?: Record<string, boolean>;
 
-    // Generic completion tracking
-    completedSteps?: number;
-    totalSteps?: number;
-    metadata?: Record<string, unknown>;
-  }>(),
+      // Generic completion tracking
+      completedSteps?: number;
+      totalSteps?: number;
+      metadata?: Record<string, unknown>;
+    }>(),
 
-  // Rewards Tracking
-  pointsEarned: integer('points_earned').default(0),
-  totalRewardsEarned: integer('total_rewards_earned').default(0), // For repeating tasks
+    // Rewards Tracking
+    pointsEarned: integer('points_earned').default(0),
+    totalRewardsEarned: integer('total_rewards_earned').default(0), // For repeating tasks
 
-  // Timing
-  startedAt: timestamp('started_at').defaultNow(),
-  completedAt: timestamp('completed_at'),
-  lastActivityAt: timestamp('last_activity_at').defaultNow(),
+    // Timing
+    startedAt: timestamp('started_at').defaultNow(),
+    completedAt: timestamp('completed_at'),
+    lastActivityAt: timestamp('last_activity_at').defaultNow(),
 
-  // Validation
-  verifiedAt: timestamp('verified_at'), // When completion was verified
-  verificationMethod: text('verification_method'), // 'auto' | 'manual' | 'api' | 'code_comment' | 'code_repost' | 'starter_pack'
+    // Validation
+    verifiedAt: timestamp('verified_at'), // When completion was verified
+    verificationMethod: text('verification_method'), // 'auto' | 'manual' | 'api' | 'code_comment' | 'code_repost' | 'starter_pack'
 
-  // Code-based verification tracking
-  verificationCodeId: varchar('verification_code_id'), // Link to verification code used
-  verificationCodeUsed: varchar('verification_code_used', { length: 8 }), // The actual code that was matched
-  verificationConfidence: text('verification_confidence'), // 'high' | 'medium' | 'low'
-  verificationTier: text('verification_tier'), // 'T1' | 'T2' | 'T3' (copied from task for reference)
+    // Code-based verification tracking
+    verificationCodeId: varchar('verification_code_id'), // Link to verification code used
+    verificationCodeUsed: varchar('verification_code_used', { length: 8 }), // The actual code that was matched
+    verificationConfidence: text('verification_confidence'), // 'high' | 'medium' | 'low'
+    verificationTier: text('verification_tier'), // 'T1' | 'T2' | 'T3' (copied from task for reference)
 
-  // Campaign association (for starter pack campaign exceptions)
-  campaignId: varchar('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
+    // Campaign association (for starter pack campaign exceptions)
+    campaignId: varchar('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
 
-  // Completion context - enables campaign-specific completions of one-time tasks
-  // 'standalone' = completed outside a campaign (default for backwards compatibility)
-  // 'campaign' = completed as part of a specific campaign (allows re-earning points via re-verification)
-  completionContext: text('completion_context').default('standalone'),
+    // Completion context - enables campaign-specific completions of one-time tasks
+    // 'standalone' = completed outside a campaign (default for backwards compatibility)
+    // 'campaign' = completed as part of a specific campaign (allows re-earning points via re-verification)
+    completionContext: text('completion_context').default('standalone'),
 
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('task_completions_user_task_idx').on(table.userId, table.taskId),
+    index('task_completions_tenant_id_idx').on(table.tenantId),
+    index('task_completions_campaign_id_idx').on(table.campaignId),
+    index('task_completions_completed_at_idx').on(table.completedAt),
+    index('task_completions_last_activity_idx').on(table.lastActivityAt),
+  ]
+);
 
 // Platform Task Completions - Track platform-wide task completions (separate from creator tasks)
 export const platformTaskCompletions = pgTable('platform_task_completions', {
@@ -1939,12 +1957,24 @@ export const platformTaskCompletions = pgTable('platform_task_completions', {
 
 // Manual Review Queue - Tasks requiring creator review (Instagram, Facebook, etc.)
 export const manualReviewQueue = pgTable('manual_review_queue', {
-  id: serial('id').primaryKey(),
-  taskCompletionId: integer('task_completion_id').notNull(),
-  tenantId: integer('tenant_id').notNull(),
-  creatorId: integer('creator_id').notNull(),
-  fanId: integer('fan_id').notNull(),
-  taskId: integer('task_id').notNull(),
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  taskCompletionId: varchar('task_completion_id')
+    .notNull()
+    .references(() => taskCompletions.id),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id),
+  creatorId: varchar('creator_id')
+    .notNull()
+    .references(() => creators.id),
+  fanId: varchar('fan_id')
+    .notNull()
+    .references(() => users.id),
+  taskId: varchar('task_id')
+    .notNull()
+    .references(() => tasks.id),
 
   // Platform and task info
   platform: varchar('platform', { length: 50 }).notNull(),
@@ -1963,7 +1993,7 @@ export const manualReviewQueue = pgTable('manual_review_queue', {
   // Review details
   submittedAt: timestamp('submitted_at').defaultNow(),
   reviewedAt: timestamp('reviewed_at'),
-  reviewedBy: integer('reviewed_by'),
+  reviewedBy: varchar('reviewed_by').references(() => users.id),
   reviewNotes: text('review_notes'),
 
   // Metadata
@@ -2025,13 +2055,13 @@ export const rewardDistributions = pgTable('reward_distributions', {
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
   taskId: varchar('task_id')
-    .references(() => tasks.id)
+    .references(() => tasks.id, { onDelete: 'cascade' })
     .notNull(),
   taskCompletionId: varchar('task_completion_id').references(() => taskCompletions.id, {
     onDelete: 'cascade',
   }),
   tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
+    .references(() => tenants.id, { onDelete: 'restrict' })
     .notNull(),
 
   // Reward Details
@@ -2372,7 +2402,6 @@ export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one, many 
   rewards: many(rewards),
   fanPrograms: many(fanPrograms),
   tasks: many(tasks),
-  taskCompletions: many(taskCompletions),
 }));
 
 export const rewardsRelations = relations(rewards, ({ one, many }) => ({
@@ -2385,6 +2414,29 @@ export const rewardsRelations = relations(rewards, ({ one, many }) => ({
     references: [loyaltyPrograms.id],
   }),
   redemptions: many(rewardRedemptions),
+}));
+
+export const manualReviewQueueRelations = relations(manualReviewQueue, ({ one }) => ({
+  taskCompletion: one(taskCompletions, {
+    fields: [manualReviewQueue.taskCompletionId],
+    references: [taskCompletions.id],
+  }),
+  task: one(tasks, {
+    fields: [manualReviewQueue.taskId],
+    references: [tasks.id],
+  }),
+  fan: one(users, {
+    fields: [manualReviewQueue.fanId],
+    references: [users.id],
+  }),
+  creator: one(creators, {
+    fields: [manualReviewQueue.creatorId],
+    references: [creators.id],
+  }),
+  tenant: one(tenants, {
+    fields: [manualReviewQueue.tenantId],
+    references: [tenants.id],
+  }),
 }));
 
 export const fanProgramsRelations = relations(fanPrograms, ({ one, many }) => ({
@@ -3208,7 +3260,7 @@ export const nftMints = pgTable('nft_mints', {
     .default(sql`gen_random_uuid()`),
 
   // Mint Operation Details
-  crossmintActionId: text('crossmint_action_id').unique().notNull(), // Crossmint's action ID for status tracking
+  crossmintActionId: text('crossmint_action_id').unique(), // Unique mint action ID (nullable for non-Crossmint mints)
 
   // Source Information
   collectionId: varchar('collection_id').references(() => nftCollections.id), // nullable for badge mints (which use badgeTemplateId instead)

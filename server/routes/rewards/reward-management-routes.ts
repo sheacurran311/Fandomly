@@ -36,7 +36,8 @@ export function registerRewardManagementRoutes(app: Express, storage: any) {
       // Fetch rewards with tenant isolation
       const rewards = tenantId ? await storage.getAllRewards(tenantId) : [];
       res.json(rewards);
-    } catch {
+    } catch (error) {
+      console.error('Error fetching rewards:', error);
       res.status(500).json({ error: 'Failed to fetch rewards' });
     }
   });
@@ -238,21 +239,26 @@ export function registerRewardManagementRoutes(app: Express, storage: any) {
   });
 
   // Get rewards by program
-  app.get('/api/rewards/program/:programId', async (req, res) => {
-    try {
-      // Get loyalty program to verify tenant context
-      const program = await storage.getLoyaltyProgram(req.params.programId);
-      if (!program) {
-        return res.status(404).json({ error: 'Program not found' });
-      }
+  app.get(
+    '/api/rewards/program/:programId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        // Get loyalty program to verify tenant context
+        const program = await storage.getLoyaltyProgram(req.params.programId);
+        if (!program) {
+          return res.status(404).json({ error: 'Program not found' });
+        }
 
-      // Fetch rewards with tenant isolation
-      const rewards = await storage.getRewardsByProgram(req.params.programId, program.tenantId);
-      res.json(rewards);
-    } catch {
-      res.status(500).json({ error: 'Failed to fetch rewards' });
+        // Fetch rewards with tenant isolation
+        const rewards = await storage.getRewardsByProgram(req.params.programId, program.tenantId);
+        res.json(rewards);
+      } catch (error) {
+        console.error('Error fetching rewards:', error);
+        res.status(500).json({ error: 'Failed to fetch rewards' });
+      }
     }
-  });
+  );
 
   // Admin physical rewards approval routes
   app.get(

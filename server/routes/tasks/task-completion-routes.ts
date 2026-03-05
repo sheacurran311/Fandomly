@@ -2,10 +2,11 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import type { IStorage } from '../../core/storage';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
+import { standardApiLimiter } from '../../middleware/rate-limit';
 import { taskFrequencyService } from '../../services/task-frequency-service';
 import { pointsMultiplierService } from '../../services/points/multiplier-service';
 import { db } from '../../db';
-import { fanPrograms } from '@shared/schema';
+import { fanPrograms, taskCompletions, rewardDistributions } from '@shared/schema';
 import { sql, and, eq } from 'drizzle-orm';
 
 // Validation schemas
@@ -299,92 +300,97 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // POST /api/task-completions/start
   // Start a task (create initial completion record)
   // ==============================================
-  router.post('/start', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
+  router.post(
+    '/start',
+    standardApiLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
 
-      // Validate request body
-      const validation = startTaskSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: 'Invalid request data',
-          details: validation.error.issues,
+        // Validate request body
+        const validation = startTaskSchema.safeParse(req.body);
+        if (!validation.success) {
+          return res.status(400).json({
+            error: 'Invalid request data',
+            details: validation.error.issues,
+          });
+        }
+
+        const { taskId, tenantId, campaignId } = validation.data;
+
+        // Check if task exists
+        const task = await storage.getTask(taskId, tenantId);
+        if (!task) {
+          return res.status(404).json({ error: 'Task not found' });
+        }
+
+        // Determine completion context based on whether campaignId is provided
+        // Campaign completions are scoped separately from standalone completions
+        // This enables the re-verification model for one-time tasks within campaigns
+        const completionContext = campaignId ? 'campaign' : 'standalone';
+
+        // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
+        // Pass campaignId to scope the eligibility check to the appropriate context
+        const frequencyCheck = await taskFrequencyService.checkEligibility({
+          userId: req.user.id,
+          taskId,
+          tenantId,
+          campaignId, // Campaign-scoped check if campaignId provided
+        });
+
+        if (!frequencyCheck.isEligible) {
+          return res.status(403).json({
+            error: 'Task not available',
+            reason: frequencyCheck.reason,
+            nextAvailableAt: frequencyCheck.nextAvailableAt,
+            lastCompletedAt: frequencyCheck.lastCompletedAt,
+            completionsCount: frequencyCheck.completionsCount,
+          });
+        }
+
+        // Check if user has already started this task (but not completed) within the same context
+        const existingCompletion = await storage.getTaskCompletionByUserAndTask(
+          req.user.id,
+          taskId,
+          campaignId
+        );
+        if (existingCompletion && existingCompletion.status === 'in_progress') {
+          return res.json({
+            completion: existingCompletion,
+            message: 'Task already started',
+          });
+        }
+
+        // Create new task completion with appropriate context
+        const completion = await storage.createTaskCompletion({
+          taskId,
+          userId: req.user.id,
+          tenantId,
+          campaignId: campaignId || undefined, // Set campaignId if provided
+          completionContext, // 'standalone' or 'campaign'
+          status: 'in_progress',
+          progress: 0,
+          completionData: {},
+          pointsEarned: 0,
+          totalRewardsEarned: 0,
+        });
+
+        res.status(201).json({ completion });
+      } catch (error: unknown) {
+        console.error('Error starting task:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        res.status(500).json({
+          error: 'Failed to start task',
+          message: errorMessage,
+          details: errorStack,
         });
       }
-
-      const { taskId, tenantId, campaignId } = validation.data;
-
-      // Check if task exists
-      const task = await storage.getTask(taskId, tenantId);
-      if (!task) {
-        return res.status(404).json({ error: 'Task not found' });
-      }
-
-      // Determine completion context based on whether campaignId is provided
-      // Campaign completions are scoped separately from standalone completions
-      // This enables the re-verification model for one-time tasks within campaigns
-      const completionContext = campaignId ? 'campaign' : 'standalone';
-
-      // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
-      // Pass campaignId to scope the eligibility check to the appropriate context
-      const frequencyCheck = await taskFrequencyService.checkEligibility({
-        userId: req.user.id,
-        taskId,
-        tenantId,
-        campaignId, // Campaign-scoped check if campaignId provided
-      });
-
-      if (!frequencyCheck.isEligible) {
-        return res.status(403).json({
-          error: 'Task not available',
-          reason: frequencyCheck.reason,
-          nextAvailableAt: frequencyCheck.nextAvailableAt,
-          lastCompletedAt: frequencyCheck.lastCompletedAt,
-          completionsCount: frequencyCheck.completionsCount,
-        });
-      }
-
-      // Check if user has already started this task (but not completed) within the same context
-      const existingCompletion = await storage.getTaskCompletionByUserAndTask(
-        req.user.id,
-        taskId,
-        campaignId
-      );
-      if (existingCompletion && existingCompletion.status === 'in_progress') {
-        return res.json({
-          completion: existingCompletion,
-          message: 'Task already started',
-        });
-      }
-
-      // Create new task completion with appropriate context
-      const completion = await storage.createTaskCompletion({
-        taskId,
-        userId: req.user.id,
-        tenantId,
-        campaignId: campaignId || undefined, // Set campaignId if provided
-        completionContext, // 'standalone' or 'campaign'
-        status: 'in_progress',
-        progress: 0,
-        completionData: {},
-        pointsEarned: 0,
-        totalRewardsEarned: 0,
-      });
-
-      res.status(201).json({ completion });
-    } catch (error: unknown) {
-      console.error('Error starting task:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      res.status(500).json({
-        error: 'Failed to start task',
-        message: errorMessage,
-        details: errorStack,
-      });
     }
-  });
+  );
 
   // ==============================================
   // PATCH /api/task-completions/:completionId/progress
@@ -443,6 +449,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   router.post(
     '/:completionId/complete',
+    standardApiLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -491,63 +498,78 @@ export function createTaskCompletionRoutes(storage: IStorage) {
         const pointsToAward = Math.round(basePoints * multiplier);
         const now = new Date();
 
-        // Update completion to completed
-        const updatedCompletion = await storage.updateTaskCompletion(completionId, {
-          status: 'completed',
-          progress: 100,
-          completionData: completionData || existingCompletion.completionData,
-          pointsEarned: (existingCompletion.pointsEarned || 0) + pointsToAward,
-          totalRewardsEarned: (existingCompletion.totalRewardsEarned || 0) + pointsToAward,
-          completedAt: now,
-          verifiedAt: now,
-          verificationMethod,
-          lastActivityAt: now,
-        });
+        // Wrap all state mutations in a transaction for atomicity.
+        // Uses optimistic locking (status check in WHERE) to prevent double-completion.
+        const result = await db.transaction(async (tx) => {
+          // 1. Atomically update completion — only if still in_progress
+          const [updatedCompletion] = await tx
+            .update(taskCompletions)
+            .set({
+              status: 'completed',
+              progress: 100,
+              completionData: completionData || existingCompletion.completionData,
+              pointsEarned: (existingCompletion.pointsEarned || 0) + pointsToAward,
+              totalRewardsEarned: (existingCompletion.totalRewardsEarned || 0) + pointsToAward,
+              completedAt: now,
+              verifiedAt: now,
+              verificationMethod,
+              lastActivityAt: now,
+              updatedAt: now,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any)
+            .where(
+              and(eq(taskCompletions.id, completionId), eq(taskCompletions.status, 'in_progress'))
+            )
+            .returning();
 
-        // Create reward distribution record
-        const rewardDistribution = await storage.createRewardDistribution({
-          userId: req.user.id,
-          taskId: task.id,
-          taskCompletionId: completionId,
-          tenantId: task.tenantId ?? '',
-          rewardType: 'points',
-          amount: pointsToAward,
-          currency: task.pointCurrency || 'default',
-          reason: 'task_completion',
-          description: `Completed task: ${task.name}`,
-          metadata: {
-            taskName: task.name,
-            taskType: task.taskType,
-            basePoints,
-            multiplier,
-            multiplierBreakdown: breakdown,
-          },
-        });
+          if (!updatedCompletion) {
+            throw new Error('Task already completed or no longer in progress');
+          }
 
-        // Update fan program points balance
-        if (pointsToAward > 0 && task.tenantId) {
-          // Find the fan's program for this tenant
-          const [fanProgram] = await db
-            .select()
-            .from(fanPrograms)
-            .where(and(eq(fanPrograms.fanId, req.user.id), eq(fanPrograms.tenantId, task.tenantId)))
-            .limit(1);
+          // 2. Create reward distribution record
+          const [rewardDistribution] = await tx
+            .insert(rewardDistributions)
+            .values({
+              userId: req.user!.id,
+              taskId: task.id,
+              taskCompletionId: completionId,
+              tenantId: task.tenantId ?? '',
+              rewardType: 'points',
+              amount: pointsToAward,
+              currency: task.pointCurrency || 'default',
+              reason: 'task_completion',
+              description: `Completed task: ${task.name}`,
+              metadata: {
+                taskName: task.name,
+                taskType: task.taskType,
+                basePoints,
+                multiplier,
+                multiplierBreakdown: breakdown,
+              },
+              createdAt: now,
+            })
+            .returning();
 
-          if (fanProgram) {
-            await db
+          // 3. Update fan program points balance atomically
+          if (pointsToAward > 0 && task.tenantId) {
+            await tx
               .update(fanPrograms)
               .set({
                 currentPoints: sql`${fanPrograms.currentPoints} + ${pointsToAward}`,
                 totalPointsEarned: sql`${fanPrograms.totalPointsEarned} + ${pointsToAward}`,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               } as any)
-              .where(eq(fanPrograms.id, fanProgram.id));
+              .where(
+                and(eq(fanPrograms.fanId, req.user!.id), eq(fanPrograms.tenantId, task.tenantId))
+              );
           }
-        }
+
+          return { updatedCompletion, rewardDistribution };
+        });
 
         res.json({
-          completion: updatedCompletion,
-          reward: rewardDistribution,
+          completion: result.updatedCompletion,
+          reward: result.rewardDistribution,
           pointsAwarded: pointsToAward,
         });
       } catch (error) {
@@ -563,6 +585,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   router.post(
     '/:taskId/check-in',
+    standardApiLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -699,6 +722,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   router.post(
     '/:taskCompletionId/verify',
+    standardApiLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {

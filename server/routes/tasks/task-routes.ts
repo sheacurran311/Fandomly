@@ -1,8 +1,9 @@
-import { Express, Request, Response } from "express";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+import { Express, Request, Response } from 'express';
 import { storage } from '../../core/storage';
 import { db } from '../../db';
-import { z } from "zod";
-import { authenticateUser, AuthenticatedRequest } from "../../middleware/rbac";
+import { z } from 'zod';
+import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import {
   socialTaskSettings,
   twitterTaskSettings,
@@ -18,24 +19,29 @@ import {
   normalizeUsername,
   extractContentId,
   type SocialTaskSettings,
-} from "@shared/taskFieldSchemas";
-import {
-  taskCompletions,
-  manualReviewQueue,
-  creators,
-  socialConnections,
-} from "@shared/schema";
-import { eq, and, isNull, desc, sql } from "drizzle-orm";
-import { uploadScreenshot, getFileUrl } from "../../middleware/upload";
-import { unifiedVerification } from "../../services/verification/unified-verification";
-import { taskFrequencyService } from "../../services/task-frequency-service";
+} from '@shared/taskFieldSchemas';
+import { taskCompletions, manualReviewQueue, creators, socialConnections } from '@shared/schema';
+import { eq, and, isNull, desc, sql } from 'drizzle-orm';
+import { uploadScreenshot, getFileUrl } from '../../middleware/upload';
+import { unifiedVerification } from '../../services/verification/unified-verification';
+import { taskFrequencyService } from '../../services/task-frequency-service';
 
 // Task configuration schemas based on our task builders
 const baseTaskSchemaFields = {
   name: z.string().min(1),
   description: z.string().optional(),
   ownershipLevel: z.enum(['platform', 'creator']).default('creator'),
-  section: z.enum(['user_onboarding', 'social_engagement', 'community_building', 'content_creation', 'streaming_music', 'token_activity', 'custom']).default('custom'),
+  section: z
+    .enum([
+      'user_onboarding',
+      'social_engagement',
+      'community_building',
+      'content_creation',
+      'streaming_music',
+      'token_activity',
+      'custom',
+    ])
+    .default('custom'),
   programId: z.string().optional(), // Associate task with a loyalty program
   campaignId: z.string().optional(), // Associate task with a campaign
   startTime: z.string().optional(),
@@ -43,30 +49,32 @@ const baseTaskSchemaFields = {
   isRequired: z.boolean().default(false),
   hideFromUI: z.boolean().default(false),
   isDraft: z.boolean().default(true),
-  
+
   // REWARD CONFIGURATION (Snag-inspired)
   rewardType: z.enum(['points', 'multiplier']).default('points'),
-  
+
   // Points reward fields
   pointsToReward: z.number().min(1).max(10000).optional(),
   pointCurrency: z.string().default('default'),
-  
+
   // Multiplier reward fields
   multiplierValue: z.number().min(1.01).max(10.0).optional(),
   currenciesToApply: z.array(z.string()).optional(),
   applyToExistingBalance: z.boolean().default(false),
-  
+
   // TIMING CONFIGURATION (Snag-inspired)
   updateCadence: z.enum(['immediate', 'daily', 'weekly', 'monthly']).default('immediate'),
   rewardFrequency: z.enum(['one_time', 'daily', 'weekly', 'monthly']).default('one_time'),
-  
+
   // Task-specific multiplier for ALL tasks
   baseMultiplier: z.number().min(1.0).max(10.0).optional().default(1.0),
-  multiplierConfig: z.object({
-    stackingType: z.enum(['additive', 'multiplicative']).optional(),
-    maxMultiplier: z.number().min(1.0).optional(),
-    allowEventMultipliers: z.boolean().optional(),
-  }).optional(),
+  multiplierConfig: z
+    .object({
+      stackingType: z.enum(['additive', 'multiplicative']).optional(),
+      maxMultiplier: z.number().min(1.0).optional(),
+      allowEventMultipliers: z.boolean().optional(),
+    })
+    .optional(),
 };
 
 const baseTaskSchema = z.object(baseTaskSchemaFields);
@@ -74,38 +82,52 @@ const baseTaskSchema = z.object(baseTaskSchemaFields);
 const referralTaskSchema = baseTaskSchema.extend({
   taskType: z.literal('referral'),
   customSettings: z.object({
-    referralTier: z.enum(['platform_creator_to_creator', 'platform_fan_to_fan', 'campaign_fan_to_fan']),
+    referralTier: z.enum([
+      'platform_creator_to_creator',
+      'platform_fan_to_fan',
+      'campaign_fan_to_fan',
+    ]),
     rewardStructure: z.enum(['fixed', 'percentage', 'revenue_share']),
     referrerPoints: z.number().optional(),
     referredPoints: z.number().optional(),
     percentageOfReferred: z.number().min(1).max(100).optional(),
     revenueSharePercentage: z.number().min(1).max(50).optional(),
     revenueShareDuration: z.enum(['lifetime', '12_months', '6_months', '3_months']).optional(),
-    dualRewards: z.object({
-      enabled: z.boolean(),
-      creatorPoints: z.number().min(0).optional(),
-      platformPoints: z.number().min(0).optional(),
-    }).optional(),
-    qualifyingConditions: z.array(z.object({
-      type: z.enum(['quest_completion', 'point_threshold', 'account_age', 'revenue_threshold']),
-      value: z.union([z.string(), z.number()]),
-    })).optional(),
+    dualRewards: z
+      .object({
+        enabled: z.boolean(),
+        creatorPoints: z.number().min(0).optional(),
+        platformPoints: z.number().min(0).optional(),
+      })
+      .optional(),
+    qualifyingConditions: z
+      .array(
+        z.object({
+          type: z.enum(['quest_completion', 'point_threshold', 'account_age', 'revenue_threshold']),
+          value: z.union([z.string(), z.number()]),
+        })
+      )
+      .optional(),
     maxReferralsPerUser: z.number().nullable().optional(),
     totalMaxReferrals: z.number().nullable().optional(),
   }),
 });
 
 const checkInTaskSchema = baseTaskSchema.extend({
-  taskType: z.literal('checkin'),
+  taskType: z.literal('check_in'),
   customSettings: z.object({
     pointsPerCheckIn: z.number().min(1),
     frequency: z.enum(['daily', 'weekly', 'monthly']),
     enableStreak: z.boolean(),
     rewardOnlyStreakCompletions: z.boolean().optional(),
-    streakMilestones: z.array(z.object({
-      consecutiveDays: z.number().min(1),
-      bonusPoints: z.number().min(1),
-    })).optional(),
+    streakMilestones: z
+      .array(
+        z.object({
+          consecutiveDays: z.number().min(1),
+          bonusPoints: z.number().min(1),
+        })
+      )
+      .optional(),
     celebrationType: z.enum(['none', 'image', 'video']).optional(),
     celebrationUrl: z.string().url().optional().or(z.literal('')),
     countAnyRuleAsCheckIn: z.boolean().optional(),
@@ -119,10 +141,14 @@ const followerMilestoneSchema = baseTaskSchema.extend({
     milestoneType: z.enum(['single', 'tiered']),
     singleFollowerCount: z.number().optional(),
     singlePoints: z.number().optional(),
-    tiers: z.array(z.object({
-      followers: z.number().min(1),
-      points: z.number().min(1),
-    })).optional(),
+    tiers: z
+      .array(
+        z.object({
+          followers: z.number().min(1),
+          points: z.number().min(1),
+        })
+      )
+      .optional(),
   }),
 });
 
@@ -140,42 +166,74 @@ const completeProfileTaskSchema = baseTaskSchema.extend({
 // These extend baseTaskSchema with standardized social settings
 
 const twitterTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet', 'twitter_quote_tweet', 'twitter_reply']),
+  taskType: z.enum(['twitter_follow', 'twitter_like', 'twitter_retweet', 'twitter_quote_tweet']),
   platform: z.literal('twitter'),
   points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: twitterTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const facebookTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['facebook_like_page', 'facebook_like_post', 'facebook_comment_post', 'facebook_comment_photo', 'facebook_share', 'facebook_join_group']),
+  taskType: z.enum([
+    'facebook_like_page',
+    'facebook_like_post',
+    'facebook_comment_post',
+    'facebook_comment_photo',
+    'facebook_share',
+    'facebook_join_group',
+  ]),
   platform: z.literal('facebook'),
   points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: facebookTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const instagramTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['instagram_follow', 'instagram_like_post', 'comment_code', 'mention_story', 'keyword_comment']),
+  taskType: z.enum([
+    'instagram_follow',
+    'instagram_like_post',
+    'comment_code',
+    'mention_story',
+    'keyword_comment',
+  ]),
   platform: z.literal('instagram'),
   points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: instagramTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const youtubeTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['youtube_subscribe', 'youtube_like', 'youtube_comment', 'youtube_watch', 'youtube_share']),
+  taskType: z.enum([
+    'youtube_subscribe',
+    'youtube_like',
+    'youtube_comment',
+    'youtube_watch',
+    'youtube_share',
+  ]),
   platform: z.literal('youtube'),
   points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: youtubeTaskSettings.omit({ platform: true }), // Use unified schema
 });
 
 const tiktokTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['tiktok_follow', 'tiktok_like', 'tiktok_comment', 'tiktok_share', 'tiktok_duet', 'tiktok_stitch', 'tiktok_post']),
+  taskType: z.enum([
+    'tiktok_follow',
+    'tiktok_like',
+    'tiktok_comment',
+    'tiktok_share',
+    'tiktok_duet',
+    'tiktok_stitch',
+    'tiktok_post',
+  ]),
   platform: z.literal('tiktok'),
   points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: tiktokTaskSettings.omit({ platform: true }).optional(), // Use unified schema
 });
 
 const spotifyTaskSchema = baseTaskSchema.extend({
-  taskType: z.enum(['spotify_follow', 'spotify_playlist', 'spotify_save_track', 'spotify_save_album']),
+  taskType: z.enum([
+    'spotify_follow',
+    'spotify_playlist',
+    'spotify_save_track',
+    'spotify_save_album',
+  ]),
   platform: z.literal('spotify'),
   points: z.number().min(1).max(10000).optional(), // Legacy support
   settings: spotifyTaskSettings.omit({ platform: true }), // Use unified schema
@@ -204,17 +262,21 @@ const pollTaskSchema = baseTaskSchema.extend({
   settings: z.object({
     pollQuizConfig: z.object({
       type: z.literal('poll'),
-      questions: z.array(z.object({
-        id: z.string(),
-        questionText: z.string(),
-        questionType: z.enum(['single_choice', 'multiple_choice', 'true_false']),
-        options: z.array(z.object({
-          id: z.number(),
-          text: z.string(),
-          isCorrect: z.boolean().optional(),
-        })),
-        explanation: z.string().optional(),
-      })),
+      questions: z.array(
+        z.object({
+          id: z.string(),
+          questionText: z.string(),
+          questionType: z.enum(['single_choice', 'multiple_choice', 'true_false']),
+          options: z.array(
+            z.object({
+              id: z.number(),
+              text: z.string(),
+              isCorrect: z.boolean().optional(),
+            })
+          ),
+          explanation: z.string().optional(),
+        })
+      ),
       showResults: z.boolean().optional(),
       allowMultipleSubmissions: z.boolean().optional(),
     }),
@@ -229,18 +291,22 @@ const quizTaskSchema = baseTaskSchema.extend({
   settings: z.object({
     pollQuizConfig: z.object({
       type: z.literal('quiz'),
-      questions: z.array(z.object({
-        id: z.string(),
-        questionText: z.string(),
-        questionType: z.enum(['single_choice', 'multiple_choice', 'true_false']),
-        options: z.array(z.object({
-          id: z.number(),
-          text: z.string(),
-          isCorrect: z.boolean().optional(),
-        })),
-        correctAnswers: z.array(z.number()).optional(),
-        explanation: z.string().optional(),
-      })),
+      questions: z.array(
+        z.object({
+          id: z.string(),
+          questionText: z.string(),
+          questionType: z.enum(['single_choice', 'multiple_choice', 'true_false']),
+          options: z.array(
+            z.object({
+              id: z.number(),
+              text: z.string(),
+              isCorrect: z.boolean().optional(),
+            })
+          ),
+          correctAnswers: z.array(z.number()).optional(),
+          explanation: z.string().optional(),
+        })
+      ),
       passingScore: z.number().min(0).max(100).optional(),
       requirePerfectScore: z.boolean().optional(),
       perfectScoreMultiplier: z.number().min(1).max(5).optional(),
@@ -266,187 +332,218 @@ const websiteVisitTaskSchema = baseTaskSchema.extend({
 });
 
 // Union of all task schemas with validation
-const createTaskSchema = z.discriminatedUnion('taskType', [
-  referralTaskSchema,
-  checkInTaskSchema,
-  followerMilestoneSchema,
-  completeProfileTaskSchema,
-  twitterTaskSchema,
-  facebookTaskSchema,
-  instagramTaskSchema,
-  youtubeTaskSchema,
-  tiktokTaskSchema,
-  spotifyTaskSchema,
-  twitchTaskSchema,
-  discordTaskSchema,
-  // Sprint 3: Interactive tasks
-  pollTaskSchema,
-  quizTaskSchema,
-  websiteVisitTaskSchema,
-]).refine((data) => {
-  // If reward type is 'points', pointsToReward is required (unless legacy 'points' field exists)
-  if (data.rewardType === 'points' && !data.pointsToReward && !('points' in data)) {
-    // Allow task types that manage their own points via customSettings
-    const selfManagedTypes = ['referral', 'checkin', 'follower_milestone', 'complete_profile'];
-    if (!selfManagedTypes.includes(data.taskType)) {
-      return false;
+const createTaskSchema = z
+  .discriminatedUnion('taskType', [
+    referralTaskSchema,
+    checkInTaskSchema,
+    followerMilestoneSchema,
+    completeProfileTaskSchema,
+    twitterTaskSchema,
+    facebookTaskSchema,
+    instagramTaskSchema,
+    youtubeTaskSchema,
+    tiktokTaskSchema,
+    spotifyTaskSchema,
+    twitchTaskSchema,
+    discordTaskSchema,
+    // Sprint 3: Interactive tasks
+    pollTaskSchema,
+    quizTaskSchema,
+    websiteVisitTaskSchema,
+  ])
+  .refine(
+    (data) => {
+      // If reward type is 'points', pointsToReward is required (unless legacy 'points' field exists)
+      if (data.rewardType === 'points' && !data.pointsToReward && !('points' in data)) {
+        // Allow task types that manage their own points via customSettings
+        const selfManagedTypes = ['referral', 'check_in', 'follower_milestone', 'complete_profile'];
+        if (!selfManagedTypes.includes(data.taskType)) {
+          return false;
+        }
+      }
+      // If reward type is 'multiplier', multiplierValue is required
+      if (data.rewardType === 'multiplier' && !data.multiplierValue) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Points reward requires pointsToReward; Multiplier reward requires multiplierValue',
     }
-  }
-  // If reward type is 'multiplier', multiplierValue is required
-  if (data.rewardType === 'multiplier' && !data.multiplierValue) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Points reward requires pointsToReward; Multiplier reward requires multiplierValue",
-});
+  );
 
 export function registerTaskRoutes(app: Express) {
   // Get all published tasks (for fans) - REQUIRES AUTH
   // Returns ONLY tasks from programs the fan has joined
-  app.get("/api/tasks/published", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-
-      // Import necessary modules
-      const { fanPrograms: fanProgramsTable } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-
-      // Get the fan's joined programs to filter tasks
-      const fanPrograms = await db
-        .select()
-        .from(fanProgramsTable)
-        .where(eq(fanProgramsTable.fanId, userId));
-
-      console.log(`[Tasks API] Fan ${userId} joined programs:`, fanPrograms.map(fp => ({ 
-        programId: fp.programId, 
-        tenantId: fp.tenantId 
-      })));
-
-      // Extract tenant IDs AND program IDs from joined programs
-      const joinedTenantIds = fanPrograms.map(fp => fp.tenantId);
-      const joinedProgramIds = fanPrograms.map(fp => fp.programId);
-
-      console.log(`[Tasks API] Fan ${userId} has joined ${joinedTenantIds.length} programs (tenant IDs):`, joinedTenantIds);
-      console.log(`[Tasks API] Fan ${userId} has joined ${joinedProgramIds.length} programs (program IDs):`, joinedProgramIds);
-
-      // If fan hasn't joined any programs, return empty array
-      if (joinedTenantIds.length === 0) {
-        console.log(`[Tasks API] Fan ${userId} hasn't joined any programs yet`);
-        return res.json({ tasks: [] });
-      }
-
-      // Get all tasks from programs the fan has joined
-      // CRITICAL: Filter by program_id, not just tenant_id
-      let tasks = await db.query.tasks.findMany({
-        where: (tasks, { eq, and, inArray }) => and(
-          inArray(tasks.programId, joinedProgramIds), // Filter by program IDs
-          eq(tasks.isDraft, false),
-          eq(tasks.isActive, true),
-          eq(tasks.ownershipLevel, 'creator')
-        ),
-        with: {
-          tenant: true,
-          creator: true,  // Direct creator relation from task
-          program: true,
-        },
-      });
-      
-      console.log(`[Tasks API] Query filter: programId IN [${joinedProgramIds.join(', ')}], isDraft=false, isActive=true, ownershipLevel='creator'`);
-      console.log(`[Tasks API] Found ${tasks.length} published tasks for fan ${userId}`);
-      
-      if (tasks.length > 0) {
-        console.log(`[Tasks API] Task details:`, tasks.map(t => ({
-          id: t.id,
-          name: t.name,
-          programId: t.programId,
-          tenantId: t.tenantId,
-          isDraft: t.isDraft,
-          isActive: t.isActive
-        })));
-      }
-      
-      // Filter by time availability
-      const now = new Date();
-      tasks = tasks.filter(task => {
-        if (task.startTime && new Date(task.startTime) > now) {
-          return false;
+  app.get(
+    '/api/tasks/published',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ error: 'Authentication required' });
         }
-        if (task.endTime && new Date(task.endTime) < now) {
-          return false;
-        }
-        return true;
-      });
-      
-      console.log(`[Tasks API] After time filtering: ${tasks.length} tasks available`);
-      
-      // Import the transformation function
-      const { buildTargetDataFromSettings } = await import("@shared/taskFieldSchemas");
 
-      // Enrich tasks with creator information AND targetData
-      const enrichedTasks = tasks.map(task => {
-        // Build targetData from customSettings for verification
-        const targetData = buildTargetDataFromSettings(
-          task.customSettings || {},
-          task.platform || 'other',
-          task.taskType || ''
+        // Import necessary modules
+        const { fanPrograms: fanProgramsTable } = await import('@shared/schema');
+        const { eq } = await import('drizzle-orm');
+
+        // Get the fan's joined programs to filter tasks
+        const fanPrograms = await db
+          .select()
+          .from(fanProgramsTable)
+          .where(eq(fanProgramsTable.fanId, userId));
+
+        console.log(
+          `[Tasks API] Fan ${userId} joined programs:`,
+          fanPrograms.map((fp) => ({
+            programId: fp.programId,
+            tenantId: fp.tenantId,
+          }))
         );
 
-        // Log the transformation for debugging
-        if (Object.keys(targetData).length > 0) {
-          console.log(`[Tasks API] Built targetData for task ${task.id} (${task.taskType}):`, {
-            customSettings: task.customSettings,
-            targetData
-          });
+        // Extract tenant IDs AND program IDs from joined programs
+        const joinedTenantIds = fanPrograms.map((fp) => fp.tenantId);
+        const joinedProgramIds = fanPrograms.map((fp) => fp.programId);
+
+        console.log(
+          `[Tasks API] Fan ${userId} has joined ${joinedTenantIds.length} programs (tenant IDs):`,
+          joinedTenantIds
+        );
+        console.log(
+          `[Tasks API] Fan ${userId} has joined ${joinedProgramIds.length} programs (program IDs):`,
+          joinedProgramIds
+        );
+
+        // If fan hasn't joined any programs, return empty array
+        if (joinedTenantIds.length === 0) {
+          console.log(`[Tasks API] Fan ${userId} hasn't joined any programs yet`);
+          return res.json({ tasks: [] });
         }
 
-        return {
-          ...task,
-          creatorName: task.creator?.displayName || task.tenant?.name || 'Unknown Creator',
-          creatorImage: (task.creator as { avatar?: string })?.avatar || (task.tenant as { branding?: { logo?: string } })?.branding?.logo || null,
-          programName: task.program?.name || null,
-          programSlug: task.program?.slug || null,
-          programImage: (task.program?.pageConfig as { headerImage?: string; logo?: string })?.headerImage || (task.program?.pageConfig as { headerImage?: string; logo?: string })?.logo || null,
-          platform: task.platform || 'other', // Use the platform field directly
-          type: task.taskType || 'other',
-          targetData, // Add the transformed targetData for Fan verification
-        };
-      });
-      
-      res.json({ tasks: enrichedTasks });
-    } catch (error) {
-      console.error('Error fetching published tasks:', error);
-      res.status(500).json({ error: 'Failed to fetch tasks' });
+        // Get all tasks from programs the fan has joined
+        // CRITICAL: Filter by program_id, not just tenant_id
+        let tasks = await db.query.tasks.findMany({
+          where: (tasks, { eq, and, inArray }) =>
+            and(
+              inArray(tasks.programId, joinedProgramIds), // Filter by program IDs
+              eq(tasks.isDraft, false),
+              eq(tasks.isActive, true),
+              eq(tasks.ownershipLevel, 'creator')
+            ),
+          with: {
+            tenant: true,
+            creator: true, // Direct creator relation from task
+            program: true,
+          },
+        });
+
+        console.log(
+          `[Tasks API] Query filter: programId IN [${joinedProgramIds.join(', ')}], isDraft=false, isActive=true, ownershipLevel='creator'`
+        );
+        console.log(`[Tasks API] Found ${tasks.length} published tasks for fan ${userId}`);
+
+        if (tasks.length > 0) {
+          console.log(
+            `[Tasks API] Task details:`,
+            tasks.map((t) => ({
+              id: t.id,
+              name: t.name,
+              programId: t.programId,
+              tenantId: t.tenantId,
+              isDraft: t.isDraft,
+              isActive: t.isActive,
+            }))
+          );
+        }
+
+        // Filter by time availability
+        const now = new Date();
+        tasks = tasks.filter((task) => {
+          if (task.startTime && new Date(task.startTime) > now) {
+            return false;
+          }
+          if (task.endTime && new Date(task.endTime) < now) {
+            return false;
+          }
+          return true;
+        });
+
+        console.log(`[Tasks API] After time filtering: ${tasks.length} tasks available`);
+
+        // Import the transformation function
+        const { buildTargetDataFromSettings } = await import('@shared/taskFieldSchemas');
+
+        // Enrich tasks with creator information AND targetData
+        const enrichedTasks = tasks.map((task) => {
+          // Build targetData from customSettings for verification
+          const targetData = buildTargetDataFromSettings(
+            task.customSettings || {},
+            task.platform || 'other',
+            task.taskType || ''
+          );
+
+          // Log the transformation for debugging
+          if (Object.keys(targetData).length > 0) {
+            console.log(`[Tasks API] Built targetData for task ${task.id} (${task.taskType}):`, {
+              customSettings: task.customSettings,
+              targetData,
+            });
+          }
+
+          return {
+            ...task,
+            creatorName: task.creator?.displayName || task.tenant?.name || 'Unknown Creator',
+            creatorImage:
+              (task.creator as { avatar?: string })?.avatar ||
+              (task.tenant as { branding?: { logo?: string } })?.branding?.logo ||
+              null,
+            programName: task.program?.name || null,
+            programSlug: task.program?.slug || null,
+            programImage:
+              (task.program?.pageConfig as { headerImage?: string; logo?: string })?.headerImage ||
+              (task.program?.pageConfig as { headerImage?: string; logo?: string })?.logo ||
+              null,
+            platform: task.platform || 'other', // Use the platform field directly
+            type: task.taskType || 'other',
+            targetData, // Add the transformed targetData for Fan verification
+          };
+        });
+
+        res.json({ tasks: enrichedTasks });
+      } catch (error) {
+        console.error('Error fetching published tasks:', error);
+        res.status(500).json({ error: 'Failed to fetch tasks' });
+      }
     }
-  });
+  );
 
   // Get published tasks for a specific creator (public endpoint)
-  app.get("/api/tasks/creator/:creatorId", async (req: Request, res: Response) => {
+  app.get('/api/tasks/creator/:creatorId', async (req: Request, res: Response) => {
     try {
       const { creatorId } = req.params;
-      
+
       // Get creator to find their tenant
       const creator = await storage.getCreator(creatorId);
       if (!creator) {
         return res.status(404).json({ error: 'Creator not found' });
       }
-      
+
       // Query tasks directly using Drizzle
       const now = new Date();
       const publishedTasks = await db.query.tasks.findMany({
-        where: (tasks, { eq, and }) => and(
-          eq(tasks.tenantId, creator.tenantId),
-          eq(tasks.isDraft, false),
-          eq(tasks.isActive, true),
-          eq(tasks.ownershipLevel, 'creator')
-        ),
+        where: (tasks, { eq, and }) =>
+          and(
+            eq(tasks.tenantId, creator.tenantId),
+            eq(tasks.isDraft, false),
+            eq(tasks.isActive, true),
+            eq(tasks.ownershipLevel, 'creator')
+          ),
       });
-      
+
       // Filter by time constraints
-      const filteredTasks = publishedTasks.filter(task => {
+      const filteredTasks = publishedTasks.filter((task) => {
         if (task.startTime && new Date(task.startTime) > now) {
           return false;
         }
@@ -455,7 +552,7 @@ export function registerTaskRoutes(app: Express) {
         }
         return true;
       });
-      
+
       res.json(filteredTasks);
     } catch (error) {
       console.error('Error fetching creator tasks:', error);
@@ -464,18 +561,18 @@ export function registerTaskRoutes(app: Express) {
   });
 
   // Create new task
-  app.post("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/tasks', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id; // Use internal database user ID
-      
+
       if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       // Get user
       const user = await storage.getUser(userId);
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: 'User not found' });
       }
 
       // Validate task data
@@ -516,22 +613,22 @@ export function registerTaskRoutes(app: Express) {
 
       // Platform tasks can only be created by Fandomly admins
       if (isPlatformTask && user.role !== 'fandomly_admin') {
-        return res.status(403).json({ error: "Only Fandomly admins can create platform tasks" });
+        return res.status(403).json({ error: 'Only Fandomly admins can create platform tasks' });
       }
 
       // Creator tasks MUST have programId (enforced at DB level, but validate early for better UX)
       if (!isPlatformTask && !validatedData.programId) {
-        return res.status(400).json({ 
-          error: "Creator tasks must be associated with a program. Please create a program first.",
-          code: "PROGRAM_REQUIRED"
+        return res.status(400).json({
+          error: 'Creator tasks must be associated with a program. Please create a program first.',
+          code: 'PROGRAM_REQUIRED',
         });
       }
 
       // Platform tasks must NOT have programId or campaignId
       if (isPlatformTask && (validatedData.programId || validatedData.campaignId)) {
-        return res.status(400).json({ 
-          error: "Platform tasks cannot be associated with programs or campaigns.",
-          code: "INVALID_PLATFORM_TASK"
+        return res.status(400).json({
+          error: 'Platform tasks cannot be associated with programs or campaigns.',
+          code: 'INVALID_PLATFORM_TASK',
         });
       }
 
@@ -543,12 +640,12 @@ export function registerTaskRoutes(app: Express) {
       if (!isPlatformTask) {
         // Verify user is a creator for creator-level tasks
         if (user.userType !== 'creator') {
-          return res.status(403).json({ error: "Only creators can create creator tasks" });
+          return res.status(403).json({ error: 'Only creators can create creator tasks' });
         }
 
         creator = await storage.getCreatorByUserId(userId);
         if (!creator) {
-          return res.status(404).json({ error: "Creator profile not found" });
+          return res.status(404).json({ error: 'Creator profile not found' });
         }
 
         tenantId = creator.tenantId;
@@ -565,37 +662,42 @@ export function registerTaskRoutes(app: Express) {
         name: validatedData.name,
         description: validatedData.description || '',
         taskType: validatedData.taskType,
-        platform: 'platform' in validatedData ? validatedData.platform : 'system' as const,
+        platform: 'platform' in validatedData ? validatedData.platform : ('system' as const),
         section: validatedData.section,
         startTime: validatedData.startTime || null,
         endTime: validatedData.endTime || null,
         isRequired: validatedData.isRequired,
         hideFromUI: validatedData.hideFromUI,
         isDraft: validatedData.isDraft,
-        
+
         // Reward configuration (Snag-inspired)
         rewardType: validatedData.rewardType || 'points',
-        pointsToReward: validatedData.pointsToReward || 
-          ('points' in validatedData 
-            ? validatedData.points 
-            : ('customSettings' in validatedData 
-              ? ('pointsPerCheckIn' in validatedData.customSettings 
+        pointsToReward:
+          validatedData.pointsToReward ||
+          ('points' in validatedData
+            ? validatedData.points
+            : 'customSettings' in validatedData
+              ? 'pointsPerCheckIn' in validatedData.customSettings
                 ? validatedData.customSettings.pointsPerCheckIn
-                : 'referrerPoints' in validatedData.customSettings && validatedData.customSettings.referrerPoints
+                : 'referrerPoints' in validatedData.customSettings &&
+                    validatedData.customSettings.referrerPoints
                   ? validatedData.customSettings.referrerPoints
-                  : 'singlePoints' in validatedData.customSettings && validatedData.customSettings.singlePoints
+                  : 'singlePoints' in validatedData.customSettings &&
+                      validatedData.customSettings.singlePoints
                     ? validatedData.customSettings.singlePoints
-                    : 'tiers' in validatedData.customSettings && Array.isArray(validatedData.customSettings.tiers) && validatedData.customSettings.tiers.length > 0
+                    : 'tiers' in validatedData.customSettings &&
+                        Array.isArray(validatedData.customSettings.tiers) &&
+                        validatedData.customSettings.tiers.length > 0
                       ? validatedData.customSettings.tiers[0].points
-                      : 50)
-              : 50)),
+                      : 50
+              : 50),
         pointCurrency: validatedData.pointCurrency || 'default',
-        
+
         // Multiplier reward configuration
         multiplierValue: validatedData.multiplierValue || null,
         currenciesToApply: validatedData.currenciesToApply || null,
         applyToExistingBalance: validatedData.applyToExistingBalance || false,
-        
+
         // Timing configuration (Snag-inspired)
         updateCadence: validatedData.updateCadence,
         rewardFrequency: validatedData.rewardFrequency,
@@ -605,12 +707,16 @@ export function registerTaskRoutes(app: Express) {
         multiplierConfig: validatedData.multiplierConfig || null,
 
         // Verification method (for Twitter tasks)
-        verificationMethod: 'verificationMethod' in validatedData ? validatedData.verificationMethod : undefined,
+        verificationMethod:
+          'verificationMethod' in validatedData ? validatedData.verificationMethod : undefined,
 
         // Custom settings (task-specific configuration)
-        customSettings: 'settings' in validatedData
-          ? validatedData.settings
-          : ('customSettings' in validatedData ? validatedData.customSettings : {}),
+        customSettings:
+          'settings' in validatedData
+            ? validatedData.settings
+            : 'customSettings' in validatedData
+              ? validatedData.customSettings
+              : {},
       };
 
       // Create task in database
@@ -623,38 +729,38 @@ export function registerTaskRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error('Error creating task:', error);
-      
+
       if (error.name === 'ZodError') {
         return res.status(400).json({
-          error: "Invalid task data",
+          error: 'Invalid task data',
           details: error.errors,
         });
       }
-      
+
       res.status(500).json({
-        error: "Failed to create task",
+        error: 'Failed to create task',
         message: error.message,
       });
     }
   });
 
   // Get all tasks for a creator
-  app.get("/api/tasks", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/tasks', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id; // Use internal database user ID
-      
+
       if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       const user = await storage.getUser(userId);
       if (!user || user.userType !== 'creator') {
-        return res.status(403).json({ error: "Only creators can view tasks" });
+        return res.status(403).json({ error: 'Only creators can view tasks' });
       }
 
       const creator = await storage.getCreatorByUserId(userId);
       if (!creator) {
-        return res.status(404).json({ error: "Creator profile not found" });
+        return res.status(404).json({ error: 'Creator profile not found' });
       }
 
       // Get all tasks for this creator's tenant
@@ -664,229 +770,248 @@ export function registerTaskRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error fetching tasks:', error);
       res.status(500).json({
-        error: "Failed to fetch tasks",
+        error: 'Failed to fetch tasks',
         message: error.message,
       });
     }
   });
 
   // Get single task by ID
-  app.get("/api/tasks/:taskId", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { taskId } = req.params;
-      const userId = req.user?.id; // Use internal database user ID
+  app.get(
+    '/api/tasks/:taskId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user?.id; // Use internal database user ID
 
-      const task = await storage.getTask(taskId);
-      if (!task) {
-        return res.status(404).json({ error: 'Task not found' });
-      }
+        const task = await storage.getTask(taskId);
+        if (!task) {
+          return res.status(404).json({ error: 'Task not found' });
+        }
 
-      // Only allow the creator who owns this task to fetch it
-      if (userId) {
-        const creator = await storage.getCreatorByUserId(userId);
-        if (creator && task.creatorId === creator.id) {
+        // Only allow the creator who owns this task to fetch it
+        if (userId) {
+          const creator = await storage.getCreatorByUserId(userId);
+          if (creator && task.creatorId === creator.id) {
+            return res.json(task);
+          }
+        }
+
+        // For non-owners, only return if task is published
+        if (!task.isDraft && task.isActive) {
           return res.json(task);
         }
-      }
 
-      // For non-owners, only return if task is published
-      if (!task.isDraft && task.isActive) {
-        return res.json(task);
+        return res.status(401).json({ error: 'Unauthorized to view this task' });
+      } catch (error) {
+        console.error('Error fetching task:', error);
+        res.status(500).json({ error: 'Failed to fetch task' });
       }
-
-      return res.status(401).json({ error: 'Unauthorized to view this task' });
-    } catch (error) {
-      console.error('Error fetching task:', error);
-      res.status(500).json({ error: 'Failed to fetch task' });
     }
-  });
+  );
 
   // Update task
-  app.put("/api/tasks/:taskId", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { taskId } = req.params;
-      const userId = req.user?.id; // Use internal database user ID
+  app.put(
+    '/api/tasks/:taskId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user?.id; // Use internal database user ID
 
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
+        if (!userId) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
 
-      const user = await storage.getUser(userId);
-      if (!user || user.userType !== 'creator') {
-        return res.status(403).json({ error: "Only creators can update tasks" });
-      }
+        const user = await storage.getUser(userId);
+        if (!user || user.userType !== 'creator') {
+          return res.status(403).json({ error: 'Only creators can update tasks' });
+        }
 
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(404).json({ error: "Creator profile not found" });
-      }
+        const creator = await storage.getCreatorByUserId(userId);
+        if (!creator) {
+          return res.status(404).json({ error: 'Creator profile not found' });
+        }
 
-      const existingTask = await storage.getTask(taskId);
-      if (!existingTask) {
-        return res.status(404).json({ error: "Task not found" });
-      }
+        const existingTask = await storage.getTask(taskId);
+        if (!existingTask) {
+          return res.status(404).json({ error: 'Task not found' });
+        }
 
-      if (existingTask.tenantId !== creator.tenantId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+        if (existingTask.tenantId !== creator.tenantId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
 
-      // Validate update data
-      const validatedData = createTaskSchema.parse(req.body);
+        // Validate update data
+        const validatedData = createTaskSchema.parse(req.body);
 
-      // Prepare update data - PRESERVE ALL FIELDS including settings for social tasks
-      const updateData: Record<string, any> = {
-        name: validatedData.name,
-        description: validatedData.description || '',
-        section: validatedData.section,
-        startTime: validatedData.startTime || null,
-        endTime: validatedData.endTime || null,
-        isRequired: validatedData.isRequired,
-        hideFromUI: validatedData.hideFromUI,
-        isDraft: validatedData.isDraft,
-        updateCadence: validatedData.updateCadence,
-        rewardFrequency: validatedData.rewardFrequency,
-        // Preserve verificationMethod
-        verificationMethod: (validatedData as any).verificationMethod || existingTask.verificationMethod,
-      };
+        // Prepare update data - PRESERVE ALL FIELDS including settings for social tasks
+        const updateData: Record<string, any> = {
+          name: validatedData.name,
+          description: validatedData.description || '',
+          section: validatedData.section,
+          startTime: validatedData.startTime || null,
+          endTime: validatedData.endTime || null,
+          isRequired: validatedData.isRequired,
+          hideFromUI: validatedData.hideFromUI,
+          isDraft: validatedData.isDraft,
+          updateCadence: validatedData.updateCadence,
+          rewardFrequency: validatedData.rewardFrequency,
+          // Preserve verificationMethod
+          verificationMethod:
+            (validatedData as any).verificationMethod || existingTask.verificationMethod,
+        };
 
-      // Handle points - support both pointsToReward and legacy 'points' field
-      if ('pointsToReward' in validatedData && validatedData.pointsToReward) {
-        updateData.pointsToReward = validatedData.pointsToReward;
-      } else if ('points' in validatedData && (validatedData as any).points) {
-        updateData.pointsToReward = (validatedData as any).points;
-      }
+        // Handle points - support both pointsToReward and legacy 'points' field
+        if ('pointsToReward' in validatedData && validatedData.pointsToReward) {
+          updateData.pointsToReward = validatedData.pointsToReward;
+        } else if ('points' in validatedData && (validatedData as any).points) {
+          updateData.pointsToReward = (validatedData as any).points;
+        }
 
-      // Handle settings for social tasks (pageUrl, channelUrl, handle, etc.)
-      if ('settings' in validatedData && validatedData.settings) {
-        updateData.settings = validatedData.settings;
-      }
+        // Handle settings for social tasks (pageUrl, channelUrl, handle, etc.)
+        if ('settings' in validatedData && validatedData.settings) {
+          updateData.settings = validatedData.settings;
+        }
 
-      // Handle customSettings for non-social tasks (checkin, referral, follower_milestone)
-      if ('customSettings' in validatedData && validatedData.customSettings) {
-        updateData.customSettings = validatedData.customSettings;
-      }
+        // Handle customSettings for non-social tasks (checkin, referral, follower_milestone)
+        if ('customSettings' in validatedData && validatedData.customSettings) {
+          updateData.customSettings = validatedData.customSettings;
+        }
 
-      const updatedTask = await storage.updateTask(taskId, updateData);
+        const updatedTask = await storage.updateTask(taskId, updateData);
 
-      res.json({
-        success: true,
-        task: updatedTask,
-        message: validatedData.isDraft ? 'Task updated and saved as draft' : 'Task updated and published',
-      });
-    } catch (error: any) {
-      console.error('Error updating task:', error);
-      
-      if (error.name === 'ZodError') {
-        return res.status(400).json({
-          error: "Invalid task data",
-          details: error.errors,
+        res.json({
+          success: true,
+          task: updatedTask,
+          message: validatedData.isDraft
+            ? 'Task updated and saved as draft'
+            : 'Task updated and published',
+        });
+      } catch (error: any) {
+        console.error('Error updating task:', error);
+
+        if (error.name === 'ZodError') {
+          return res.status(400).json({
+            error: 'Invalid task data',
+            details: error.errors,
+          });
+        }
+
+        res.status(500).json({
+          error: 'Failed to update task',
+          message: error.message,
         });
       }
-      
-      res.status(500).json({
-        error: "Failed to update task",
-        message: error.message,
-      });
     }
-  });
+  );
 
   // Delete task
-  app.delete("/api/tasks/:taskId", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { taskId } = req.params;
-      const userId = req.user?.id; // Use internal database user ID
+  app.delete(
+    '/api/tasks/:taskId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user?.id; // Use internal database user ID
 
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
+        if (!userId) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user || user.userType !== 'creator') {
+          return res.status(403).json({ error: 'Only creators can delete tasks' });
+        }
+
+        const creator = await storage.getCreatorByUserId(userId);
+        if (!creator) {
+          return res.status(404).json({ error: 'Creator profile not found' });
+        }
+
+        const existingTask = await storage.getTask(taskId);
+        if (!existingTask) {
+          return res.status(404).json({ error: 'Task not found' });
+        }
+
+        if (existingTask.tenantId !== creator.tenantId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+        await storage.deleteTask(taskId);
+
+        res.json({
+          success: true,
+          message: 'Task deleted successfully',
+        });
+      } catch (error: any) {
+        console.error('Error deleting task:', error);
+        res.status(500).json({
+          error: 'Failed to delete task',
+          message: error.message,
+        });
       }
-
-      const user = await storage.getUser(userId);
-      if (!user || user.userType !== 'creator') {
-        return res.status(403).json({ error: "Only creators can delete tasks" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(404).json({ error: "Creator profile not found" });
-      }
-
-      const existingTask = await storage.getTask(taskId);
-      if (!existingTask) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      if (existingTask.tenantId !== creator.tenantId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      await storage.deleteTask(taskId);
-
-      res.json({
-        success: true,
-        message: 'Task deleted successfully',
-      });
-    } catch (error: any) {
-      console.error('Error deleting task:', error);
-      res.status(500).json({
-        error: "Failed to delete task",
-        message: error.message,
-      });
     }
-  });
+  );
 
   // Publish draft task (change isDraft to false)
-  app.post("/api/tasks/:taskId/publish", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { taskId } = req.params;
-      const userId = req.user?.id; // Use internal database user ID
+  app.post(
+    '/api/tasks/:taskId/publish',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { taskId } = req.params;
+        const userId = req.user?.id; // Use internal database user ID
 
-      if (!userId) {
-        return res.status(401).json({ error: "Authentication required" });
+        if (!userId) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user || user.userType !== 'creator') {
+          return res.status(403).json({ error: 'Only creators can publish tasks' });
+        }
+
+        const creator = await storage.getCreatorByUserId(userId);
+        if (!creator) {
+          return res.status(404).json({ error: 'Creator profile not found' });
+        }
+
+        const existingTask = await storage.getTask(taskId);
+        if (!existingTask) {
+          return res.status(404).json({ error: 'Task not found' });
+        }
+
+        if (existingTask.tenantId !== creator.tenantId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const publishedTask = await storage.updateTask(taskId, { isDraft: false });
+
+        res.json({
+          success: true,
+          task: publishedTask,
+          message: 'Task published successfully',
+        });
+      } catch (error: any) {
+        console.error('Error publishing task:', error);
+        res.status(500).json({
+          error: 'Failed to publish task',
+          message: error.message,
+        });
       }
-
-      const user = await storage.getUser(userId);
-      if (!user || user.userType !== 'creator') {
-        return res.status(403).json({ error: "Only creators can publish tasks" });
-      }
-
-      const creator = await storage.getCreatorByUserId(userId);
-      if (!creator) {
-        return res.status(404).json({ error: "Creator profile not found" });
-      }
-
-      const existingTask = await storage.getTask(taskId);
-      if (!existingTask) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      if (existingTask.tenantId !== creator.tenantId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      const publishedTask = await storage.updateTask(taskId, { isDraft: false });
-
-      res.json({
-        success: true,
-        task: publishedTask,
-        message: 'Task published successfully',
-      });
-    } catch (error: any) {
-      console.error('Error publishing task:', error);
-      res.status(500).json({
-        error: "Failed to publish task",
-        message: error.message,
-      });
     }
-  });
+  );
 
   // Get available tasks for fans (only published, non-hidden tasks)
-  app.get("/api/tasks/available/:creatorId", async (req: Request, res: Response) => {
+  app.get('/api/tasks/available/:creatorId', async (req: Request, res: Response) => {
     try {
       const { creatorId } = req.params;
 
       const creator = await storage.getCreator(creatorId);
       if (!creator) {
-        return res.status(404).json({ error: "Creator not found" });
+        return res.status(404).json({ error: 'Creator not found' });
       }
 
       // Get all tasks for this creator's tenant
@@ -894,7 +1019,7 @@ export function registerTaskRoutes(app: Express) {
 
       // Filter to only published, non-hidden tasks within active date range
       const now = new Date();
-      const availableTasks = allTasks.filter(task => {
+      const availableTasks = allTasks.filter((task) => {
         if (task.isDraft || task.hideFromUI) return false;
         if (task.startTime && new Date(task.startTime) > now) return false;
         if (task.endTime && new Date(task.endTime) < now) return false;
@@ -905,7 +1030,7 @@ export function registerTaskRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error fetching available tasks:', error);
       res.status(500).json({
-        error: "Failed to fetch available tasks",
+        error: 'Failed to fetch available tasks',
         message: error.message,
       });
     }
@@ -928,7 +1053,7 @@ export function registerTaskRoutes(app: Express) {
    * - targetData: Task settings for verification
    */
   app.post(
-    "/api/tasks/:taskId/complete",
+    '/api/tasks/:taskId/complete',
     authenticateUser,
     uploadScreenshot.single('screenshot'),
     async (req: AuthenticatedRequest, res: Response) => {
@@ -943,23 +1068,15 @@ export function registerTaskRoutes(app: Express) {
           : undefined;
 
         // Parse form data
-        const {
-          platform,
-          taskType,
-          proofUrl,
-          proofNotes,
-          targetData,
-        } = req.body;
+        const { platform, taskType, proofUrl, proofNotes, targetData } = req.body;
 
         // Parse targetData if it's a JSON string
-        const taskSettings = typeof targetData === 'string'
-          ? JSON.parse(targetData)
-          : targetData;
+        const taskSettings = typeof targetData === 'string' ? JSON.parse(targetData) : targetData;
 
         // Get task details
         const task = await storage.getTask(taskId);
         if (!task) {
-          return res.status(404).json({ error: "Task not found" });
+          return res.status(404).json({ error: 'Task not found' });
         }
 
         // Check reward frequency eligibility (Sprint 1 feature)
@@ -1016,7 +1133,7 @@ export function registerTaskRoutes(app: Express) {
       } catch (error: any) {
         console.error('Task completion error:', error);
         res.status(500).json({
-          error: "Failed to complete task",
+          error: 'Failed to complete task',
           message: error.message,
         });
       }
@@ -1031,7 +1148,7 @@ export function registerTaskRoutes(app: Express) {
    * (e.g., user clicked "Start Task" earlier, now submitting proof)
    */
   app.post(
-    "/api/task-completions/:completionId/verify",
+    '/api/task-completions/:completionId/verify',
     authenticateUser,
     uploadScreenshot.single('screenshot'),
     async (req: AuthenticatedRequest, res: Response) => {
@@ -1046,18 +1163,10 @@ export function registerTaskRoutes(app: Express) {
           : undefined;
 
         // Parse form data
-        const {
-          platform,
-          taskType,
-          proofUrl,
-          proofNotes,
-          targetData,
-        } = req.body;
+        const { platform, taskType, proofUrl, proofNotes, targetData } = req.body;
 
         // Parse targetData if it's a JSON string
-        const taskSettings = typeof targetData === 'string'
-          ? JSON.parse(targetData)
-          : targetData;
+        const taskSettings = typeof targetData === 'string' ? JSON.parse(targetData) : targetData;
 
         // Get task completion
         const completion = await db.query.taskCompletions.findFirst({
@@ -1068,12 +1177,12 @@ export function registerTaskRoutes(app: Express) {
         });
 
         if (!completion) {
-          return res.status(404).json({ error: "Task completion not found" });
+          return res.status(404).json({ error: 'Task completion not found' });
         }
 
         // Verify user owns this completion
         if (completion.userId !== userId) {
-          return res.status(403).json({ error: "Unauthorized" });
+          return res.status(403).json({ error: 'Unauthorized' });
         }
 
         const task = completion.task;
@@ -1098,7 +1207,7 @@ export function registerTaskRoutes(app: Express) {
       } catch (error: any) {
         console.error('Task verification error:', error);
         res.status(500).json({
-          error: "Failed to verify task",
+          error: 'Failed to verify task',
           message: error.message,
         });
       }
@@ -1110,7 +1219,7 @@ export function registerTaskRoutes(app: Express) {
    * GET /api/task-completions/me
    */
   app.get(
-    "/api/task-completions/me",
+    '/api/task-completions/me',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -1131,16 +1240,13 @@ export function registerTaskRoutes(app: Express) {
         // Use single condition or AND based on array length
         const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
 
-        const completions = await db
-          .select()
-          .from(taskCompletions)
-          .where(whereClause);
+        const completions = await db.select().from(taskCompletions).where(whereClause);
 
         res.json(completions);
       } catch (error: any) {
         console.error('Error fetching task completions:', error);
         res.status(500).json({
-          error: "Failed to fetch task completions",
+          error: 'Failed to fetch task completions',
           message: error.message,
         });
       }
@@ -1152,7 +1258,7 @@ export function registerTaskRoutes(app: Express) {
    * GET /api/manual-review/queue
    */
   app.get(
-    "/api/manual-review/queue",
+    '/api/manual-review/queue',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -1165,7 +1271,7 @@ export function registerTaskRoutes(app: Express) {
         });
 
         if (!creator) {
-          return res.status(403).json({ error: "Only creators can access review queue" });
+          return res.status(403).json({ error: 'Only creators can access review queue' });
         }
 
         // Get pending reviews for this creator (creatorId is integer in legacy schema; cast for comparison)
@@ -1186,7 +1292,7 @@ export function registerTaskRoutes(app: Express) {
       } catch (error: any) {
         console.error('Error fetching review queue:', error);
         res.status(500).json({
-          error: "Failed to fetch review queue",
+          error: 'Failed to fetch review queue',
           message: error.message,
         });
       }
@@ -1198,7 +1304,7 @@ export function registerTaskRoutes(app: Express) {
    * POST /api/manual-review/:reviewId/approve
    */
   app.post(
-    "/api/manual-review/:reviewId/approve",
+    '/api/manual-review/:reviewId/approve',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -1212,14 +1318,14 @@ export function registerTaskRoutes(app: Express) {
         });
 
         if (!review) {
-          return res.status(404).json({ error: "Review not found" });
+          return res.status(404).json({ error: 'Review not found' });
         }
 
         const creatorForApprove = await db.query.creators.findFirst({
           where: eq(creators.userId, userId),
         });
         if (!creatorForApprove || String(creatorForApprove.id) !== String(review.creatorId)) {
-          return res.status(403).json({ error: "Unauthorized" });
+          return res.status(403).json({ error: 'Unauthorized' });
         }
 
         await unifiedVerification.approveManualReview(
@@ -1228,11 +1334,11 @@ export function registerTaskRoutes(app: Express) {
           reviewNotes
         );
 
-        res.json({ success: true, message: "Task approved" });
+        res.json({ success: true, message: 'Task approved' });
       } catch (error: any) {
         console.error('Error approving review:', error);
         res.status(500).json({
-          error: "Failed to approve review",
+          error: 'Failed to approve review',
           message: error.message,
         });
       }
@@ -1244,7 +1350,7 @@ export function registerTaskRoutes(app: Express) {
    * POST /api/manual-review/:reviewId/reject
    */
   app.post(
-    "/api/manual-review/:reviewId/reject",
+    '/api/manual-review/:reviewId/reject',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -1253,7 +1359,7 @@ export function registerTaskRoutes(app: Express) {
         const userId = req.user!.id;
 
         if (!reviewNotes) {
-          return res.status(400).json({ error: "Review notes required for rejection" });
+          return res.status(400).json({ error: 'Review notes required for rejection' });
         }
 
         // Verify user is creator who owns this review
@@ -1262,14 +1368,14 @@ export function registerTaskRoutes(app: Express) {
         });
 
         if (!review) {
-          return res.status(404).json({ error: "Review not found" });
+          return res.status(404).json({ error: 'Review not found' });
         }
 
         const creatorForReject = await db.query.creators.findFirst({
           where: eq(creators.userId, userId),
         });
         if (!creatorForReject || String(creatorForReject.id) !== String(review.creatorId)) {
-          return res.status(403).json({ error: "Unauthorized" });
+          return res.status(403).json({ error: 'Unauthorized' });
         }
 
         await unifiedVerification.rejectManualReview(
@@ -1278,11 +1384,11 @@ export function registerTaskRoutes(app: Express) {
           reviewNotes
         );
 
-        res.json({ success: true, message: "Task rejected" });
+        res.json({ success: true, message: 'Task rejected' });
       } catch (error: any) {
         console.error('Error rejecting review:', error);
         res.status(500).json({
-          error: "Failed to reject review",
+          error: 'Failed to reject review',
           message: error.message,
         });
       }
@@ -1296,11 +1402,11 @@ export function registerTaskRoutes(app: Express) {
   /**
    * Get or generate verification code for a task
    * GET /api/tasks/:taskId/verification-code
-   * 
+   *
    * Returns the fan's unique code for code-based (T2) verification
    */
   app.get(
-    "/api/tasks/:taskId/verification-code",
+    '/api/tasks/:taskId/verification-code',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -1308,12 +1414,12 @@ export function registerTaskRoutes(app: Express) {
         const userId = req.user!.id;
 
         // Import code service
-        const { codeService } = await import("../../services/verification/code-service");
+        const { codeService } = await import('../../services/verification/code-service');
 
         // Get the task to get tenant info
         const task = await storage.getTask(taskId);
         if (!task) {
-          return res.status(404).json({ error: "Task not found" });
+          return res.status(404).json({ error: 'Task not found' });
         }
 
         // Get or create code
@@ -1337,7 +1443,7 @@ export function registerTaskRoutes(app: Express) {
       } catch (error: any) {
         console.error('Error getting verification code:', error);
         res.status(500).json({
-          error: "Failed to get verification code",
+          error: 'Failed to get verification code',
           message: error.message,
         });
       }
@@ -1347,11 +1453,11 @@ export function registerTaskRoutes(app: Express) {
   /**
    * Check if a verification code has been found
    * POST /api/tasks/:taskId/verify-code
-   * 
+   *
    * Called when fan clicks "I posted my code" - triggers immediate check
    */
   app.post(
-    "/api/tasks/:taskId/verify-code",
+    '/api/tasks/:taskId/verify-code',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -1361,34 +1467,35 @@ export function registerTaskRoutes(app: Express) {
         // Get task details
         const task = await storage.getTask(taskId);
         if (!task) {
-          return res.status(404).json({ error: "Task not found" });
+          return res.status(404).json({ error: 'Task not found' });
         }
 
         // Import services
-        const { codeService } = await import("../../services/verification/code-service");
-        const { commentFetcher } = await import("../../services/verification/comment-fetcher");
+        const { codeService } = await import('../../services/verification/code-service');
+        const { commentFetcher } = await import('../../services/verification/comment-fetcher');
 
         // Get the fan's code
         const codeRecord = await codeService.getCodeForFan(taskId, userId);
         if (!codeRecord) {
-          return res.status(400).json({ error: "No verification code found" });
+          return res.status(400).json({ error: 'No verification code found' });
         }
 
         if (codeRecord.isUsed) {
           return res.json({
             verified: true,
-            message: "Code already verified!",
+            message: 'Code already verified!',
           });
         }
 
         // Get task settings (customSettings in schema)
         const settings = (task.customSettings || task) as Record<string, unknown>;
         const rawContentId = settings?.contentId || settings?.postId || settings?.videoId;
-        const contentId = typeof rawContentId === "string" ? rawContentId : String(rawContentId ?? "");
+        const contentId =
+          typeof rawContentId === 'string' ? rawContentId : String(rawContentId ?? '');
 
         if (!contentId) {
           return res.status(400).json({
-            error: "Task not properly configured for code verification",
+            error: 'Task not properly configured for code verification',
           });
         }
 
@@ -1397,14 +1504,14 @@ export function registerTaskRoutes(app: Express) {
           where: and(
             eq(socialConnections.userId, task.creatorId!),
             eq(socialConnections.platform, task.platform),
-            eq(socialConnections.isActive, true),
+            eq(socialConnections.isActive, true)
           ),
         });
 
         if (!creatorConnection?.accessToken) {
           return res.json({
             verified: false,
-            message: "Creator has not connected their account. Code verification may take longer.",
+            message: 'Creator has not connected their account. Code verification may take longer.',
             pendingCheck: true,
           });
         }
@@ -1433,7 +1540,7 @@ export function registerTaskRoutes(app: Express) {
 
           return res.json({
             verified: true,
-            message: "Code found! Task verified.",
+            message: 'Code found! Task verified.',
             pointsAwarded: verificationResult.pointsAwarded,
           });
         }
@@ -1441,17 +1548,18 @@ export function registerTaskRoutes(app: Express) {
         // Code not found yet
         res.json({
           verified: false,
-          message: result.reason || "Code not found yet. Please make sure you included your code in your comment.",
+          message:
+            result.reason ||
+            'Code not found yet. Please make sure you included your code in your comment.',
           code: codeRecord.code,
         });
       } catch (error: any) {
         console.error('Error verifying code:', error);
         res.status(500).json({
-          error: "Failed to verify code",
+          error: 'Failed to verify code',
           message: error.message,
         });
       }
     }
   );
 }
-
