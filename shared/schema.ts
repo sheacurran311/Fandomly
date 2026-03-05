@@ -811,100 +811,108 @@ export const loyaltyPrograms = pgTable(
   (table) => [
     index('loyalty_programs_creator_id_idx').on(table.creatorId),
     index('loyalty_programs_tenant_id_idx').on(table.tenantId),
+    index('loyalty_programs_status_idx').on(table.status),
   ]
 );
 
-export const rewards = pgTable('rewards', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant
-  programId: varchar('program_id')
-    .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
-    .notNull(),
-  name: text('name').notNull(),
-  description: text('description'),
-  pointsCost: integer('points_cost').notNull(),
-  rewardType: text('reward_type').notNull(), // "traditional" | "nft" | "token" | "experience" | "raffle" | "physical" | "custom"
-  rewardData: jsonb('reward_data').$type<{
-    nftMetadata?: {
-      name: string;
-      description: string;
-      image: string;
-      attributes: Array<{ trait_type: string; value: string }>;
-      contractAddress?: string;
-      tokenId?: string;
-      blockchain: string; // "ethereum" | "solana" | "polygon" | "bsc"
-      rarity?: string;
-      collection?: string;
-    };
-    nftData?: {
-      collectionId?: string;
-      templateId?: string;
-      autoMintOnRedeem?: boolean;
-    };
-    tokenAmount?: string;
-    experienceDetails?: string;
-    downloadLink?: string;
-    couponCode?: string;
-    // New reward type data
-    raffleData?: {
-      prizeDescription: string;
-      prizeValue?: number;
-      entryPointsCost: number; // Points per entry (usually 1)
-      maxEntries?: number;
-      drawDate: string;
-      winnerSelectionMethod: 'random' | 'manual';
-    };
-    physicalData?: {
-      itemName: string;
-      itemDescription: string;
-      shippingRequired: boolean;
-      estimatedDeliveryDays?: number;
-      stockQuantity?: number;
-      weight?: number;
-      dimensions?: { length: number; width: number; height: number };
-      condition?: 'game-used' | 'new' | 'like-new' | 'sponsor-item';
-      quantity?: number;
-      photos?: string[];
-      approvalStatus?: 'pending' | 'approved' | 'rejected';
-      adminNotes?: string;
-      submittedAt?: string;
-      approvedAt?: string;
-    };
-    customData?: {
-      serviceName: string;
-      serviceDescription: string;
-      deliveryMethod: 'email' | 'platform' | 'video_call' | 'physical';
-      estimatedFulfillmentDays?: number;
-      customInstructions?: string;
-      requiresPersonalization: boolean;
-    };
-    videoData?: {
-      maxVideoDuration: number;
-      deliveryInstructions: string;
-      turnaroundDays: number;
-      requiresPersonalization: boolean;
-      personalizationInstructions?: string;
-      sampleVideoUrl?: string;
-    };
-  }>(),
-  maxRedemptions: integer('max_redemptions'),
-  currentRedemptions: integer('current_redemptions').default(0),
-  requiredTier: text('required_tier'),
-  stockQuantity: integer('stock_quantity'),
-  category: text('category'),
-  imageUrl: text('image_url'),
-  redemptionRules: jsonb('redemption_rules').$type<{
-    maxPerUser?: number;
-    cooldownHours?: number;
-    requiresTier?: string;
-  }>(),
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const rewards = pgTable(
+  'rewards',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant
+    programId: varchar('program_id')
+      .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
+      .notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    pointsCost: integer('points_cost').notNull(),
+    rewardType: text('reward_type').notNull(), // "traditional" | "nft" | "token" | "experience" | "raffle" | "physical" | "custom"
+    rewardData: jsonb('reward_data').$type<{
+      nftMetadata?: {
+        name: string;
+        description: string;
+        image: string;
+        attributes: Array<{ trait_type: string; value: string }>;
+        contractAddress?: string;
+        tokenId?: string;
+        blockchain: string; // "ethereum" | "solana" | "polygon" | "bsc"
+        rarity?: string;
+        collection?: string;
+      };
+      nftData?: {
+        collectionId?: string;
+        templateId?: string;
+        autoMintOnRedeem?: boolean;
+      };
+      tokenAmount?: string;
+      experienceDetails?: string;
+      downloadLink?: string;
+      couponCode?: string;
+      // New reward type data
+      raffleData?: {
+        prizeDescription: string;
+        prizeValue?: number;
+        entryPointsCost: number; // Points per entry (usually 1)
+        maxEntries?: number;
+        drawDate: string;
+        winnerSelectionMethod: 'random' | 'manual';
+      };
+      physicalData?: {
+        itemName: string;
+        itemDescription: string;
+        shippingRequired: boolean;
+        estimatedDeliveryDays?: number;
+        stockQuantity?: number;
+        weight?: number;
+        dimensions?: { length: number; width: number; height: number };
+        condition?: 'game-used' | 'new' | 'like-new' | 'sponsor-item';
+        quantity?: number;
+        photos?: string[];
+        approvalStatus?: 'pending' | 'approved' | 'rejected';
+        adminNotes?: string;
+        submittedAt?: string;
+        approvedAt?: string;
+      };
+      customData?: {
+        serviceName: string;
+        serviceDescription: string;
+        deliveryMethod: 'email' | 'platform' | 'video_call' | 'physical';
+        estimatedFulfillmentDays?: number;
+        customInstructions?: string;
+        requiresPersonalization: boolean;
+      };
+      videoData?: {
+        maxVideoDuration: number;
+        deliveryInstructions: string;
+        turnaroundDays: number;
+        requiresPersonalization: boolean;
+        personalizationInstructions?: string;
+        sampleVideoUrl?: string;
+      };
+    }>(),
+    maxRedemptions: integer('max_redemptions'),
+    currentRedemptions: integer('current_redemptions').default(0),
+    requiredTier: text('required_tier'),
+    stockQuantity: integer('stock_quantity'),
+    category: text('category'),
+    imageUrl: text('image_url'),
+    redemptionRules: jsonb('redemption_rules').$type<{
+      maxPerUser?: number;
+      cooldownHours?: number;
+      requiresTier?: string;
+    }>(),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('rewards_is_active_idx').on(table.isActive),
+    index('rewards_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 export const fanPrograms = pgTable('fan_programs', {
   id: varchar('id')
@@ -1909,6 +1917,8 @@ export const taskCompletions = pgTable(
     index('task_completions_user_task_idx').on(table.userId, table.taskId),
     index('task_completions_tenant_id_idx').on(table.tenantId),
     index('task_completions_campaign_id_idx').on(table.campaignId),
+    index('task_completions_completed_at_idx').on(table.completedAt),
+    index('task_completions_last_activity_idx').on(table.lastActivityAt),
   ]
 );
 

@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import type { IStorage } from '../../core/storage';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
+import { standardApiLimiter } from '../../middleware/rate-limit';
 import { taskFrequencyService } from '../../services/task-frequency-service';
 import { pointsMultiplierService } from '../../services/points/multiplier-service';
 import { db } from '../../db';
@@ -299,92 +300,97 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // POST /api/task-completions/start
   // Start a task (create initial completion record)
   // ==============================================
-  router.post('/start', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
+  router.post(
+    '/start',
+    standardApiLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
 
-      // Validate request body
-      const validation = startTaskSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: 'Invalid request data',
-          details: validation.error.issues,
+        // Validate request body
+        const validation = startTaskSchema.safeParse(req.body);
+        if (!validation.success) {
+          return res.status(400).json({
+            error: 'Invalid request data',
+            details: validation.error.issues,
+          });
+        }
+
+        const { taskId, tenantId, campaignId } = validation.data;
+
+        // Check if task exists
+        const task = await storage.getTask(taskId, tenantId);
+        if (!task) {
+          return res.status(404).json({ error: 'Task not found' });
+        }
+
+        // Determine completion context based on whether campaignId is provided
+        // Campaign completions are scoped separately from standalone completions
+        // This enables the re-verification model for one-time tasks within campaigns
+        const completionContext = campaignId ? 'campaign' : 'standalone';
+
+        // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
+        // Pass campaignId to scope the eligibility check to the appropriate context
+        const frequencyCheck = await taskFrequencyService.checkEligibility({
+          userId: req.user.id,
+          taskId,
+          tenantId,
+          campaignId, // Campaign-scoped check if campaignId provided
+        });
+
+        if (!frequencyCheck.isEligible) {
+          return res.status(403).json({
+            error: 'Task not available',
+            reason: frequencyCheck.reason,
+            nextAvailableAt: frequencyCheck.nextAvailableAt,
+            lastCompletedAt: frequencyCheck.lastCompletedAt,
+            completionsCount: frequencyCheck.completionsCount,
+          });
+        }
+
+        // Check if user has already started this task (but not completed) within the same context
+        const existingCompletion = await storage.getTaskCompletionByUserAndTask(
+          req.user.id,
+          taskId,
+          campaignId
+        );
+        if (existingCompletion && existingCompletion.status === 'in_progress') {
+          return res.json({
+            completion: existingCompletion,
+            message: 'Task already started',
+          });
+        }
+
+        // Create new task completion with appropriate context
+        const completion = await storage.createTaskCompletion({
+          taskId,
+          userId: req.user.id,
+          tenantId,
+          campaignId: campaignId || undefined, // Set campaignId if provided
+          completionContext, // 'standalone' or 'campaign'
+          status: 'in_progress',
+          progress: 0,
+          completionData: {},
+          pointsEarned: 0,
+          totalRewardsEarned: 0,
+        });
+
+        res.status(201).json({ completion });
+      } catch (error: unknown) {
+        console.error('Error starting task:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        res.status(500).json({
+          error: 'Failed to start task',
+          message: errorMessage,
+          details: errorStack,
         });
       }
-
-      const { taskId, tenantId, campaignId } = validation.data;
-
-      // Check if task exists
-      const task = await storage.getTask(taskId, tenantId);
-      if (!task) {
-        return res.status(404).json({ error: 'Task not found' });
-      }
-
-      // Determine completion context based on whether campaignId is provided
-      // Campaign completions are scoped separately from standalone completions
-      // This enables the re-verification model for one-time tasks within campaigns
-      const completionContext = campaignId ? 'campaign' : 'standalone';
-
-      // CHECK FREQUENCY ELIGIBILITY (PRIORITY 1 FEATURE)
-      // Pass campaignId to scope the eligibility check to the appropriate context
-      const frequencyCheck = await taskFrequencyService.checkEligibility({
-        userId: req.user.id,
-        taskId,
-        tenantId,
-        campaignId, // Campaign-scoped check if campaignId provided
-      });
-
-      if (!frequencyCheck.isEligible) {
-        return res.status(403).json({
-          error: 'Task not available',
-          reason: frequencyCheck.reason,
-          nextAvailableAt: frequencyCheck.nextAvailableAt,
-          lastCompletedAt: frequencyCheck.lastCompletedAt,
-          completionsCount: frequencyCheck.completionsCount,
-        });
-      }
-
-      // Check if user has already started this task (but not completed) within the same context
-      const existingCompletion = await storage.getTaskCompletionByUserAndTask(
-        req.user.id,
-        taskId,
-        campaignId
-      );
-      if (existingCompletion && existingCompletion.status === 'in_progress') {
-        return res.json({
-          completion: existingCompletion,
-          message: 'Task already started',
-        });
-      }
-
-      // Create new task completion with appropriate context
-      const completion = await storage.createTaskCompletion({
-        taskId,
-        userId: req.user.id,
-        tenantId,
-        campaignId: campaignId || undefined, // Set campaignId if provided
-        completionContext, // 'standalone' or 'campaign'
-        status: 'in_progress',
-        progress: 0,
-        completionData: {},
-        pointsEarned: 0,
-        totalRewardsEarned: 0,
-      });
-
-      res.status(201).json({ completion });
-    } catch (error: unknown) {
-      console.error('Error starting task:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      res.status(500).json({
-        error: 'Failed to start task',
-        message: errorMessage,
-        details: errorStack,
-      });
     }
-  });
+  );
 
   // ==============================================
   // PATCH /api/task-completions/:completionId/progress
@@ -443,6 +449,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   router.post(
     '/:completionId/complete',
+    standardApiLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -578,6 +585,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   router.post(
     '/:taskId/check-in',
+    standardApiLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -714,6 +722,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
   // ==============================================
   router.post(
     '/:taskCompletionId/verify',
+    standardApiLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
