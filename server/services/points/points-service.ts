@@ -5,6 +5,7 @@
  * 1. Fandomly Points - Platform currency (redeemable for Fandomly admin rewards)
  * 2. Creator Points - Per-creator currency (redeemable for creator-specific rewards)
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { db } from '../../db';
 import {
@@ -374,22 +375,19 @@ export class PointsService {
       LIMIT ${limit}
     `);
 
-    const creatorTxs: PointTransaction[] = (creatorTxsRaw.rows || []).map(
-      (tx: Record<string, unknown>) => ({
-        id: tx.id,
+    const creatorTxs: PointTransaction[] = ((creatorTxsRaw as any).rows || []).map((tx: any) => {
+      const points = Number(tx.points ?? 0);
+      return {
+        id: String(tx.id ?? ''),
         userId,
-        tenantId: tx.tenant_id,
-        amount: tx.points ?? 0,
-        type: (tx.points && tx.points >= 0 ? 'earned' : 'spent') as
-          | 'earned'
-          | 'spent'
-          | 'bonus'
-          | 'refund',
-        source: tx.source,
-        metadata: tx.metadata ?? undefined,
-        createdAt: tx.created_at ? new Date(tx.created_at) : new Date(),
-      })
-    );
+        tenantId: String(tx.tenant_id ?? ''),
+        amount: points,
+        type: (points >= 0 ? 'earned' : 'spent') as 'earned' | 'spent' | 'bonus' | 'refund',
+        source: String(tx.source ?? ''),
+        metadata: (tx.metadata as Record<string, unknown>) ?? undefined,
+        createdAt: tx.created_at ? new Date(String(tx.created_at)) : new Date(),
+      };
+    });
 
     return { fandomly, creator: creatorTxs };
   }

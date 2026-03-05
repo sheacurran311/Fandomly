@@ -852,8 +852,10 @@ export class CreatorTaskReferralService {
       }
 
       const data = fanData.get(ref.referringFanId);
-      data.totalShares++;
-      if (ref.completedTaskDate) data.totalCompletions++;
+      if (data) {
+        (data.totalShares as number)++;
+        if (ref.completedTaskDate) (data.totalCompletions as number)++;
+      }
     }
 
     // Sort and limit

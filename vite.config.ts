@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+// @ts-ignore - installed in production, may be missing locally
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 /**

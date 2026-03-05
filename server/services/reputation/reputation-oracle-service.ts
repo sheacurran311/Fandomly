@@ -12,6 +12,7 @@
  *
  * Contract interaction follows the same viem pattern as BlockchainNFTService.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
   createWalletClient,
@@ -122,7 +123,7 @@ export class ReputationOracleService {
       abi: REPUTATION_REGISTRY_ABI,
       functionName: 'updateScore',
       args: [walletAddress as Address, BigInt(score), reason],
-    });
+    } as any);
 
     await this.publicClient.waitForTransactionReceipt({ hash });
     return hash;
@@ -152,7 +153,7 @@ export class ReputationOracleService {
         abi: REPUTATION_REGISTRY_ABI,
         functionName: 'batchUpdateScores',
         args: [addresses, scores, reason],
-      });
+      } as any);
 
       await this.publicClient.waitForTransactionReceipt({ hash });
       txHashes.push(hash);
@@ -209,7 +210,7 @@ export class ReputationOracleService {
         .set({
           offChainScore: score,
           previousScore,
-          scoreBreakdown: breakdown,
+          scoreBreakdown: breakdown as any,
           lastCalculatedAt: now,
           updatedAt: now,
           walletAddress: user?.walletAddress || existing[0].walletAddress,
@@ -235,7 +236,7 @@ export class ReputationOracleService {
         offChainScore: score,
         onChainScore: 0,
         previousScore: 0,
-        scoreBreakdown: breakdown,
+        scoreBreakdown: breakdown as any,
         syncStatus: score > 0 ? 'pending' : 'synced',
         lastCalculatedAt: now,
         ...(thresholdCrossed
@@ -245,7 +246,7 @@ export class ReputationOracleService {
               pendingThresholdSync: true,
             }
           : {}),
-      });
+      } as any);
     }
 
     return { score, breakdown, thresholdCrossed };
@@ -437,7 +438,7 @@ export class ReputationOracleService {
 
     try {
       const txHash = await this.pushSingleScore(
-        entry.walletAddress,
+        entry.walletAddress ?? '',
         entry.offChainScore,
         `threshold_crossing_${entry.crossedThreshold}`
       );

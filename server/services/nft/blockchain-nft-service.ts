@@ -5,6 +5,7 @@
  * Uses viem to call FandomlyNFT, FandomlyBadge, and CreatorCollectionFactory
  * via the deployer wallet (backend-managed, gas-free for users).
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
   createWalletClient,
@@ -337,7 +338,7 @@ export class BlockchainNFTService {
       abi: FandomlyNFT_ABI,
       functionName: 'createCollection',
       args: [name, BigInt(maxSupply), BigInt(pointsCost)],
-    });
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     return { txHash: hash, receipt };
@@ -353,7 +354,7 @@ export class BlockchainNFTService {
       abi: FandomlyNFT_ABI,
       functionName: 'mint',
       args: [recipientAddress, BigInt(collectionId), tokenUri],
-    });
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
@@ -388,12 +389,13 @@ export class BlockchainNFTService {
   }
 
   async getTokensOfOwner(ownerAddress: Address): Promise<bigint[]> {
-    return this.publicClient.readContract({
+    const result = await this.publicClient.readContract({
       address: this.nftAddress,
       abi: FandomlyNFT_ABI,
       functionName: 'tokensOfOwner',
       args: [ownerAddress],
     });
+    return [...result] as bigint[];
   }
 
   async getTokenURI(tokenId: number): Promise<string> {
@@ -433,7 +435,7 @@ export class BlockchainNFTService {
       abi: FandomlyBadge_ABI,
       functionName: 'createPlatformBadgeType',
       args: [metadataUri, soulbound, BigInt(maxSupply)],
-    });
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     return { txHash: hash, receipt };
@@ -450,7 +452,7 @@ export class BlockchainNFTService {
       abi: FandomlyBadge_ABI,
       functionName: 'createCreatorBadgeType',
       args: [metadataUri, creatorAddress, soulbound, BigInt(maxSupply)],
-    });
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     return { txHash: hash, receipt };
@@ -466,7 +468,7 @@ export class BlockchainNFTService {
       abi: FandomlyBadge_ABI,
       functionName: 'mint',
       args: [recipientAddress, BigInt(badgeTypeId), BigInt(amount)],
-    });
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     return { txHash: hash, receipt };
@@ -482,7 +484,7 @@ export class BlockchainNFTService {
       abi: FandomlyBadge_ABI,
       functionName: 'batchMintToMany',
       args: [recipients, BigInt(badgeTypeId), BigInt(amountEach)],
-    });
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     return { txHash: hash, receipt };
@@ -532,12 +534,13 @@ export class BlockchainNFTService {
   }
 
   async getCreatorBadgeTypes(creatorAddress: Address): Promise<bigint[]> {
-    return this.publicClient.readContract({
+    const result = await this.publicClient.readContract({
       address: this.badgeAddress,
       abi: FandomlyBadge_ABI,
       functionName: 'getCreatorBadgeTypes',
       args: [creatorAddress],
     });
+    return [...result] as bigint[];
   }
 
   // ── CreatorCollectionFactory ──────────────────────────────────────────
@@ -554,8 +557,8 @@ export class BlockchainNFTService {
       address: this.factoryAddress,
       abi: CreatorCollectionFactory_ABI,
       functionName: 'createCollection',
-      args: [name, symbol, creatorAddress, tenantId, BigInt(maxSupply), royaltyBps],
-    });
+      args: [name, symbol, creatorAddress, tenantId, BigInt(maxSupply), BigInt(royaltyBps)],
+    } as any);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 

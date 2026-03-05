@@ -149,10 +149,12 @@ export class CheckInService {
     const longestStreak = Math.max(newStreak, longestStreakVal);
     const isNewRecord = longestStreak > longestStreakVal;
 
-    // Check for milestone achievement
     const milestone = this.checkMilestone(newStreak);
     const metadata = (streakRecord.metadata as Record<string, unknown>) || {};
-    const streakMilestones = metadata.streakMilestones || [];
+    const streakMilestones = (metadata.streakMilestones || []) as {
+      days: number;
+      awardedAt: string;
+    }[];
 
     if (milestone && !this.hasMilestone(streakMilestones, milestone.days)) {
       streakMilestones.push({
@@ -172,11 +174,14 @@ export class CheckInService {
         lastStreakReset: streakReset ? now : streakRecord.lastStreakReset,
         metadata: {
           ...metadata,
-          streakMilestones,
-          missedDays: streakReset ? (metadata.missedDays || 0) + 1 : metadata.missedDays,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          streakMilestones: streakMilestones as any,
+          missedDays: streakReset
+            ? (Number(metadata.missedDays) || 0) + 1
+            : Number(metadata.missedDays) || 0,
           longestStreakAchievedAt: isNewRecord
             ? now.toISOString()
-            : metadata.longestStreakAchievedAt,
+            : (metadata.longestStreakAchievedAt as string | undefined),
         },
         updatedAt: now,
       })

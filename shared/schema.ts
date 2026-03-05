@@ -895,6 +895,14 @@ export const rewards = pgTable('rewards', {
   maxRedemptions: integer('max_redemptions'),
   currentRedemptions: integer('current_redemptions').default(0),
   requiredTier: text('required_tier'),
+  stockQuantity: integer('stock_quantity'),
+  category: text('category'),
+  imageUrl: text('image_url'),
+  redemptionRules: jsonb('redemption_rules').$type<{
+    maxPerUser?: number;
+    cooldownHours?: number;
+    requiresTier?: string;
+  }>(),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -964,16 +972,24 @@ export const rewardRedemptions = pgTable('reward_redemptions', {
   fanId: varchar('fan_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
+  userId: varchar('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  programId: varchar('program_id'),
   rewardId: varchar('reward_id')
     .references(() => rewards.id, { onDelete: 'restrict' })
     .notNull(),
   pointsSpent: integer('points_spent').notNull(),
+  quantity: integer('quantity').default(1),
+  shippingAddress: jsonb('shipping_address'),
+  metadata: jsonb('metadata'),
   status: text('status').default('pending'), // "pending" | "completed" | "failed"
   redemptionData: jsonb('redemption_data').$type<{
     nftTxHash?: string;
     tokenTxHash?: string;
     deliveryInfo?: unknown;
   }>(),
+  trackingNumber: text('tracking_number'),
+  trackingUrl: text('tracking_url'),
+  fulfillmentNotes: text('fulfillment_notes'),
   redeemedAt: timestamp('redeemed_at').defaultNow(),
 });
 
@@ -1762,6 +1778,26 @@ export const campaignParticipations = pgTable(
       availableTasks?: string[];
       lastActivityAt?: string;
     }>(),
+
+    // Campaign V2: Flexible rewards tracking
+    pendingRewards: jsonb('pending_rewards').$type<
+      Array<{
+        type: 'nft' | 'badge' | 'raffle_entry' | 'reward' | 'points';
+        rewardId?: string;
+        metadata?: Record<string, unknown>;
+        status: 'pending' | 'claimed' | 'failed';
+      }>
+    >(),
+    claimedRewards: jsonb('claimed_rewards').$type<
+      Array<{
+        type: 'nft' | 'badge' | 'raffle_entry' | 'reward' | 'points';
+        rewardId?: string;
+        metadata?: Record<string, unknown>;
+        claimedAt: string;
+        deliveryData?: Record<string, unknown>;
+      }>
+    >(),
+    rewardsClaimedAt: timestamp('rewards_claimed_at'),
 
     createdAt: timestamp('created_at').defaultNow(),
   },
@@ -4177,3 +4213,38 @@ export type ActiveMultiplier = typeof activeMultipliers.$inferSelect;
 export type CheckInStreak = typeof checkInStreaks.$inferSelect;
 export type WebsiteVisitTracking = typeof websiteVisitTracking.$inferSelect;
 export type PollQuizResponse = typeof pollQuizResponses.$inferSelect;
+
+// ============================================================================
+// RAFFLE ENTRIES
+// ============================================================================
+
+export const raffleEntries = pgTable(
+  'raffle_entries',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id').references(() => tenants.id),
+    userId: varchar('user_id')
+      .references(() => users.id)
+      .notNull(),
+    campaignId: varchar('campaign_id').references(() => campaigns.id, {
+      onDelete: 'cascade',
+    }),
+    rewardId: varchar('reward_id').references(() => rewards.id, {
+      onDelete: 'cascade',
+    }),
+    entrySource: varchar('entry_source', { length: 50 }).notNull().default('campaign_completion'),
+    entryCount: integer('entry_count').default(1),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    enteredAt: timestamp('entered_at').defaultNow(),
+  },
+  (table) => [
+    index('raffle_entries_user_id_idx').on(table.userId),
+    index('raffle_entries_campaign_id_idx').on(table.campaignId),
+    index('raffle_entries_reward_id_idx').on(table.rewardId),
+  ]
+);
+
+export type RaffleEntry = typeof raffleEntries.$inferSelect;
+export type InsertRaffleEntry = typeof raffleEntries.$inferInsert;

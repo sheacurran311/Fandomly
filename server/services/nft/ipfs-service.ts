@@ -11,6 +11,7 @@
  * per Avalanche Academy guidance (breaks tokenURI resolution on some indexers).
  */
 
+// @ts-expect-error - pinata-web3 types may not be installed
 import { PinataSDK } from 'pinata-web3';
 
 // ────────────────────────────────────────────────────────────────────────────

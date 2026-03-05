@@ -16,9 +16,12 @@ export const FANDOMLY_CHAIN = {
 } as const;
 
 export const CONTRACTS = {
-  ReputationRegistry: '0x9a0f05d971bb5bb908fc45ce51e948712265e518',
-  CreatorTokenFactory: '0xd8d942262792dd1d794b52137f93359ef530dcd9',
-  FanStaking: '0xfca2572ed381cfc8d7cca205f9da0b4e2b7d6d89',
+  ReputationRegistry: '0x4ad8bbb28fba6beaee346e61ac03d18903331356',
+  CreatorTokenFactory: '0x1cfb20643302b88c1291a950f263b5c17d8f7aa6',
+  FanStaking: '0xc0e2fc4eac83b421856527992de427a01aeeea7b',
+  FandomlyBadge: '0x06b614d42c15e37bf14ecd2c71b5aea796eb217f',
+  FandomlyNFT: '0xb8f5f92911b4332bfb7f5cb16788b4fa3eac4af5',
+  CreatorCollectionFactory: '0xbec1d118e2999667eb870d4a95f06a7b9d0d8f72',
 } as const;
 
 export const DEPLOYER_ADDRESS = '0x95A6bEb968633D1440e89F462a133519808f8015' as const;
@@ -312,6 +315,178 @@ export const CREATOR_TOKEN_ABI = [
     inputs: [],
     name: 'tenantId',
     outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+// FandomlyBadge ABI — ERC-1155 badge operations
+export const FANDOMLY_BADGE_ABI = [
+  {
+    inputs: [
+      { name: 'badgeUri', type: 'string' },
+      { name: 'creator', type: 'address' },
+      { name: 'soulbound', type: 'bool' },
+      { name: 'maxSupply', type: 'uint256' },
+    ],
+    name: 'createCreatorBadgeType',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'badgeTypeId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'recipients', type: 'address[]' },
+      { name: 'badgeTypeId', type: 'uint256' },
+      { name: 'amountEach', type: 'uint256' },
+    ],
+    name: 'batchMintToMany',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'id', type: 'uint256' },
+    ],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'badgeTypeId', type: 'uint256' }],
+    name: 'getBadgeType',
+    outputs: [
+      {
+        components: [
+          { name: 'uri', type: 'string' },
+          { name: 'creator', type: 'address' },
+          { name: 'soulbound', type: 'bool' },
+          { name: 'maxSupply', type: 'uint256' },
+          { name: 'active', type: 'bool' },
+        ],
+        name: '',
+        type: 'tuple',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'badgeTypeId', type: 'uint256' }],
+    name: 'uri',
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+// FandomlyNFT ABI — ERC-721 NFT operations
+export const FANDOMLY_NFT_ABI = [
+  {
+    inputs: [
+      { name: 'collectionName', type: 'string' },
+      { name: 'maxSupply', type: 'uint256' },
+      { name: 'pointsCost', type: 'uint256' },
+    ],
+    name: 'createCollection',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'collectionId', type: 'uint256' },
+      { name: 'tokenUri', type: 'string' },
+    ],
+    name: 'mint',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    name: 'tokenURI',
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'owner', type: 'address' }],
+    name: 'tokensOfOwner',
+    outputs: [{ name: '', type: 'uint256[]' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'collectionId', type: 'uint256' }],
+    name: 'getCollection',
+    outputs: [
+      {
+        components: [
+          { name: 'name', type: 'string' },
+          { name: 'maxSupply', type: 'uint256' },
+          { name: 'minted', type: 'uint256' },
+          { name: 'pointsCost', type: 'uint256' },
+          { name: 'active', type: 'bool' },
+        ],
+        name: '',
+        type: 'tuple',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    name: 'ownerOf',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+// CreatorCollectionFactory ABI — per-creator NFT collection factory
+export const CREATOR_COLLECTION_FACTORY_ABI = [
+  {
+    inputs: [
+      { name: 'name', type: 'string' },
+      { name: 'symbol', type: 'string' },
+      { name: 'creatorAddress', type: 'address' },
+      { name: 'tenantId', type: 'string' },
+      { name: 'maxSupply', type: 'uint256' },
+      { name: 'royaltyBps', type: 'uint96' },
+    ],
+    name: 'createCollection',
+    outputs: [{ name: 'collectionAddress', type: 'address' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'creator', type: 'address' }],
+    name: 'getCreatorCollections',
+    outputs: [{ name: '', type: 'address[]' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'creator', type: 'address' }],
+    name: 'getCreatorCollectionCount',
+    outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
   },
