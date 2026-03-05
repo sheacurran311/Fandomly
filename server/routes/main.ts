@@ -37,6 +37,7 @@ import { registerYouTubeTaskRoutes } from './tasks/youtube-task-routes';
 import { registerSpotifyTaskRoutes } from './tasks/spotify-task-routes';
 import { registerTikTokTaskRoutes } from './tasks/tiktok-task-routes';
 import { registerQuizRoutes } from './tasks/quiz-routes';
+import { registerReviewRoutes } from './tasks/review-routes';
 import { registerVisitTrackingRoutes } from './tasks/visit-tracking-routes';
 import { registerLeaderboardRoutes } from './programs/leaderboard-routes';
 import { registerBetaSignupRoutes } from './beta-signup-routes';
@@ -2712,8 +2713,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSpotifyTaskRoutes(app);
   registerTikTokTaskRoutes(app);
 
-  // Register quiz/poll and website visit tracking routes
+  // Register quiz/poll, review queue, and website visit tracking routes
   registerQuizRoutes(app);
+  registerReviewRoutes(app);
   registerVisitTrackingRoutes(app);
 
   // Register tenant routes

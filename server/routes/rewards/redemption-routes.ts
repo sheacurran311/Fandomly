@@ -428,7 +428,7 @@ export function registerRedemptionRoutes(app: Express) {
                     },
                     txHash: mintResult.txHash,
                     status: 'completed',
-                    mintedAt: new Date(),
+                    completedAt: new Date(),
                   } as any)
                   .returning();
 
@@ -499,7 +499,7 @@ export function registerRedemptionRoutes(app: Express) {
                     txHash: mintResult.txHash,
                     tokenId: mintResult.tokenId || null,
                     status: 'completed',
-                    mintedAt: new Date(),
+                    completedAt: new Date(),
                   } as any)
                   .returning();
 
