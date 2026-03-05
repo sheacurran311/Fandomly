@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Token Factory Page — Creator token launch and management.
  *
@@ -319,7 +320,9 @@ function TokenDashboard({ token }: { token: TokenInfo }) {
 
 export default function TokenFactoryPage() {
   const { user } = useAuth();
-  const walletAddress = (user as Record<string, unknown>)?.avalancheL1Address as string | undefined;
+  const walletAddress = (user as unknown as Record<string, unknown>)?.avalancheL1Address as
+    | string
+    | undefined;
 
   const { data: reputation, isLoading: repLoading } = useQuery<ReputationData>({
     queryKey: ['/api/reputation/me'],

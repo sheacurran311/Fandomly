@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -396,7 +397,7 @@ export default function Profile() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="text-white font-medium">
-                                  {program.name || 'Your Program'}
+                                  {(program as any).name || 'Your Program'}
                                 </p>
                                 <p className="text-sm text-gray-400">Draft - not yet published</p>
                               </div>
@@ -421,9 +422,11 @@ export default function Profile() {
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-white font-medium">{program.name}</p>
+                                <p className="text-white font-medium">{(program as any).name}</p>
                                 <p className="text-sm text-gray-400">
-                                  {program.slug ? `/programs/${program.slug}` : 'Published'}
+                                  {(program as any).slug
+                                    ? `/programs/${(program as any).slug}`
+                                    : 'Published'}
                                 </p>
                               </div>
                               <Badge className="bg-green-500/20 text-green-400 border-green-400">
@@ -432,11 +435,13 @@ export default function Profile() {
                               </Badge>
                             </div>
                             <div className="flex gap-2">
-                              {program.slug && (
+                              {(program as any).slug && (
                                 <Button
                                   variant="outline"
                                   className="flex-1 border-green-500/30 text-green-400 hover:bg-green-500/10"
-                                  onClick={() => window.open(`/programs/${program.slug}`, '_blank')}
+                                  onClick={() =>
+                                    window.open(`/programs/${(program as any).slug}`, '_blank')
+                                  }
                                 >
                                   View Program <ExternalLink className="h-4 w-4 ml-2" />
                                 </Button>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
@@ -573,7 +574,11 @@ export default function ProgramPublic() {
         </div>
 
         {/* Tab Navigation */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as string)} className="mt-8">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+          className="mt-8"
+        >
           <TabsList className="w-full justify-start border-b" style={styles.tabsList}>
             {visibility.showActivityFeed && (
               <TabsTrigger
@@ -715,10 +720,10 @@ export default function ProgramPublic() {
               )}
               {visibility.showLeaderboard && <LeaderboardWidget programId={programData.id} />}
               {visibility.showCampaigns && activeCampaigns.length > 0 && (
-                <ActiveCampaignsWidget campaigns={campaigns} />
+                <ActiveCampaignsWidget campaigns={campaigns ?? []} />
               )}
               {visibility.showTasks && activeTasks.length > 0 && (
-                <ActiveTasksWidget tasks={tasks} />
+                <ActiveTasksWidget tasks={tasks ?? []} />
               )}
             </div>
           </div>
@@ -832,7 +837,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                   Follow on social media to support the creator and earn rewards!
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {creator.socialLinks.twitter && (
+                  {creator.socialLinks?.twitter && (
                     <div className="relative">
                       <Button
                         variant="outline"
@@ -840,7 +845,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                         className={`border-gray-300 text-gray-700 hover:bg-gray-50 ${
                           socialCompletions.twitter?.completed ? 'border-green-300 bg-green-50' : ''
                         }`}
-                        onClick={() => window.open(creator.socialLinks.twitter, '_blank')}
+                        onClick={() => window.open((creator.socialLinks as any).twitter, '_blank')}
                       >
                         <Twitter className="h-4 w-4 mr-2" />
                         Twitter
@@ -860,7 +865,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       )}
                     </div>
                   )}
-                  {creator.socialLinks.instagram && (
+                  {creator.socialLinks?.instagram && (
                     <div className="relative">
                       <Button
                         variant="outline"
@@ -870,7 +875,9 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                             ? 'border-green-300 bg-green-50'
                             : ''
                         }`}
-                        onClick={() => window.open(creator.socialLinks.instagram, '_blank')}
+                        onClick={() =>
+                          window.open((creator.socialLinks as any).instagram, '_blank')
+                        }
                       >
                         <Instagram className="h-4 w-4 mr-2" />
                         Instagram
@@ -890,7 +897,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       )}
                     </div>
                   )}
-                  {creator.socialLinks.discord && (
+                  {creator.socialLinks?.discord && (
                     <div className="relative">
                       <Button
                         variant="outline"
@@ -898,7 +905,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                         className={`border-gray-300 text-gray-700 hover:bg-gray-50 ${
                           socialCompletions.discord?.completed ? 'border-green-300 bg-green-50' : ''
                         }`}
-                        onClick={() => window.open(creator.socialLinks.discord, '_blank')}
+                        onClick={() => window.open((creator.socialLinks as any).discord, '_blank')}
                       >
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Discord
@@ -918,7 +925,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       )}
                     </div>
                   )}
-                  {creator.socialLinks.facebook && (
+                  {creator.socialLinks?.facebook && (
                     <div className="relative">
                       <Button
                         variant="outline"
@@ -928,7 +935,7 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                             ? 'border-green-300 bg-green-50'
                             : ''
                         }`}
-                        onClick={() => window.open(creator.socialLinks.facebook, '_blank')}
+                        onClick={() => window.open((creator.socialLinks as any).facebook, '_blank')}
                       >
                         <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
@@ -950,12 +957,12 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
                       )}
                     </div>
                   )}
-                  {creator.socialLinks.website && (
+                  {(creator.socialLinks as any)?.website && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                      onClick={() => window.open(creator.socialLinks.website, '_blank')}
+                      onClick={() => window.open((creator.socialLinks as any).website, '_blank')}
                     >
                       <Globe className="h-4 w-4 mr-2" />
                       Website

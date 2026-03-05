@@ -1,46 +1,49 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import { useFanStats, useActiveCampaigns } from "@/hooks/use-fan-dashboard";
-import { useRewardRedemptions } from "@/hooks/use-points";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import DashboardCard from "@/components/dashboard/dashboard-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Link } from "wouter";
-import { 
-  Trophy, 
-  Star, 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
+import { useFanStats, useActiveCampaigns } from '@/hooks/use-fan-dashboard';
+import { useRewardRedemptions } from '@/hooks/use-points';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import DashboardCard from '@/components/dashboard/dashboard-card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Link } from 'wouter';
+import {
+  Trophy,
+  Star,
   Gift,
   Users,
   CheckCircle2,
   Loader2,
   ArrowRight,
-  Clock,
-  Sparkles
-} from "lucide-react";
-import { TimeframeSelector, type Timeframe } from "@/components/charts/TimeframeSelector";
-import { BarChartCard } from "@/components/charts/BarChartCard";
-import { PieChartCard } from "@/components/charts/PieChartCard";
-import { apiRequest } from "@/lib/queryClient";
-import { format, formatDistanceToNow } from 'date-fns';
+  Sparkles,
+} from 'lucide-react';
+import { TimeframeSelector, type Timeframe } from '@/components/charts/TimeframeSelector';
+import { BarChartCard } from '@/components/charts/BarChartCard';
+import { PieChartCard } from '@/components/charts/PieChartCard';
+import { apiRequest } from '@/lib/queryClient';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function FanDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: fanStats, isLoading: statsLoading, error: statsError } = useFanStats();
   const { data: activeCampaigns, isLoading: campaignsLoading } = useActiveCampaigns();
   const { data: redemptionHistory = [], isLoading: redemptionsLoading } = useRewardRedemptions();
-  
+
   const [timeframe, setTimeframe] = useState<Timeframe>('weekly');
 
   // Fetch points history
   const { data: pointsHistory } = useQuery({
     queryKey: ['/api/fan/dashboard/points-history', timeframe],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/fan/dashboard/points-history?timeframe=${timeframe}`);
+      const response = await apiRequest(
+        'GET',
+        `/api/fan/dashboard/points-history?timeframe=${timeframe}`
+      );
       return response.json();
     },
     enabled: !!user,
@@ -50,7 +53,10 @@ export default function FanDashboard() {
   const { data: taskStats } = useQuery({
     queryKey: ['/api/fan/dashboard/task-completion-stats', timeframe],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/fan/dashboard/task-completion-stats?timeframe=${timeframe}`);
+      const response = await apiRequest(
+        'GET',
+        `/api/fan/dashboard/task-completion-stats?timeframe=${timeframe}`
+      );
       return response.json();
     },
     enabled: !!user,
@@ -77,10 +83,11 @@ export default function FanDashboard() {
   });
 
   // Calculate total tasks completed
-  const totalTasksCompleted = useMemo(() => 
-    userCompletions?.completions?.filter(
-      (c: any) => c.status === 'completed' || c.status === 'claimed'
-    ).length || 0,
+  const totalTasksCompleted = useMemo(
+    () =>
+      userCompletions?.completions?.filter(
+        (c: any) => c.status === 'completed' || c.status === 'claimed'
+      ).length || 0,
     [userCompletions?.completions]
   );
 
@@ -89,8 +96,11 @@ export default function FanDashboard() {
 
   // Memoize merged points history data for chart
   const mergedPointsHistory = useMemo(() => {
-    const periodMap = new Map<string, { period: string; platformPoints: number; creatorPoints: number }>();
-    
+    const periodMap = new Map<
+      string,
+      { period: string; platformPoints: number; creatorPoints: number }
+    >();
+
     // Process platform points
     (pointsHistory?.platformPoints || []).forEach((item: any) => {
       const period = item.period;
@@ -99,7 +109,7 @@ export default function FanDashboard() {
       }
       periodMap.get(period)!.platformPoints = Number(item.points) || 0;
     });
-    
+
     // Process creator points
     (pointsHistory?.creatorPoints || []).forEach((item: any) => {
       const period = item.period;
@@ -108,7 +118,7 @@ export default function FanDashboard() {
       }
       periodMap.get(period)!.creatorPoints = Number(item.points) || 0;
     });
-    
+
     return Array.from(periodMap.values()).sort((a, b) => a.period.localeCompare(b.period));
   }, [pointsHistory]);
 
@@ -137,7 +147,7 @@ export default function FanDashboard() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">
-            Welcome back, {user.username || "Fan"}!
+            Welcome back, {user.username || 'Fan'}!
           </h1>
           <p className="text-gray-400">
             Track your progress, complete tasks, and earn rewards from your favorite creators.
@@ -180,13 +190,15 @@ export default function FanDashboard() {
               />
               <DashboardCard
                 title="Creators Joined"
-                value={(fanStats?.creatorsEnrolledCount ?? fanStats?.followingCount)?.toString() || "0"}
+                value={
+                  (fanStats?.creatorsEnrolledCount ?? fanStats?.followingCount)?.toString() || '0'
+                }
                 description="Active memberships"
                 icon={<Users className="h-5 w-5" />}
               />
               <DashboardCard
                 title="Rewards Redeemed"
-                value={fanStats?.rewardsEarned?.toString() || "0"}
+                value={fanStats?.rewardsEarned?.toString() || '0'}
                 description="Total rewards claimed"
                 icon={<Gift className="h-5 w-5" />}
               />
@@ -209,21 +221,19 @@ export default function FanDashboard() {
               data={mergedPointsHistory}
               dataKeys={[
                 { key: 'platformPoints', color: '#8b5cf6', name: 'Platform' },
-                { key: 'creatorPoints', color: '#3b82f6', name: 'Creator' }
+                { key: 'creatorPoints', color: '#3b82f6', name: 'Creator' },
               ]}
               xAxisKey="period"
               height={280}
-              stacked={true}
+              stacked
             />
 
             {/* Task Completion Chart */}
             <BarChartCard
               title="Task Completions"
               description="Your task activity over time"
-              data={taskStats?.completions || []}
-              dataKeys={[
-                { key: 'completed', color: '#10b981', name: 'Tasks Completed' }
-              ]}
+              data={(taskStats as any)?.completions || []}
+              dataKeys={[{ key: 'completed', color: '#10b981', name: 'Tasks Completed' }]}
               xAxisKey="period"
               height={280}
             />
@@ -233,7 +243,7 @@ export default function FanDashboard() {
         {/* Insights Row - 3 columns */}
         <div>
           <h2 className="text-2xl font-bold text-white mb-6">Insights</h2>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Points Breakdown Pie Chart */}
             <PieChartCard
@@ -243,14 +253,14 @@ export default function FanDashboard() {
                 ...(pointsBreakdown?.platformPoints?.map((item: any) => ({
                   name: item.source || 'Platform',
                   value: Number(item.total_points) || 0,
-                  color: '#8b5cf6'
+                  color: '#8b5cf6',
                 })) || []),
                 ...(pointsBreakdown?.creatorPoints?.map((item: any) => ({
                   name: item.source || 'Creator',
                   value: Number(item.total_points) || 0,
-                  color: '#3b82f6'
-                })) || [])
-              ].filter(item => item.value > 0)}
+                  color: '#3b82f6',
+                })) || []),
+              ].filter((item) => item.value > 0)}
               height={260}
             />
 
@@ -260,7 +270,11 @@ export default function FanDashboard() {
                 <CardTitle className="text-white text-base flex items-center justify-between">
                   <span>Programs Overview</span>
                   <Link href="/fan-dashboard/joined">
-                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-white h-7 px-2"
+                    >
                       View All <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </Link>
@@ -276,29 +290,44 @@ export default function FanDashboard() {
                     <Trophy className="h-10 w-10 text-gray-600 mx-auto mb-3" />
                     <p className="text-sm text-gray-400 mb-3">No programs yet</p>
                     <Link href="/find-creators">
-                      <Button size="sm" variant="outline" className="text-xs border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+                      >
                         Discover Creators
                       </Button>
                     </Link>
                   </div>
                 ) : (
                   <>
-                    {activeCampaigns.slice(0, 4).map((campaign) => (
-                      <div key={campaign.id} className="flex items-center space-x-3 p-2 rounded-lg bg-white/5">
+                    {activeCampaigns.slice(0, 4).map((campaign: any) => (
+                      <div
+                        key={campaign.id}
+                        className="flex items-center space-x-3 p-2 rounded-lg bg-white/5"
+                      >
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={campaign.creatorImage} />
+                          <AvatarImage
+                            src={campaign.creatorImageUrl || (campaign as any).creatorImage}
+                          />
                           <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-xs">
                             {campaign.creator?.substring(0, 2).toUpperCase() || 'CR'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{campaign.creator}</p>
-                          <p className="text-xs text-gray-400">{campaign.points.toLocaleString()} pts earned</p>
+                          <p className="text-sm font-medium text-white truncate">
+                            {campaign.creator}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {campaign.points.toLocaleString()} pts earned
+                          </p>
                         </div>
                       </div>
                     ))}
                     {activeCampaigns.length > 4 && (
-                      <p className="text-xs text-gray-500 text-center">+{activeCampaigns.length - 4} more programs</p>
+                      <p className="text-xs text-gray-500 text-center">
+                        +{activeCampaigns.length - 4} more programs
+                      </p>
                     )}
                   </>
                 )}
@@ -311,7 +340,11 @@ export default function FanDashboard() {
                 <CardTitle className="text-white text-base flex items-center justify-between">
                   <span>Recent Activity</span>
                   <Link href="/fan-dashboard/points">
-                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-white h-7 px-2"
+                    >
                       View All <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </Link>
@@ -330,25 +363,41 @@ export default function FanDashboard() {
                   </div>
                 ) : (
                   redemptionHistory.slice(0, 4).map((redemption: any) => (
-                    <div key={redemption.id} className="flex items-center space-x-3 p-2 rounded-lg bg-white/5">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        redemption.status === 'fulfilled' ? 'bg-green-400/20 text-green-400' :
-                        redemption.status === 'pending' ? 'bg-yellow-400/20 text-yellow-400' :
-                        'bg-gray-400/20 text-gray-400'
-                      }`}>
+                    <div
+                      key={redemption.id}
+                      className="flex items-center space-x-3 p-2 rounded-lg bg-white/5"
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          redemption.status === 'fulfilled'
+                            ? 'bg-green-400/20 text-green-400'
+                            : redemption.status === 'pending'
+                              ? 'bg-yellow-400/20 text-yellow-400'
+                              : 'bg-gray-400/20 text-gray-400'
+                        }`}
+                      >
                         <Gift className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{redemption.reward?.name || 'Reward'}</p>
+                        <p className="text-sm font-medium text-white truncate">
+                          {redemption.reward?.name || 'Reward'}
+                        </p>
                         <p className="text-xs text-gray-400">
-                          {formatDistanceToNow(new Date(redemption.redeemedAt), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(redemption.redeemedAt), {
+                            addSuffix: true,
+                          })}
                         </p>
                       </div>
-                      <Badge variant="outline" className={`text-xs shrink-0 ${
-                        redemption.status === 'fulfilled' ? 'border-green-400/30 text-green-400' :
-                        redemption.status === 'pending' ? 'border-yellow-400/30 text-yellow-400' :
-                        'border-gray-400/30 text-gray-400'
-                      }`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs shrink-0 ${
+                          redemption.status === 'fulfilled'
+                            ? 'border-green-400/30 text-green-400'
+                            : redemption.status === 'pending'
+                              ? 'border-yellow-400/30 text-yellow-400'
+                              : 'border-gray-400/30 text-gray-400'
+                        }`}
+                      >
                         {redemption.status}
                       </Badge>
                     </div>
@@ -367,15 +416,21 @@ export default function FanDashboard() {
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {(() => {
-                    const maxPoints = Math.max(...pointsBreakdown.creatorPoints.map((p: any) => Number(p.total_points) || 0));
+                    const maxPoints = Math.max(
+                      ...pointsBreakdown.creatorPoints.map((p: any) => Number(p.total_points) || 0)
+                    );
                     return pointsBreakdown.creatorPoints.map((program: any, index: number) => {
                       const points = Number(program.total_points) || 0;
                       const percentage = maxPoints > 0 ? (points / maxPoints) * 100 : 0;
                       return (
                         <div key={index} className="p-4 rounded-lg bg-white/5">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm text-gray-300 truncate max-w-[70%] font-medium">{program.source}</span>
-                            <span className="text-sm font-bold text-white">{points.toLocaleString()}</span>
+                            <span className="text-sm text-gray-300 truncate max-w-[70%] font-medium">
+                              {program.source}
+                            </span>
+                            <span className="text-sm font-bold text-white">
+                              {points.toLocaleString()}
+                            </span>
                           </div>
                           <Progress value={percentage} className="h-2" />
                         </div>
@@ -396,8 +451,11 @@ export default function FanDashboard() {
               Discover Creators
             </Button>
           </Link>
-          <Link href="/fan-dashboard/points">
-            <Button variant="outline" className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10">
+          <Link href="/fan-dashboard/rewards-store">
+            <Button
+              variant="outline"
+              className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+            >
               <Gift className="h-4 w-4 mr-2" />
               Browse Rewards
             </Button>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -59,11 +60,13 @@ export default function TaskBuilder() {
     enabled: !!user?.id,
   });
 
+  const [hasInitialized, setHasInitialized] = useState(false);
+
   // Auto-select most recently created program (sync during render, not in effect)
   if (programs.length > 0 && !selectedProgramId && !isEditMode && !hasInitialized) {
-    const sortedPrograms = [...programs].sort(
-      (a: { createdAt: string }, b: { createdAt: string }) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    const sortedPrograms = [...(programs as any[])].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
     );
     setSelectedProgramId(sortedPrograms[0].id);
   }
@@ -106,7 +109,6 @@ export default function TaskBuilder() {
     isEditMode && existingTask?.campaignId ? existingTask.campaignId : undefined;
 
   // Sync derived values into state only once when task first loads
-  const [hasInitialized, setHasInitialized] = useState(false);
   if (existingTask && !hasInitialized) {
     setHasInitialized(true);
     if (derivedTemplate && !selectedTemplate) {
@@ -259,9 +261,8 @@ export default function TaskBuilder() {
   }
 
   // Filter campaigns by selected program
-  const filteredCampaigns = campaigns.filter(
-    (campaign: { id: string; name: string; programId: string }) =>
-      !selectedProgramId || campaign.programId === selectedProgramId
+  const filteredCampaigns = (campaigns as any[]).filter(
+    (campaign: any) => !selectedProgramId || campaign.programId === selectedProgramId
   );
 
   // Program/Campaign selector card rendered inside TaskBuilderBase
@@ -286,7 +287,7 @@ export default function TaskBuilder() {
               <SelectValue placeholder="Select a program (required)" />
             </SelectTrigger>
             <SelectContent className="bg-slate-900 border-white/10">
-              {programs.map((program: { id: string; name: string }) => (
+              {(programs as any[]).map((program: any) => (
                 <SelectItem
                   key={program.id}
                   value={program.id}
@@ -316,17 +317,15 @@ export default function TaskBuilder() {
                 <SelectItem value="unassigned" className="text-white hover:bg-white/10">
                   No Campaign (Unassigned)
                 </SelectItem>
-                {filteredCampaigns.map(
-                  (campaign: { id: string; name: string; programId: string }) => (
-                    <SelectItem
-                      key={campaign.id}
-                      value={campaign.id}
-                      className="text-white hover:bg-white/10"
-                    >
-                      {campaign.name}
-                    </SelectItem>
-                  )
-                )}
+                {filteredCampaigns.map((campaign: any) => (
+                  <SelectItem
+                    key={campaign.id}
+                    value={campaign.id}
+                    className="text-white hover:bg-white/10"
+                  >
+                    {campaign.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-400 mt-1">
@@ -358,8 +357,8 @@ export default function TaskBuilder() {
       return (
         <DashboardLayout userType="creator">
           <ReferralTaskBuilder
-            onSave={handleSave}
-            onPublish={handlePublish}
+            onSave={handleSave as any}
+            onPublish={handlePublish as any}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
@@ -372,8 +371,8 @@ export default function TaskBuilder() {
       return (
         <DashboardLayout userType="creator">
           <CheckInTaskBuilder
-            onSave={handleSave}
-            onPublish={handlePublish}
+            onSave={handleSave as any}
+            onPublish={handlePublish as any}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
@@ -386,8 +385,8 @@ export default function TaskBuilder() {
       return (
         <DashboardLayout userType="creator">
           <FollowerMilestoneBuilder
-            onSave={handleSave}
-            onPublish={handlePublish}
+            onSave={handleSave as any}
+            onPublish={handlePublish as any}
             onBack={handleBack}
             initialData={existingTask}
             isEditMode={isEditMode}
