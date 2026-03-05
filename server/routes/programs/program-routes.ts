@@ -424,6 +424,60 @@ export function registerProgramRoutes(app: Express) {
           return res.status(404).json({ error: 'Program not found' });
         }
 
+        // Validate publish requirements (skip for republish/URL updates)
+        if (!existingProgram.publishedAt) {
+          const missingFields: string[] = [];
+          const pageConfig = (existingProgram.pageConfig as any) || {};
+          const creatorDetails = pageConfig.creatorDetails || {};
+          const creatorCategory = creator.category;
+
+          // Universal requirements
+          if (!existingProgram.name?.trim()) missingFields.push('Program Name');
+          if (!existingProgram.description?.trim()) missingFields.push('Bio / Description');
+          if (!pageConfig.logo) missingFields.push('Profile Image (Logo)');
+
+          // Creator-type-specific requirements
+          if (creatorCategory === 'athlete') {
+            if (!creatorDetails.athlete?.sport) missingFields.push('Sport');
+            if (!creatorDetails.athlete?.education?.level && !creatorDetails.athlete?.education)
+              missingFields.push('Education Level');
+          } else if (creatorCategory === 'musician') {
+            if (!creatorDetails.musician?.bandArtistName) missingFields.push('Artist / Band Name');
+            if (!creatorDetails.musician?.artistType) missingFields.push('Artist Type');
+            if (!creatorDetails.musician?.musicGenre) missingFields.push('Music Genre');
+            if (!creatorDetails.musician?.musicCatalogUrl) missingFields.push('Music Catalog URL');
+          } else if (creatorCategory === 'content_creator') {
+            const cc = creatorDetails.contentCreator || {};
+            if (!cc.contentType || (Array.isArray(cc.contentType) && cc.contentType.length === 0))
+              missingFields.push('Content Type');
+            if (
+              !cc.topicsOfFocus ||
+              (Array.isArray(cc.topicsOfFocus) && cc.topicsOfFocus.length === 0)
+            )
+              missingFields.push('Topics of Focus');
+            if (!cc.aboutMe?.trim()) missingFields.push('About Me');
+          }
+
+          // Require at least 1 connected social account
+          const { socialConnections } = await import('@shared/schema');
+          const connectedAccounts = await db
+            .select()
+            .from(socialConnections)
+            .where(eq(socialConnections.userId, userId))
+            .limit(1);
+
+          if (connectedAccounts.length === 0) {
+            missingFields.push('At least 1 connected social account');
+          }
+
+          if (missingFields.length > 0) {
+            return res.status(400).json({
+              error: 'Cannot publish program. Please complete the following:',
+              missingFields,
+            });
+          }
+        }
+
         // Determine if this is a republish (already has publishedAt)
         const isRepublish = !!existingProgram.publishedAt;
         const now = new Date();
@@ -769,8 +823,13 @@ export function registerProgramRoutes(app: Express) {
         tasks: programTasks,
       });
     } catch (error) {
-      console.error('Error fetching public program:', error);
-      res.status(500).json({ error: 'Failed to fetch program' });
+      const err = error as Error;
+      console.error('Error fetching public program:', err?.message ?? error);
+      console.error('Stack:', err?.stack);
+      res.status(500).json({
+        error: 'Failed to fetch program',
+        details: err?.message ?? String(error),
+      });
     }
   });
 

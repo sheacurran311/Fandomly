@@ -2416,6 +2416,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const redemptions = await storage.getRewardRedemptionsByProgram(req.params.programId);
       res.json(redemptions);
     } catch (error) {
+      const err = error as Error;
+      console.error('Error fetching reward redemptions for program:', err?.message ?? error);
       res.status(500).json({ error: 'Failed to fetch reward redemptions for program' });
     }
   });
