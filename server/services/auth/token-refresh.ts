@@ -73,6 +73,10 @@ const PLATFORM_CONFIGS: Record<
 };
 
 class TokenRefreshService {
+  // In-memory mutex map to prevent concurrent token refreshes for the same connection.
+  // Key: connectionId, Value: Promise of the in-flight refresh result.
+  private inFlightRefreshes = new Map<string, Promise<TokenRefreshResult>>();
+
   /**
    * Check if a token is expired or about to expire
    */
@@ -98,9 +102,27 @@ class TokenRefreshService {
   }
 
   /**
-   * Refresh OAuth token for a connection
+   * Refresh OAuth token for a connection.
+   * Uses a per-connection mutex to prevent concurrent refreshes from corrupting tokens.
    */
   async refreshToken(connection: SocialConnection): Promise<TokenRefreshResult> {
+    const connectionId = connection.id;
+
+    // If a refresh is already in-flight for this connection, wait for it
+    const existing = this.inFlightRefreshes.get(connectionId);
+    if (existing) {
+      return existing;
+    }
+
+    const refreshPromise = this._doRefreshToken(connection).finally(() => {
+      this.inFlightRefreshes.delete(connectionId);
+    });
+
+    this.inFlightRefreshes.set(connectionId, refreshPromise);
+    return refreshPromise;
+  }
+
+  private async _doRefreshToken(connection: SocialConnection): Promise<TokenRefreshResult> {
     const platform = connection.platform;
     const config = PLATFORM_CONFIGS[platform];
 

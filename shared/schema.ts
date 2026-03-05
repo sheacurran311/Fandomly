@@ -2045,13 +2045,13 @@ export const rewardDistributions = pgTable('reward_distributions', {
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
   taskId: varchar('task_id')
-    .references(() => tasks.id)
+    .references(() => tasks.id, { onDelete: 'cascade' })
     .notNull(),
   taskCompletionId: varchar('task_completion_id').references(() => taskCompletions.id, {
     onDelete: 'cascade',
   }),
   tenantId: varchar('tenant_id')
-    .references(() => tenants.id)
+    .references(() => tenants.id, { onDelete: 'restrict' })
     .notNull(),
 
   // Reward Details
