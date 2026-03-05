@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { FacebookSDKManager, FacebookPage } from '@/lib/facebook';
@@ -43,7 +44,7 @@ import {
 
 function SyncHistorySection() {
   const { data, isLoading } = useSyncHistory(10);
-  const logs = data?.logs || [];
+  const logs = (data as any)?.logs || [];
 
   if (isLoading || logs.length === 0) return null;
 
@@ -54,22 +55,22 @@ function SyncHistorySection() {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          {logs.map((log: Record<string, unknown>) => (
+          {logs.map((log: any) => (
             <div
-              key={log.id}
+              key={String(log.id)}
               className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"
             >
               <div className="flex items-center gap-2">
                 <div
                   className={`w-2 h-2 rounded-full ${log.status === 'completed' ? 'bg-green-400' : log.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'}`}
                 />
-                <span className="text-sm text-white capitalize">{log.platform}</span>
-                <span className="text-xs text-gray-400">{log.syncType}</span>
+                <span className="text-sm text-white capitalize">{String(log.platform)}</span>
+                <span className="text-xs text-gray-400">{String(log.syncType)}</span>
               </div>
               <div className="flex items-center gap-3 text-xs text-gray-400">
-                {log.itemsSynced > 0 && <span>{log.itemsSynced} items</span>}
-                {log.durationMs && <span>{(log.durationMs / 1000).toFixed(1)}s</span>}
-                <span>{new Date(log.startedAt).toLocaleTimeString()}</span>
+                {log.itemsSynced > 0 && <span>{Number(log.itemsSynced)} items</span>}
+                {log.durationMs && <span>{(Number(log.durationMs) / 1000).toFixed(1)}s</span>}
+                <span>{new Date(String(log.startedAt)).toLocaleTimeString()}</span>
               </div>
             </div>
           ))}

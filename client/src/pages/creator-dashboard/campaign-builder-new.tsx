@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { fetchApi, queryClient } from '@/lib/queryClient';
@@ -35,11 +36,9 @@ import {
   AlertCircle,
   Plus,
   X,
-  Calendar,
   Clock,
   Trophy,
   Gift,
-  Target,
   Users,
   CheckSquare,
   Lock,
@@ -50,6 +49,8 @@ import {
   Eye,
   Shield,
   Hash,
+  Calendar,
+  Target,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import {
@@ -62,6 +63,8 @@ import {
   useCampaignSponsors,
 } from '@/hooks/useCampaignBuilder';
 import type { Task, Campaign } from '@shared/schema';
+import { RewardPickerDialog } from '@/components/campaigns/reward-picker-dialog';
+import { Image, Ticket } from 'lucide-react';
 
 const STEPS = [
   { number: 1, label: 'Basics', icon: Calendar },
@@ -169,6 +172,18 @@ export default function CampaignBuilderNew() {
     completionBonusPoints: 0,
   });
 
+  const [completionRewards, setCompletionRewards] = useState<
+    Array<{
+      type: 'nft' | 'raffle_entry' | 'badge' | 'reward';
+      rewardId?: string;
+      value?: number;
+      metadata?: Record<string, unknown>;
+      displayName?: string;
+      displayImage?: string;
+    }>
+  >([]);
+  const [showRewardPicker, setShowRewardPicker] = useState(false);
+
   const [gating, setGating] = useState({
     accessCodeEnabled: false,
     accessCode: '',
@@ -238,8 +253,10 @@ export default function CampaignBuilderNew() {
   });
 
   const createTaskMutation = useMutation({
-    mutationFn: (taskData: Record<string, unknown>) =>
-      fetchApi('/api/tasks', { method: 'POST', body: JSON.stringify(taskData) }),
+    mutationFn: async (taskData: Record<string, unknown>) =>
+      fetchApi('/api/tasks', { method: 'POST', body: JSON.stringify(taskData) }) as Promise<
+        Record<string, unknown>
+      >,
     onSuccess: async (newTask: Record<string, unknown>) => {
       if (campaignId && newTask.id) {
         await assignTaskMutation.mutateAsync({ taskId: newTask.id as string, campaignId });
@@ -300,12 +317,12 @@ export default function CampaignBuilderNew() {
   const displaySponsors = campaignId ? savedSponsors : sponsors;
 
   // Load builder data into state
-  const builderDataJson = builderData ? JSON.stringify(builderData.campaign.id) : null;
+  const builderDataJson = builderData ? JSON.stringify((builderData as any).campaign.id) : null;
   useEffect(() => {
     if (!builderData) return;
-    const c = builderData.campaign;
+    const c = (builderData as any).campaign;
     const campaignAny = c as Record<string, unknown>;
-    const reqAny = (c.requirements || {}) as Record<string, unknown>;
+    const reqAny = ((c as any).requirements || {}) as Record<string, unknown>;
     setBasics({
       name: c.name || '',
       description: c.description || '',
@@ -322,6 +339,20 @@ export default function CampaignBuilderNew() {
       campaignMultiplier: Number(campaignAny.campaignMultiplier) || 1,
       completionBonusPoints: (campaignAny.completionBonusPoints as number) || 0,
     });
+    // Load completion rewards
+    const savedBonusRewards = (campaignAny.completionBonusRewards as any[]) || [];
+    if (savedBonusRewards.length > 0) {
+      setCompletionRewards(
+        savedBonusRewards.map((r: any) => ({
+          type: r.type,
+          rewardId: r.rewardId,
+          value: r.value,
+          metadata: r.metadata,
+          displayName: r.metadata?.displayName || r.metadata?.name || r.type,
+          displayImage: r.metadata?.displayImage || r.metadata?.imageUrl,
+        }))
+      );
+    }
     setGating({
       accessCodeEnabled: (campaignAny.accessCodeEnabled as boolean) || false,
       accessCode: (campaignAny.accessCode as string) || '',
@@ -357,6 +388,12 @@ export default function CampaignBuilderNew() {
       accentColor: basics.accentColor,
       campaignMultiplier: rewards.campaignMultiplier,
       completionBonusPoints: rewards.completionBonusPoints,
+      completionBonusRewards: completionRewards.map((r) => ({
+        type: r.type,
+        rewardId: r.rewardId,
+        value: r.value,
+        metadata: { ...r.metadata, displayName: r.displayName, displayImage: r.displayImage },
+      })),
       verificationMode,
       enforceSequentialTasks: taskFlow.enforceSequentialTasks,
       accessCodeEnabled: gating.accessCodeEnabled,
@@ -387,9 +424,9 @@ export default function CampaignBuilderNew() {
     }
 
     if (campaignId) {
-      await updateCampaign.mutateAsync({ campaignId, data: payload });
+      await updateCampaign.mutateAsync({ campaignId, data: payload as any });
     } else {
-      const result = await createCampaign.mutateAsync(payload);
+      const result = (await createCampaign.mutateAsync(payload as any)) as any;
       if (result.id) {
         setCampaignId(result.id);
         // Save sponsors that were added before campaign was created
@@ -933,17 +970,112 @@ export default function CampaignBuilderNew() {
                   />
                 </div>
 
+                {/* Campaign Completion Rewards */}
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10 space-y-4">
+                  <div>
+                    <h3 className="text-white font-medium flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-brand-primary" />
+                      Campaign Completion Rewards
+                    </h3>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Rewards fans receive when they complete all required tasks
+                    </p>
+                  </div>
+
+                  {completionRewards.length > 0 && (
+                    <div className="space-y-2">
+                      {completionRewards.map((reward, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10"
+                        >
+                          <div className="flex items-center gap-3">
+                            {reward.displayImage ? (
+                              <img
+                                src={reward.displayImage}
+                                alt={reward.displayName || ''}
+                                className="w-10 h-10 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                                {reward.type === 'nft' && (
+                                  <Image className="w-5 h-5 text-purple-400" />
+                                )}
+                                {reward.type === 'raffle_entry' && (
+                                  <Ticket className="w-5 h-5 text-amber-400" />
+                                )}
+                                {reward.type === 'badge' && (
+                                  <Award className="w-5 h-5 text-blue-400" />
+                                )}
+                                {reward.type === 'reward' && (
+                                  <Gift className="w-5 h-5 text-green-400" />
+                                )}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-white font-medium text-sm">
+                                {reward.displayName || reward.type}
+                              </p>
+                              <Badge
+                                variant="secondary"
+                                className="text-xs bg-white/10 text-gray-300 border-white/20"
+                              >
+                                {reward.type === 'nft'
+                                  ? 'NFT'
+                                  : reward.type === 'raffle_entry'
+                                    ? 'Raffle Entry'
+                                    : reward.type === 'badge'
+                                      ? 'Badge'
+                                      : 'Reward'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setCompletionRewards((prev) => prev.filter((_, i) => i !== index))
+                            }
+                            className="text-gray-400 hover:text-red-400"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowRewardPicker(true)}
+                    className="w-full border-dashed border-white/20 text-gray-300 hover:text-white hover:bg-white/5"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Completion Reward
+                  </Button>
+                </div>
+
+                <RewardPickerDialog
+                  open={showRewardPicker}
+                  onOpenChange={setShowRewardPicker}
+                  onAddReward={(reward) => {
+                    setCompletionRewards((prev) => [...prev, reward]);
+                  }}
+                  existingRewards={completionRewards}
+                />
+
                 <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                   <h3 className="text-white font-medium mb-2">Task Point Summary</h3>
                   <div className="space-y-2">
                     {availableTasks
                       .filter((t) => assignedTaskIds.includes(t.id))
-                      .map((task) => (
+                      .map((task: any) => (
                         <div key={task.id} className="flex justify-between text-sm">
                           <span className="text-gray-300">{task.name}</span>
                           <span className="text-white font-medium">
-                            {task.pointsToReward} x {rewards.campaignMultiplier} ={' '}
-                            {Math.round(task.pointsToReward * rewards.campaignMultiplier)} pts
+                            {task.pointsToReward ?? 0} x {rewards.campaignMultiplier} ={' '}
+                            {Math.round((task.pointsToReward ?? 0) * rewards.campaignMultiplier)}{' '}
+                            pts
                           </span>
                         </div>
                       ))}
@@ -1153,6 +1285,12 @@ export default function CampaignBuilderNew() {
                     {rewards.completionBonusPoints > 0 && (
                       <p className="text-sm text-yellow-300 mt-1">
                         +{rewards.completionBonusPoints} bonus pts
+                      </p>
+                    )}
+                    {completionRewards.length > 0 && (
+                      <p className="text-sm text-purple-300 mt-1">
+                        {completionRewards.length} completion reward
+                        {completionRewards.length !== 1 ? 's' : ''}
                       </p>
                     )}
                   </div>

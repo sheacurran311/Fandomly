@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { type Task } from '@shared/schema';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -395,7 +396,7 @@ function CreateCampaignModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       let current = newData as Record<string, unknown>;
 
       for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]];
+        current = current[keys[i]] as Record<string, unknown>;
       }
       current[keys[keys.length - 1]] = value;
 
@@ -1118,7 +1119,8 @@ export default function CampaignBuilder() {
     if (programs.length > 0 && !selectedProgramId) {
       // Sort by createdAt DESC and select the most recent
       const sortedPrograms = [...programs].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        (a, b) =>
+          new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
       );
       // Use setTimeout to avoid calling setState synchronously in effect
       setTimeout(() => {

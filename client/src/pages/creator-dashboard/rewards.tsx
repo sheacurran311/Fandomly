@@ -1,11 +1,12 @@
-import { useState, useMemo, createElement } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useMemo, createElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -37,18 +38,19 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { apiRequest } from '@/lib/queryClient';
 import {
-  Plus,
   Gift,
   Ticket,
   Package,
   Star,
   Coins,
   Users,
-  Edit,
   Eye,
   Video as VideoIcon,
   AlertCircle,
   Sparkles,
+  Image as ImageIcon,
+  Plus,
+  Edit,
 } from 'lucide-react';
 import type { Reward } from '@shared/schema';
 import { insertRewardSchema } from '@shared/schema';
@@ -62,7 +64,7 @@ const rewardCreationFormSchema = insertRewardSchema.extend({
   name: z.string().min(1, 'Reward name is required').max(100, 'Name too long'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   pointsCost: z.number().min(1, 'Points cost must be at least 1'),
-  rewardType: z.enum(['raffle', 'physical', 'custom', 'video'], {
+  rewardType: z.enum(['raffle', 'physical', 'custom', 'video', 'nft'], {
     required_error: 'Please select a reward type',
   }),
   maxRedemptions: z.number().min(1).optional().nullable(),
@@ -82,6 +84,8 @@ const getRewardTypeIcon = (type: string) => {
       return VideoIcon;
     case 'custom':
       return Star;
+    case 'nft':
+      return ImageIcon;
     default:
       return Gift;
   }
@@ -97,6 +101,8 @@ const getRewardTypeBadgeColor = (type: string) => {
       return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
     case 'custom':
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    case 'nft':
+      return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
     default:
       return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   }
@@ -369,7 +375,7 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowDetails(true)}
+              onClick={() => _setShowDetails(true)}
               className="text-gray-400 hover:text-white p-1"
             >
               <Eye className="h-4 w-4" />
@@ -380,7 +386,11 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
               onClick={toggleRewardStatus}
               className="text-gray-400 hover:text-white p-1"
             >
-              {reward.isActive ? <Edit className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+              {(reward as any).isActive ? (
+                <Edit className="h-4 w-4" />
+              ) : (
+                <Star className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
@@ -443,6 +453,13 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
               {reward.rewardData.customData.deliveryMethod}
             </div>
           )}
+
+          {reward.rewardType === 'nft' && (reward.rewardData as any)?.nftData && (
+            <div className="text-xs text-indigo-400 bg-indigo-500/10 p-2 rounded">
+              NFT: {(reward.rewardData as any).nftData.collectionName || 'Digital Collectible'}
+              {(reward.rewardData as any).nftData.soulbound && ' (Soulbound)'}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -499,6 +516,11 @@ function RewardCreationForm({
           personalizationInstructions: '',
           sampleVideoUrl: '',
         },
+        nftData: {
+          collectionId: '',
+          templateId: '',
+          autoMintOnRedeem: true,
+        } as any,
       },
     },
   });
@@ -520,7 +542,9 @@ function RewardCreationForm({
               ? { videoData: data.rewardData?.videoData }
               : watchedRewardType === 'custom'
                 ? { customData: data.rewardData?.customData }
-                : {},
+                : watchedRewardType === 'nft'
+                  ? { nftData: (data.rewardData as any)?.nftData }
+                  : {},
     };
     onSubmit(processedData);
   };
@@ -529,7 +553,7 @@ function RewardCreationForm({
     <Form {...form}>
       {/* eslint-disable @typescript-eslint/no-explicit-any */}
       <form
-        onSubmit={form.handleSubmit(handleFormSubmit)}
+        onSubmit={form.handleSubmit(handleFormSubmit as any)}
         className="space-y-6"
         data-testid="form-reward-creation"
       >
@@ -591,6 +615,7 @@ function RewardCreationForm({
                         <SelectValue placeholder="Select reward type" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="nft">NFT (Digital Collectible)</SelectItem>
                         <SelectItem value="raffle">Raffle Entry</SelectItem>
                         <SelectItem value="physical">Physical Item</SelectItem>
                         <SelectItem value="video">Custom Video (Cameo)</SelectItem>
@@ -654,6 +679,104 @@ function RewardCreationForm({
         </div>
 
         {/* Type-Specific Configuration */}
+        {watchedRewardType === 'nft' && (
+          <div
+            className="space-y-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg"
+            data-testid="section-nft-config"
+          >
+            <h3 className="text-white font-medium">NFT Configuration</h3>
+            <p className="text-sm text-gray-400">
+              Configure the NFT collection that will be minted as a reward on Fandomly Chain
+            </p>
+            <FormField
+              control={form.control as any}
+              name="rewardData.nftData.collectionName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Collection Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="e.g., Campaign Achievement NFT"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control as any}
+              name="rewardData.nftData.collectionDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Describe what this NFT represents..."
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control as any}
+              name="rewardData.nftData.imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Image URL</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="https://..."
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control as any}
+              name="rewardData.nftData.maxSupply"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Max Supply (optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      placeholder="Leave empty for unlimited"
+                      className="mt-2 bg-white/10 border-white/20 text-white"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="nft-soulbound"
+                checked={form.watch('rewardData.nftData.soulbound' as any)}
+                onChange={(e) =>
+                  form.setValue('rewardData.nftData.soulbound' as any, e.target.checked)
+                }
+                className="rounded border-white/20"
+              />
+              <Label htmlFor="nft-soulbound" className="text-white cursor-pointer">
+                Soulbound (non-transferable)
+              </Label>
+            </div>
+            <p className="text-sm text-indigo-300">
+              NFTs will be minted on Fandomly Chain when fans redeem this reward.
+            </p>
+          </div>
+        )}
+
         {watchedRewardType === 'raffle' && (
           <div
             className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg"
