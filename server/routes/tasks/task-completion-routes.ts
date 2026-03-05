@@ -192,17 +192,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
         const { db } = await import('../../db');
         const { eq, desc } = await import('drizzle-orm');
-        const { taskCompletions, tasks, tenantMemberships } = await import('@shared/schema');
-
-        // Verify user has access to this tenant
-        const [membership] = await db
-          .select()
-          .from(tenantMemberships)
-          .where(
-            and(eq(tenantMemberships.userId, req.user.id), eq(tenantMemberships.tenantId, tenantId))
-          )
-          .limit(1);
-        const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
+        const { taskCompletions, tasks } = await import('@shared/schema');
 
         // Get completions for tasks belonging to this tenant
         let rows = await db
