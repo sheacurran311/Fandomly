@@ -330,9 +330,9 @@ export class UnifiedVerificationService {
     if (taskType.includes('quote') || taskType.includes('repost')) {
       return {
         verified: false,
-        requiresManualReview: false,
+        requiresManualReview: true,
         confidence: 'medium' as const,
-        reason: 'Quote tweet verification pending',
+        reason: 'Quote tweet requires manual verification',
         metadata: {
           verificationTier: 'T2',
           verificationMethod: 'code_repost',

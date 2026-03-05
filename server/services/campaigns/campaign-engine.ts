@@ -645,7 +645,7 @@ export class CampaignEngineService {
             const user = await db.query.users.findFirst({
               where: eq(users.id, userId),
             });
-            const walletAddress = user?.walletAddress || (user as any)?.avalancheL1Address;
+            const walletAddress = (user as any)?.avalancheL1Address || user?.walletAddress;
 
             if (walletAddress) {
               // Mint NFT via blockchain service
@@ -683,7 +683,7 @@ export class CampaignEngineService {
             const user = await db.query.users.findFirst({
               where: eq(users.id, userId),
             });
-            const walletAddress = user?.walletAddress || (user as any)?.avalancheL1Address;
+            const walletAddress = (user as any)?.avalancheL1Address || user?.walletAddress;
             if (walletAddress) {
               try {
                 const { getBlockchainNFTService } = await import('../nft/blockchain-nft-service');

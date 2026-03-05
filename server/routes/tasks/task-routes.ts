@@ -1274,13 +1274,13 @@ export function registerTaskRoutes(app: Express) {
           return res.status(403).json({ error: 'Only creators can access review queue' });
         }
 
-        // Get pending reviews for this creator (creatorId is integer in legacy schema; cast for comparison)
+        // Get pending reviews for this creator
         const reviews = await db
           .select()
           .from(manualReviewQueue)
           .where(
             and(
-              sql`${manualReviewQueue.creatorId}::text = ${creator.id}`,
+              eq(manualReviewQueue.creatorId, creator.id),
               eq(manualReviewQueue.status, status as string),
               isNull(manualReviewQueue.deletedAt)
             )
@@ -1314,7 +1314,7 @@ export function registerTaskRoutes(app: Express) {
 
         // Verify user is creator who owns this review
         const review = await db.query.manualReviewQueue.findFirst({
-          where: eq(manualReviewQueue.id, Number(reviewId)),
+          where: eq(manualReviewQueue.id, reviewId),
         });
 
         if (!review) {
@@ -1328,11 +1328,7 @@ export function registerTaskRoutes(app: Express) {
           return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        await unifiedVerification.approveManualReview(
-          Number(reviewId),
-          userId as unknown as number,
-          reviewNotes
-        );
+        await unifiedVerification.approveManualReview(reviewId, userId, reviewNotes);
 
         res.json({ success: true, message: 'Task approved' });
       } catch (error: any) {
@@ -1364,7 +1360,7 @@ export function registerTaskRoutes(app: Express) {
 
         // Verify user is creator who owns this review
         const review = await db.query.manualReviewQueue.findFirst({
-          where: eq(manualReviewQueue.id, Number(reviewId)),
+          where: eq(manualReviewQueue.id, reviewId),
         });
 
         if (!review) {
@@ -1378,11 +1374,7 @@ export function registerTaskRoutes(app: Express) {
           return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        await unifiedVerification.rejectManualReview(
-          Number(reviewId),
-          userId as unknown as number,
-          reviewNotes
-        );
+        await unifiedVerification.rejectManualReview(reviewId, userId, reviewNotes);
 
         res.json({ success: true, message: 'Task rejected' });
       } catch (error: any) {

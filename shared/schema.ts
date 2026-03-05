@@ -2296,6 +2296,7 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   owner: one(users, {
     fields: [tenants.ownerId],
     references: [users.id],
+    relationName: 'ownedTenants',
   }),
   memberships: many(tenantMemberships),
   creators: many(creators),
@@ -2315,6 +2316,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   currentTenant: one(tenants, {
     fields: [users.currentTenantId],
     references: [tenants.id],
+    relationName: 'currentTenant',
   }),
   ownedTenants: many(tenants, {
     relationName: 'ownedTenants',
@@ -2330,8 +2332,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   agency: one(agencies, {
     fields: [users.agencyId],
     references: [agencies.id],
+    relationName: 'agencyMember',
   }),
-  ownedAgencies: many(agencies),
+  ownedAgencies: many(agencies, {
+    relationName: 'ownedAgencies',
+  }),
   taskCompletions: many(taskCompletions),
   taskAssignments: many(taskAssignments),
   platformTaskCompletions: many(platformTaskCompletions),
@@ -2375,6 +2380,7 @@ export const agenciesRelations = relations(agencies, ({ one, many }) => ({
   owner: one(users, {
     fields: [agencies.ownerUserId],
     references: [users.id],
+    relationName: 'ownedAgencies',
   }),
   agencyTenants: many(agencyTenants),
 }));

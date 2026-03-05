@@ -552,6 +552,14 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
           // 3. Update fan program points balance atomically
           if (pointsToAward > 0 && task.tenantId) {
+            const programWhere = [
+              eq(fanPrograms.fanId, req.user!.id),
+              eq(fanPrograms.tenantId, task.tenantId),
+            ];
+            // Scope to specific program when task has a programId
+            if (task.programId) {
+              programWhere.push(eq(fanPrograms.programId, task.programId));
+            }
             await tx
               .update(fanPrograms)
               .set({
@@ -559,9 +567,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
                 totalPointsEarned: sql`${fanPrograms.totalPointsEarned} + ${pointsToAward}`,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               } as any)
-              .where(
-                and(eq(fanPrograms.fanId, req.user!.id), eq(fanPrograms.tenantId, task.tenantId))
-              );
+              .where(and(...programWhere));
           }
 
           return { updatedCompletion, rewardDistribution };

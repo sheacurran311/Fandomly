@@ -307,7 +307,7 @@ export function registerRedemptionRoutes(app: Express) {
         const userRedemptionCountResult = await db.execute(sql`
           SELECT COALESCE(SUM(quantity), 0) as total
           FROM reward_redemptions
-          WHERE reward_id = ${rewardId} AND user_id = ${userId}
+          WHERE reward_id = ${rewardId} AND fan_id = ${userId}
         `);
         const currentCount = parseInt((userRedemptionCountResult as any).rows?.[0]?.total || '0');
 
@@ -377,12 +377,15 @@ export function registerRedemptionRoutes(app: Express) {
           // Attempt to mint NFT immediately
           try {
             const [rewardUser] = await db
-              .select({ walletAddress: users.walletAddress })
+              .select({
+                avalancheL1Address: users.avalancheL1Address,
+                walletAddress: users.walletAddress,
+              })
               .from(users)
               .where(eq(users.id, userId))
               .limit(1);
 
-            const walletAddress = rewardUser?.walletAddress;
+            const walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress;
 
             if (!walletAddress) {
               // User doesn't have a wallet - defer minting
@@ -454,7 +457,7 @@ export function registerRedemptionRoutes(app: Express) {
                       pointsSpent: totalPointsCost,
                     },
                     txHash: mintResult.txHash,
-                    status: 'completed',
+                    status: 'success',
                     completedAt: new Date(),
                   } as any)
                   .returning();
@@ -525,7 +528,7 @@ export function registerRedemptionRoutes(app: Express) {
                     },
                     txHash: mintResult.txHash,
                     tokenId: mintResult.tokenId || null,
-                    status: 'completed',
+                    status: 'success',
                     completedAt: new Date(),
                   } as any)
                   .returning();
