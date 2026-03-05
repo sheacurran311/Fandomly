@@ -1,6 +1,16 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface BarChartCardProps {
   title: string;
   description?: string;
@@ -30,27 +40,17 @@ export function BarChartCard({
         <ResponsiveContainer width="100%" height={height}>
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-            <XAxis 
-              dataKey={xAxisKey} 
-              stroke="#888"
-              style={{ fontSize: '12px' }}
-            />
-            <YAxis 
-              stroke="#888"
-              style={{ fontSize: '12px' }}
-            />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: 'rgba(0, 0, 0, 0.9)', 
+            <XAxis dataKey={xAxisKey} stroke="#888" style={{ fontSize: '12px' }} />
+            <YAxis stroke="#888" style={{ fontSize: '12px' }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
                 border: '1px solid #333',
-                borderRadius: '8px'
+                borderRadius: '8px',
               }}
               labelStyle={{ color: '#fff' }}
             />
-            <Legend 
-              wrapperStyle={{ paddingTop: '20px' }}
-              iconType="rect"
-            />
+            <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="rect" />
             {dataKeys.map((dataKey) => (
               <Bar
                 key={dataKey.key}
@@ -66,4 +66,3 @@ export function BarChartCard({
     </Card>
   );
 }
-

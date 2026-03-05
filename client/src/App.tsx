@@ -53,6 +53,7 @@ import FanPoints from '@/pages/fan-dashboard/points';
 import FanNotifications from '@/pages/fan-dashboard/notifications';
 import FanCampaignDetail from '@/pages/fan-dashboard/campaign-detail';
 import FanSettings from '@/pages/fan-dashboard/settings';
+import FanRewardsStore from '@/pages/fan-dashboard/rewards-store';
 // RBAC Dashboard removed - users now route to type-specific dashboards
 import FanOnboardingProfile from '@/pages/fan-onboarding-profile';
 import FanChooseCreators from '@/pages/fan-choose-creators';
@@ -166,6 +167,7 @@ function Router() {
       />
       <Route path="/fan-dashboard/achievements" component={FanAchievements} />
       <Route path="/fan-dashboard/points" component={FanPoints} />
+      <Route path="/fan-dashboard/rewards-store" component={FanRewardsStore} />
       <Route path="/fan-dashboard/notifications" component={FanNotifications} />
       <Route path="/fan-dashboard/billing" component={BillingPage} />
       <Route path="/fan-dashboard/settings" component={FanSettings} />

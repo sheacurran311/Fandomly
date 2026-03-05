@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Facebook, User, CheckCircle, AlertCircle, Unlink, Plus, Users } from "lucide-react";
-import { useFacebookConnection } from "@/hooks/use-social-connection";
-import { type FacebookPage } from "@/lib/facebook";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Facebook, User, CheckCircle, Unlink, Plus, Users } from 'lucide-react';
+import { useFacebookConnection } from '@/hooks/use-social-connection';
+import { type FacebookPage } from '@/lib/facebook';
 
 export default function CreatorFacebookConnect() {
   const {
@@ -35,7 +36,9 @@ export default function CreatorFacebookConnect() {
       if (connection?.profileData?.pages?.length) {
         setPages(connection.profileData.pages);
         const savedId = localStorage.getItem('fandomly_active_facebook_page_id');
-        const page = connection.profileData.pages.find((p: any) => p.id === savedId) || connection.profileData.pages[0];
+        const page =
+          connection.profileData.pages.find((p: any) => p.id === savedId) ||
+          connection.profileData.pages[0];
         setSelectedPage(page);
       }
     } catch (error) {
@@ -61,9 +64,9 @@ export default function CreatorFacebookConnect() {
           <div className="space-y-3">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                {userInfo.picture?.data?.url ? (
-                  <img 
-                    src={userInfo.picture.data.url} 
+                {(userInfo as any).picture?.data?.url ? (
+                  <img
+                    src={(userInfo as any).picture.data.url}
                     alt={userInfo.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
@@ -82,8 +85,8 @@ export default function CreatorFacebookConnect() {
                     Rewarded
                   </Badge>
                 </div>
-                {userInfo.email && (
-                  <p className="text-xs text-gray-500">{userInfo.email}</p>
+                {(userInfo as any).email && (
+                  <p className="text-xs text-gray-500">{(userInfo as any).email}</p>
                 )}
               </div>
             </div>
@@ -91,8 +94,13 @@ export default function CreatorFacebookConnect() {
             {pages && pages.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-400 uppercase">Connected Pages</span>
-                  <Badge variant="secondary" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                  <span className="text-xs font-medium text-gray-400 uppercase">
+                    Connected Pages
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-500/20 text-blue-400 border-blue-500/30"
+                  >
                     <Users className="h-3 w-3 mr-1" />
                     {pages.length}
                   </Badge>
@@ -100,7 +108,7 @@ export default function CreatorFacebookConnect() {
 
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {pages.map((page) => (
-                    <div 
+                    <div
                       key={page.id}
                       className={`p-2 rounded-lg border cursor-pointer transition-colors ${
                         selectedPage?.id === page.id
@@ -112,14 +120,20 @@ export default function CreatorFacebookConnect() {
                       <div className="flex items-center space-x-2">
                         <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center overflow-hidden">
                           {page.picture?.data?.url ? (
-                            <img src={page.picture.data.url} alt={page.name} className="w-full h-full object-cover" />
+                            <img
+                              src={page.picture.data.url}
+                              alt={page.name}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <Users className="h-4 w-4 text-blue-400" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-white truncate">{page.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{page.category || 'Page'}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {page.category || 'Page'}
+                          </p>
                         </div>
                         {selectedPage?.id === page.id && (
                           <CheckCircle className="h-4 w-4 text-blue-400" />
@@ -131,9 +145,9 @@ export default function CreatorFacebookConnect() {
               </div>
             )}
 
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="w-full border-white/20 text-gray-300 hover:bg-white/10"
               onClick={disconnectFacebook}
               data-testid="button-disconnect-facebook-creator"
@@ -149,13 +163,15 @@ export default function CreatorFacebookConnect() {
                 <Facebook className="h-6 w-6 text-blue-500" />
               </div>
               <p className="text-sm text-white font-medium mb-1">Connect Facebook</p>
-              <p className="text-xs text-gray-400 mb-2">Manage your Facebook pages and reach your audience</p>
+              <p className="text-xs text-gray-400 mb-2">
+                Manage your Facebook pages and reach your audience
+              </p>
               <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
                 +500 Points
               </Badge>
             </div>
-            
-            <Button 
+
+            <Button
               className="w-full bg-brand-primary hover:bg-brand-primary/80"
               onClick={connectFacebook}
               disabled={isConnecting}
@@ -164,7 +180,7 @@ export default function CreatorFacebookConnect() {
               <Plus className="h-4 w-4 mr-2" />
               {isConnecting ? 'Connecting...' : 'Connect Facebook'}
             </Button>
-            
+
             <div className="text-center">
               <p className="text-xs text-gray-500">
                 Connect to manage campaigns and engage with your community

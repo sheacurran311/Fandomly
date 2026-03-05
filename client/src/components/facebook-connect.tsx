@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,7 +45,9 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       if (connection?.profileData?.pages?.length) {
         setConnectedPages(connection.profileData.pages);
         const savedId = localStorage.getItem('fandomly_active_facebook_page_id');
-        const page = connection.profileData.pages.find((p: any) => p.id === savedId) || connection.profileData.pages[0];
+        const page =
+          connection.profileData.pages.find((p: any) => p.id === savedId) ||
+          connection.profileData.pages[0];
         setSelectedPage(page);
       }
     } catch (error) {
@@ -80,8 +83,12 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
       if (data?.success) {
         toast({ title: 'Profile Updated', description: 'Facebook profile imported.' });
       }
-    } catch (error) {
-      toast({ title: 'Import Failed', description: 'Could not import your Facebook profile data.', variant: 'destructive' });
+    } catch {
+      toast({
+        title: 'Import Failed',
+        description: 'Could not import your Facebook profile data.',
+        variant: 'destructive',
+      });
     } finally {
       setIsImportingProfile(false);
     }
@@ -90,8 +97,12 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
   const handleConnect = async () => {
     try {
       await connectFacebook();
-    } catch (error) {
-      toast({ title: 'Connection Error', description: 'Unable to connect to Facebook', variant: 'destructive' });
+    } catch {
+      toast({
+        title: 'Connection Error',
+        description: 'Unable to connect to Facebook',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -110,12 +121,17 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
             Connect Facebook Page
           </CardTitle>
           <p className="text-gray-300 text-sm">
-            Connect your Facebook page to run social media campaigns and track engagement for your loyalty program.
+            Connect your Facebook page to run social media campaigns and track engagement for your
+            loyalty program.
           </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <Button onClick={handleConnect} disabled={isConnecting} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
               {isConnecting ? 'Connecting…' : 'Connect with Facebook'}
             </Button>
           </div>
@@ -157,14 +173,16 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
             {(userInfo as any).email && <p className="text-xs">Email: {(userInfo as any).email}</p>}
             <p className="text-xs">ID: {userInfo.id}</p>
             {(userInfo as any).likes && (
-              <p className="text-xs">Likes: {(userInfo as any).likes.data?.length || 0} pages/interests</p>
+              <p className="text-xs">
+                Likes: {(userInfo as any).likes.data?.length || 0} pages/interests
+              </p>
             )}
             {user && (
               <div className="pt-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => importFacebookProfile(userInfo)}
+                  onClick={() => importFacebookProfile(userInfo as any as FacebookUser)}
                   disabled={isImportingProfile}
                   className="text-blue-400 border-blue-600 hover:bg-blue-500/10"
                   data-testid="button-import-facebook-profile"
@@ -206,9 +224,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
                           {(page as any).fan_count.toLocaleString()}
                         </Badge>
                       )}
-                      {selectedPage?.id === page.id && (
-                        <Check className="h-4 w-4 text-green-400" />
-                      )}
+                      {selectedPage?.id === page.id && <Check className="h-4 w-4 text-green-400" />}
                     </div>
                   </div>
                 </div>
@@ -234,11 +250,18 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       credentials: 'include',
-                      body: JSON.stringify({ pages: mapped })
+                      body: JSON.stringify({ pages: mapped }),
                     });
-                    toast({ title: 'Saved Pages', description: 'Your pages are saved for use in campaigns and webhooks.' });
+                    toast({
+                      title: 'Saved Pages',
+                      description: 'Your pages are saved for use in campaigns and webhooks.',
+                    });
                   } catch (e: any) {
-                    toast({ title: 'Save Failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+                    toast({
+                      title: 'Save Failed',
+                      description: e?.message || 'Unknown error',
+                      variant: 'destructive',
+                    });
                   }
                 }}
               >
@@ -255,7 +278,8 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
               <span className="font-medium">Campaign Ready</span>
             </div>
             <p className="text-gray-300 text-sm">
-              Your Facebook page "{selectedPage.name}" is connected and ready for social media campaigns.
+              Your Facebook page &ldquo;{selectedPage.name}&rdquo; is connected and ready for social
+              media campaigns.
             </p>
           </div>
         )}
@@ -263,7 +287,7 @@ export function FacebookConnect({ onConnectionSuccess, className }: FacebookConn
         {connectedPages.length === 0 && (
           <div className="text-center py-4">
             <p className="text-gray-400 text-sm">
-              No Facebook pages found. Make sure you're an admin of at least one Facebook page.
+              No Facebook pages found. Make sure you&apos;re an admin of at least one Facebook page.
             </p>
           </div>
         )}

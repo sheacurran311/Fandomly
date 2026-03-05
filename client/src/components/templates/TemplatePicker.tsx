@@ -304,9 +304,9 @@ export function TemplatePicker({ open, onOpenChange, onTaskCreated }: TemplatePi
 
     // Map config fields to task columns
     let targetUrl: string | undefined;
-    if (config.page_url) targetUrl = config.page_url;
-    if (config.channel_url) targetUrl = config.channel_url;
-    if (config.artist_url) targetUrl = config.artist_url;
+    if (config.page_url) targetUrl = String(config.page_url);
+    if (config.channel_url) targetUrl = String(config.channel_url);
+    if (config.artist_url) targetUrl = String(config.artist_url);
 
     // Fold misc inputs into customInstructions for now
     const customBits: string[] = [];

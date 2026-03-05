@@ -1,28 +1,29 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { 
-  TrendingUp, 
-  Star, 
-  Trophy, 
-  Crown,
-  Zap,
-  Target
-} from "lucide-react";
-import { type UserLevel } from "@shared/schema";
+import { createElement } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { TrendingUp, Star, Trophy, Crown, Zap, Target } from 'lucide-react';
+interface UserLevel {
+  currentLevel: number | null;
+  levelPoints: number | null;
+  nextLevelThreshold: number | null;
+  totalPoints: number | null;
+  achievementsUnlocked: number | null;
+}
 
 interface LevelProgressProps {
   userLevel: UserLevel;
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
   showDetails?: boolean;
 }
 
-export default function LevelProgress({ 
-  userLevel, 
-  size = "md",
-  showDetails = true 
-}: LevelProgressProps) {
-  const progressPercentage = ((userLevel.levelPoints ?? 0) / (userLevel.nextLevelThreshold ?? 1000)) * 100;
+export default function LevelProgress({
+  userLevel,
+  size = 'md',
+  showDetails = true,
+}: LevelProgressProps): React.ReactElement {
+  const progressPercentage =
+    ((userLevel.levelPoints ?? 0) / (userLevel.nextLevelThreshold ?? 1000)) * 100;
   const pointsToNext = (userLevel.nextLevelThreshold ?? 1000) - (userLevel.levelPoints ?? 0);
 
   const getLevelIcon = (level: number | null) => {
@@ -35,32 +36,39 @@ export default function LevelProgress({
 
   const getLevelColor = (level: number | null) => {
     const lvl = level ?? 1;
-    if (lvl >= 50) return "from-purple-400 to-purple-600";
-    if (lvl >= 25) return "from-yellow-400 to-yellow-600";
-    if (lvl >= 10) return "from-blue-400 to-blue-600";
-    return "from-green-400 to-green-600";
+    if (lvl >= 50) return 'from-purple-400 to-purple-600';
+    if (lvl >= 25) return 'from-yellow-400 to-yellow-600';
+    if (lvl >= 10) return 'from-blue-400 to-blue-600';
+    return 'from-green-400 to-green-600';
   };
 
   const getLevelBadgeColor = (level: number | null) => {
     const lvl = level ?? 1;
-    if (lvl >= 50) return "bg-purple-500/20 text-purple-300 border-purple-500/30";
-    if (lvl >= 25) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
-    if (lvl >= 10) return "bg-blue-500/20 text-blue-300 border-blue-500/30";
-    return "bg-green-500/20 text-green-300 border-green-500/30";
+    if (lvl >= 50) return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+    if (lvl >= 25) return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+    if (lvl >= 10) return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+    return 'bg-green-500/20 text-green-300 border-green-500/30';
   };
 
-  const LevelIcon = getLevelIcon(userLevel.currentLevel);
+  const levelIcon = getLevelIcon(userLevel.currentLevel);
 
-  if (size === "sm") {
+  if (size === 'sm') {
     return (
       <div className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 border border-white/10">
-        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getLevelColor(userLevel.currentLevel)} flex items-center justify-center`}>
-          <LevelIcon className="h-5 w-5 text-white" />
+        <div
+          className={`w-10 h-10 rounded-full bg-gradient-to-br ${getLevelColor(userLevel.currentLevel)} flex items-center justify-center`}
+        >
+          {createElement(levelIcon, { className: 'h-5 w-5 text-white' })}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1">
-            <span className="text-sm font-medium text-white">Level {userLevel.currentLevel ?? 1}</span>
-            <Badge variant="outline" className={`text-xs ${getLevelBadgeColor(userLevel.currentLevel)}`}>
+            <span className="text-sm font-medium text-white">
+              Level {userLevel.currentLevel ?? 1}
+            </span>
+            <Badge
+              variant="outline"
+              className={`text-xs ${getLevelBadgeColor(userLevel.currentLevel)}`}
+            >
               {(userLevel.totalPoints ?? 0).toLocaleString()} XP
             </Badge>
           </div>
@@ -75,8 +83,10 @@ export default function LevelProgress({
       <CardHeader className="pb-4">
         <CardTitle className="text-white flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getLevelColor(userLevel.currentLevel)} flex items-center justify-center`}>
-              <LevelIcon className="h-6 w-6 text-white" />
+            <div
+              className={`w-12 h-12 rounded-full bg-gradient-to-br ${getLevelColor(userLevel.currentLevel)} flex items-center justify-center`}
+            >
+              {createElement(levelIcon, { className: 'h-6 w-6 text-white' })}
             </div>
             <div>
               <div className="flex items-center space-x-2">
@@ -95,12 +105,14 @@ export default function LevelProgress({
           <div className="text-right">
             <div className="flex items-center space-x-1 text-brand-secondary">
               <Zap className="h-4 w-4" />
-              <span className="text-sm font-medium">{userLevel.achievementsUnlocked ?? 0} badges</span>
+              <span className="text-sm font-medium">
+                {userLevel.achievementsUnlocked ?? 0} badges
+              </span>
             </div>
           </div>
         </CardTitle>
       </CardHeader>
-      
+
       {showDetails && (
         <CardContent className="pt-0">
           <div className="space-y-4">
