@@ -61,8 +61,6 @@ export default function TaskBuilder() {
     enabled: !!user?.id,
   });
 
-  const [hasInitialized, setHasInitialized] = useState(false);
-
   // Auto-select most recently created program (sync during render, not in effect)
   if (programs.length > 0 && !selectedProgramId && !isEditMode && !hasInitialized) {
     const sortedPrograms = [...(programs as any[])].sort(
