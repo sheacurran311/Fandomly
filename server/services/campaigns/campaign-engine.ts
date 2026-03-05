@@ -446,30 +446,39 @@ export class CampaignEngineService {
       return { success: false, message: 'Not participating in campaign' };
     }
 
-    const pending = Array.isArray(participation.tasksPendingVerification)
-      ? participation.tasksPendingVerification
-      : [];
-    const alreadyPending = pending.some(
-      (p: unknown) => (p as Record<string, unknown>).assignmentId === assignmentId
-    );
-    if (alreadyPending) {
-      return { success: true, message: 'Task already marked for deferred verification' };
-    }
-
-    const updated = [...pending, { taskId, assignmentId, completedAt: new Date().toISOString() }];
-
-    await db
+    // Atomic JSONB append with dedup check to prevent race conditions.
+    const newEntry = JSON.stringify({
+      taskId,
+      assignmentId,
+      completedAt: new Date().toISOString(),
+    });
+    const result = await db
       .update(campaignParticipations)
       .set({
-        tasksPendingVerification: updated,
-        progressMetadata: {
-          ...(participation.progressMetadata && typeof participation.progressMetadata === 'object'
-            ? (participation.progressMetadata as Record<string, unknown>)
-            : {}),
-          lastActivityAt: new Date().toISOString(),
-        },
-      })
-      .where(eq(campaignParticipations.id, participation.id));
+        tasksPendingVerification: sql`COALESCE(${campaignParticipations.tasksPendingVerification}, '[]'::jsonb) || ${`[${newEntry}]`}::jsonb`,
+        progressMetadata: sql`jsonb_set(
+          COALESCE(${campaignParticipations.progressMetadata}, '{}'::jsonb),
+          '{lastActivityAt}',
+          ${JSON.stringify(new Date().toISOString())}::jsonb
+        )`,
+      } as Record<string, unknown>)
+      .where(
+        and(
+          eq(campaignParticipations.id, participation.id),
+          // Only append if this assignmentId isn't already in the array
+          sql`NOT EXISTS (
+            SELECT 1 FROM jsonb_array_elements(
+              COALESCE(${campaignParticipations.tasksPendingVerification}, '[]'::jsonb)
+            ) AS elem
+            WHERE elem->>'assignmentId' = ${assignmentId}
+          )`
+        )
+      )
+      .returning({ id: campaignParticipations.id });
+
+    if (result.length === 0) {
+      return { success: true, message: 'Task already marked for deferred verification' };
+    }
 
     return { success: true, message: 'Task marked for verification at campaign end' };
   }
@@ -592,13 +601,30 @@ export class CampaignEngineService {
       };
     }
 
+    // Atomically claim the rewards slot to prevent double-claim race condition.
+    // Only one concurrent request can set rewardsClaimedAt from NULL.
+    const claimLock = await db
+      .update(campaignParticipations)
+      .set({ rewardsClaimedAt: new Date() })
+      .where(
+        and(
+          eq(campaignParticipations.id, participation.id),
+          sql`${campaignParticipations.rewardsClaimedAt} IS NULL`
+        )
+      )
+      .returning({ id: campaignParticipations.id });
+
+    if (claimLock.length === 0) {
+      // Another concurrent request already claimed — re-read and return
+      return {
+        success: true,
+        claimedRewards: (participation.claimedRewards as ClaimedRewardItem[]) || [],
+        error: 'Rewards already claimed',
+      };
+    }
+
     const pending = (participation.pendingRewards as CompletionRewardItem[]) || [];
     if (pending.length === 0) {
-      // No flexible rewards to claim -- just mark as claimed
-      await db
-        .update(campaignParticipations)
-        .set({ rewardsClaimedAt: new Date() })
-        .where(eq(campaignParticipations.id, participation.id));
       return { success: true, claimedRewards: [] };
     }
 
@@ -819,32 +845,34 @@ export class CampaignEngineService {
   // --------------------------------------------------------------------------
 
   private async addCompletedTask(userId: string, campaignId: string, assignmentId: string) {
-    const participation = await db.query.campaignParticipations.findFirst({
-      where: and(
-        eq(campaignParticipations.campaignId, campaignId),
-        eq(campaignParticipations.memberId, userId)
-      ),
-    });
-
-    if (!participation) return;
-
-    const completed = (participation.tasksCompleted as string[]) || [];
-    if (completed.includes(assignmentId)) return;
-
-    await db
+    // Atomic JSONB array append with dedup guard in WHERE clause.
+    // Prevents lost updates when concurrent task completions race on the same campaign.
+    const result = await db
       .update(campaignParticipations)
       .set({
-        tasksCompleted: [...completed, assignmentId],
-        participationCount: (participation.participationCount || 0) + 1,
+        tasksCompleted: sql`COALESCE(${campaignParticipations.tasksCompleted}, '[]'::jsonb) || ${JSON.stringify([assignmentId])}::jsonb`,
+        participationCount: sql`COALESCE(${campaignParticipations.participationCount}, 0) + 1`,
         lastParticipation: new Date(),
-        progressMetadata: {
-          ...(participation.progressMetadata && typeof participation.progressMetadata === 'object'
-            ? (participation.progressMetadata as Record<string, unknown>)
-            : {}),
-          lastActivityAt: new Date().toISOString(),
-        },
-      })
-      .where(eq(campaignParticipations.id, participation.id));
+        progressMetadata: sql`jsonb_set(
+          COALESCE(${campaignParticipations.progressMetadata}, '{}'::jsonb),
+          '{lastActivityAt}',
+          ${JSON.stringify(new Date().toISOString())}::jsonb
+        )`,
+      } as Record<string, unknown>)
+      .where(
+        and(
+          eq(campaignParticipations.campaignId, campaignId),
+          eq(campaignParticipations.memberId, userId),
+          // Only append if not already in the array (dedup guard)
+          sql`NOT (COALESCE(${campaignParticipations.tasksCompleted}, '[]'::jsonb) @> ${JSON.stringify([assignmentId])}::jsonb)`
+        )
+      )
+      .returning({ id: campaignParticipations.id });
+
+    if (result.length === 0) {
+      // Either participation doesn't exist or task already completed — both are safe no-ops
+      return;
+    }
   }
 
   private async checkNFTOwnership(userId: string, collectionIds: string[]): Promise<boolean> {

@@ -123,17 +123,23 @@ export async function handleParticleCallback(
   // 2. Verify the wallet belongs to a user in this Particle project
   //    This confirms the login was genuine — only wallets created through
   //    Particle's auth flow for this project pass this check.
-  const isVerified = await verifyWalletIsProjectUser(walletAddress);
+  let isVerified = await verifyWalletIsProjectUser(walletAddress);
   if (!isVerified) {
-    // This can happen on first login before Particle registers the wallet server-side.
-    // Particle may take a moment to propagate new wallet registrations, so we allow
-    // the login through if we have a valid uuid (the user just authenticated).
-    // We log a warning but don't block — the uuid/email from the client is trusted
-    // because the Particle modal itself authenticated the user.
+    // Particle may take a moment to propagate new wallet registrations.
+    // Retry once with a short delay before rejecting.
     console.warn(
-      '[Particle Auth] Wallet not yet registered as project user — allowing through on first login.',
+      '[Particle Auth] Wallet not yet registered as project user — retrying after delay.',
       { walletAddress, particleUuid }
     );
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    isVerified = await verifyWalletIsProjectUser(walletAddress);
+    if (!isVerified) {
+      console.error('[Particle Auth] Wallet verification FAILED after retry — blocking login.', {
+        walletAddress,
+        particleUuid,
+      });
+      return { success: false, error: 'Wallet verification failed. Please try again.' };
+    }
   }
 
   if (!particleUuid) {

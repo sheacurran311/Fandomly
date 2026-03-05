@@ -641,11 +641,11 @@ export class UnifiedVerificationService {
     const priority = this.calculateReviewPriority(params.taskType);
 
     await db.insert(manualReviewQueue).values({
-      taskCompletionId: params.taskCompletionId as unknown as number,
-      tenantId: params.tenantId as unknown as number,
-      creatorId: params.creatorId as unknown as number,
-      fanId: params.fanId as unknown as number,
-      taskId: params.taskId as unknown as number,
+      taskCompletionId: params.taskCompletionId,
+      tenantId: params.tenantId,
+      creatorId: params.creatorId,
+      fanId: params.fanId,
+      taskId: params.taskId,
       platform: params.platform,
       taskType: params.taskType,
       taskName: params.taskName,
@@ -687,7 +687,7 @@ export class UnifiedVerificationService {
   /**
    * Award points for verified task completion
    */
-  private async awardPoints(taskCompletionId: string, taskId: string): Promise<number> {
+  async awardPoints(taskCompletionId: string, taskId: string): Promise<number> {
     // Get task completion to get userId
     const completion = await db.query.taskCompletions.findFirst({
       where: eq(taskCompletions.id, taskCompletionId),
@@ -845,8 +845,8 @@ export class UnifiedVerificationService {
    * Admin: Approve manual review
    */
   async approveManualReview(
-    reviewId: number,
-    reviewerId: number,
+    reviewId: string,
+    reviewerId: string,
     reviewNotes?: string
   ): Promise<void> {
     const review = await db.query.manualReviewQueue.findFirst({
@@ -875,10 +875,10 @@ export class UnifiedVerificationService {
         status: 'completed',
         verifiedAt: new Date(),
       })
-      .where(eq(taskCompletions.id, String(review.taskCompletionId)));
+      .where(eq(taskCompletions.id, review.taskCompletionId));
 
-    // Award points (taskCompletionId may be number in legacy schema)
-    await this.awardPoints(String(review.taskCompletionId), String(review.taskId));
+    // Award points
+    await this.awardPoints(review.taskCompletionId, review.taskId);
 
     // TODO: Send notification to fan
   }
@@ -887,8 +887,8 @@ export class UnifiedVerificationService {
    * Admin: Reject manual review
    */
   async rejectManualReview(
-    reviewId: number,
-    reviewerId: number,
+    reviewId: string,
+    reviewerId: string,
     reviewNotes: string
   ): Promise<void> {
     const review = await db.query.manualReviewQueue.findFirst({
@@ -910,14 +910,13 @@ export class UnifiedVerificationService {
       })
       .where(eq(manualReviewQueue.id, reviewId));
 
-    // Update task completion
+    // Update task completion as rejected
     await db
       .update(taskCompletions)
       .set({
-        status: 'completed',
-        verifiedAt: new Date(),
+        status: 'rejected',
       })
-      .where(eq(taskCompletions.id, String(review.taskCompletionId)));
+      .where(eq(taskCompletions.id, review.taskCompletionId));
 
     // TODO: Send notification to fan
   }

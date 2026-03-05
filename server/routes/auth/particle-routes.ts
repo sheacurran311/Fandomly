@@ -14,6 +14,7 @@
 import type { Express, Request, Response } from 'express';
 import { handleParticleCallback } from '../../services/auth/particle-auth-service';
 import { signRefreshToken } from '../../services/auth/jwt-service';
+import { authRateLimiter } from '../../middleware/rate-limit';
 
 export function registerParticleAuthRoutes(app: Express) {
   /**
@@ -29,7 +30,7 @@ export function registerParticleAuthRoutes(app: Express) {
    *
    * Response: Same shape as POST /api/auth/social/callback for consistency
    */
-  app.post('/api/auth/particle/callback', async (req: Request, res: Response) => {
+  app.post('/api/auth/particle/callback', authRateLimiter, async (req: Request, res: Response) => {
     try {
       const { particleToken, walletAddress, particleUuid, userEmail, userName, userAvatar } =
         req.body;

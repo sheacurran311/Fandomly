@@ -10,6 +10,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import crypto from 'crypto';
 import type { Express } from 'express';
 import { db } from '../../db';
 import {
@@ -93,14 +94,14 @@ export function registerBadgeRoutes(app: Express) {
     try {
       const userId = req.user!.id;
 
-      // Get user's wallet address
+      // Get user's wallet address (Fandomly Chain / Avalanche L1)
       const [user] = await db
-        .select({ walletAddress: users.walletAddress })
+        .select({ avalancheL1Address: users.avalancheL1Address })
         .from(users)
         .where(eq(users.id, userId))
         .limit(1);
 
-      if (!user?.walletAddress) {
+      if (!user?.avalancheL1Address) {
         return res.json({
           badges: [],
           message: 'No wallet address connected. Connect wallet to see your badges.',
@@ -115,7 +116,7 @@ export function registerBadgeRoutes(app: Express) {
           nm.tx_hash,
           nm.token_id,
           nm.mint_reason,
-          nm.minted_at,
+          nm.completed_at,
           bt.name as badge_name,
           bt.description as badge_description,
           bt.category,
@@ -127,8 +128,8 @@ export function registerBadgeRoutes(app: Express) {
         INNER JOIN fandomly_badge_templates bt ON nm.badge_template_id = bt.id
         WHERE nm.recipient_user_id = ${userId}
           AND nm.badge_template_id IS NOT NULL
-          AND nm.status = 'completed'
-        ORDER BY nm.minted_at DESC
+          AND nm.status = 'success'
+        ORDER BY nm.completed_at DESC
       `);
 
       const badges = (userBadgesResult as any).rows || [];
@@ -145,7 +146,7 @@ export function registerBadgeRoutes(app: Express) {
 
           for (const badgeTypeId of uniqueBadgeTypeIds) {
             const balance = await nftService.getBadgeBalance(
-              user.walletAddress as Address,
+              user.avalancheL1Address as Address,
               badgeTypeId as number
             );
             onChainBalances[badgeTypeId as number] = balance.toString();
@@ -165,7 +166,7 @@ export function registerBadgeRoutes(app: Express) {
 
       res.json({
         badges: badgesWithBalance,
-        walletAddress: user.walletAddress,
+        walletAddress: user.avalancheL1Address,
         totalBadges: badges.length,
       });
     } catch (error) {
@@ -188,7 +189,7 @@ export function registerBadgeRoutes(app: Express) {
           id: users.id,
           username: users.username,
           avatar: users.avatar,
-          walletAddress: users.walletAddress,
+          avalancheL1Address: users.avalancheL1Address,
         })
         .from(users)
         .where(eq(users.id, userId))
@@ -204,7 +205,7 @@ export function registerBadgeRoutes(app: Express) {
           nm.id as mint_id,
           nm.badge_template_id,
           nm.token_id,
-          nm.minted_at,
+          nm.completed_at,
           bt.name as badge_name,
           bt.description as badge_description,
           bt.category,
@@ -215,8 +216,8 @@ export function registerBadgeRoutes(app: Express) {
         INNER JOIN fandomly_badge_templates bt ON nm.badge_template_id = bt.id
         WHERE nm.recipient_user_id = ${userId}
           AND nm.badge_template_id IS NOT NULL
-          AND nm.status = 'completed'
-        ORDER BY nm.minted_at DESC
+          AND nm.status = 'success'
+        ORDER BY nm.completed_at DESC
       `);
 
       const badges = (userBadgesResult as any).rows || [];
@@ -265,7 +266,7 @@ export function registerBadgeRoutes(app: Express) {
         FROM nft_mints
         WHERE recipient_user_id = ${userId}
           AND badge_template_id = ${badgeTypeId}
-          AND status = 'completed'
+          AND status = 'success'
       `);
 
         const alreadyClaimed = parseInt((existingMintResult as any).rows?.[0]?.count || '0') > 0;
@@ -409,7 +410,7 @@ export function registerBadgeRoutes(app: Express) {
         FROM nft_mints
         WHERE recipient_user_id = ${userId}
           AND badge_template_id = ${badgeTypeId}
-          AND status = 'completed'
+          AND status = 'success'
       `);
 
         const alreadyClaimed = parseInt((existingMintResult as any).rows?.[0]?.count || '0') > 0;
@@ -418,14 +419,14 @@ export function registerBadgeRoutes(app: Express) {
           return res.status(400).json({ error: 'Badge already claimed' });
         }
 
-        // Get user's wallet address
+        // Get user's wallet address (Fandomly Chain / Avalanche L1)
         const [user] = await db
-          .select({ walletAddress: users.walletAddress })
+          .select({ avalancheL1Address: users.avalancheL1Address })
           .from(users)
           .where(eq(users.id, userId))
           .limit(1);
 
-        if (!user?.walletAddress) {
+        if (!user?.avalancheL1Address) {
           return res.status(400).json({
             error: 'No wallet address found. Connect your wallet first.',
             requiresWallet: true,
@@ -507,7 +508,7 @@ export function registerBadgeRoutes(app: Express) {
 
         // Mint the badge on-chain
         const mintResult = await nftService.mintBadge(
-          user.walletAddress as Address,
+          user.avalancheL1Address as Address,
           badgeTemplate.onChainBadgeTypeId,
           1
         );
@@ -516,14 +517,14 @@ export function registerBadgeRoutes(app: Express) {
         const [nftMint] = await db
           .insert(nftMints)
           .values({
-            crossmintActionId: `fandomly-badge-${Date.now()}-${userId}`,
+            crossmintActionId: crypto.randomUUID(),
             badgeTemplateId: badgeTypeId,
             recipientUserId: userId,
-            recipientWalletAddress: user.walletAddress,
+            recipientWalletAddress: user.avalancheL1Address,
             recipientChain: 'fandomly-chain',
             mintReason: 'badge_achievement',
             txHash: mintResult.txHash,
-            status: 'completed',
+            status: 'success',
             completedAt: new Date(),
           } as any)
           .returning();

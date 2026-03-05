@@ -105,8 +105,7 @@ export default function ProgramBuilderNew() {
   const { data: programCampaigns = [] } = useQuery<Campaign[]>({
     queryKey: [`/api/campaigns/program/${selectedProgram?.id}`],
     queryFn: async () => {
-      const response = await fetchApi(`/api/campaigns/creator/${user?.creator?.id}`);
-      const allCampaigns = await (response as any).json();
+      const allCampaigns = await fetchApi(`/api/campaigns/creator/${user?.creator?.id}`);
       // Filter campaigns by programId
       return allCampaigns.filter((c: Campaign) => c.programId === selectedProgram?.id);
     },
@@ -117,8 +116,7 @@ export default function ProgramBuilderNew() {
   const { data: programTasks = [] } = useQuery<Task[]>({
     queryKey: [`/api/tasks/program/${selectedProgram?.id}`],
     queryFn: async () => {
-      const response = await fetchApi('/api/tasks');
-      const allTasks = await (response as any).json();
+      const allTasks = await fetchApi('/api/tasks');
       // Filter tasks by programId
       return allTasks.filter((t: Task) => t.programId === selectedProgram?.id);
     },
