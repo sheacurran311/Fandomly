@@ -21,6 +21,7 @@
  *   GET    /api/nft/creator-collections/:address — Get creator's collections
  *   GET    /api/nft/stats                  — Platform NFT statistics
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Express } from 'express';
 import { eq, desc } from 'drizzle-orm';
@@ -103,12 +104,10 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Upload image error:', error);
-        res
-          .status(500)
-          .json({
-            error: 'Failed to upload image',
-            message: error instanceof Error ? error.message : String(error),
-          });
+        res.status(500).json({
+          error: 'Failed to upload image',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   );
@@ -162,12 +161,10 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Upload video error:', error);
-        res
-          .status(500)
-          .json({
-            error: 'Failed to upload video',
-            message: error instanceof Error ? error.message : String(error),
-          });
+        res.status(500).json({
+          error: 'Failed to upload video',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   );
@@ -212,7 +209,6 @@ export function registerNFTRoutes(app: Express) {
       const nextId = await blockchain.getNextCollectionId();
       const onChainCollectionId = Number(nextId) - 1;
 
-      // Save to database
       const newCollection: InsertNftCollection = {
         creatorId: creator?.id,
         tenantId: user.currentTenantId,
@@ -227,7 +223,7 @@ export function registerNFTRoutes(app: Express) {
           maxSupply,
           collectionImageUrl: imageUrl,
           onChainCollectionId,
-        },
+        } as any,
         isActive: true,
         deployedAt: new Date(),
       };
@@ -245,12 +241,10 @@ export function registerNFTRoutes(app: Express) {
       });
     } catch (error: unknown) {
       console.error('Create collection error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to create collection',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to create collection',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -262,7 +256,7 @@ export function registerNFTRoutes(app: Express) {
     try {
       const creator = await storage.getCreatorByUserId(req.user!.id);
 
-      let collections;
+      let collections: (typeof nftCollections.$inferSelect)[] = [];
       if (req.user?.role === 'fandomly_admin') {
         collections = await db
           .select()
@@ -274,19 +268,15 @@ export function registerNFTRoutes(app: Express) {
           .from(nftCollections)
           .where(eq(nftCollections.creatorId, creator.id))
           .orderBy(desc(nftCollections.createdAt));
-      } else {
-        collections = [];
       }
 
       res.json({ collections });
     } catch (error: unknown) {
       console.error('Get collections error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch collections',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch collections',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -306,7 +296,6 @@ export function registerNFTRoutes(app: Express) {
 
       if (!collection) return res.status(404).json({ error: 'Collection not found' });
 
-      // Optionally fetch on-chain data
       let onChainData;
       const blockchain = getBlockchainNFTService();
       if (
@@ -314,9 +303,10 @@ export function registerNFTRoutes(app: Express) {
         (collection.metadata as Record<string, unknown>)?.onChainCollectionId !== undefined
       ) {
         try {
-          onChainData = await blockchain.getNFTCollection(
-            (collection.metadata as Record<string, unknown>).onChainCollectionId
-          );
+          const onChainId = (collection.metadata as Record<string, unknown>).onChainCollectionId;
+          if (typeof onChainId === 'number') {
+            onChainData = await blockchain.getNFTCollection(onChainId);
+          }
         } catch {
           // On-chain data fetch is best-effort
         }
@@ -325,12 +315,10 @@ export function registerNFTRoutes(app: Express) {
       res.json({ collection, onChainData });
     } catch (error: unknown) {
       console.error('Get collection error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch collection',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch collection',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -374,11 +362,10 @@ export function registerNFTRoutes(app: Express) {
 
       const onChainCollectionId = (collection.metadata as Record<string, unknown>)
         ?.onChainCollectionId;
-      if (onChainCollectionId === undefined) {
-        return res.status(400).json({ error: 'Collection has no on-chain ID' });
+      if (onChainCollectionId === undefined || typeof onChainCollectionId !== 'number') {
+        return res.status(400).json({ error: 'Collection has no valid on-chain ID' });
       }
 
-      // Resolve token URI
       let finalTokenUri = tokenUri;
       if (!finalTokenUri && metadata && ipfs) {
         const uploaded = await ipfs.uploadMetadata(metadata, metadata.name);
@@ -388,7 +375,6 @@ export function registerNFTRoutes(app: Express) {
         return res.status(400).json({ error: 'tokenUri or metadata is required' });
       }
 
-      // Mint on-chain
       const mintResult = await blockchain.mintNFT(
         recipientAddress as Address,
         onChainCollectionId,
@@ -440,12 +426,10 @@ export function registerNFTRoutes(app: Express) {
       });
     } catch (error: unknown) {
       console.error('Mint NFT error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to mint NFT',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to mint NFT',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -477,12 +461,10 @@ export function registerNFTRoutes(app: Express) {
       res.json({ address, tokens, total: tokens.length });
     } catch (error: unknown) {
       console.error('Get tokens error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch tokens',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch tokens',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -565,7 +547,6 @@ export function registerNFTRoutes(app: Express) {
         const nextId = await blockchain.getNextBadgeTypeId();
         const onChainBadgeTypeId = Number(nextId) - 1;
 
-        // Save to database
         const [savedBadge] = await db
           .insert(fandomlyBadgeTemplates)
           .values({
@@ -580,7 +561,7 @@ export function registerNFTRoutes(app: Express) {
                 { trait_type: 'Soulbound', value: soulbound ? 'Yes' : 'No' },
               ],
               onChainBadgeTypeId,
-            },
+            } as any,
             isActive: true,
             totalIssued: 0,
           })
@@ -597,12 +578,10 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Create badge type error:', error);
-        res
-          .status(500)
-          .json({
-            error: 'Failed to create badge type',
-            message: error instanceof Error ? error.message : String(error),
-          });
+        res.status(500).json({
+          error: 'Failed to create badge type',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   );
@@ -639,11 +618,10 @@ export function registerNFTRoutes(app: Express) {
       if (!badge) return res.status(404).json({ error: 'Badge template not found' });
 
       const onChainBadgeTypeId = (badge.nftMetadata as Record<string, unknown>)?.onChainBadgeTypeId;
-      if (onChainBadgeTypeId === undefined) {
-        return res.status(400).json({ error: 'Badge has no on-chain type ID' });
+      if (onChainBadgeTypeId === undefined || typeof onChainBadgeTypeId !== 'number') {
+        return res.status(400).json({ error: 'Badge has no valid on-chain type ID' });
       }
 
-      // Mint on-chain
       const mintResult = await blockchain.mintBadge(
         recipientAddress as Address,
         onChainBadgeTypeId,
@@ -687,12 +665,10 @@ export function registerNFTRoutes(app: Express) {
       });
     } catch (error: unknown) {
       console.error('Mint badge error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to mint badge',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to mint badge',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -703,7 +679,7 @@ export function registerNFTRoutes(app: Express) {
   app.post(
     '/api/nft/badges/batch-mint',
     authenticateUser,
-    requireRole(['fandomly_admin', 'creator']),
+    requireRole(['fandomly_admin', 'customer_admin']),
     async (req: AuthenticatedRequest, res) => {
       try {
         const blockchain = getBlockchainNFTService();
@@ -736,8 +712,8 @@ export function registerNFTRoutes(app: Express) {
 
         const onChainBadgeTypeId = (badge.nftMetadata as Record<string, unknown>)
           ?.onChainBadgeTypeId;
-        if (onChainBadgeTypeId === undefined) {
-          return res.status(400).json({ error: 'Badge has no on-chain type ID' });
+        if (onChainBadgeTypeId === undefined || typeof onChainBadgeTypeId !== 'number') {
+          return res.status(400).json({ error: 'Badge has no valid on-chain type ID' });
         }
 
         const addresses = recipients.map((r: string | { walletAddress: string }) =>
@@ -759,12 +735,10 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Batch mint badge error:', error);
-        res
-          .status(500)
-          .json({
-            error: 'Failed to batch mint badges',
-            message: error instanceof Error ? error.message : String(error),
-          });
+        res.status(500).json({
+          error: 'Failed to batch mint badges',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   );
@@ -792,14 +766,14 @@ export function registerNFTRoutes(app: Express) {
         (badge.nftMetadata as Record<string, unknown>)?.onChainBadgeTypeId !== undefined
       ) {
         try {
-          onChainData = await blockchain.getBadgeType(
-            (badge.nftMetadata as Record<string, unknown>).onChainBadgeTypeId
-          );
-          // Convert bigints to strings for JSON serialization
-          onChainData = {
-            ...onChainData,
-            maxSupply: onChainData.maxSupply.toString(),
-          };
+          const badgeTypeId = (badge.nftMetadata as Record<string, unknown>).onChainBadgeTypeId;
+          if (typeof badgeTypeId === 'number') {
+            onChainData = await blockchain.getBadgeType(badgeTypeId);
+            onChainData = {
+              ...onChainData,
+              maxSupply: onChainData.maxSupply.toString(),
+            };
+          }
         } catch {
           /* best effort */
         }
@@ -812,12 +786,10 @@ export function registerNFTRoutes(app: Express) {
       res.json({ badge, onChainData });
     } catch (error: unknown) {
       console.error('Get badge type error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch badge type',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch badge type',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -845,13 +817,16 @@ export function registerNFTRoutes(app: Express) {
           )
           .map(async (badge) => {
             const badgeTypeId = (badge.nftMetadata as Record<string, unknown>).onChainBadgeTypeId;
+            if (typeof badgeTypeId !== 'number') {
+              return { badge, badgeTypeId, balance: '0', owned: false };
+            }
             try {
               const balance = await blockchain.getBadgeBalance(address as Address, badgeTypeId);
               return {
                 badge,
                 badgeTypeId,
                 balance: balance.toString(),
-                owned: balance > 0n,
+                owned: balance > BigInt(0),
               };
             } catch {
               return { badge, badgeTypeId, balance: '0', owned: false };
@@ -866,12 +841,10 @@ export function registerNFTRoutes(app: Express) {
       });
     } catch (error: unknown) {
       console.error('Get user badges error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch user badges',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch user badges',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -918,7 +891,6 @@ export function registerNFTRoutes(app: Express) {
           royaltyBps || 500 // Default 5%
         );
 
-        // Save to database
         const newCollection: InsertNftCollection = {
           creatorId: creator?.id,
           tenantId: user.currentTenantId,
@@ -934,7 +906,7 @@ export function registerNFTRoutes(app: Express) {
             royaltyPercentage: (royaltyBps || 500) / 100,
             maxSupply,
             factoryAddress: CONTRACTS.CreatorCollectionFactory,
-          },
+          } as any,
           isActive: true,
           deployedAt: new Date(),
         };
@@ -952,12 +924,10 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Create creator collection error:', error);
-        res
-          .status(500)
-          .json({
-            error: 'Failed to create creator collection',
-            message: error instanceof Error ? error.message : String(error),
-          });
+        res.status(500).json({
+          error: 'Failed to create creator collection',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   );
@@ -981,12 +951,10 @@ export function registerNFTRoutes(app: Express) {
       });
     } catch (error: unknown) {
       console.error('Get creator collections error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch creator collections',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch creator collections',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -1035,12 +1003,10 @@ export function registerNFTRoutes(app: Express) {
       });
     } catch (error: unknown) {
       console.error('Get NFT stats error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch NFT stats',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch NFT stats',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -1059,12 +1025,10 @@ export function registerNFTRoutes(app: Express) {
       res.json({ deliveries });
     } catch (error: unknown) {
       console.error('Get deliveries error:', error);
-      res
-        .status(500)
-        .json({
-          error: 'Failed to fetch deliveries',
-          message: error instanceof Error ? error.message : String(error),
-        });
+      res.status(500).json({
+        error: 'Failed to fetch deliveries',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 

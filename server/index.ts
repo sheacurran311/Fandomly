@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Request } from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { doubleCsrf } from 'csrf-csrf';
@@ -68,7 +68,7 @@ const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   },
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-  getTokenFromRequest: (req) => req.headers['x-csrf-token'] as string,
+  getCsrfTokenFromRequest: (req: Request) => req.headers['x-csrf-token'] as string,
 });
 
 // Expose CSRF token endpoint for frontend

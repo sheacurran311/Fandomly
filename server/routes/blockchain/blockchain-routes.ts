@@ -27,7 +27,7 @@ import {
 } from '@shared/blockchain-config';
 import { db } from '../../db';
 import { eq } from 'drizzle-orm';
-import { users, reputationScores, socialConnections } from '@shared/schema';
+import { users, reputationScores, socialConnections, creators } from '@shared/schema';
 
 // ============================================================================
 // CHAIN + CLIENTS
@@ -152,7 +152,10 @@ export function registerBlockchainRoutes(app: Express) {
           return res.status(503).json({ error: 'Deployer wallet not configured' });
         }
 
-        const tenantId = user[0].tenantId || userId;
+        const creatorRecord = await db.query.creators.findFirst({
+          where: (creators, { eq }) => eq(creators.userId, userId),
+        });
+        const tenantId = creatorRecord?.tenantId || userId;
 
         const hash = await walletClient.writeContract({
           address: CONTRACTS.CreatorTokenFactory as Address,
@@ -273,15 +276,16 @@ export function registerBlockchainRoutes(app: Express) {
         functionName: 'totalTokensCreated',
       });
 
-      // Get all creators with wallet addresses who might have tokens
       const creatorsWithWallets = await db
         .select({
           id: users.id,
           username: users.username,
           walletAddress: users.avalancheL1Address,
-          tenantId: users.tenantId,
+          creatorId: creators.id,
+          tenantId: creators.tenantId,
         })
         .from(users)
+        .leftJoin(creators, eq(users.id, creators.userId))
         .where(eq(users.userType, 'creator'));
 
       const tokens = [];

@@ -312,7 +312,8 @@ export function registerAdminRoutes(app: Express) {
       const sortDir = req.query.sortDir === 'asc' ? 'asc' : 'desc';
 
       // Build WHERE conditions
-      const conditions = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const conditions: any[] = [];
       if (search) {
         conditions.push(
           or(ilike(users.username, `%${search}%`), ilike(users.email, `%${search}%`))
@@ -322,7 +323,7 @@ export function registerAdminRoutes(app: Express) {
         conditions.push(eq(users.userType, userType));
       }
       if (role && role !== 'all') {
-        conditions.push(eq(users.role, role));
+        conditions.push(sql`${users.role} = ${role}`);
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -675,15 +676,24 @@ export function registerAdminRoutes(app: Express) {
         const creatorId = req.params.id;
         const { approved, notes } = req.body;
 
+        const creator = await db.query.creators.findFirst({ where: eq(creators.id, creatorId) });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existingVerificationData = (creator?.verificationData as any) || {};
+
         await db
           .update(creators)
           .set({
             isVerified: !!approved,
             verificationData: {
-              verifiedByAdmin: req.user?.id,
+              ...existingVerificationData,
               verifiedAt: new Date().toISOString(),
-              approved: !!approved,
-              notes: notes || null,
+              verificationMethod: 'manual' as const,
+              adminVerification: {
+                verifiedBy: req.user?.id,
+                approved: !!approved,
+                notes: notes || null,
+                verifiedAt: new Date().toISOString(),
+              },
             },
           })
           .where(eq(creators.id, creatorId));

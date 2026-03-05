@@ -1,29 +1,21 @@
 /**
  * Point Expiration Background Job
  * Sprint 5: Handles automatic point expiration and notification sending
- * 
+ *
  * Features:
  * - Marks expired points as void
  * - Deducts from user balances
  * - Sends "expiring soon" notifications (7-day and 1-day warnings)
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from '../db';
-import { sql, eq, and, lte, isNull, gt } from 'drizzle-orm';
-
-interface ExpiringPoints {
-  id: string;
-  userId: string;
-  points: number;
-  expiresAt: Date;
-  type: 'creator' | 'platform';
-  fanProgramId?: string;
-}
+import { sql } from 'drizzle-orm';
 
 class PointExpirationJob {
-  private intervalId: NodeJS.Timer | null = null;
+  private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
-  private readonly RUN_INTERVAL_MS = 60 * 60 * 1000; // Run every hour
+  private readonly RUN_INTERVAL_MS = 60 * 60 * 1000;
 
   /**
    * Start the background job
@@ -35,12 +27,14 @@ class PointExpirationJob {
     }
 
     console.log('[PointExpirationJob] Starting point expiration background job');
-    
+
     // Run immediately on start, then on interval
-    this.runJob().catch(err => console.error('[PointExpirationJob] Initial run failed:', err));
-    
+    this.runJob().catch((err) => console.error('[PointExpirationJob] Initial run failed:', err));
+
     this.intervalId = setInterval(() => {
-      this.runJob().catch(err => console.error('[PointExpirationJob] Scheduled run failed:', err));
+      this.runJob().catch((err) =>
+        console.error('[PointExpirationJob] Scheduled run failed:', err)
+      );
     }, this.RUN_INTERVAL_MS);
   }
 
@@ -71,10 +65,10 @@ class PointExpirationJob {
     try {
       // 1. Expire points that have passed their expiration date
       const expiredCount = await this.expirePoints();
-      
+
       // 2. Send 7-day warning notifications
       const sevenDayWarnings = await this.sendExpirationWarnings(7);
-      
+
       // 3. Send 1-day warning notifications
       const oneDayWarnings = await this.sendExpirationWarnings(1);
 
@@ -98,12 +92,11 @@ class PointExpirationJob {
     const now = new Date();
     let totalExpired = 0;
 
-    // Expire creator points
     const creatorExpired = await db.execute(sql`
       WITH expired_transactions AS (
         UPDATE point_transactions
-        SET is_expired = TRUE, expired_at = ${now.toISOString()}
-        WHERE expires_at <= ${now.toISOString()}
+        SET is_expired = TRUE, expired_at = ${now.toISOString()}::timestamp
+        WHERE expires_at <= ${now.toISOString()}::timestamp
           AND is_expired = FALSE
           AND points > 0
         RETURNING id, fan_program_id, points
@@ -150,7 +143,7 @@ class PointExpirationJob {
     const now = new Date();
     const warningDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
     const notificationType = daysAhead === 7 ? '7_day_warning' : '1_day_warning';
-    
+
     let notificationsSent = 0;
 
     // Find creator points expiring soon that haven't been notified
@@ -186,10 +179,12 @@ class PointExpirationJob {
           ON CONFLICT (transaction_id, notification_type) DO NOTHING
         `);
         notificationsSent++;
-        
+
         // TODO: Actually send the notification via email/push
         // For now, just record that we would send it
-        console.log(`[PointExpirationJob] Would send ${notificationType} to user ${row.user_id} for ${row.points} points`);
+        console.log(
+          `[PointExpirationJob] Would send ${notificationType} to user ${row.user_id} for ${row.points} points`
+        );
       } catch (error) {
         console.error('[PointExpirationJob] Failed to create notification:', error);
       }
@@ -226,8 +221,10 @@ class PointExpirationJob {
           ON CONFLICT (transaction_id, notification_type) DO NOTHING
         `);
         notificationsSent++;
-        
-        console.log(`[PointExpirationJob] Would send ${notificationType} to user ${row.user_id} for ${row.points} platform points`);
+
+        console.log(
+          `[PointExpirationJob] Would send ${notificationType} to user ${row.user_id} for ${row.points} platform points`
+        );
       } catch (error) {
         console.error('[PointExpirationJob] Failed to create platform notification:', error);
       }

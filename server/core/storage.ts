@@ -53,7 +53,6 @@ import {
   type InsertRewardDistribution,
   type AuditLog,
   type InsertAuditLog,
-  insertSocialCampaignTaskSchema,
   creatorFacebookPages,
 } from '@shared/schema';
 import { db } from '../db';
@@ -1695,6 +1694,22 @@ export class DatabaseStorage implements IStorage {
   async getAuditLogById(id: string): Promise<AuditLog | undefined> {
     const [log] = await db.select().from(auditLog).where(eq(auditLog.id, id));
     return log || undefined;
+  }
+
+  async getSocialCampaignTasks(_campaignId: string): Promise<any[]> {
+    return [];
+  }
+
+  async createSocialCampaignTask(_data: any): Promise<any> {
+    throw new Error('Not implemented');
+  }
+
+  async updateSocialCampaignTask(_id: string, _data: any): Promise<any> {
+    throw new Error('Not implemented');
+  }
+
+  async deleteSocialCampaignTask(_id: string): Promise<void> {
+    throw new Error('Not implemented');
   }
 }
 

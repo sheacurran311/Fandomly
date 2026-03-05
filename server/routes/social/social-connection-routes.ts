@@ -5,6 +5,7 @@ import { socialConnections, syncPreferences, platformPointsTransactions } from '
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
 import { onReputationSignalChanged } from '../../services/reputation/reputation-event-handler';
+import { getSocialMultiplierService } from '../../services/social/social-multiplier-service';
 
 const router = Router();
 
@@ -145,6 +146,14 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
       // Notify reputation system of reconnection (non-blocking)
       onReputationSignalChanged(userId, 'socialConnections');
+
+      // Update social multiplier on FanStaking contract (non-blocking)
+      const multiplierService = getSocialMultiplierService();
+      if (multiplierService) {
+        multiplierService.syncUserMultiplier(userId).catch((err) => {
+          console.error(`[Social Connection] Failed to sync multiplier for user ${userId}:`, err);
+        });
+      }
     } else {
       // Create new connection
       const [newConnection] = await db
@@ -168,6 +177,14 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 
       // Notify reputation system of new connection (non-blocking)
       onReputationSignalChanged(userId, 'socialConnections');
+
+      // Update social multiplier on FanStaking contract (non-blocking)
+      const multiplierService = getSocialMultiplierService();
+      if (multiplierService) {
+        multiplierService.syncUserMultiplier(userId).catch((err) => {
+          console.error(`[Social Connection] Failed to sync multiplier for user ${userId}:`, err);
+        });
+      }
 
       // Award platform points for new social connection (one-time per platform)
       // Check transaction history to prevent exploit via disconnect/reconnect
@@ -284,6 +301,14 @@ router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, r
       console.error(`[Social Disconnect] Error updating sync preferences:`, syncPrefError);
     }
 
+    // Update social multiplier on FanStaking contract (non-blocking)
+    const multiplierService = getSocialMultiplierService();
+    if (multiplierService) {
+      multiplierService.syncUserMultiplier(userId).catch((err) => {
+        console.error(`[Social Disconnect] Failed to sync multiplier for user ${userId}:`, err);
+      });
+    }
+
     console.log(
       `[Social Disconnect] Successfully disconnected ${platformLower} for user ${userId}`
     );
@@ -312,10 +337,188 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
       .delete(socialConnections)
       .where(and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)));
 
+    // Update social multiplier on FanStaking contract (non-blocking)
+    const multiplierService = getSocialMultiplierService();
+    if (multiplierService) {
+      multiplierService.syncUserMultiplier(userId).catch((err) => {
+        console.error(`[Social Disconnect] Failed to sync multiplier for user ${userId}:`, err);
+      });
+    }
+
     res.json({ success: true, message: `${platform} disconnected successfully` });
   } catch (error) {
     console.error('Error disconnecting social connection:', error);
     res.status(500).json({ error: 'Failed to disconnect social connection' });
+  }
+});
+
+/**
+ * POST /api/social-connections/instagram/handle
+ * Save Instagram handle for fans (no OAuth required)
+ * Instagram API only supports Business accounts, so fans provide their handle manually
+ */
+router.post('/instagram/handle', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID required' });
+    }
+
+    let { handle } = req.body;
+
+    if (!handle || typeof handle !== 'string') {
+      return res.status(400).json({ error: 'Instagram handle is required' });
+    }
+
+    // Strip leading @ if present
+    handle = handle.trim();
+    if (handle.startsWith('@')) {
+      handle = handle.substring(1);
+    }
+
+    // Validate Instagram handle format: 1-30 characters, alphanumeric + underscores + periods
+    const instagramHandleRegex = /^[a-zA-Z0-9._]{1,30}$/;
+    if (!instagramHandleRegex.test(handle)) {
+      return res.status(400).json({
+        error:
+          'Invalid Instagram handle. Must be 1-30 characters with only letters, numbers, underscores, and periods.',
+      });
+    }
+
+    let pointsActuallyAwarded = 0;
+
+    // Check if connection already exists
+    const existingConnection = await db.query.socialConnections.findFirst({
+      where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, 'instagram')),
+    });
+
+    let savedConnection;
+    if (existingConnection) {
+      // Update existing connection
+      const [updated] = await db
+        .update(socialConnections)
+        .set({
+          platformUsername: handle,
+          platformDisplayName: handle,
+          platformUserId: handle, // Use handle as ID since we don't have OAuth
+          lastSyncedAt: new Date(),
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(socialConnections.id, existingConnection.id))
+        .returning();
+
+      savedConnection = updated;
+
+      // Notify reputation system of reconnection (non-blocking)
+      onReputationSignalChanged(userId, 'socialConnections');
+
+      // Update social multiplier on FanStaking contract (non-blocking)
+      const multiplierService = getSocialMultiplierService();
+      if (multiplierService) {
+        multiplierService.syncUserMultiplier(userId).catch((err) => {
+          console.error(`[Social Connection] Failed to sync multiplier for user ${userId}:`, err);
+        });
+      }
+    } else {
+      // Create new connection
+      const [newConnection] = await db
+        .insert(socialConnections)
+        .values({
+          userId,
+          platform: 'instagram',
+          platformUserId: handle, // Use handle as ID since we don't have OAuth
+          platformUsername: handle,
+          platformDisplayName: handle,
+          lastSyncedAt: new Date(),
+          isActive: true,
+        })
+        .returning();
+
+      savedConnection = newConnection;
+
+      // Notify reputation system of new connection (non-blocking)
+      onReputationSignalChanged(userId, 'socialConnections');
+
+      // Update social multiplier on FanStaking contract (non-blocking)
+      const multiplierService = getSocialMultiplierService();
+      if (multiplierService) {
+        multiplierService.syncUserMultiplier(userId).catch((err) => {
+          console.error(`[Social Connection] Failed to sync multiplier for user ${userId}:`, err);
+        });
+      }
+
+      // Award platform points for new social connection (one-time per platform)
+      try {
+        const existingReward = await db.query.platformPointsTransactions.findFirst({
+          where: and(
+            eq(platformPointsTransactions.userId, userId),
+            eq(platformPointsTransactions.source, 'social_connection_reward'),
+            sql`metadata->>'platform' = 'instagram'`
+          ),
+        });
+
+        if (!existingReward) {
+          await platformPointsService.awardPoints(
+            userId,
+            SOCIAL_CONNECTION_POINTS,
+            'social_connection_reward',
+            {
+              platform: 'instagram',
+              platformUsername: handle,
+              connectionId: newConnection.id,
+            }
+          );
+          pointsActuallyAwarded = SOCIAL_CONNECTION_POINTS;
+          console.log(
+            `[Social Connection] Awarded ${SOCIAL_CONNECTION_POINTS} points to user ${userId} for connecting instagram`
+          );
+        } else {
+          console.log(
+            `[Social Connection] User ${userId} already received points for instagram - skipping (disconnect/reconnect protection)`
+          );
+        }
+      } catch (pointsError) {
+        console.error(`[Social Connection] Error awarding points:`, pointsError);
+        // Don't fail the connection if points award fails
+      }
+
+      // Auto-create sync preferences for new connection (disabled for manual handles)
+      try {
+        const existingSyncPref = await db.query.syncPreferences.findFirst({
+          where: and(eq(syncPreferences.userId, userId), eq(syncPreferences.platform, 'instagram')),
+        });
+        if (!existingSyncPref) {
+          await db.insert(syncPreferences).values({
+            userId,
+            platform: 'instagram',
+            syncEnabled: false, // Disabled for manual handles
+            syncFrequencyMinutes: 60,
+            syncStatus: 'idle',
+          });
+          console.log(`[Social Connection] Created sync preference for instagram user ${userId}`);
+        }
+      } catch (syncPrefError) {
+        console.error(`[Social Connection] Error creating sync preference:`, syncPrefError);
+        // Don't fail the connection if sync pref creation fails
+      }
+    }
+
+    return res.json({
+      success: true,
+      connection: {
+        id: savedConnection.id,
+        platform: savedConnection.platform,
+        platformUsername: savedConnection.platformUsername,
+        platformDisplayName: savedConnection.platformDisplayName,
+        profileData: savedConnection.profileData,
+      },
+      pointsAwarded: pointsActuallyAwarded,
+      isNewConnection: !existingConnection,
+    });
+  } catch (error) {
+    console.error('Error saving Instagram handle:', error);
+    res.status(500).json({ error: 'Failed to save Instagram handle' });
   }
 });
 

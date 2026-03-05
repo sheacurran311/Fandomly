@@ -501,12 +501,10 @@ export function registerCampaignV2Routes(app: Express) {
               .where(eq(taskAssignments.id, item.assignmentId));
           }
         } else {
-          return res
-            .status(400)
-            .json({
-              error:
-                'Provide orderedAssignmentIds (array of IDs) or order (array of { assignmentId, taskOrder })',
-            });
+          return res.status(400).json({
+            error:
+              'Provide orderedAssignmentIds (array of IDs) or order (array of { assignmentId, taskOrder })',
+          });
         }
 
         res.json({ success: true });
@@ -662,13 +660,51 @@ export function registerCampaignV2Routes(app: Express) {
           const campaign = await db.query.campaigns.findFirst({
             where: eq(campaigns.id, campaignId),
           });
+          // Return pending rewards info so UI can show the claim dialog
+          const progress = await campaignEngine.getCampaignProgress(userId, campaignId);
           res.json({
             success: true,
             message: 'Completion bonus awarded!',
             bonusPoints: campaign?.completionBonusPoints || 0,
+            completionBonusRewards: campaign?.completionBonusRewards || [],
+            pendingRewards: progress.pendingRewards || [],
+            hasRewardsToClaim: (progress.pendingRewards || []).some((r) => r.status === 'pending'),
           });
         } else {
           res.status(400).json({ error: 'Campaign not yet completed or bonus already claimed' });
+        }
+      } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+  );
+
+  /**
+   * POST /api/campaigns/v2/:campaignId/claim-rewards
+   * Claim pending rewards after campaign completion (NFTs, raffle entries, badges, etc.)
+   */
+  app.post(
+    '/api/campaigns/v2/:campaignId/claim-rewards',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { campaignId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const result = await campaignEngine.claimRewards(userId, campaignId);
+
+        if (result.success) {
+          res.json({
+            success: true,
+            claimedRewards: result.claimedRewards,
+            message:
+              result.claimedRewards.length > 0
+                ? `${result.claimedRewards.length} reward(s) claimed!`
+                : 'No rewards to claim',
+          });
+        } else {
+          res.status(400).json({ error: result.error || 'Failed to claim rewards' });
         }
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -783,6 +819,7 @@ export function registerCampaignV2Routes(app: Express) {
           accentColor: campaign.accentColor,
           campaignMultiplier: campaign.campaignMultiplier,
           completionBonusPoints: campaign.completionBonusPoints,
+          completionBonusRewards: campaign.completionBonusRewards || [],
           verificationMode: campaign.verificationMode,
           enforceSequentialTasks: campaign.enforceSequentialTasks,
           totalParticipants: campaign.totalParticipants,
