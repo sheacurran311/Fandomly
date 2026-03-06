@@ -58,7 +58,8 @@ export function registerRewardManagementRoutes(app: Express, storage: any) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeRewards = rewards.filter((reward: any) => reward.isActive);
         res.json(activeRewards);
-      } catch {
+      } catch (error) {
+        console.error('Error fetching creator rewards:', error);
         res.status(500).json({ error: 'Failed to fetch rewards' });
       }
     }

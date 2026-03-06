@@ -2567,8 +2567,11 @@ export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => 
     fields: [taskCompletions.tenantId],
     references: [tenants.id],
   }),
-  // Note: campaignId exists on task_completions; programId does not
-  // Access programId via task.program instead
+  campaign: one(campaigns, {
+    fields: [taskCompletions.campaignId],
+    references: [campaigns.id],
+  }),
+  // Note: programId does not exist on task_completions — access via task.program instead
 }));
 
 export const platformTasksRelations = relations(platformTasks, ({ one, many }) => ({
@@ -3182,7 +3185,7 @@ export const fandomlyBadgeTemplates = pgTable('fandomly_badge_templates', {
   category: text('category').notNull(), // "achievement", "milestone", "special", "event"
 
   // Badge Requirements
-  requirementType: text('requirement_type').notNull(), // "task_completion", "points_threshold", "referrals", "streak", "manual"
+  requirementType: text('requirement_type').notNull(), // "achievement", "points_milestone", "event_participation", "manual"
   requirementData: jsonb('requirement_data').$type<{
     taskId?: string;
     pointsRequired?: number;
