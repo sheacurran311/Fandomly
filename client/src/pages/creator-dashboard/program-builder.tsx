@@ -105,7 +105,9 @@ export default function ProgramBuilderNew() {
   const { data: programCampaigns = [] } = useQuery<Campaign[]>({
     queryKey: [`/api/campaigns/program/${selectedProgram?.id}`],
     queryFn: async () => {
-      const allCampaigns = await fetchApi(`/api/campaigns/creator/${user?.creator?.id}`);
+      const allCampaigns = (await fetchApi(
+        `/api/campaigns/creator/${user?.creator?.id}`
+      )) as Campaign[];
       // Filter campaigns by programId
       return allCampaigns.filter((c: Campaign) => c.programId === selectedProgram?.id);
     },
@@ -116,7 +118,7 @@ export default function ProgramBuilderNew() {
   const { data: programTasks = [] } = useQuery<Task[]>({
     queryKey: [`/api/tasks/program/${selectedProgram?.id}`],
     queryFn: async () => {
-      const allTasks = await fetchApi('/api/tasks');
+      const allTasks = (await fetchApi('/api/tasks')) as Task[];
       // Filter tasks by programId
       return allTasks.filter((t: Task) => t.programId === selectedProgram?.id);
     },
@@ -1524,8 +1526,6 @@ function CreateProgramModal({
     </Dialog>
   );
 }
-
-type CreatorType = 'athlete' | 'musician' | 'content_creator';
 
 interface PublishRequirement {
   label: string;

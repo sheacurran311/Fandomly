@@ -380,6 +380,8 @@ export function registerRedemptionRoutes(app: Express) {
         const nftData = (reward.rewardData as any)?.nftData;
 
         if (nftData?.autoMintOnRedeem) {
+          // Declare outside try so it's accessible in catch for error logging
+          let walletAddress: string | null = null;
           // Attempt to mint NFT immediately
           try {
             const [rewardUser] = await db
@@ -391,7 +393,7 @@ export function registerRedemptionRoutes(app: Express) {
               .where(eq(users.id, userId))
               .limit(1);
 
-            const walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress;
+            walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress || null;
 
             if (!walletAddress) {
               // User doesn't have a wallet - defer minting

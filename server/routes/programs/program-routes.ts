@@ -5,6 +5,7 @@ import { db } from '../../db';
 import { loyaltyPrograms, campaigns, tasks } from '@shared/schema';
 import { eq, and, desc, sql, or } from 'drizzle-orm';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
+import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
 
 // Validation schemas
 const createProgramSchema = z.object({
@@ -231,6 +232,22 @@ export function registerProgramRoutes(app: Express) {
 
       if (!creator) {
         return res.status(404).json({ error: 'Creator not found' });
+      }
+
+      // Enforce subscription limit for program creation
+      if (creator.tenantId) {
+        try {
+          await enforceSubscriptionLimit(creator.tenantId, 'programs');
+        } catch (limitErr: any) {
+          if (limitErr.code === 'LIMIT_EXCEEDED') {
+            return res.status(403).json({
+              error: limitErr.message,
+              code: 'LIMIT_EXCEEDED',
+              ...limitErr.details,
+            });
+          }
+          throw limitErr;
+        }
       }
 
       // Validate request body

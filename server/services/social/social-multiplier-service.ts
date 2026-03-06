@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Social Multiplier Service
  *
@@ -152,13 +153,13 @@ export class SocialMultiplierService {
         `[SocialMultiplier] Updating multiplier for ${walletAddress}: ${multiplier} (${multiplier / 100}x)`
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hash = await this.walletClient.writeContract({
         address: this.stakingAddress,
         abi: FAN_STAKING_ABI as readonly unknown[],
         functionName: 'setUserMultiplier',
         args: [walletAddress as Address, BigInt(multiplier)],
-      } as unknown);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
 
       await this.publicClient.waitForTransactionReceipt({ hash });
 
