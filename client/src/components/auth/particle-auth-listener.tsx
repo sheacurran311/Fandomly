@@ -219,9 +219,26 @@ function ParticleAuthListenerInner() {
     toast,
   ]);
 
-  // Bridge when Particle social login connects and Fandomly is not yet authenticated
+  // Track whether Particle was already connected on first render (persisted session).
+  // We skip auto-bridging for persisted sessions to prevent auth errors on page load
+  // when the user hasn't explicitly initiated a login.
+  const wasConnectedOnMount = useRef<boolean | null>(null);
   useEffect(() => {
-    if (isConnected && address && !isFandomlyAuthed && isParticleSocialLogin) {
+    if (wasConnectedOnMount.current === null) {
+      wasConnectedOnMount.current = isConnected;
+    }
+  }, [isConnected]);
+
+  // Bridge when Particle social login connects and Fandomly is not yet authenticated.
+  // Only bridge if the connection is NEW (not a persisted session from a previous visit).
+  useEffect(() => {
+    if (
+      isConnected &&
+      address &&
+      !isFandomlyAuthed &&
+      isParticleSocialLogin &&
+      wasConnectedOnMount.current === false // Only for fresh connections, not persisted
+    ) {
       startTransition(() => {
         bridgeAuth();
       });
