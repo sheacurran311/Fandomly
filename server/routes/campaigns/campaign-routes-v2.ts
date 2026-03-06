@@ -320,7 +320,7 @@ export function registerCampaignV2Routes(app: Express) {
     try {
       const { campaignId } = req.params;
       const sponsors = await campaignSponsorService.getSponsors(campaignId);
-      res.json({ sponsors });
+      res.json(sponsors);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }

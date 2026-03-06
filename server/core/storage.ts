@@ -1528,7 +1528,7 @@ export class DatabaseStorage implements IStorage {
 
       const profileData: any = (user as any).profileData || {};
       const connections = Array.isArray(profileData.socialConnections)
-        ? profileData.socialConnections
+        ? profileData.socialConnections.filter((c: any) => c.isActive !== false)
         : [];
       console.log(
         `[Storage] Getting social accounts for user ${user.id} -> ${connections.length} found`

@@ -330,9 +330,9 @@ export class UnifiedVerificationService {
     if (taskType.includes('quote') || taskType.includes('repost')) {
       return {
         verified: false,
-        requiresManualReview: false,
+        requiresManualReview: true,
         confidence: 'medium' as const,
-        reason: 'Quote tweet verification pending',
+        reason: 'Quote tweet requires manual verification',
         metadata: {
           verificationTier: 'T2',
           verificationMethod: 'code_repost',
@@ -756,10 +756,18 @@ export class UnifiedVerificationService {
     // This inserts into point_transactions table for proper tracking
     if (pointsToAward > 0 && task.tenantId) {
       try {
-        // Get creatorId from the loyalty program associated with this tenant
-        const program = await db.query.loyaltyPrograms.findFirst({
-          where: eq(loyaltyPrograms.tenantId, task.tenantId),
-        });
+        // Use task.programId directly when available; fall back to tenant lookup
+        let program: { id: string; creatorId: string | null } | undefined;
+        if ((task as any).programId) {
+          program = await db.query.loyaltyPrograms.findFirst({
+            where: eq(loyaltyPrograms.id, (task as any).programId),
+          });
+        }
+        if (!program) {
+          program = await db.query.loyaltyPrograms.findFirst({
+            where: eq(loyaltyPrograms.tenantId, task.tenantId),
+          });
+        }
 
         if (program?.creatorId) {
           await creatorPointsService.awardPoints(
@@ -769,14 +777,14 @@ export class UnifiedVerificationService {
             pointsToAward,
             'task_completion',
             `Task completed: ${task.name}`,
-            { taskId: taskId, taskCompletionId: taskCompletionId }
+            { taskId: taskId, taskCompletionId: taskCompletionId, programId: program.id }
           );
           console.log(
-            `[Points] Awarded ${pointsToAward} creator points to user ${completion.userId} for task ${task.name}`
+            `[Points] Awarded ${pointsToAward} creator points to user ${completion.userId} for task ${task.name} (program ${program.id})`
           );
         } else {
           console.warn(
-            `[Points] No loyalty program found for tenant ${task.tenantId}, skipping points award to user balance`
+            `[Points] No loyalty program found for task ${taskId}, skipping points award to user balance`
           );
         }
       } catch (pointsError) {
@@ -803,19 +811,21 @@ export class UnifiedVerificationService {
         return 'auto_check_in';
     }
 
-    // Platform-based verification (existing)
+    // Platform-based verification
     switch (platform.toLowerCase()) {
       case 'twitter':
       case 'x':
       case 'youtube':
+      case 'spotify':
+      case 'twitch':
+      case 'discord':
+      case 'kick':
+      case 'patreon':
         return 'api';
       case 'tiktok':
       case 'instagram':
         return 'smart_detection';
       case 'facebook':
-      case 'spotify':
-      case 'twitch':
-      case 'discord':
         return 'manual';
       default:
         return 'manual';

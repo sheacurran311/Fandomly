@@ -410,17 +410,15 @@ export default function CampaignBuilderNew() {
       if (parsedEnd) payload.endDate = parsedEnd;
     }
 
-    // Merge gating into requirements
-    if (
-      gating.requiredPreviousCampaigns.length > 0 ||
-      gating.requiredBadgeIds.length > 0 ||
-      gating.requiredNftCollectionIds.length > 0
-    ) {
-      payload.requirements = {
-        requiredPreviousCampaigns: gating.requiredPreviousCampaigns,
-        requiredBadgeIds: gating.requiredBadgeIds,
-        requiredNftCollectionIds: gating.requiredNftCollectionIds,
-      };
+    // Send gating fields at top level (server expects top-level, not nested under requirements)
+    if (gating.requiredPreviousCampaigns.length > 0) {
+      (payload as any).prerequisiteCampaigns = gating.requiredPreviousCampaigns;
+    }
+    if (gating.requiredBadgeIds.length > 0) {
+      (payload as any).requiredBadgeIds = gating.requiredBadgeIds;
+    }
+    if (gating.requiredNftCollectionIds.length > 0) {
+      (payload as any).requiredNftCollectionIds = gating.requiredNftCollectionIds;
     }
 
     if (campaignId) {

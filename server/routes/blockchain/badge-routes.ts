@@ -529,11 +529,11 @@ export function registerBadgeRoutes(app: Express) {
           } as any)
           .returning();
 
-        // Increment issued count
+        // Increment issued count atomically to avoid race conditions
         await db
           .update(fandomlyBadgeTemplates)
           .set({
-            totalIssued: (badgeTemplate.totalIssued || 0) + 1,
+            totalIssued: sql`COALESCE(${fandomlyBadgeTemplates.totalIssued}, 0) + 1`,
           })
           .where(eq(fandomlyBadgeTemplates.id, badgeTypeId));
 

@@ -983,7 +983,7 @@ export const rewardRedemptions = pgTable('reward_redemptions', {
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
   userId: varchar('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  programId: varchar('program_id'),
+  programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'set null' }),
   rewardId: varchar('reward_id')
     .references(() => rewards.id, { onDelete: 'restrict' })
     .notNull(),
@@ -1729,6 +1729,7 @@ export const taskAssignments = pgTable(
     index('task_assignments_campaign_id_idx').on(table.campaignId),
     index('task_assignments_tenant_id_idx').on(table.tenantId),
     index('task_assignments_task_id_idx').on(table.taskId),
+    uniqueIndex('task_assignments_campaign_task_unique').on(table.campaignId, table.taskId),
   ]
 );
 
@@ -1842,7 +1843,7 @@ export const taskCompletions = pgTable(
       .notNull(),
 
     // Completion Status
-    status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed'
+    status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed' | 'claimed' | 'rejected' | 'pending_review'
     progress: integer('progress').default(0), // 0-100 percentage
 
     // Completion Data (task-specific tracking)
@@ -2296,6 +2297,7 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   owner: one(users, {
     fields: [tenants.ownerId],
     references: [users.id],
+    relationName: 'ownedTenants',
   }),
   memberships: many(tenantMemberships),
   creators: many(creators),
@@ -2315,6 +2317,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   currentTenant: one(tenants, {
     fields: [users.currentTenantId],
     references: [tenants.id],
+    relationName: 'currentTenant',
   }),
   ownedTenants: many(tenants, {
     relationName: 'ownedTenants',
@@ -2330,8 +2333,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   agency: one(agencies, {
     fields: [users.agencyId],
     references: [agencies.id],
+    relationName: 'agencyMember',
   }),
-  ownedAgencies: many(agencies),
+  ownedAgencies: many(agencies, {
+    relationName: 'ownedAgencies',
+  }),
   taskCompletions: many(taskCompletions),
   taskAssignments: many(taskAssignments),
   platformTaskCompletions: many(platformTaskCompletions),
@@ -2375,6 +2381,7 @@ export const agenciesRelations = relations(agencies, ({ one, many }) => ({
   owner: one(users, {
     fields: [agencies.ownerUserId],
     references: [users.id],
+    relationName: 'ownedAgencies',
   }),
   agencyTenants: many(agencyTenants),
 }));
@@ -2560,8 +2567,8 @@ export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => 
     fields: [taskCompletions.tenantId],
     references: [tenants.id],
   }),
-  // Note: programId and campaignId don't exist on task_completions table
-  // Access these via task.program and task.campaign instead
+  // Note: campaignId exists on task_completions; programId does not
+  // Access programId via task.program instead
 }));
 
 export const platformTasksRelations = relations(platformTasks, ({ one, many }) => ({
