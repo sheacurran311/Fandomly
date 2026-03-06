@@ -66,11 +66,19 @@ class PointExpirationJob {
       // 1. Expire points that have passed their expiration date
       const expiredCount = await this.expirePoints();
 
-      // 2. Send 7-day warning notifications
-      const sevenDayWarnings = await this.sendExpirationWarnings(7);
-
-      // 3. Send 1-day warning notifications
-      const oneDayWarnings = await this.sendExpirationWarnings(1);
+      // 2. Send warning notifications (gracefully skips if notification table doesn't exist yet)
+      let sevenDayWarnings = 0;
+      let oneDayWarnings = 0;
+      try {
+        sevenDayWarnings = await this.sendExpirationWarnings(7);
+        oneDayWarnings = await this.sendExpirationWarnings(1);
+      } catch (notifError: any) {
+        if (notifError?.code === '42P01') {
+          // point_expiration_notifications table doesn't exist yet — skip silently
+        } else {
+          console.warn('[PointExpirationJob] Warning notification step failed:', notifError?.message);
+        }
+      }
 
       const duration = Date.now() - startTime;
       console.log(`[PointExpirationJob] Completed in ${duration}ms`, {

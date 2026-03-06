@@ -11,6 +11,9 @@ import { reputationSyncJob } from './jobs/reputation-sync-job';
 
 const app = express();
 
+// Trust proxy for rate limiting behind reverse proxies (Replit, Neon, etc.)
+app.set('trust proxy', 1);
+
 // Security headers via Helmet
 app.use(
   helmet({

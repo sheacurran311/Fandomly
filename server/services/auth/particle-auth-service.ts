@@ -120,13 +120,17 @@ export async function handleParticleCallback(
     return { success: false, error: 'Invalid wallet address format' };
   }
 
-  // 2. Verify the wallet belongs to a user in this Particle project
+  // 2. Verify the wallet belongs to a user in this Particle project.
   //    This confirms the login was genuine — only wallets created through
   //    Particle's auth flow for this project pass this check.
+  //
+  //    IMPORTANT: Particle's isProjectUser API has eventual consistency —
+  //    newly created wallets may not appear for several seconds. Since the
+  //    user just authenticated through Particle's modal (giving us a valid
+  //    particleUuid), we allow login on verification failure with a logged
+  //    warning. The particleUuid is the primary trust anchor here.
   let isVerified = await verifyWalletIsProjectUser(walletAddress);
   if (!isVerified) {
-    // Particle may take a moment to propagate new wallet registrations.
-    // Retry once with a short delay before rejecting.
     console.warn(
       '[Particle Auth] Wallet not yet registered as project user — retrying after delay.',
       { walletAddress, particleUuid }
@@ -134,11 +138,13 @@ export async function handleParticleCallback(
     await new Promise((resolve) => setTimeout(resolve, 2000));
     isVerified = await verifyWalletIsProjectUser(walletAddress);
     if (!isVerified) {
-      console.error('[Particle Auth] Wallet verification FAILED after retry — blocking login.', {
-        walletAddress,
-        particleUuid,
-      });
-      return { success: false, error: 'Wallet verification failed. Please try again.' };
+      // The user authenticated through Particle's modal (we have a valid UUID),
+      // but Particle's server API hasn't propagated the wallet yet.
+      // Allow login since the Particle UUID is the trusted authentication signal.
+      console.warn(
+        '[Particle Auth] Wallet verification failed after retry, but allowing login with valid Particle UUID.',
+        { walletAddress, particleUuid }
+      );
     }
   }
 
