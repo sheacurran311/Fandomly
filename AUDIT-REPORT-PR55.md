@@ -11,10 +11,10 @@
 PR #55 addressed **18 files** with ~2500 additions and ~2100 deletions. The fix pass successfully resolved the majority of CRITICAL issues but introduced **2 new CRITICAL issues** and **1 regression**. Several MEDIUM-severity issues were not addressed.
 
 | Original Severity | Fixed | Partially Fixed | Not Fixed | Regressed |
-|-------------------|-------|-----------------|-----------|-----------|
-| **CRITICAL (18)** | 16 | 1 | 1 | 0 |
-| **HIGH (30)** | 17 | 4 | 9 | 0 |
-| **MEDIUM (38)** | 5 | 2 | 31 | 1 |
+| ----------------- | ----- | --------------- | --------- | --------- |
+| **CRITICAL (18)** | 16    | 1               | 1         | 0         |
+| **HIGH (30)**     | 17    | 4               | 9         | 0         |
+| **MEDIUM (38)**   | 5     | 2               | 31        | 1         |
 
 **New issues introduced by PR:** 2 CRITICAL, 2 HIGH, 4 MEDIUM, 2 LOW
 
@@ -24,24 +24,24 @@ PR #55 addressed **18 files** with ~2500 additions and ~2100 deletions. The fix 
 
 ### FIXED (16 of 18)
 
-| # | Issue | File | Evidence |
-|---|-------|------|----------|
-| 1 | Zod 'checkin' vs DB 'check_in' | task-routes.ts:117 | Now uses `z.literal('check_in')` |
-| 2 | 'twitter_reply' not in DB enum | task-routes.ts:169 | Removed from Zod enum. Residual refs in taskFieldSchemas.ts (non-blocking) |
-| 3 | rejectManualReview sets 'completed' | unified-verification.ts:913-918 | Now sets `status: 'rejected'` on both review queue and task completion |
-| 4 | Direct approval missing points | review-routes.ts:271-277 | Now calls `unifiedVerification.awardPoints(completionId, completion.taskId)` |
-| 5 | manualReviewQueue integer columns | shared/schema.ts:1959-2007 | All 6 ID columns migrated to `varchar` with proper `.references()` FK constraints |
-| 6 | useState never imported | campaign-builder-new.tsx:2 | Now imports `{ useEffect, useState }` |
-| 7 | rewardRedemptions missing fanId | redemption-routes.ts:352-354 | Insert now sets both `userId` and `fanId: userId` |
-| 8 | /pending route unreachable | redemption-routes.ts:663 vs 723 | `/pending` now registered BEFORE `/:redemptionId` |
-| 9 | userPoints vs userBalance mismatch | redemption-routes.ts:152 | Backend now returns both `userBalance` and `userPoints: userBalance` |
-| 10 | Catalog called without programId | redemption-routes.ts:127-139 | Backend auto-resolves when programId omitted |
-| 11 | Badge status 'completed' vs enum | badge-routes.ts | All queries now use `'success'` matching the enum |
-| 12 | Badge uses walletAddress | badge-routes.ts | All references now use `avalancheL1Address` |
-| 13 | Badge minted_at doesn't exist | badge-routes.ts | All references now use `completed_at` |
-| 14 | Particle auth bypass | particle-auth-service.ts:126-143 | Retry-then-reject pattern: retries once after 2s delay, blocks login on second failure |
-| 15 | Social connect missing tokens | social-routes.ts:1643-1653 | Tokens encrypted via `encryptToken()` and stored |
-| 16 | taskCompletions zero indexes | shared/schema.ts:1916-1919 | Three indexes added: `(userId, taskId)`, `(tenantId)`, `(campaignId)` |
+| #   | Issue                               | File                             | Evidence                                                                               |
+| --- | ----------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | Zod 'checkin' vs DB 'check_in'      | task-routes.ts:117               | Now uses `z.literal('check_in')`                                                       |
+| 2   | 'twitter_reply' not in DB enum      | task-routes.ts:169               | Removed from Zod enum. Residual refs in taskFieldSchemas.ts (non-blocking)             |
+| 3   | rejectManualReview sets 'completed' | unified-verification.ts:913-918  | Now sets `status: 'rejected'` on both review queue and task completion                 |
+| 4   | Direct approval missing points      | review-routes.ts:271-277         | Now calls `unifiedVerification.awardPoints(completionId, completion.taskId)`           |
+| 5   | manualReviewQueue integer columns   | shared/schema.ts:1959-2007       | All 6 ID columns migrated to `varchar` with proper `.references()` FK constraints      |
+| 6   | useState never imported             | campaign-builder-new.tsx:2       | Now imports `{ useEffect, useState }`                                                  |
+| 7   | rewardRedemptions missing fanId     | redemption-routes.ts:352-354     | Insert now sets both `userId` and `fanId: userId`                                      |
+| 8   | /pending route unreachable          | redemption-routes.ts:663 vs 723  | `/pending` now registered BEFORE `/:redemptionId`                                      |
+| 9   | userPoints vs userBalance mismatch  | redemption-routes.ts:152         | Backend now returns both `userBalance` and `userPoints: userBalance`                   |
+| 10  | Catalog called without programId    | redemption-routes.ts:127-139     | Backend auto-resolves when programId omitted                                           |
+| 11  | Badge status 'completed' vs enum    | badge-routes.ts                  | All queries now use `'success'` matching the enum                                      |
+| 12  | Badge uses walletAddress            | badge-routes.ts                  | All references now use `avalancheL1Address`                                            |
+| 13  | Badge minted_at doesn't exist       | badge-routes.ts                  | All references now use `completed_at`                                                  |
+| 14  | Particle auth bypass                | particle-auth-service.ts:126-143 | Retry-then-reject pattern: retries once after 2s delay, blocks login on second failure |
+| 15  | Social connect missing tokens       | social-routes.ts:1643-1653       | Tokens encrypted via `encryptToken()` and stored                                       |
+| 16  | taskCompletions zero indexes        | shared/schema.ts:1916-1919       | Three indexes added: `(userId, taskId)`, `(tenantId)`, `(campaignId)`                  |
 
 ### PARTIALLY FIXED (1 of 18)
 
@@ -71,25 +71,25 @@ ISSUE: fetchApi().json() double-parse bug was reported but the file I'm checking
 
 ### FIXED (17 of 30)
 
-| # | Issue | Evidence |
-|---|-------|----------|
-| 1 | createManualReview UUID→number casts | String IDs passed directly; schema now varchar |
-| 2 | Missing Drizzle relations for manualReviewQueue | `manualReviewQueueRelations` defined with all 5 relations |
-| 3 | Review queue integer-to-text cast | Schema now varchar, `::text` casts are harmless no-ops |
-| 4 | No pointTransactions on direct completion | Now creates `rewardDistributions` record in same transaction |
-| 5 | Catalog r.deleted_at IS NULL | Changed to `r.is_active = TRUE` |
-| 6 | Shipping address field name mismatch | Zod schema and frontend now aligned |
-| 7 | User history filters by user_id | Now uses `rr.fan_id` |
-| 8 | r.redemption_instructions doesn't exist | Reference removed |
-| 9 | addCompletedTask TOCTOU race | Atomic JSONB append with dedup WHERE guard |
-| 10 | claimRewards double-claim | Atomic `WHERE rewardsClaimedAt IS NULL` pattern |
-| 11 | loyaltyPrograms phantom taskCompletions relation | Removed from loyaltyProgramsRelations |
-| 12 | Particle callback no rate limiting | `authRateLimiter` middleware added |
-| 13 | Reputation uses walletAddress | Now uses `avalancheL1Address` with fallback |
-| 14 | Multiplier privilege escalation | Requires `fandomly_admin` for platform-wide multipliers |
-| 15 | fetchApi().json() double-parse | Fixed — no longer chains .json() |
-| 16 | Reward management bare catch {} (2 of 3) | 2 catch blocks now log errors |
-| 17 | Badge uses walletAddress (badge-routes) | All references now use `avalancheL1Address` |
+| #   | Issue                                            | Evidence                                                     |
+| --- | ------------------------------------------------ | ------------------------------------------------------------ |
+| 1   | createManualReview UUID→number casts             | String IDs passed directly; schema now varchar               |
+| 2   | Missing Drizzle relations for manualReviewQueue  | `manualReviewQueueRelations` defined with all 5 relations    |
+| 3   | Review queue integer-to-text cast                | Schema now varchar, `::text` casts are harmless no-ops       |
+| 4   | No pointTransactions on direct completion        | Now creates `rewardDistributions` record in same transaction |
+| 5   | Catalog r.deleted_at IS NULL                     | Changed to `r.is_active = TRUE`                              |
+| 6   | Shipping address field name mismatch             | Zod schema and frontend now aligned                          |
+| 7   | User history filters by user_id                  | Now uses `rr.fan_id`                                         |
+| 8   | r.redemption_instructions doesn't exist          | Reference removed                                            |
+| 9   | addCompletedTask TOCTOU race                     | Atomic JSONB append with dedup WHERE guard                   |
+| 10  | claimRewards double-claim                        | Atomic `WHERE rewardsClaimedAt IS NULL` pattern              |
+| 11  | loyaltyPrograms phantom taskCompletions relation | Removed from loyaltyProgramsRelations                        |
+| 12  | Particle callback no rate limiting               | `authRateLimiter` middleware added                           |
+| 13  | Reputation uses walletAddress                    | Now uses `avalancheL1Address` with fallback                  |
+| 14  | Multiplier privilege escalation                  | Requires `fandomly_admin` for platform-wide multipliers      |
+| 15  | fetchApi().json() double-parse                   | Fixed — no longer chains .json()                             |
+| 16  | Reward management bare catch {} (2 of 3)         | 2 catch blocks now log errors                                |
+| 17  | Badge uses walletAddress (badge-routes)          | All references now use `avalancheL1Address`                  |
 
 ### PARTIALLY FIXED (4 of 30)
 
@@ -314,13 +314,13 @@ FIX: Correct the comment.
 
 ### FIXED (5 of 38)
 
-| Issue | Evidence |
-|-------|----------|
-| fetchApi().json() double-parse | Fixed — no longer chains .json() |
-| manualReviewQueue relations missing | manualReviewQueueRelations defined |
+| Issue                                            | Evidence                             |
+| ------------------------------------------------ | ------------------------------------ |
+| fetchApi().json() double-parse                   | Fixed — no longer chains .json()     |
+| manualReviewQueue relations missing              | manualReviewQueueRelations defined   |
 | Shipping address mismatch (also counted as HIGH) | Aligned between frontend and backend |
-| loyaltyPrograms phantom taskCompletions relation | Removed |
-| Program builder fetchApi double-parse | Fixed |
+| loyaltyPrograms phantom taskCompletions relation | Removed                              |
+| Program builder fetchApi double-parse            | Fixed                                |
 
 ### NOT FIXED (31 of 38)
 
@@ -377,30 +377,30 @@ STATUS: REGRESSED — was "not working" before (missing tokens), now "actively b
 
 ### Fix Coverage by Severity
 
-| Original Severity | Total | Fixed | Partial | Not Fixed | Regressed |
-|-------------------|-------|-------|---------|-----------|-----------|
-| CRITICAL | 18 | 16 | 2 | 0 | 0 |
-| HIGH | 30 | 17 | 4 | 9 | 0 |
-| MEDIUM | 38 | 5 | 2 | 30 | 1 |
-| **Total** | **86** | **38** | **8** | **39** | **1** |
+| Original Severity | Total  | Fixed  | Partial | Not Fixed | Regressed |
+| ----------------- | ------ | ------ | ------- | --------- | --------- |
+| CRITICAL          | 18     | 16     | 2       | 0         | 0         |
+| HIGH              | 30     | 17     | 4       | 9         | 0         |
+| MEDIUM            | 38     | 5      | 2       | 30        | 1         |
+| **Total**         | **86** | **38** | **8**   | **39**    | **1**     |
 
 ### New Issues Introduced
 
-| Severity | Count |
-|----------|-------|
-| CRITICAL | 2 |
-| HIGH | 2 |
-| MEDIUM | 4 |
-| LOW | 2 |
+| Severity  | Count  |
+| --------- | ------ |
+| CRITICAL  | 2      |
+| HIGH      | 2      |
+| MEDIUM    | 4      |
+| LOW       | 2      |
 | **Total** | **10** |
 
 ### Remaining Risk Profile
 
-| Severity | Still Open (Not Fixed + Partial + New) |
-|----------|-----------------------------------------|
-| CRITICAL | 4 (2 original partial + 2 new) |
-| HIGH | 15 (9 original + 4 partial→medium + 2 new) |
-| MEDIUM | 38 (30 original + 4 new + 2 partial + 1 regressed + 1 new low) |
+| Severity | Still Open (Not Fixed + Partial + New)                         |
+| -------- | -------------------------------------------------------------- |
+| CRITICAL | 4 (2 original partial + 2 new)                                 |
+| HIGH     | 15 (9 original + 4 partial→medium + 2 new)                     |
+| MEDIUM   | 38 (30 original + 4 new + 2 partial + 1 regressed + 1 new low) |
 
 ---
 

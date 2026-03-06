@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { socialConnections, syncPreferences, platformPointsTransactions } from '@shared/schema';
+import {
+  socialConnections,
+  syncPreferences,
+  platformPointsTransactions,
+  users,
+} from '@shared/schema';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
 import { onReputationSignalChanged } from '../../services/reputation/reputation-event-handler';
 import { getSocialMultiplierService } from '../../services/social/social-multiplier-service';
+import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
 
 const router = Router();
 
@@ -155,6 +161,28 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         });
       }
     } else {
+      // Check subscription limit for new social connections (creators only)
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+      if (user?.currentTenantId) {
+        try {
+          await enforceSubscriptionLimit(user.currentTenantId, 'socialConnections');
+        } catch (limitErr: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((limitErr as any).code === 'LIMIT_EXCEEDED') {
+            return res.status(403).json({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              error: (limitErr as any).message,
+              code: 'LIMIT_EXCEEDED',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ...(limitErr as any).details,
+            });
+          }
+          throw limitErr;
+        }
+      }
+
       // Create new connection
       const [newConnection] = await db
         .insert(socialConnections)

@@ -51,7 +51,9 @@ import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
 import { registerReputationRoutes } from './reputation/reputation-routes';
 import { registerBlockchainRoutes } from './blockchain/blockchain-routes';
 import { registerBadgeRoutes } from './blockchain/badge-routes';
+import { registerStripeWebhookRoutes } from './stripe/stripe-webhook-routes';
 import { errorHandler } from '../lib/api-errors';
+import { getTierLimits, type SubscriptionTier } from '@shared/subscription-config';
 import {
   insertUserSchema,
   insertCreatorSchema,
@@ -401,12 +403,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const username = userData.username || 'creator';
           const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${user.id.slice(-6)}`;
 
+          const freeLimits = getTierLimits('free');
           const tenant = await storage.createTenant({
             slug: tenantSlug,
             name: `${username}'s Store`,
             ownerId: user.id,
             status: 'trial',
-            subscriptionTier: 'starter',
+            subscriptionTier: 'free',
             branding: {
               primaryColor: '#8B5CF6',
               secondaryColor: '#06B6D4',
@@ -416,14 +419,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               businessType: 'individual' as const,
             },
             limits: {
-              maxMembers: 100,
-              maxCampaigns: 3,
-              maxRewards: 10,
-              maxApiCalls: 1000,
-              storageLimit: 100,
-              customDomain: false,
-              advancedAnalytics: false,
-              whiteLabel: false,
+              maxMembers: freeLimits.maxMembers,
+              maxCampaigns: freeLimits.maxCampaigns,
+              maxRewards: freeLimits.maxRewards,
+              maxApiCalls: freeLimits.maxApiCalls,
+              storageLimit: freeLimits.storageLimit,
+              customDomain: freeLimits.customDomain,
+              advancedAnalytics: freeLimits.advancedAnalytics,
+              whiteLabel: freeLimits.whiteLabel,
+              maxTasks: freeLimits.maxTasks,
+              maxSocialConnections: freeLimits.maxSocialConnections,
+              maxPrograms: freeLimits.maxPrograms,
             },
             settings: {
               timezone: 'UTC',
@@ -503,12 +509,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const username = user.username || 'creator';
           const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${userId.slice(-6)}`;
 
+          const defaultLimits = getTierLimits('free');
           const tenant = await storage.createTenant({
             slug: tenantSlug,
             name: `${username}'s Store`,
             ownerId: userId,
             status: 'trial',
-            subscriptionTier: 'starter',
+            subscriptionTier: 'free',
             branding: {
               primaryColor: '#8B5CF6',
               secondaryColor: '#06B6D4',
@@ -518,14 +525,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               businessType: 'individual' as const,
             },
             limits: {
-              maxMembers: 100,
-              maxCampaigns: 3,
-              maxRewards: 10,
-              maxApiCalls: 1000,
-              storageLimit: 100,
-              customDomain: false,
-              advancedAnalytics: false,
-              whiteLabel: false,
+              maxMembers: defaultLimits.maxMembers,
+              maxCampaigns: defaultLimits.maxCampaigns,
+              maxRewards: defaultLimits.maxRewards,
+              maxApiCalls: defaultLimits.maxApiCalls,
+              storageLimit: defaultLimits.storageLimit,
+              customDomain: defaultLimits.customDomain,
+              advancedAnalytics: defaultLimits.advancedAnalytics,
+              whiteLabel: defaultLimits.whiteLabel,
+              maxTasks: defaultLimits.maxTasks,
+              maxSocialConnections: defaultLimits.maxSocialConnections,
+              maxPrograms: defaultLimits.maxPrograms,
             },
             settings: {
               timezone: 'UTC',
@@ -588,7 +598,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const { creatorType, username: proposedUsername } = req.body;
+        const {
+          creatorType,
+          username: proposedUsername,
+          subscriptionTier: requestedTier,
+        } = req.body;
 
         // Validate creatorType
         if (!creatorType || !['athlete', 'musician', 'content_creator'].includes(creatorType)) {
@@ -656,12 +670,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const username = user.username || 'creator';
             const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${userId.slice(-6)}`;
 
+            // Resolve subscription tier and limits from shared config
+            const validTiers: SubscriptionTier[] = [
+              'free',
+              'beginner',
+              'rising',
+              'allstar',
+              'enterprise',
+            ];
+            const selectedTier: SubscriptionTier = validTiers.includes(requestedTier)
+              ? requestedTier
+              : 'free';
+            const tierLimits = getTierLimits(selectedTier);
+
             const tenant = await storage.createTenant({
               slug: tenantSlug,
               name: `${username}'s Store`,
               ownerId: userId,
               status: 'trial',
-              subscriptionTier: 'starter',
+              subscriptionTier: selectedTier,
               branding: {
                 primaryColor: '#8B5CF6',
                 secondaryColor: '#06B6D4',
@@ -671,14 +698,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 businessType: 'individual' as const,
               },
               limits: {
-                maxMembers: 100,
-                maxCampaigns: 3,
-                maxRewards: 10,
-                maxApiCalls: 1000,
-                storageLimit: 100,
-                customDomain: false,
-                advancedAnalytics: false,
-                whiteLabel: false,
+                maxMembers: tierLimits.maxMembers,
+                maxCampaigns: tierLimits.maxCampaigns,
+                maxRewards: tierLimits.maxRewards,
+                maxApiCalls: tierLimits.maxApiCalls,
+                storageLimit: tierLimits.storageLimit,
+                customDomain: tierLimits.customDomain,
+                advancedAnalytics: tierLimits.advancedAnalytics,
+                whiteLabel: tierLimits.whiteLabel,
+                maxTasks: tierLimits.maxTasks,
+                maxSocialConnections: tierLimits.maxSocialConnections,
+                maxPrograms: tierLimits.maxPrograms,
               },
               settings: {
                 timezone: 'UTC',
@@ -1023,7 +1053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let stripeSubscriptionId = null;
 
         // Only process Stripe if configured and on paid plan
-        if (subscriptionTier && subscriptionTier !== 'starter' && process.env.STRIPE_SECRET_KEY) {
+        if (subscriptionTier && subscriptionTier !== 'free' && process.env.STRIPE_SECRET_KEY) {
           // Create Stripe customer and subscription for paid plans
           try {
             const Stripe = (await import('stripe')).default;
@@ -1050,7 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('Stripe customer creation error:', stripeError);
             // Continue with onboarding even if Stripe fails
           }
-        } else if (subscriptionTier && subscriptionTier !== 'starter') {
+        } else if (subscriptionTier && subscriptionTier !== 'free') {
           console.log(
             '⚠️  Stripe not configured, skipping payment processing for subscription tier:',
             subscriptionTier
@@ -1113,8 +1143,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (tenant) {
             // Build update data conditionally - store setup is now optional during onboarding
+            // SECURITY: Never trust client-submitted subscriptionTier for paid tiers.
+            // Paid tier upgrades ONLY happen via Stripe webhook after payment confirms.
+            // During onboarding, always default to 'free'. User upgrades through Checkout.
+            const safeTier = 'free';
+
             const updateData: any = {
-              subscriptionTier: subscriptionTier || tenant.subscriptionTier || 'starter',
+              subscriptionTier: safeTier,
+              limits: getTierLimits(safeTier as SubscriptionTier),
               businessInfo: {
                 businessType: creatorType || tenant.businessInfo?.businessType || 'athlete',
                 ...(creatorType === 'brand' && brandName ? { companyName: brandName } : {}),
@@ -1313,12 +1349,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const username = updatedUser.username || 'creator';
             const tenantSlug = `${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${updatedUser.id.slice(-6)}`;
 
+            const switchLimits = getTierLimits('free');
             const tenant = await storage.createTenant({
               slug: tenantSlug,
               name: `${username}'s Store`,
               ownerId: updatedUser.id,
               status: 'trial',
-              subscriptionTier: 'starter',
+              subscriptionTier: 'free',
               branding: {
                 primaryColor: '#8B5CF6',
                 secondaryColor: '#06B6D4',
@@ -1328,14 +1365,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 businessType: 'individual' as const,
               },
               limits: {
-                maxMembers: 100,
-                maxCampaigns: 3,
-                maxRewards: 10,
-                maxApiCalls: 1000,
-                storageLimit: 100,
-                customDomain: false,
-                advancedAnalytics: false,
-                whiteLabel: false,
+                maxMembers: switchLimits.maxMembers,
+                maxCampaigns: switchLimits.maxCampaigns,
+                maxRewards: switchLimits.maxRewards,
+                maxApiCalls: switchLimits.maxApiCalls,
+                storageLimit: switchLimits.storageLimit,
+                customDomain: switchLimits.customDomain,
+                advancedAnalytics: switchLimits.advancedAnalytics,
+                whiteLabel: switchLimits.whiteLabel,
+                maxTasks: switchLimits.maxTasks,
+                maxSocialConnections: switchLimits.maxSocialConnections,
+                maxPrograms: switchLimits.maxPrograms,
               },
               settings: {
                 timezone: 'UTC',
@@ -2684,6 +2724,342 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get subscription details with live usage counts
+  app.get('/api/subscription-details', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+      const user = await storage.getUser(userId);
+      if (!user?.currentTenantId) {
+        return res.json({ tier: 'free', limits: getTierLimits('free'), usage: {} });
+      }
+
+      const { checkSubscriptionLimit } = await import('../services/subscription-limit-service');
+
+      const [tenant] = await db
+        .select()
+        .from((await import('@shared/schema')).tenants)
+        .where(
+          (await import('drizzle-orm')).eq(
+            (await import('@shared/schema')).tenants.id,
+            user.currentTenantId
+          )
+        )
+        .limit(1);
+
+      if (!tenant) {
+        return res.json({ tier: 'free', limits: getTierLimits('free'), usage: {} });
+      }
+
+      const tier = (tenant.subscriptionTier as SubscriptionTier) || 'free';
+      const tierLimits = getTierLimits(tier);
+
+      // Get live usage counts
+      const [tasksResult, campaignsResult, programsResult, socialsResult] = await Promise.all([
+        checkSubscriptionLimit(user.currentTenantId, 'tasks'),
+        checkSubscriptionLimit(user.currentTenantId, 'campaigns'),
+        checkSubscriptionLimit(user.currentTenantId, 'programs'),
+        checkSubscriptionLimit(user.currentTenantId, 'socialConnections'),
+      ]);
+
+      res.json({
+        tier,
+        tierName: (await import('@shared/subscription-config')).getTierDefinition(tier).name,
+        limits: tierLimits,
+        usage: {
+          tasks: tasksResult.current,
+          campaigns: campaignsResult.current,
+          programs: programsResult.current,
+          socialConnections: socialsResult.current,
+          members: (tenant.usage as any)?.currentMembers ?? 0,
+        },
+        billingInfo: tenant.billingInfo || null,
+      });
+    } catch (error: any) {
+      console.error('Subscription details error:', error);
+      res.status(500).json({ error: 'Failed to fetch subscription details' });
+    }
+  });
+
+  // ─── Stripe Subscription Management ──────────────────────────────
+
+  // Create Checkout Session for new subscription or upgrade
+  app.post(
+    '/api/stripe/create-checkout-session',
+    syncActionLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const { tier } = req.body;
+        if (!tier || tier === 'free' || tier === 'enterprise') {
+          return res.status(400).json({ error: 'Invalid tier for checkout' });
+        }
+
+        const { getStripe, getPriceIdForTier } = await import('../services/stripe-service');
+        const stripe = getStripe();
+
+        const priceId = getPriceIdForTier(tier);
+        if (!priceId) {
+          return res.status(400).json({ error: `No Stripe price configured for tier: ${tier}` });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const userTenants = await storage.getUserTenants(user.id);
+        const tenant = userTenants[0];
+
+        // Get or create Stripe customer
+        let customerId = tenant?.billingInfo?.stripeCustomerId;
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: user.email || undefined,
+            name: user.username || 'Creator',
+            metadata: { userId: user.id, tenantId: tenant?.id || '' },
+          });
+          customerId = customer.id;
+
+          // Store customer ID
+          if (tenant) {
+            await storage.updateTenant(tenant.id, {
+              billingInfo: { ...tenant.billingInfo, stripeCustomerId: customerId },
+            });
+          }
+        }
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          mode: 'subscription',
+          line_items: [{ price: priceId, quantity: 1 }],
+          success_url: `${baseUrl}/creator-dashboard/subscriptions?session_id={CHECKOUT_SESSION_ID}&success=true`,
+          cancel_url: `${baseUrl}/creator-dashboard/subscriptions?canceled=true`,
+          metadata: {
+            tenantId: tenant?.id || '',
+            userId: user.id,
+            tier,
+          },
+          subscription_data: {
+            metadata: {
+              tenantId: tenant?.id || '',
+              userId: user.id,
+              tier,
+            },
+          },
+        });
+
+        res.json({ url: session.url });
+      } catch (error: any) {
+        console.error('Checkout session error:', error);
+        res.status(500).json({ error: 'Failed to create checkout session' });
+      }
+    }
+  );
+
+  // Create Billing Portal session (manage payment methods, invoices, cancel)
+  app.post(
+    '/api/stripe/create-portal-session',
+    syncActionLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const user = await storage.getUser(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const userTenants = await storage.getUserTenants(user.id);
+        const tenant = userTenants[0];
+        const customerId = tenant?.billingInfo?.stripeCustomerId;
+
+        if (!customerId) {
+          return res
+            .status(400)
+            .json({ error: 'No billing account found. Subscribe to a plan first.' });
+        }
+
+        const { createBillingPortalSession } = await import('../services/stripe-service');
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const session = await createBillingPortalSession(
+          customerId,
+          `${baseUrl}/creator-dashboard/subscriptions`
+        );
+
+        res.json({ url: session.url });
+      } catch (error: any) {
+        console.error('Portal session error:', error);
+        res.status(500).json({ error: 'Failed to create billing portal session' });
+      }
+    }
+  );
+
+  // Change subscription (upgrade/downgrade with proration)
+  app.post(
+    '/api/stripe/change-subscription',
+    syncActionLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const { tier } = req.body;
+        if (!tier || tier === 'enterprise') {
+          return res.status(400).json({ error: 'Invalid tier' });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const userTenants = await storage.getUserTenants(user.id);
+        const tenant = userTenants[0];
+        const subscriptionId = tenant?.billingInfo?.subscriptionId;
+
+        if (!subscriptionId) {
+          return res.status(400).json({ error: 'No active subscription to change' });
+        }
+
+        // Free tier = cancel subscription
+        if (tier === 'free') {
+          const { getStripe } = await import('../services/stripe-service');
+          const stripe = getStripe();
+          await stripe.subscriptions.update(subscriptionId, {
+            cancel_at_period_end: true,
+          });
+          return res.json({ success: true, message: 'Subscription will cancel at period end' });
+        }
+
+        const { getStripe, getPriceIdForTier } = await import('../services/stripe-service');
+        const stripe = getStripe();
+
+        const newPriceId = getPriceIdForTier(tier);
+        if (!newPriceId) {
+          return res.status(400).json({ error: `No Stripe price configured for tier: ${tier}` });
+        }
+
+        // Get current subscription
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const currentItemId = subscription.items.data[0]?.id;
+
+        if (!currentItemId) {
+          return res.status(400).json({ error: 'Subscription has no items' });
+        }
+
+        // Update with proration
+        const updated = await stripe.subscriptions.update(subscriptionId, {
+          items: [{ id: currentItemId, price: newPriceId }],
+          proration_behavior: 'create_prorations',
+          // Cancel the pending cancellation if upgrading
+          cancel_at_period_end: false,
+        });
+
+        // NOTE: Tier change in DB is handled by webhook (customer.subscription.updated)
+        // We don't update tier here to maintain webhook-first architecture
+
+        res.json({
+          success: true,
+          subscriptionId: updated.id,
+          status: updated.status,
+          message: 'Subscription updated. Changes will be reflected shortly.',
+        });
+      } catch (error: any) {
+        console.error('Subscription change error:', error);
+        res.status(500).json({ error: 'Failed to change subscription' });
+      }
+    }
+  );
+
+  // Cancel subscription at period end
+  app.post(
+    '/api/stripe/cancel-subscription',
+    syncActionLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const user = await storage.getUser(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const userTenants = await storage.getUserTenants(user.id);
+        const tenant = userTenants[0];
+        const subscriptionId = tenant?.billingInfo?.subscriptionId;
+
+        if (!subscriptionId) {
+          return res.status(400).json({ error: 'No active subscription to cancel' });
+        }
+
+        const { getStripe } = await import('../services/stripe-service');
+        const stripe = getStripe();
+
+        const updated = await stripe.subscriptions.update(subscriptionId, {
+          cancel_at_period_end: true,
+        });
+
+        res.json({
+          success: true,
+          cancelAt: updated.cancel_at
+            ? new Date((updated.cancel_at as number) * 1000).toISOString()
+            : null,
+          message: 'Subscription will cancel at the end of the current billing period.',
+        });
+      } catch (error: any) {
+        console.error('Subscription cancel error:', error);
+        res.status(500).json({ error: 'Failed to cancel subscription' });
+      }
+    }
+  );
+
+  // List past invoices
+  app.get('/api/stripe/invoices', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const userTenants = await storage.getUserTenants(user.id);
+      const tenant = userTenants[0];
+      const customerId = tenant?.billingInfo?.stripeCustomerId;
+
+      if (!customerId) {
+        return res.json({ invoices: [] });
+      }
+
+      const { getStripe } = await import('../services/stripe-service');
+      const stripe = getStripe();
+
+      const invoices = await stripe.invoices.list({
+        customer: customerId,
+        limit: 12,
+      });
+
+      res.json({
+        invoices: invoices.data.map((inv) => ({
+          id: inv.id,
+          number: inv.number,
+          status: inv.status,
+          amount: inv.amount_due ? (inv.amount_due / 100).toFixed(2) : '0.00',
+          currency: inv.currency,
+          date: inv.created ? new Date(inv.created * 1000).toISOString() : null,
+          pdfUrl: inv.invoice_pdf,
+          hostedUrl: inv.hosted_invoice_url,
+        })),
+      });
+    } catch (error: any) {
+      console.error('Invoice list error:', error);
+      res.status(500).json({ error: 'Failed to fetch invoices' });
+    }
+  });
+
   // Register authentication routes (Google OAuth and general auth)
   registerGoogleAuthRoutes(app);
   registerAuthRoutes(app);
@@ -2882,6 +3258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Badge routes (badge claiming and viewing)
   registerBadgeRoutes(app);
+
+  // Register Stripe webhook routes (must use raw body — express.json() is skipped for this path)
+  registerStripeWebhookRoutes(app);
 
   // ============================================================================
   // CAMPAIGN BUILDER: Draft & Task Assignment Endpoints (legacy)

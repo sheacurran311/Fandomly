@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Admin Multiplier Management Routes
  *
@@ -106,10 +107,10 @@ export function registerMultiplierRoutes(app: Express) {
       let query = db.select().from(activeMultipliers);
 
       if (tenantId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         query = query.where(
           or(eq(activeMultipliers.tenantId, tenantId), isNull(activeMultipliers.tenantId))
-        ) as unknown;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ) as any;
       }
 
       const multipliers = await query.orderBy(desc(activeMultipliers.createdAt));

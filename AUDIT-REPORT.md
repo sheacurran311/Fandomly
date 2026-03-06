@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-| Severity | Count |
-|----------|-------|
-| **CRITICAL** | 18 |
-| **HIGH** | 30 |
-| **MEDIUM** | 38 |
-| **LOW** | 21 |
-| **Total** | **107** |
+| Severity     | Count   |
+| ------------ | ------- |
+| **CRITICAL** | 18      |
+| **HIGH**     | 30      |
+| **MEDIUM**   | 38      |
+| **LOW**      | 21      |
+| **Total**    | **107** |
 
 The audit found **18 critical issues** that will cause immediate runtime failures, data corruption, or security bypasses when users interact with the platform. The most dangerous clusters are:
 
@@ -1203,49 +1203,49 @@ FIX: Return generic messages; log full errors server-side only.
 
 ### Phase 1 — Blockers (CRITICAL, prevents core functionality)
 
-| # | Feature | Issue | Effort |
-|---|---------|-------|--------|
-| 1 | Campaign Builder | Add missing `useState` import | 1 min |
-| 2 | Manual Review Queue | Migrate integer columns to varchar + add FKs | 30 min |
-| 3 | Task Building | Fix 'checkin' → 'check_in' enum mismatch | 5 min |
-| 4 | Task Review | Fix rejectManualReview setting status to 'completed' | 5 min |
-| 5 | Redemption | Add fanId to rewardRedemptions insert | 5 min |
-| 6 | Redemption | Fix route ordering for /pending | 5 min |
-| 7 | Reward Store | Fix userPoints vs userBalance field name | 5 min |
-| 8 | Reward Store | Pass programId to catalog endpoint | 10 min |
-| 9 | Reward Store | Remove deleted_at reference from catalog query | 5 min |
-| 10 | Badge System | Fix 'completed' → 'success' enum values | 10 min |
-| 11 | Badge System | Fix minted_at → completed_at column refs | 10 min |
-| 12 | Badge System | Fix walletAddress → avalancheL1Address | 5 min |
-| 13 | Program Builder | Fix fetchApi().json() double-parse | 5 min |
-| 14 | Social | Store accessToken/refreshToken in connect endpoint | 20 min |
-| 15 | Schema | Add indexes to taskCompletions table | 10 min |
+| #   | Feature             | Issue                                                | Effort |
+| --- | ------------------- | ---------------------------------------------------- | ------ |
+| 1   | Campaign Builder    | Add missing `useState` import                        | 1 min  |
+| 2   | Manual Review Queue | Migrate integer columns to varchar + add FKs         | 30 min |
+| 3   | Task Building       | Fix 'checkin' → 'check_in' enum mismatch             | 5 min  |
+| 4   | Task Review         | Fix rejectManualReview setting status to 'completed' | 5 min  |
+| 5   | Redemption          | Add fanId to rewardRedemptions insert                | 5 min  |
+| 6   | Redemption          | Fix route ordering for /pending                      | 5 min  |
+| 7   | Reward Store        | Fix userPoints vs userBalance field name             | 5 min  |
+| 8   | Reward Store        | Pass programId to catalog endpoint                   | 10 min |
+| 9   | Reward Store        | Remove deleted_at reference from catalog query       | 5 min  |
+| 10  | Badge System        | Fix 'completed' → 'success' enum values              | 10 min |
+| 11  | Badge System        | Fix minted_at → completed_at column refs             | 10 min |
+| 12  | Badge System        | Fix walletAddress → avalancheL1Address               | 5 min  |
+| 13  | Program Builder     | Fix fetchApi().json() double-parse                   | 5 min  |
+| 14  | Social              | Store accessToken/refreshToken in connect endpoint   | 20 min |
+| 15  | Schema              | Add indexes to taskCompletions table                 | 10 min |
 
 ### Phase 2 — Security (CRITICAL + HIGH security issues)
 
-| # | Feature | Issue | Effort |
-|---|---------|-------|--------|
-| 1 | Auth | Fix Particle verification bypass | 30 min |
-| 2 | Auth | Add rate limiting to /api/auth/particle/callback | 10 min |
-| 3 | Auth | Fix forgeable pending link IDs | 1 hr |
-| 4 | Auth | Fix open redirect on Google auth | 15 min |
-| 5 | Social | Enforce Instagram webhook signature verification | 15 min |
-| 6 | Admin | Fix multiplier admin privilege escalation | 20 min |
-| 7 | Social | Add auth to token exchange endpoints | 30 min |
-| 8 | Social | Remove/gate debug token endpoints | 15 min |
+| #   | Feature | Issue                                            | Effort |
+| --- | ------- | ------------------------------------------------ | ------ |
+| 1   | Auth    | Fix Particle verification bypass                 | 30 min |
+| 2   | Auth    | Add rate limiting to /api/auth/particle/callback | 10 min |
+| 3   | Auth    | Fix forgeable pending link IDs                   | 1 hr   |
+| 4   | Auth    | Fix open redirect on Google auth                 | 15 min |
+| 5   | Social  | Enforce Instagram webhook signature verification | 15 min |
+| 6   | Admin   | Fix multiplier admin privilege escalation        | 20 min |
+| 7   | Social  | Add auth to token exchange endpoints             | 30 min |
+| 8   | Social  | Remove/gate debug token endpoints                | 15 min |
 
 ### Phase 3 — Data Integrity (HIGH race conditions + consistency)
 
-| # | Feature | Issue | Effort |
-|---|---------|-------|--------|
-| 1 | Redemption | Move balance/stock checks inside transaction | 1 hr |
-| 2 | Points | Fix read-then-write race in platform points | 30 min |
-| 3 | Points | Fix read-then-write race in creator points spend | 30 min |
-| 4 | Campaign | Fix claimRewards double-claim race | 30 min |
-| 5 | Campaign | Fix addCompletedTask TOCTOU race | 30 min |
-| 6 | Task | Wrap task completion in transaction | 30 min |
-| 7 | Redemption | Unify dual redemption endpoints | 2 hr |
-| 8 | Points | Consolidate dual points awarding paths | 1 hr |
+| #   | Feature    | Issue                                            | Effort |
+| --- | ---------- | ------------------------------------------------ | ------ |
+| 1   | Redemption | Move balance/stock checks inside transaction     | 1 hr   |
+| 2   | Points     | Fix read-then-write race in platform points      | 30 min |
+| 3   | Points     | Fix read-then-write race in creator points spend | 30 min |
+| 4   | Campaign   | Fix claimRewards double-claim race               | 30 min |
+| 5   | Campaign   | Fix addCompletedTask TOCTOU race                 | 30 min |
+| 6   | Task       | Wrap task completion in transaction              | 30 min |
+| 7   | Redemption | Unify dual redemption endpoints                  | 2 hr   |
+| 8   | Points     | Consolidate dual points awarding paths           | 1 hr   |
 
 ### Phase 4 — Feature Fixes (HIGH functional issues)
 
@@ -1255,15 +1255,15 @@ Remaining HIGH and MEDIUM issues in priority order: shipping address mismatch, c
 
 ## Summary Table
 
-| Area | CRITICAL | HIGH | MEDIUM | LOW | Total |
-|------|----------|------|--------|-----|-------|
-| Task Lifecycle | 4 | 7 | 7 | 4 | 22 |
-| Campaign System | 1 | 5 | 6 | 3 | 15 |
-| Rewards & Redemption | 4 | 7 | 5 | 4 | 20 |
-| NFT & Badge System | 3 | 1 | 2 | 2 | 8 |
-| Points & Reputation | 0 | 3 | 5 | 2 | 10 |
-| Social Connections | 2 | 3 | 4 | 2 | 11 |
-| Program Builder & Public Page | 1 | 2 | 3 | 1 | 7 |
-| Auth | 1 | 3 | 3 | 2 | 9 |
-| Schema Integrity | 2 | 0 | 3 | 1 | 6 |
-| **Total** | **18** | **31** | **38** | **21** | **108** |
+| Area                          | CRITICAL | HIGH   | MEDIUM | LOW    | Total   |
+| ----------------------------- | -------- | ------ | ------ | ------ | ------- |
+| Task Lifecycle                | 4        | 7      | 7      | 4      | 22      |
+| Campaign System               | 1        | 5      | 6      | 3      | 15      |
+| Rewards & Redemption          | 4        | 7      | 5      | 4      | 20      |
+| NFT & Badge System            | 3        | 1      | 2      | 2      | 8       |
+| Points & Reputation           | 0        | 3      | 5      | 2      | 10      |
+| Social Connections            | 2        | 3      | 4      | 2      | 11      |
+| Program Builder & Public Page | 1        | 2      | 3      | 1      | 7       |
+| Auth                          | 1        | 3      | 3      | 2      | 9       |
+| Schema Integrity              | 2        | 0      | 3      | 1      | 6       |
+| **Total**                     | **18**   | **31** | **38** | **21** | **108** |

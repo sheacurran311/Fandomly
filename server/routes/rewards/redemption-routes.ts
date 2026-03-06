@@ -394,7 +394,6 @@ export function registerRedemptionRoutes(app: Express) {
 
           // Attempt to mint NFT immediately
           try {
-
             if (!walletAddress) {
               // User doesn't have a wallet - defer minting
               console.log(

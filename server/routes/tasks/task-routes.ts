@@ -2,6 +2,7 @@
 import { Express, Request, Response } from 'express';
 import { storage } from '../../core/storage';
 import { db } from '../../db';
+import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
 import { z } from 'zod';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import {
@@ -650,6 +651,22 @@ export function registerTaskRoutes(app: Express) {
 
         tenantId = creator.tenantId;
         creatorId = creator.id;
+
+        // Enforce subscription limit for task creation
+        if (tenantId) {
+          try {
+            await enforceSubscriptionLimit(tenantId, 'tasks');
+          } catch (limitErr: any) {
+            if (limitErr.code === 'LIMIT_EXCEEDED') {
+              return res.status(403).json({
+                error: limitErr.message,
+                code: 'LIMIT_EXCEEDED',
+                ...limitErr.details,
+              });
+            }
+            throw limitErr;
+          }
+        }
       }
 
       // Prepare task data for storage

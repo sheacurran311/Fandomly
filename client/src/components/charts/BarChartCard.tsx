@@ -18,6 +18,7 @@ interface BarChartCardProps {
   dataKeys: { key: string; color: string; name: string }[];
   xAxisKey: string;
   height?: number;
+  stacked?: boolean;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export function BarChartCard({
   dataKeys,
   xAxisKey,
   height = 300,
+  stacked = false,
   className = '',
 }: BarChartCardProps) {
   return (
@@ -58,6 +60,7 @@ export function BarChartCard({
                 fill={dataKey.color}
                 name={dataKey.name}
                 radius={[4, 4, 0, 0]}
+                {...(stacked ? { stackId: 'stack' } : {})}
               />
             ))}
           </BarChart>

@@ -8,6 +8,9 @@ import { syncScheduler } from './services/analytics/sync/sync-scheduler';
 import { groupGoalPoller } from './services/verification/group-goals/group-goal-poller';
 import { pointExpirationJob } from './jobs/point-expiration-job';
 import { reputationSyncJob } from './jobs/reputation-sync-job';
+import { gdprDeletionJob } from './jobs/gdpr-deletion-job';
+import { gdprRetentionJob } from './jobs/gdpr-retention-job';
+import { standardApiLimiter } from './middleware/rate-limit';
 
 const app = express();
 
@@ -48,9 +51,19 @@ app.use(
   })
 );
 
-app.use(express.json());
+// Skip JSON body parsing for Stripe webhook — it needs the raw body for signature verification
+app.use((req, res, next) => {
+  if (req.path === '/api/stripe/webhook') {
+    return next();
+  }
+  express.json()(req, res, next);
+});
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+// Global rate limiting for all API routes (100 req/min per IP)
+// Specific routes can apply stricter limits (analytics, sync, auth) on top of this
+app.use('/api/', standardApiLimiter);
 
 // CSRF Protection
 const isProduction = process.env.NODE_ENV === 'production';
@@ -202,6 +215,20 @@ app.use((req, res, next) => {
         log('Reputation sync job started (hourly)');
       } catch (err) {
         console.error('Failed to start reputation sync job:', err);
+      }
+
+      try {
+        gdprDeletionJob.start();
+        log('GDPR deletion job started (every 6 hours)');
+      } catch (err) {
+        console.error('Failed to start GDPR deletion job:', err);
+      }
+
+      try {
+        gdprRetentionJob.start();
+        log('GDPR retention job started (daily)');
+      } catch (err) {
+        console.error('Failed to start GDPR retention job:', err);
       }
     }
   );

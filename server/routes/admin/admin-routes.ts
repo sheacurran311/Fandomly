@@ -718,7 +718,7 @@ export function registerAdminRoutes(app: Express) {
         const creatorId = req.params.id;
         const { tier } = req.body;
 
-        const validTiers = ['starter', 'pro', 'business', 'enterprise'];
+        const validTiers = ['free', 'beginner', 'rising', 'allstar', 'enterprise'];
         if (!validTiers.includes(tier)) {
           return res
             .status(400)

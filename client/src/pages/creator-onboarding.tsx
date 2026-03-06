@@ -44,6 +44,7 @@ import {
 import { ImageUpload } from '@/components/ui/image-upload';
 import { LocationPicker } from '@/components/ui/location-picker';
 import { PersonalLinksInput } from '@/components/ui/personal-links-input';
+import { SUBSCRIPTION_TIERS, SELECTABLE_TIERS } from '@shared/subscription-config';
 
 const topSports = [
   'American Football',
@@ -270,62 +271,41 @@ const mainContentPlatformOptions = [
   { id: 'spotify', label: 'Spotify' },
 ];
 
-const subscriptionTiers = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: 'Free',
-    icon: Rocket,
-    color: 'from-blue-500 to-blue-600',
-    features: [
-      '1 Loyalty Program',
-      'Up to 100 members',
-      'Basic campaigns',
-      'Email support',
-      'Standard analytics',
-    ],
-  },
-  {
-    id: 'professional',
-    name: 'Professional',
-    price: '$29/month',
-    icon: Crown,
-    color: 'from-purple-500 to-purple-600',
-    popular: true,
-    features: [
-      '5 Loyalty Programs',
-      'Up to 1,000 members',
-      'Advanced campaigns',
-      'Priority support',
-      'Advanced analytics',
-      'Custom branding',
-      'API access',
-    ],
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '$99/month',
-    icon: Building,
-    color: 'from-green-500 to-green-600',
-    features: [
-      'Unlimited programs',
-      'Unlimited members',
-      'Premium campaigns',
-      'Dedicated support',
-      'White-label solution',
-      'Custom integrations',
-      'Advanced compliance',
-    ],
-  },
-];
+const tierIcons: Record<string, typeof Rocket> = {
+  free: Rocket,
+  beginner: Zap,
+  rising: Crown,
+  allstar: Trophy,
+  enterprise: Building,
+};
+
+const tierColors: Record<string, string> = {
+  free: 'from-blue-500 to-blue-600',
+  beginner: 'from-cyan-500 to-cyan-600',
+  rising: 'from-purple-500 to-purple-600',
+  allstar: 'from-amber-500 to-amber-600',
+  enterprise: 'from-green-500 to-green-600',
+};
+
+const subscriptionTiers = SELECTABLE_TIERS.map((tierId) => {
+  const tier = SUBSCRIPTION_TIERS[tierId];
+  return {
+    id: tierId,
+    name: tier.name,
+    price: tier.priceLabel,
+    icon: tierIcons[tierId] || Rocket,
+    color: tierColors[tierId] || 'from-blue-500 to-blue-600',
+    popular: tier.recommended || false,
+    features: tier.features,
+  };
+});
 
 export default function CreatorOnboardingPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
-  const [selectedTier, setSelectedTier] = useState('professional');
+  const [selectedTier, setSelectedTier] = useState('free');
   const [isEditingSlug, setIsEditingSlug] = useState(false);
 
   // Get creator type from URL params
@@ -381,7 +361,7 @@ export default function CreatorOnboardingPage() {
     followerCount: '',
 
     // Settings
-    subscriptionTier: 'professional',
+    subscriptionTier: 'free',
   });
 
   // Username validation

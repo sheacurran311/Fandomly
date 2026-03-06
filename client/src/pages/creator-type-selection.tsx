@@ -3,11 +3,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuth as useAuthContext } from '@/contexts/auth-context';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchApi } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { THEME_TEMPLATES, type ThemeTemplate } from '@shared/theme-templates';
@@ -15,6 +16,16 @@ import {
   CREATOR_TEMPLATES,
   type CreatorType,
 } from '@/components/program/creator-program-templates';
+import { PlatformConnectionPriority } from '@/components/program/platform-connection-priority';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
+import { FacebookSDKManager } from '@/lib/facebook';
+import { socialManager } from '@/lib/social-integrations';
+import { TwitterSDKManager } from '@/lib/twitter';
+import {
+  SUBSCRIPTION_TIERS,
+  SELECTABLE_TIERS,
+  type SubscriptionTier,
+} from '@shared/subscription-config';
 import {
   Trophy,
   Music,
@@ -32,6 +43,10 @@ import {
   Globe,
   Instagram,
   Youtube,
+  Link2,
+  CreditCard,
+  AlertCircle,
+  Crown,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -54,6 +69,7 @@ interface OnboardingState {
   pointsName: string;
   themeId: string;
   logoUrl: string | null;
+  subscriptionTier: SubscriptionTier;
 }
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -63,6 +79,8 @@ const STEPS = [
   { id: 'basics', label: 'Program Info', icon: Type },
   { id: 'theme', label: 'Style', icon: Palette },
   { id: 'photo', label: 'Photo', icon: Camera },
+  { id: 'socials', label: 'Socials', icon: Link2 },
+  { id: 'plan', label: 'Plan', icon: CreditCard },
 ] as const;
 
 const CREATOR_TYPES: CreatorTypeOption[] = [
@@ -133,7 +151,27 @@ export default function CreatorTypeSelection() {
     pointsName: '',
     themeId: '',
     logoUrl: null,
+    subscriptionTier: 'free',
   });
+
+  // Social connection state
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const [recentlyConnected, setRecentlyConnected] = useState<Set<string>>(new Set<string>());
+
+  // Fetch social connections
+  const { data: socialConnectionsData } = useQuery({
+    queryKey: ['/api/social-connections'],
+    queryFn: async () => {
+      const response = await fetchApi('/api/social-connections');
+      return response as any;
+    },
+  });
+
+  const connectedPlatforms = new Set<string>(
+    (socialConnectionsData as any)?.connections
+      ?.map((c: { platform?: string }) => c.platform)
+      .filter((p: unknown): p is string => typeof p === 'string') || []
+  );
 
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -171,6 +209,93 @@ export default function CreatorTypeSelection() {
     [user, state.username]
   );
 
+  // Social platform connection handler (mirrors program-builder logic)
+  const handleConnectPlatform = async (platformId: string) => {
+    const platformNames: Record<string, string> = {
+      twitter: 'Twitter',
+      instagram: 'Instagram',
+      discord: 'Discord',
+      facebook: 'Facebook',
+      tiktok: 'TikTok',
+      youtube: 'YouTube',
+      spotify: 'Spotify',
+      twitch: 'Twitch',
+    };
+    const platformName = platformNames[platformId] || platformId;
+    setConnectingPlatform(platformId);
+
+    try {
+      let result: {
+        success: boolean;
+        error?: string;
+        user?: unknown;
+        accessToken?: string;
+        refreshToken?: string;
+      };
+
+      if (platformId === 'twitter') {
+        result = await TwitterSDKManager.secureLogin('creator');
+        if (result.success && result.user) {
+          try {
+            await fetchApi('/api/social-connections', {
+              method: 'POST',
+              body: JSON.stringify({
+                platform: 'twitter',
+                platformUserId: (result.user as any).id,
+                platformUsername: String((result.user as any).username),
+                platformDisplayName: String((result.user as any).name),
+                accessToken: result.accessToken,
+                refreshToken: result.refreshToken,
+                profileData: {
+                  profileImageUrl: (result.user as any).profileImageUrl,
+                  followersCount: (result.user as any).followersCount,
+                  followingCount: (result.user as any).followingCount,
+                },
+              }),
+            });
+          } catch (saveErr) {
+            console.warn('[Onboarding] Twitter save failed:', saveErr);
+          }
+        }
+      } else if (platformId === 'facebook') {
+        result = await FacebookSDKManager.login(
+          'pages_show_list,pages_read_engagement,business_management'
+        );
+        result.success = result.success && !!result.accessToken;
+      } else {
+        const api = (socialManager as any)[platformId as keyof typeof socialManager];
+        if (!api) {
+          console.warn('Unknown platform:', platformId);
+          return;
+        }
+        result = await (api as any).secureLogin();
+      }
+
+      if (result.success) {
+        setRecentlyConnected((prev) => new Set(prev).add(platformId));
+        toast({
+          title: `${platformName} Connected! +500 Points`,
+          description: `Successfully connected your ${platformName} account`,
+        });
+        invalidateSocialConnections();
+      } else {
+        toast({
+          title: 'Connection Failed',
+          description: result.error || `Failed to connect ${platformName}`,
+          variant: 'destructive',
+        });
+      }
+    } catch {
+      toast({
+        title: 'Connection Failed',
+        description: `An error occurred while connecting ${platformName}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
   // API: create creator + tenant + program, then update program with user choices
   const finishMutation = useMutation({
     mutationFn: async () => {
@@ -182,6 +307,7 @@ export default function CreatorTypeSelection() {
         body: JSON.stringify({
           creatorType: state.creatorType,
           username: state.username.trim() || undefined,
+          subscriptionTier: state.subscriptionTier,
         }),
       });
 
@@ -606,6 +732,137 @@ export default function CreatorTypeSelection() {
               </div>
             </div>
           )}
+
+          {/* Step 4: Social Connections */}
+          {currentStep === 4 && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                Connect Your Social Accounts
+              </h1>
+              <p className="text-gray-400 mb-6 text-lg">
+                Earn <span className="text-brand-primary font-semibold">+500 Fandomly Points</span>{' '}
+                for each account you connect. These connections power your tasks and engagement
+                tracking.
+              </p>
+
+              {connectedPlatforms.size === 0 && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-6">
+                  <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-200 text-sm font-medium">No accounts connected yet</p>
+                    <p className="text-amber-200/70 text-xs mt-1">
+                      {
+                        "You'll need at least one social account connected to publish your program. You can always add more later."
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {connectedPlatforms.size > 0 && (
+                <div className="flex items-center gap-2 mb-6">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                    {connectedPlatforms.size} connected
+                  </Badge>
+                  <span className="text-sm text-gray-400">
+                    +{connectedPlatforms.size * 500} points earned
+                  </span>
+                </div>
+              )}
+
+              {state.creatorType && (
+                <PlatformConnectionPriority
+                  creatorType={state.creatorType}
+                  connectedPlatforms={connectedPlatforms}
+                  socialConnections={(socialConnectionsData as any)?.connections || []}
+                  recentlyConnected={recentlyConnected}
+                  connectingPlatform={connectingPlatform}
+                  onConnect={handleConnectPlatform}
+                  asCard={false}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Step 5: Choose Plan */}
+          {currentStep === 5 && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
+                Choose Your Plan
+              </h1>
+              <p className="text-gray-400 mb-8 text-lg">
+                Start free and upgrade anytime as your community grows.
+              </p>
+
+              <div className="space-y-3">
+                {SELECTABLE_TIERS.map((tierId) => {
+                  const tier = SUBSCRIPTION_TIERS[tierId];
+                  const isSelected = state.subscriptionTier === tierId;
+                  const isRecommended = tier.recommended;
+
+                  return (
+                    <button
+                      key={tierId}
+                      onClick={() => setState((s) => ({ ...s, subscriptionTier: tierId }))}
+                      className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 relative ${
+                        isSelected
+                          ? 'border-brand-primary bg-brand-primary/8 ring-1 ring-brand-primary/30'
+                          : 'border-white/8 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      {isRecommended && (
+                        <div className="absolute -top-2.5 right-4">
+                          <Badge className="bg-brand-primary/90 text-white text-xs px-2.5 py-0.5 border-0">
+                            <Crown className="h-3 w-3 mr-1" />
+                            Recommended
+                          </Badge>
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-white font-semibold text-lg">{tier.name}</span>
+                            {isSelected && <Check className="h-4 w-4 text-brand-primary" />}
+                          </div>
+                          <p className="text-gray-400 text-sm mb-3">{tier.description}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {tier.features.slice(0, 4).map((f) => (
+                              <span
+                                key={f}
+                                className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-gray-300 border border-white/8"
+                              >
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <p className="text-2xl font-bold text-white">
+                            {tier.price === 0 ? 'Free' : `$${tier.price}`}
+                          </p>
+                          {tier.price !== null && tier.price > 0 && (
+                            <p className="text-xs text-gray-500">per month</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Enterprise CTA */}
+              <div className="mt-6 p-4 rounded-xl bg-white/[0.03] border border-white/8 text-center">
+                <p className="text-gray-400 text-sm">
+                  Need more?{' '}
+                  <span className="text-brand-primary font-medium cursor-pointer hover:underline">
+                    Contact us
+                  </span>{' '}
+                  about Agency & Enterprise plans.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom navigation */}
@@ -621,44 +878,44 @@ export default function CreatorTypeSelection() {
             )}
 
             {currentStep < STEPS.length - 1 ? (
-              <Button
-                onClick={goNext}
-                disabled={!canAdvance()}
-                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Continue
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
               <div className="flex items-center gap-3">
-                {!state.logoUrl && (
+                {/* Skip button for photo (step 3) and socials (step 4) */}
+                {(currentStep === 3 || currentStep === 4) && (
                   <Button
                     variant="ghost"
-                    onClick={handleFinish}
-                    disabled={finishMutation.isPending}
+                    onClick={goNext}
                     className="text-gray-400 hover:text-white"
                   >
                     Skip for now
                   </Button>
                 )}
                 <Button
-                  onClick={handleFinish}
-                  disabled={finishMutation.isPending}
-                  className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold"
+                  onClick={goNext}
+                  disabled={!canAdvance()}
+                  className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {finishMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      Finish Setup
-                      <Sparkles className="h-4 w-4 ml-2" />
-                    </>
-                  )}
+                  Continue
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
+            ) : (
+              <Button
+                onClick={handleFinish}
+                disabled={finishMutation.isPending}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold"
+              >
+                {finishMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Finish Setup
+                    <Sparkles className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </Button>
             )}
           </div>
         </div>
