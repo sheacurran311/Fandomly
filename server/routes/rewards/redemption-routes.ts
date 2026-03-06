@@ -96,7 +96,7 @@ export function registerRedemptionRoutes(app: Express) {
           r.program_id as "programId",
           r.tenant_id as "tenantId",
           r.category,
-          r.metadata,
+          r.reward_data as "rewardData",
           r.created_at as "createdAt",
           COALESCE(r.stock_quantity, 0) as "stockRemaining",
           CASE WHEN r.stock_quantity IS NULL OR r.stock_quantity > 0 THEN TRUE ELSE FALSE END as "inStock",
@@ -380,21 +380,20 @@ export function registerRedemptionRoutes(app: Express) {
         const nftData = (reward.rewardData as any)?.nftData;
 
         if (nftData?.autoMintOnRedeem) {
-          // Declare outside try so it's accessible in catch for error logging
-          let walletAddress: string | null = null;
+          // Fetch wallet address before try/catch so it's accessible in the catch block
+          const [rewardUser] = await db
+            .select({
+              avalancheL1Address: users.avalancheL1Address,
+              walletAddress: users.walletAddress,
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+          const walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress;
+
           // Attempt to mint NFT immediately
           try {
-            const [rewardUser] = await db
-              .select({
-                avalancheL1Address: users.avalancheL1Address,
-                walletAddress: users.walletAddress,
-              })
-              .from(users)
-              .where(eq(users.id, userId))
-              .limit(1);
-
-            walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress || null;
-
             if (!walletAddress) {
               // User doesn't have a wallet - defer minting
               console.log(
@@ -661,7 +660,7 @@ export function registerRedemptionRoutes(app: Express) {
         INNER JOIN rewards r ON rr.reward_id = r.id
         LEFT JOIN loyalty_programs lp ON rr.program_id = lp.id
         WHERE ${conditions}
-        ORDER BY rr.created_at DESC
+        ORDER BY rr.redeemed_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `);
@@ -719,7 +718,7 @@ export function registerRedemptionRoutes(app: Express) {
         INNER JOIN users u ON rr.fan_id = u.id
         WHERE r.tenant_id = ${creator.tenantId}
           AND rr.status = 'pending'
-        ORDER BY rr.created_at ASC
+        ORDER BY rr.redeemed_at ASC
         LIMIT ${limit}
         OFFSET ${offset}
       `);
@@ -859,36 +858,45 @@ export function registerRedemptionRoutes(app: Express) {
           .set(updateData)
           .where(eq(rewardRedemptions.id, redemptionId));
 
-        // If cancelled/refunded, return points to user
+        // If cancelled/refunded, return points and restore stock
         if (status === 'cancelled' || status === 'refunded') {
           const pointsToReturn = redemption.points_spent || 0;
+          const quantityToRestore = redemption.quantity || 1;
 
-          // Get fan program
+          // Get fan program (prefer fan_id, fall back to user_id for old records)
+          const fanIdForLookup = redemption.fan_id || redemption.user_id;
           const [fanProgram] = await db
             .select()
             .from(fanPrograms)
             .where(
               and(
-                eq(fanPrograms.fanId, redemption.user_id),
+                eq(fanPrograms.fanId, fanIdForLookup),
                 eq(fanPrograms.programId, redemption.program_id)
               )
             )
             .limit(1);
 
           if (fanProgram && pointsToReturn > 0) {
-            // Return points
             await db.execute(sql`
             UPDATE fan_programs
             SET current_points = current_points + ${pointsToReturn}
             WHERE id = ${fanProgram.id}
           `);
 
-            // Record refund transaction
             await db.execute(sql`
             INSERT INTO point_transactions 
               (fan_program_id, tenant_id, points, type, source, metadata, created_at)
             VALUES 
               (${fanProgram.id}, ${redemption.tenant_id || ''}, ${pointsToReturn}, 'refund', 'redemption_cancelled', ${JSON.stringify({ redemptionId, reason: status })}, NOW())
+          `);
+          }
+
+          // Restore stock quantity on the reward
+          if (redemption.reward_id) {
+            await db.execute(sql`
+            UPDATE rewards
+            SET stock_quantity = stock_quantity + ${quantityToRestore}
+            WHERE id = ${redemption.reward_id} AND stock_quantity IS NOT NULL
           `);
           }
         }

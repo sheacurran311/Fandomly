@@ -270,7 +270,7 @@ function ProgramCustomizer({
   tasks = [],
 }: {
   program: ProgramWithDetails;
-  onPublish: (slug: string) => void;
+  onPublish: (slug: string) => void | Promise<void>;
   onUpdate: () => void;
   campaigns?: Campaign[];
   tasks?: Task[];
@@ -1436,7 +1436,10 @@ function ProgramCustomizer({
         setPublishSlug={setPublishSlug}
         showPublishDialog={showPublishDialog}
         setShowPublishDialog={setShowPublishDialog}
-        onPublish={onPublish}
+        onPublish={async (slug) => {
+          await updateProgramMutation.mutateAsync(buildSaveData());
+          onPublish(slug);
+        }}
         customizeData={customizeData}
         creatorType={creatorType}
         connectedPlatforms={connectedPlatforms}
@@ -1593,7 +1596,7 @@ function PublishDialog({
   setPublishSlug: (v: string) => void;
   showPublishDialog: boolean;
   setShowPublishDialog: (v: boolean) => void;
-  onPublish: (slug: string) => void;
+  onPublish: (slug: string) => void | Promise<void>;
   customizeData: Record<string, any>;
   creatorType: CreatorType;
   connectedPlatforms: Set<string>;
@@ -1673,8 +1676,8 @@ function PublishDialog({
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                onPublish(publishSlug);
+              onClick={async () => {
+                await onPublish(publishSlug);
                 setShowPublishDialog(false);
               }}
               className="bg-brand-primary hover:bg-brand-primary/80"
