@@ -282,28 +282,42 @@ export class CampaignEngineService {
       .where(and(eq(taskAssignments.campaignId, campaignId), eq(taskAssignments.isActive, true)));
     const requiredCount = assignments.filter((a) => !a.isOptional).length;
 
-    // Create participation
-    const [participation] = await db
-      .insert(campaignParticipations)
-      .values({
-        campaignId,
-        memberId: userId,
-        tenantId,
-        participationCount: 0,
-        totalTasksRequired: requiredCount,
-        tasksCompleted: [],
-        tasksPendingVerification: [],
-        lastParticipation: new Date(),
-      })
-      .returning();
+    // Create participation (handle concurrent joins gracefully)
+    try {
+      const [participation] = await db
+        .insert(campaignParticipations)
+        .values({
+          campaignId,
+          memberId: userId,
+          tenantId,
+          participationCount: 0,
+          totalTasksRequired: requiredCount,
+          tasksCompleted: [],
+          tasksPendingVerification: [],
+          lastParticipation: new Date(),
+        })
+        .returning();
 
-    // Increment campaign participant count
-    await db
-      .update(campaigns)
-      .set({ totalParticipants: sql`${campaigns.totalParticipants} + 1` })
-      .where(eq(campaigns.id, campaignId));
+      // Increment campaign participant count
+      await db
+        .update(campaigns)
+        .set({ totalParticipants: sql`${campaigns.totalParticipants} + 1` })
+        .where(eq(campaigns.id, campaignId));
 
-    return { success: true, participation, alreadyJoined: false };
+      return { success: true, participation, alreadyJoined: false };
+    } catch (error: any) {
+      // Handle unique constraint violation from concurrent join attempts
+      if (error?.code === '23505') {
+        const existingParticipation = await db.query.campaignParticipations.findFirst({
+          where: and(
+            eq(campaignParticipations.campaignId, campaignId),
+            eq(campaignParticipations.memberId, userId)
+          ),
+        });
+        return { success: true, participation: existingParticipation!, alreadyJoined: true };
+      }
+      throw error;
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -311,6 +325,10 @@ export class CampaignEngineService {
   // --------------------------------------------------------------------------
 
   async getCampaignProgress(userId: string, campaignId: string): Promise<CampaignProgressResult> {
+    const campaign = await db.query.campaigns.findFirst({
+      where: eq(campaigns.id, campaignId),
+    });
+
     const participation = await db.query.campaignParticipations.findFirst({
       where: and(
         eq(campaignParticipations.campaignId, campaignId),
@@ -338,11 +356,22 @@ export class CampaignEngineService {
     const requiredAssignments = assignments.filter((a) => !a.isOptional);
     const optionalAssignments = assignments.filter((a) => a.isOptional);
 
-    for (const assignment of assignments) {
+    // When enforceSequentialTasks is enabled and no explicit dependsOnTaskIds are set,
+    // automatically chain tasks by their taskOrder (each depends on the previous)
+    const enforceSequential = (campaign as any)?.enforceSequentialTasks === true;
+
+    for (let i = 0; i < assignments.length; i++) {
+      const assignment = assignments[i];
       const aid = assignment.id;
       if (completedIds.includes(aid) || pendingVerificationIds.includes(aid)) continue;
 
-      const dependsOn = (assignment.dependsOnTaskIds as string[]) || [];
+      let dependsOn = (assignment.dependsOnTaskIds as string[]) || [];
+
+      // Auto-generate sequential dependency if flag is on and no explicit deps set
+      if (enforceSequential && dependsOn.length === 0 && i > 0) {
+        dependsOn = [assignments[i - 1].id];
+      }
+
       const allDependenciesMet =
         dependsOn.length === 0 || dependsOn.every((depId) => completedIds.includes(depId));
 
@@ -356,7 +385,7 @@ export class CampaignEngineService {
     const totalCompleted = completedIds.length;
     const totalRequired = requiredAssignments.length;
     const completionPercentage =
-      totalRequired > 0 ? Math.round((totalCompleted / assignments.length) * 100) : 0;
+      totalRequired > 0 ? Math.round((totalCompleted / totalRequired) * 100) : 0;
 
     const allRequiredDone = requiredAssignments.every((a) => completedIds.includes(a.id));
     const canClaimCompletion =
@@ -399,8 +428,29 @@ export class CampaignEngineService {
       return { success: false, message: 'Task assignment not found' };
     }
 
-    // Check dependencies
-    const dependsOn = (assignment.dependsOnTaskIds as string[]) || [];
+    // Check dependencies (including auto-sequential enforcement)
+    let dependsOn = (assignment.dependsOnTaskIds as string[]) || [];
+
+    // If enforceSequentialTasks is on and no explicit deps, derive from task order
+    if (dependsOn.length === 0) {
+      const campaignRecord = await db.query.campaigns.findFirst({
+        where: eq(campaigns.id, campaignId),
+      });
+      if ((campaignRecord as any)?.enforceSequentialTasks) {
+        const allAssignments = await db
+          .select({ id: taskAssignments.id, taskOrder: taskAssignments.taskOrder })
+          .from(taskAssignments)
+          .where(
+            and(eq(taskAssignments.campaignId, campaignId), eq(taskAssignments.isActive, true))
+          )
+          .orderBy(taskAssignments.taskOrder);
+        const idx = allAssignments.findIndex((a) => a.id === assignmentId);
+        if (idx > 0) {
+          dependsOn = [allAssignments[idx - 1].id];
+        }
+      }
+    }
+
     if (dependsOn.length > 0) {
       const participation = await db.query.campaignParticipations.findFirst({
         where: and(
@@ -888,14 +938,21 @@ export class CampaignEngineService {
   }
 
   private async checkBadgeOwnership(userId: string, badgeIds: string[]): Promise<boolean> {
-    // Check NFT deliveries where the mint references a badge template
-    const deliveries = await db
-      .select()
-      .from(nftDeliveries)
-      .where(eq(nftDeliveries.userId, userId));
-    // For now, check if user has any badge-related deliveries
-    // This can be refined when badge minting is fully integrated
-    return deliveries.length > 0 || badgeIds.length === 0;
+    if (badgeIds.length === 0) return true;
+    // Check that the user owns NFT mints for each required badge template
+    const { nftMints } = await import('@shared/schema');
+    const ownedMints = await db
+      .select({ badgeTemplateId: nftMints.badgeTemplateId })
+      .from(nftMints)
+      .where(
+        and(
+          eq(nftMints.recipientUserId, userId),
+          eq(nftMints.status, 'success'),
+          inArray(nftMints.badgeTemplateId, badgeIds)
+        )
+      );
+    const ownedBadgeIds = new Set(ownedMints.map((m) => m.badgeTemplateId).filter(Boolean));
+    return badgeIds.every((id) => ownedBadgeIds.has(id));
   }
 
   private async getUserReputation(userId: string): Promise<number> {

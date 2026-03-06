@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { users, platformPointsTransactions } from '@shared/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { onReputationSignalChanged } from '../reputation/reputation-event-handler';
 
 /**
@@ -35,21 +35,8 @@ export class PlatformPointsService {
     metadata?: Record<string, unknown>
   ): Promise<{ success: boolean; newBalance: number }> {
     try {
-      // Get current user data
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      const currentPoints = Number(
-        (user.profileData as Record<string, unknown>)?.fandomlyPoints ?? 0
-      );
-      const newBalance = currentPoints + points;
-
-      // Create transaction record
+      // Atomically increment fandomlyPoints in profile_data and append transaction record
+      // Uses jsonb operations to avoid read-then-write race conditions
       const transaction = {
         id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         points,
@@ -58,26 +45,27 @@ export class PlatformPointsService {
         createdAt: new Date().toISOString(),
       };
 
-      const existingTransactions = ((user.profileData as Record<string, unknown>)
-        ?.pointsTransactions ?? []) as unknown[];
-      const updatedTransactions = [transaction, ...existingTransactions].slice(0, 100);
-
-      // Update user's platform points balance and transactions in profile_data (legacy)
-      await db
+      // Atomic update: increment points and prepend transaction (keep last 100)
+      const [updated] = await db
         .update(users)
         .set({
           profileData: sql`jsonb_set(
             jsonb_set(
               COALESCE(profile_data, '{}'::jsonb),
               '{fandomlyPoints}',
-              ${newBalance}::text::jsonb
+              (COALESCE((profile_data->>'fandomlyPoints')::numeric, 0) + ${points})::text::jsonb
             ),
             '{pointsTransactions}',
-            ${JSON.stringify(updatedTransactions)}::jsonb
+            (${JSON.stringify([transaction])}::jsonb || COALESCE(profile_data->'pointsTransactions', '[]'::jsonb))[:100]
           )`,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userId));
+        .where(eq(users.id, userId))
+        .returning({ profileData: users.profileData });
+
+      const newBalance = Number(
+        (updated?.profileData as Record<string, unknown>)?.fandomlyPoints ?? 0
+      );
 
       // Also insert into platform_points_transactions table for unified querying
       // This ensures charts, leaderboards, and history all use the same data source
@@ -205,19 +193,57 @@ export class PlatformPointsService {
     metadata?: Record<string, unknown>
   ): Promise<{ success: boolean; newBalance: number }> {
     try {
-      // Get current balance
-      const currentBalance = await this.getBalance(userId);
+      // Atomic check-and-deduct: only deduct if balance is sufficient
+      const transaction = {
+        id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        points: -points,
+        source: reason,
+        metadata,
+        createdAt: new Date().toISOString(),
+      };
 
-      if (currentBalance < points) {
+      const result = await db
+        .update(users)
+        .set({
+          profileData: sql`jsonb_set(
+            jsonb_set(
+              COALESCE(profile_data, '{}'::jsonb),
+              '{fandomlyPoints}',
+              (COALESCE((profile_data->>'fandomlyPoints')::numeric, 0) - ${points})::text::jsonb
+            ),
+            '{pointsTransactions}',
+            (${JSON.stringify([transaction])}::jsonb || COALESCE(profile_data->'pointsTransactions', '[]'::jsonb))[:100]
+          )`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(users.id, userId),
+            sql`COALESCE((profile_data->>'fandomlyPoints')::numeric, 0) >= ${points}`
+          )
+        )
+        .returning({ profileData: users.profileData });
+
+      if (result.length === 0) {
         throw new Error('Insufficient platform points');
       }
 
-      // Deduct points (award negative amount)
-      const result = await this.awardPoints(userId, -points, reason, metadata);
+      const newBalance = Number(
+        (result[0]?.profileData as Record<string, unknown>)?.fandomlyPoints ?? 0
+      );
+
+      // Also insert into platform_points_transactions table
+      await db.insert(platformPointsTransactions).values({
+        userId,
+        points: -points,
+        source: reason,
+        description: `Spent ${points} platform points for ${reason}`,
+        metadata: metadata ?? undefined,
+      });
 
       console.log(`[Platform Points] Spent ${points} points for user ${userId}. Reason: ${reason}`);
 
-      return result;
+      return { success: true, newBalance };
     } catch (error) {
       console.error('[Platform Points] Error spending points:', error);
       throw error;

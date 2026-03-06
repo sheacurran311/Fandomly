@@ -608,8 +608,10 @@ export function createTaskCompletionRoutes(storage: IStorage) {
           return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Note: We're not checking task.taskType === 'check_in' because 'check_in' is not in the current task type enum
-        // This will need to be addressed when the schema is updated
+        // Validate this is a check_in task
+        if (task.taskType !== 'check_in') {
+          return res.status(400).json({ error: 'Task is not a check-in type' });
+        }
 
         // Get or create completion
         let completion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);

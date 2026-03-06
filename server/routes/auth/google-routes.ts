@@ -21,6 +21,21 @@ import {
  * Do NOT remove these routes unless all users have been migrated to Particle auth
  * and there is no longer a need for a non-Particle fallback path.
  */
+// Validate redirect_uri to prevent open redirect attacks.
+// Only allows same-origin URIs or configured allowed origins.
+function isAllowedRedirectUri(uri: string, host: string): boolean {
+  try {
+    const parsed = new URL(uri);
+    const allowedHosts = [
+      host,
+      ...(process.env.ALLOWED_REDIRECT_HOSTS || '').split(',').filter(Boolean),
+    ];
+    return allowedHosts.some((h) => parsed.host === h || parsed.host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 export function registerGoogleAuthRoutes(app: Express) {
   /**
    * GET /api/auth/google
@@ -31,6 +46,11 @@ export function registerGoogleAuthRoutes(app: Express) {
       const redirectUri =
         (req.query.redirect_uri as string) ||
         `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+
+      if (!isAllowedRedirectUri(redirectUri, req.get('host') || '')) {
+        return res.status(400).json({ error: 'Invalid redirect_uri' });
+      }
+
       const state = req.query.state as string;
 
       const authUrl = getGoogleAuthUrl(redirectUri, state);
@@ -55,6 +75,10 @@ export function registerGoogleAuthRoutes(app: Express) {
 
       if (!redirectUri) {
         return res.status(400).json({ error: 'redirect_uri is required' });
+      }
+
+      if (!isAllowedRedirectUri(redirectUri, req.get('host') || '')) {
+        return res.status(400).json({ error: 'Invalid redirect_uri' });
       }
 
       const authUrl = getGoogleAuthUrl(redirectUri, state);
