@@ -180,7 +180,7 @@ export function registerDashboardStatsRoutes(app: Express) {
         WITH program_stats AS (
           SELECT
             COUNT(*) as programs_joined,
-            COALESCE(SUM(fp.points_balance), 0) as total_creator_points
+            COALESCE(SUM(fp.current_points), 0) as total_creator_points
           FROM fan_programs fp
           WHERE fp.fan_id = ${userId}
         ),

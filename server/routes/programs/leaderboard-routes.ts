@@ -37,13 +37,12 @@ export function registerLeaderboardRoutes(app: Express) {
           cl.campaign_id,
           cl.user_id,
           cl.username,
-          cl.avatar,
-          cl.points,
+          cl.avatar_url AS avatar,
+          cl.total_points AS points,
           cl.participation_count,
-          cl.last_participation,
+          cl.last_activity AS last_participation,
           cl.rank,
           cl.joined_at,
-          -- Get rank change from history (yesterday vs today)
           COALESCE(rh.rank_change, 0) AS rank_change,
           COALESCE(rh.points_change, 0) AS points_change
         FROM ${sql.raw(viewName)} cl
@@ -153,14 +152,12 @@ export function registerLeaderboardRoutes(app: Express) {
             pl.program_id,
             pl.user_id,
             pl.username,
-            pl.avatar,
+            pl.avatar_url AS avatar,
             pl.current_points,
-            pl.total_points_earned,
+            pl.total_points,
             pl.current_tier,
             pl.joined_at,
             pl.rank,
-            pl.current_rank,
-            -- Get rank change from history
             COALESCE(rh.rank_change, 0) AS rank_change,
             COALESCE(rh.points_change, 0) AS points_change
           FROM program_leaderboard pl
@@ -334,12 +331,11 @@ export function registerLeaderboardRoutes(app: Express) {
         SELECT
           pl.user_id,
           pl.username,
-          pl.avatar,
+          pl.avatar_url AS avatar,
           pl.total_points,
           pl.transaction_count,
           pl.last_activity,
           pl.rank,
-          -- Get rank change from history
           COALESCE(rh.rank_change, 0) AS rank_change,
           COALESCE(rh.points_change, 0) AS points_change
         FROM ${sql.raw(viewName)} pl
