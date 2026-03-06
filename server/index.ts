@@ -14,6 +14,10 @@ import { standardApiLimiter } from './middleware/rate-limit';
 
 const app = express();
 
+// Trust the first proxy (Replit / load balancer) so express-rate-limit
+// reads the real client IP from X-Forwarded-For instead of erroring.
+app.set('trust proxy', 1);
+
 // Security headers via Helmet
 app.use(
   helmet({
