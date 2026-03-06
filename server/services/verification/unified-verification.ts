@@ -325,14 +325,19 @@ export class UnifiedVerificationService {
     }
 
     // ================================================================
-    // CODE-IN-REPOST VERIFICATION (T2 - Twitter Quote Tweets)
+    // CODE-IN-REPOST VERIFICATION (T2 - non-Twitter platforms)
     // ================================================================
-    if (taskType.includes('quote') || taskType.includes('repost')) {
+    // Twitter quote tweets and retweets are handled by the Twitter verifier below.
+    // Only intercept non-Twitter repost/quote tasks here.
+    if (
+      (taskType.includes('quote') || taskType.includes('repost')) &&
+      !['twitter', 'x'].includes(platform.toLowerCase())
+    ) {
       return {
         verified: false,
         requiresManualReview: true,
         confidence: 'medium' as const,
-        reason: 'Quote tweet requires manual verification',
+        reason: 'Quote/repost requires manual verification',
         metadata: {
           verificationTier: 'T2',
           verificationMethod: 'code_repost',

@@ -1236,8 +1236,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter user info (uses OAuth access token for auth, not session)
-  app.get('/api/social/twitter/user', async (req: Request, res: Response) => {
+  // Twitter user info
+  app.get('/api/social/twitter/user', authenticateUser, async (req: Request, res: Response) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1553,8 +1553,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Discord user info (uses OAuth access token for auth, not session)
-  app.get('/api/social/discord/me', async (req, res) => {
+  // Discord user info
+  app.get('/api/social/discord/me', authenticateUser, async (req, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1589,8 +1589,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitch user info (uses OAuth access token for auth, not session)
-  app.get('/api/social/twitch/me', async (req, res) => {
+  // Twitch user info
+  app.get('/api/social/twitch/me', authenticateUser, async (req, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
