@@ -8,6 +8,7 @@
 import { db } from '@db';
 import { socialConnections, type SocialConnection } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { safeDecryptToken } from '../../lib/token-encryption';
 
 export interface TokenRefreshResult {
   success: boolean;
@@ -36,8 +37,8 @@ const PLATFORM_CONFIGS: Record<
   },
   youtube: {
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    clientIdEnv: 'GOOGLE_CLIENT_ID',
-    clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+    clientIdEnv: 'GOOGLE_YOUTUBE_CLIENT_ID',
+    clientSecretEnv: 'GOOGLE_YOUTUBE_CLIENT_SECRET',
     useBasicAuth: false,
   },
   twitch: {
@@ -93,7 +94,7 @@ class TokenRefreshService {
     if (!this.isTokenExpired(connection.tokenExpiresAt)) {
       return {
         success: true,
-        accessToken: connection.accessToken || undefined,
+        accessToken: connection.accessToken ? safeDecryptToken(connection.accessToken) : undefined,
         expiresAt: connection.tokenExpiresAt || undefined,
       };
     }
@@ -140,6 +141,9 @@ class TokenRefreshService {
       };
     }
 
+    // Decrypt token before sending to OAuth provider (tokens may be stored encrypted)
+    const refreshToken = safeDecryptToken(connection.refreshToken);
+
     const clientId = process.env[config.clientIdEnv];
     const clientSecret = process.env[config.clientSecretEnv];
 
@@ -162,12 +166,12 @@ class TokenRefreshService {
           `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
         body = new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: connection.refreshToken,
+          refresh_token: refreshToken,
         });
       } else {
         body = new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: connection.refreshToken,
+          refresh_token: refreshToken,
           client_id: clientId,
           client_secret: clientSecret,
         });
@@ -251,7 +255,7 @@ class TokenRefreshService {
       return result.accessToken;
     }
 
-    return connection.accessToken;
+    return connection.accessToken ? safeDecryptToken(connection.accessToken) : null;
   }
 
   /**

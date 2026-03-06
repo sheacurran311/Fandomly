@@ -552,6 +552,14 @@ export function createTaskCompletionRoutes(storage: IStorage) {
 
           // 3. Update fan program points balance atomically
           if (pointsToAward > 0 && task.tenantId) {
+            const programWhere = [
+              eq(fanPrograms.fanId, req.user!.id),
+              eq(fanPrograms.tenantId, task.tenantId),
+            ];
+            // Scope to specific program when task has a programId
+            if (task.programId) {
+              programWhere.push(eq(fanPrograms.programId, task.programId));
+            }
             await tx
               .update(fanPrograms)
               .set({
@@ -559,9 +567,7 @@ export function createTaskCompletionRoutes(storage: IStorage) {
                 totalPointsEarned: sql`${fanPrograms.totalPointsEarned} + ${pointsToAward}`,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               } as any)
-              .where(
-                and(eq(fanPrograms.fanId, req.user!.id), eq(fanPrograms.tenantId, task.tenantId))
-              );
+              .where(and(...programWhere));
           }
 
           return { updatedCompletion, rewardDistribution };
@@ -602,8 +608,10 @@ export function createTaskCompletionRoutes(storage: IStorage) {
           return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Note: We're not checking task.taskType === 'check_in' because 'check_in' is not in the current task type enum
-        // This will need to be addressed when the schema is updated
+        // Validate this is a check_in task
+        if (task.taskType !== 'check_in') {
+          return res.status(400).json({ error: 'Task is not a check-in type' });
+        }
 
         // Get or create completion
         let completion = await storage.getTaskCompletionByUserAndTask(req.user.id, taskId);

@@ -583,18 +583,13 @@ function verifyWebhookSignature(body: any, signature: string, rawBody?: Buffer):
 export function registerSocialRoutes(app: Express) {
   // ===== Instagram Webhooks =====
 
-  // Test endpoint to verify webhook URL is accessible
+  // Test endpoint to verify webhook URL is accessible (no secrets exposed)
   app.get('/webhooks/instagram/test', (req: Request, res: Response) => {
-    console.log('[Instagram Webhooks] Test endpoint accessed');
     res.json({
       status: 'ok',
       message: 'Instagram webhook endpoint is accessible',
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
       hasVerifyToken: !!process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
-      verifyTokenPreview: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN
-        ? `${process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN.substring(0, 10)}...`
-        : 'NOT_SET',
     });
   });
 
@@ -613,12 +608,11 @@ export function registerSocialRoutes(app: Express) {
 
     const expectedToken = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
 
-    console.log('[Instagram Webhooks] Verification comparison:');
-    console.log('  - Mode:', mode, '(expected: subscribe)');
-    console.log('  - Token received:', token);
-    console.log('  - Token expected:', expectedToken);
-    console.log('  - Challenge:', challenge);
-    console.log('  - Tokens match:', token === expectedToken);
+    console.log('[Instagram Webhooks] Verification attempt:', {
+      mode,
+      hasToken: !!token,
+      tokensMatch: token === expectedToken,
+    });
 
     // Check if a token and mode were sent
     if (mode && token) {
@@ -869,8 +863,11 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Inspect a token via /debug_token (requires app credentials)
+  // Inspect a token via /debug_token (dev-only, requires app credentials)
   app.get('/api/facebook/debug-token', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found' });
+    }
     try {
       const inputToken = (req.query.token as string) || (req.headers['x-fb-token'] as string);
       const appId = process.env.FACEBOOK_APP_ID;
@@ -1305,11 +1302,14 @@ export function registerSocialRoutes(app: Express) {
     }
   );
 
-  // Debug endpoint to see raw stored token data
+  // Debug endpoint to see raw stored token data (dev-only)
   app.get(
     '/api/social/twitter/debug-tokens',
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(404).json({ error: 'Not found' });
+      }
       try {
         const userId = req.user!.id;
 
@@ -1758,11 +1758,12 @@ export function registerSocialRoutes(app: Express) {
         const connection = await db.query.socialConnections.findFirst({
           where: and(
             eq(socialConnections.userId, userId),
-            eq(socialConnections.platform, platform)
+            eq(socialConnections.platform, platform),
+            eq(socialConnections.isActive, true)
           ),
         });
 
-        if (connection && connection.isActive) {
+        if (connection) {
           res.json({
             connected: true,
             connection: {

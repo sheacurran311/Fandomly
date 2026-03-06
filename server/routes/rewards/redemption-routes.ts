@@ -307,7 +307,7 @@ export function registerRedemptionRoutes(app: Express) {
         const userRedemptionCountResult = await db.execute(sql`
           SELECT COALESCE(SUM(quantity), 0) as total
           FROM reward_redemptions
-          WHERE reward_id = ${rewardId} AND user_id = ${userId}
+          WHERE reward_id = ${rewardId} AND fan_id = ${userId}
         `);
         const currentCount = parseInt((userRedemptionCountResult as any).rows?.[0]?.total || '0');
 
@@ -322,12 +322,15 @@ export function registerRedemptionRoutes(app: Express) {
 
       // Start transaction: deduct points and create redemption
       const result = await db.transaction(async (tx) => {
-        // Deduct points
-        await tx.execute(sql`
+        // Deduct points atomically — WHERE ensures no negative balance from concurrent requests
+        const deductResult = await tx.execute(sql`
           UPDATE fan_programs
           SET current_points = current_points - ${totalPointsCost}
-          WHERE id = ${fanProgram.id}
+          WHERE id = ${fanProgram.id} AND current_points >= ${totalPointsCost}
         `);
+        if ((deductResult as any).rowCount === 0) {
+          throw new Error('Insufficient points (concurrent request)');
+        }
 
         // Record point transaction
         await tx.execute(sql`
@@ -337,13 +340,16 @@ export function registerRedemptionRoutes(app: Express) {
             (${fanProgram.id}, ${reward.tenantId || ''}, ${-totalPointsCost}, 'spent', 'reward_redemption', ${JSON.stringify({ rewardId, rewardName: reward.name })}, NOW())
         `);
 
-        // Reduce stock if tracked
+        // Reduce stock if tracked (atomic guard against negative stock)
         if (reward.stockQuantity !== null) {
-          await tx.execute(sql`
-            UPDATE rewards 
+          const stockResult = await tx.execute(sql`
+            UPDATE rewards
             SET stock_quantity = stock_quantity - ${quantity}
-            WHERE id = ${rewardId}
+            WHERE id = ${rewardId} AND stock_quantity >= ${quantity}
           `);
+          if ((stockResult as any).rowCount === 0) {
+            throw new Error('Insufficient stock (concurrent request)');
+          }
         }
 
         // Create redemption record
@@ -377,12 +383,15 @@ export function registerRedemptionRoutes(app: Express) {
           // Attempt to mint NFT immediately
           try {
             const [rewardUser] = await db
-              .select({ walletAddress: users.walletAddress })
+              .select({
+                avalancheL1Address: users.avalancheL1Address,
+                walletAddress: users.walletAddress,
+              })
               .from(users)
               .where(eq(users.id, userId))
               .limit(1);
 
-            const walletAddress = rewardUser?.walletAddress;
+            const walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress;
 
             if (!walletAddress) {
               // User doesn't have a wallet - defer minting
@@ -454,7 +463,7 @@ export function registerRedemptionRoutes(app: Express) {
                       pointsSpent: totalPointsCost,
                     },
                     txHash: mintResult.txHash,
-                    status: 'completed',
+                    status: 'success',
                     completedAt: new Date(),
                   } as any)
                   .returning();
@@ -525,7 +534,7 @@ export function registerRedemptionRoutes(app: Express) {
                     },
                     txHash: mintResult.txHash,
                     tokenId: mintResult.tokenId || null,
-                    status: 'completed',
+                    status: 'success',
                     completedAt: new Date(),
                   } as any)
                   .returning();
@@ -552,6 +561,26 @@ export function registerRedemptionRoutes(app: Express) {
           } catch (mintError) {
             console.error('[Redemption] NFT minting failed:', mintError);
 
+            // Record failed mint in nftMints table so retry logic can pick it up
+            try {
+              await db.insert(nftMints).values({
+                crossmintActionId: `redemption-failed-${Date.now()}-${userId}`,
+                recipientUserId: userId,
+                recipientWalletAddress: walletAddress || null,
+                recipientChain: 'fandomly-chain',
+                mintReason: 'reward_redemption',
+                contextData: {
+                  rewardId: reward.id,
+                  redemptionId: result.id,
+                  pointsSpent: totalPointsCost,
+                  nftData,
+                },
+                status: 'failed',
+              } as any);
+            } catch {
+              /* best-effort */
+            }
+
             // Update redemption to indicate failed mint
             await db
               .update(rewardRedemptions)
@@ -565,7 +594,7 @@ export function registerRedemptionRoutes(app: Express) {
               .where(eq(rewardRedemptions.id, result.id));
 
             // Don't fail the entire redemption - points were already spent
-            // User can try to claim NFT later via a retry mechanism
+            // Failed mints are recorded in nft_mints with status='failed' for retry
           }
         } else {
           // Auto-mint is disabled - mark for manual fulfillment

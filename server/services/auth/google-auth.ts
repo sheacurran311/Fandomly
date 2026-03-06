@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from '../../db';
 import { users, socialConnections } from '@shared/schema';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { signAccessToken, signRefreshToken } from './jwt-service';
 import { nanoid } from 'nanoid';
+import { encryptToken } from '../../lib/token-encryption';
 
 // Google OAuth2 configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -18,7 +20,7 @@ export interface GoogleTokenResponse {
 }
 
 export interface GoogleUserInfo {
-  id: string;           // Google's unique user ID
+  id: string; // Google's unique user ID
   email: string;
   verified_email: boolean;
   name?: string;
@@ -49,12 +51,15 @@ export interface AuthResult {
 /**
  * Exchange an authorization code for tokens
  */
-export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<GoogleTokenResponse> {
+export async function exchangeGoogleCode(
+  code: string,
+  redirectUri: string
+): Promise<GoogleTokenResponse> {
   console.log('[Google Auth] Exchanging code for tokens', {
     hasClientId: !!GOOGLE_CLIENT_ID,
     hasClientSecret: !!GOOGLE_CLIENT_SECRET,
     redirectUri,
-    codeLength: code.length
+    codeLength: code.length,
   });
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
@@ -69,8 +74,8 @@ export async function exchangeGoogleCode(code: string, redirectUri: string): Pro
       client_secret: GOOGLE_CLIENT_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: redirectUri
-    }).toString()
+      redirect_uri: redirectUri,
+    }).toString(),
   });
 
   if (!response.ok) {
@@ -87,7 +92,7 @@ export async function exchangeGoogleCode(code: string, redirectUri: string): Pro
  */
 export async function getGoogleUserInfo(accessToken: string): Promise<GoogleUserInfo> {
   const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!response.ok) {
@@ -105,33 +110,33 @@ export async function getGoogleUserInfo(accessToken: string): Promise<GoogleUser
  */
 export async function authenticateWithGoogle(
   googleTokens: GoogleTokenResponse,
-  _options: Record<string, any> = {}  // options parameter kept for backward compat but userType is ignored
+  _options: Record<string, any> = {} // options parameter kept for backward compat but userType is ignored
 ): Promise<AuthResult> {
   // Get user info from Google
   const googleUser = await getGoogleUserInfo(googleTokens.access_token);
-  
+
   console.log('[Google Auth] Processing authentication for:', {
     googleId: googleUser.id,
     email: googleUser.email,
-    name: googleUser.name
+    name: googleUser.name,
   });
 
   // Check if user exists by Google ID
   let existingUser = await db.query.users.findFirst({
-    where: eq(users.googleId, googleUser.id)
+    where: eq(users.googleId, googleUser.id),
   });
 
   // If not found by Google ID, check by email
   if (!existingUser && googleUser.email) {
     existingUser = await db.query.users.findFirst({
-      where: eq(users.email, googleUser.email)
+      where: eq(users.email, googleUser.email),
     });
 
     // If found by email but different provider, handle account linking
     if (existingUser && !existingUser.googleId) {
       console.log('[Google Auth] Found user by email with different provider', {
         userId: existingUser.id,
-        existingProvider: existingUser.primaryAuthProvider
+        existingProvider: existingUser.primaryAuthProvider,
       });
 
       // Return link required response
@@ -149,8 +154,15 @@ export async function authenticateWithGoogle(
         refreshToken: '',
         isNewUser: false,
         linkRequired: true,
-        existingProviders: existingUser.primaryAuthProvider ? [existingUser.primaryAuthProvider] : [],
-        pendingLinkId: await createPendingLink(existingUser.id, googleUser.id, 'google', googleUser.email)
+        existingProviders: existingUser.primaryAuthProvider
+          ? [existingUser.primaryAuthProvider]
+          : [],
+        pendingLinkId: await createPendingLink(
+          existingUser.id,
+          googleUser.id,
+          'google',
+          googleUser.email
+        ),
       };
     }
   }
@@ -161,11 +173,12 @@ export async function authenticateWithGoogle(
   if (existingUser) {
     // Update existing user with Google ID if not set
     if (!existingUser.googleId) {
-      await db.update(users)
+      await db
+        .update(users)
         .set({
           googleId: googleUser.id,
           primaryAuthProvider: existingUser.primaryAuthProvider || 'google',
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(users.id, existingUser.id));
     }
@@ -174,27 +187,25 @@ export async function authenticateWithGoogle(
     // Create new user
     isNewUser = true;
     const username = generateUsername(googleUser.name || googleUser.email?.split('@')[0] || 'user');
-    
-    const [newUser] = await db.insert(users).values({
-      email: googleUser.email,
-      username,
-      googleId: googleUser.id,
-      primaryAuthProvider: 'google',
-      userType: 'pending',  // ALL new users start as 'pending' — they choose type after auth
-      role: 'customer_end_user',
-      avatar: googleUser.picture || null,
-      profileData: {
-        name: googleUser.name,
-        firstName: googleUser.given_name,
-        lastName: googleUser.family_name,
-      },
-      onboardingState: {
-        currentStep: 0,
-        totalSteps: 5,
-        completedSteps: [],
-        isCompleted: false
-      }
-    } as any).returning();
+
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        email: googleUser.email,
+        username,
+        googleId: googleUser.id,
+        primaryAuthProvider: 'google',
+        userType: 'pending', // ALL new users start as 'pending' — they choose type after auth
+        role: 'customer_end_user',
+        avatar: googleUser.picture || null,
+        profileData: {
+          name: googleUser.name,
+          firstName: googleUser.given_name,
+          lastName: googleUser.family_name,
+        },
+        onboardingState: { step: 'user_type_selection' },
+      } as any)
+      .returning();
 
     user = newUser;
     console.log('[Google Auth] Created new user:', user.id);
@@ -204,28 +215,29 @@ export async function authenticateWithGoogle(
     throw new Error('Failed to create or find user');
   }
 
-  // Store Google connection in social_connections table
+  // Store Google connection in social_connections table (tokens encrypted at rest)
   await upsertSocialConnection(user.id, 'google', {
     platformUserId: googleUser.id,
     platformUsername: googleUser.email,
     platformDisplayName: googleUser.name || googleUser.email,
-    accessToken: googleTokens.access_token,
-    refreshToken: googleTokens.refresh_token,
-    tokenExpiresAt: googleTokens.expires_in ? 
-      new Date(Date.now() + googleTokens.expires_in * 1000) : null,
+    accessToken: googleTokens.access_token ? encryptToken(googleTokens.access_token) : undefined,
+    refreshToken: googleTokens.refresh_token ? encryptToken(googleTokens.refresh_token) : undefined,
+    tokenExpiresAt: googleTokens.expires_in
+      ? new Date(Date.now() + googleTokens.expires_in * 1000)
+      : null,
     profileData: {
       email: googleUser.email,
       verified: googleUser.verified_email,
       picture: googleUser.picture,
-      locale: googleUser.locale
-    }
+      locale: googleUser.locale,
+    },
   });
 
   // Generate JWT tokens
   const accessToken = signAccessToken({
     id: user.id,
     email: user.email,
-    provider: 'google'
+    provider: 'google',
   });
   const refreshToken = signRefreshToken({ id: user.id });
 
@@ -241,7 +253,7 @@ export async function authenticateWithGoogle(
     },
     accessToken,
     refreshToken,
-    isNewUser
+    isNewUser,
   };
 }
 
@@ -257,18 +269,20 @@ async function createPendingLink(
   // For now, store in a simple way - in production you'd want a proper table
   // Return a unique ID that can be used to confirm the link
   const linkId = nanoid();
-  
+
   // Store the pending link data (you could use Redis or a database table)
   // For now, we'll encode it in the ID itself (in production, use proper storage)
-  const pendingLinkData = Buffer.from(JSON.stringify({
-    existingUserId,
-    providerId,
-    provider,
-    email,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
-  })).toString('base64url');
-  
+  const pendingLinkData = Buffer.from(
+    JSON.stringify({
+      existingUserId,
+      providerId,
+      provider,
+      email,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    })
+  ).toString('base64url');
+
   // Use '.' as delimiter — safe because nanoid and base64url never contain '.'
   return `${linkId}.${pendingLinkData}`;
 }
@@ -307,7 +321,7 @@ export async function confirmAccountLink(
 
   // Get the existing user
   const existingUser = await db.query.users.findFirst({
-    where: eq(users.id, linkData.existingUserId)
+    where: eq(users.id, linkData.existingUserId),
   });
 
   if (!existingUser) {
@@ -323,7 +337,8 @@ export async function confirmAccountLink(
   }
 
   // Update user with Google ID
-  await db.update(users)
+  await db
+    .update(users)
     .set({
       googleId: googleUser.id,
       linkedAccounts: {
@@ -333,36 +348,37 @@ export async function confirmAccountLink(
             provider: 'google',
             providerId: googleUser.id,
             email: googleUser.email,
-            linkedAt: new Date().toISOString()
-          }
-        ]
+            linkedAt: new Date().toISOString(),
+          },
+        ],
       },
-      updatedAt: new Date()
+      updatedAt: new Date(),
     })
     .where(eq(users.id, existingUser.id));
 
-  // Store Google connection
+  // Store Google connection (tokens encrypted at rest)
   await upsertSocialConnection(existingUser.id, 'google', {
     platformUserId: googleUser.id,
     platformUsername: googleUser.email,
     platformDisplayName: googleUser.name || googleUser.email,
-    accessToken: googleTokens.access_token,
-    refreshToken: googleTokens.refresh_token,
-    tokenExpiresAt: googleTokens.expires_in ? 
-      new Date(Date.now() + googleTokens.expires_in * 1000) : null,
+    accessToken: googleTokens.access_token ? encryptToken(googleTokens.access_token) : undefined,
+    refreshToken: googleTokens.refresh_token ? encryptToken(googleTokens.refresh_token) : undefined,
+    tokenExpiresAt: googleTokens.expires_in
+      ? new Date(Date.now() + googleTokens.expires_in * 1000)
+      : null,
     profileData: {
       email: googleUser.email,
       verified: googleUser.verified_email,
       picture: googleUser.picture,
-      locale: googleUser.locale
-    }
+      locale: googleUser.locale,
+    },
   });
 
   // Generate tokens
   const accessToken = signAccessToken({
     id: existingUser.id,
     email: existingUser.email,
-    provider: 'google'
+    provider: 'google',
   });
   const refreshToken = signRefreshToken({ id: existingUser.id });
 
@@ -378,7 +394,7 @@ export async function confirmAccountLink(
     },
     accessToken,
     refreshToken,
-    isNewUser: false
+    isNewUser: false,
   };
 }
 
@@ -397,8 +413,8 @@ export async function refreshGoogleTokens(refreshToken: string): Promise<GoogleT
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
       refresh_token: refreshToken,
-      grant_type: 'refresh_token'
-    }).toString()
+      grant_type: 'refresh_token',
+    }).toString(),
   });
 
   if (!response.ok) {
@@ -427,19 +443,17 @@ async function upsertSocialConnection(
   }
 ) {
   const existing = await db.query.socialConnections.findFirst({
-    where: and(
-      eq(socialConnections.userId, userId),
-      eq(socialConnections.platform, platform)
-    )
+    where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)),
   });
 
   if (existing) {
-    await db.update(socialConnections)
+    await db
+      .update(socialConnections)
       .set({
         ...data,
         lastSyncedAt: new Date(),
         updatedAt: new Date(),
-        isActive: true
+        isActive: true,
       })
       .where(eq(socialConnections.id, existing.id));
   } else {
@@ -448,7 +462,7 @@ async function upsertSocialConnection(
       platform,
       ...data,
       connectedAt: new Date(),
-      isActive: true
+      isActive: true,
     } as any);
   }
 }
@@ -478,7 +492,7 @@ export function getGoogleAuthUrl(redirectUri: string, state?: string): string {
     scope: 'openid email profile',
     access_type: 'offline',
     prompt: 'consent',
-    ...(state && { state })
+    ...(state && { state }),
   });
 
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

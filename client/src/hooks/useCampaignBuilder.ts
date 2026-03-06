@@ -21,7 +21,12 @@ interface SaveCampaignPayload {
   accentColor?: string;
   campaignMultiplier?: number;
   completionBonusPoints?: number;
-  completionBonusRewards?: Record<string, unknown>;
+  completionBonusRewards?: Array<{
+    type: string;
+    rewardId?: string;
+    value?: unknown;
+    metadata?: Record<string, unknown>;
+  }>;
   verificationMode?: 'immediate' | 'deferred';
   enforceSequentialTasks?: boolean;
   accessCode?: string;

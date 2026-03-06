@@ -60,10 +60,10 @@ export function registerReviewRoutes(app: Express) {
           return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        // Get pending reviews (creatorId in manual_review_queue is integer; compare via cast)
+        // Get pending reviews for this creator
         const reviews = await db.query.manualReviewQueue.findMany({
           where: and(
-            sql`${manualReviewQueue.creatorId}::text = ${creatorId}`,
+            eq(manualReviewQueue.creatorId, creatorId),
             eq(manualReviewQueue.status, 'pending')
           ),
           orderBy: [desc(manualReviewQueue.createdAt)],
@@ -161,7 +161,7 @@ export function registerReviewRoutes(app: Express) {
             count: sql<number>`count(*)::int`,
           })
           .from(manualReviewQueue)
-          .where(sql`${manualReviewQueue.creatorId}::text = ${creatorId}`)
+          .where(eq(manualReviewQueue.creatorId, creatorId))
           .groupBy(manualReviewQueue.status);
 
         // Get counts by platform
@@ -172,10 +172,7 @@ export function registerReviewRoutes(app: Express) {
           })
           .from(manualReviewQueue)
           .where(
-            and(
-              sql`${manualReviewQueue.creatorId}::text = ${creatorId}`,
-              eq(manualReviewQueue.status, 'pending')
-            )
+            and(eq(manualReviewQueue.creatorId, creatorId), eq(manualReviewQueue.status, 'pending'))
           )
           .groupBy(manualReviewQueue.platform);
 
@@ -246,7 +243,7 @@ export function registerReviewRoutes(app: Express) {
 
         // Find associated review queue item (taskCompletionId is int in legacy schema; cast for comparison)
         const review = await db.query.manualReviewQueue.findFirst({
-          where: sql`${manualReviewQueue.taskCompletionId}::text = ${completionId}`,
+          where: eq(manualReviewQueue.taskCompletionId, completionId),
         });
 
         if (review) {
@@ -330,7 +327,7 @@ export function registerReviewRoutes(app: Express) {
 
         // Find associated review queue item (taskCompletionId is int in legacy schema; cast for comparison)
         const review = await db.query.manualReviewQueue.findFirst({
-          where: sql`${manualReviewQueue.taskCompletionId}::text = ${completionId}`,
+          where: eq(manualReviewQueue.taskCompletionId, completionId),
         });
 
         if (review) {
