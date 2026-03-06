@@ -96,7 +96,7 @@ export function registerRedemptionRoutes(app: Express) {
           r.program_id as "programId",
           r.tenant_id as "tenantId",
           r.category,
-          r.metadata,
+          r.reward_data as "rewardData",
           r.created_at as "createdAt",
           COALESCE(r.stock_quantity, 0) as "stockRemaining",
           CASE WHEN r.stock_quantity IS NULL OR r.stock_quantity > 0 THEN TRUE ELSE FALSE END as "inStock",
@@ -661,7 +661,7 @@ export function registerRedemptionRoutes(app: Express) {
         INNER JOIN rewards r ON rr.reward_id = r.id
         LEFT JOIN loyalty_programs lp ON rr.program_id = lp.id
         WHERE ${conditions}
-        ORDER BY rr.created_at DESC
+        ORDER BY rr.redeemed_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `);
@@ -719,7 +719,7 @@ export function registerRedemptionRoutes(app: Express) {
         INNER JOIN users u ON rr.fan_id = u.id
         WHERE r.tenant_id = ${creator.tenantId}
           AND rr.status = 'pending'
-        ORDER BY rr.created_at ASC
+        ORDER BY rr.redeemed_at ASC
         LIMIT ${limit}
         OFFSET ${offset}
       `);

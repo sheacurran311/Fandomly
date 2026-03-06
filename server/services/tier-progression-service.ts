@@ -52,8 +52,8 @@ class TierProgressionService {
       SELECT
         fp.id,
         fp.program_id,
-        fp.points_balance,
-        fp.lifetime_points,
+        fp.current_points,
+        fp.total_points_earned,
         fp.current_tier_id,
         lpt.name as current_tier_name,
         lpt.tier_order as current_tier_order
@@ -68,7 +68,7 @@ class TierProgressionService {
     }
 
     const program = (fanProgramResult as any).rows[0] as any;
-    const currentPoints = program.lifetime_points || program.points_balance || 0;
+    const currentPoints = program.total_points_earned || program.current_points || 0;
 
     // Get all tiers for this loyalty program, ordered by min_points
     const tiersResult = await db.execute(sql`
@@ -231,8 +231,8 @@ class TierProgressionService {
     const fanProgramResult = await db.execute(sql`
       SELECT
         fp.program_id,
-        fp.points_balance,
-        fp.lifetime_points,
+        fp.current_points,
+        fp.total_points_earned,
         fp.current_tier_id
       FROM fan_programs fp
       WHERE fp.id = ${fanProgramId}
@@ -243,7 +243,7 @@ class TierProgressionService {
     }
 
     const program = (fanProgramResult as any).rows[0] as any;
-    const currentPoints = program.lifetime_points || program.points_balance || 0;
+    const currentPoints = program.total_points_earned || program.current_points || 0;
 
     // Get all tiers ordered by min_points
     const tiersResult = await db.execute(sql`

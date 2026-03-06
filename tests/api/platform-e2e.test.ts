@@ -71,6 +71,16 @@ async function api(
 // SETUP
 // ─────────────────────────────────────────────────────
 beforeAll(async () => {
+  // Wait for server to be ready (handles timing after restarts)
+  for (let i = 0; i < 10; i++) {
+    try {
+      const check = await fetch(`${BASE}/api/csrf-token`);
+      if (check.ok) break;
+    } catch {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+
   const csrfRes = await fetch(`${BASE}/api/csrf-token`);
   const csrfData = (await csrfRes.json()) as { csrfToken: string };
   csrfToken = csrfData.csrfToken;
@@ -129,9 +139,9 @@ describe('Health Endpoints', () => {
     expect(res.status).toBe(200);
   });
 
-  it('GET /api/health/detailed returns service info', async () => {
-    const res = await api('GET', '/api/health/detailed');
-    expect([200, 404]).toContain(res.status);
+  it('GET /api/health/detailed returns service info or requires auth', async () => {
+    const res = await api('GET', '/api/health/detailed', undefined, creatorToken);
+    expect([200, 401, 403, 404]).toContain(res.status);
   });
 });
 
@@ -309,11 +319,8 @@ describe('Reward CRUD', () => {
 describe('Reward Catalog & Redemption', () => {
   it('GET /api/rewards/catalog returns rewards for fan', async () => {
     const res = await api('GET', `/api/rewards/catalog?programId=${programId || ''}`, undefined, fanToken);
-    // 500 indicates a query-level bug in the catalog endpoint (pre-existing)
-    expect([200, 500]).toContain(res.status);
-    if (res.status === 200) {
-      expect(res.body).toHaveProperty('rewards');
-    }
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('rewards');
   });
 
   it('GET /api/rewards/catalog/:rewardId returns single reward detail', async () => {
@@ -334,14 +341,12 @@ describe('Reward Catalog & Redemption', () => {
 
   it('GET /api/rewards/redemptions lists fan redemptions', async () => {
     const res = await api('GET', '/api/rewards/redemptions', undefined, fanToken);
-    // 500 indicates a query-level bug in the redemptions endpoint (pre-existing)
-    expect([200, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
   });
 
   it('GET /api/rewards/redemptions/pending lists creator pending', async () => {
     const res = await api('GET', '/api/rewards/redemptions/pending', undefined, creatorToken);
-    // 500 indicates a query-level bug in the pending endpoint (pre-existing)
-    expect([200, 403, 500]).toContain(res.status);
+    expect([200, 403]).toContain(res.status);
   });
 });
 
@@ -495,8 +500,7 @@ describe('Fan Dashboard', () => {
 
   it('GET /api/fan/dashboard/recent-activity returns activity', async () => {
     const res = await api('GET', '/api/fan/dashboard/recent-activity', undefined, fanToken);
-    // 500 indicates a query-level bug in the activity endpoint (pre-existing)
-    expect([200, 404, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
   });
 
   it('GET /api/fan/dashboard/points-history returns points', async () => {
@@ -521,8 +525,7 @@ describe('Creator Dashboard', () => {
 
   it('GET /api/dashboard/fan-stats returns fan stats', async () => {
     const res = await api('GET', '/api/dashboard/fan-stats', undefined, creatorToken);
-    // 500 indicates a query-level bug in the fan-stats endpoint (pre-existing)
-    expect([200, 404, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
   });
 });
 
@@ -562,14 +565,12 @@ describe('Leaderboards', () => {
 
   it('GET /api/leaderboards/top-performers returns top users', async () => {
     const res = await api('GET', '/api/leaderboards/top-performers', undefined, fanToken);
-    // 500 indicates a query-level bug in the leaderboard endpoint (pre-existing)
-    expect([200, 404, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
   });
 
   it('GET /api/leaderboards/my-rankings returns user rankings', async () => {
     const res = await api('GET', '/api/leaderboards/my-rankings', undefined, fanToken);
-    // 500 indicates a query-level bug in the rankings endpoint (pre-existing)
-    expect([200, 404, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
   });
 
   it('GET /api/leaderboards/program/:programId returns program board', async () => {
@@ -581,8 +582,7 @@ describe('Leaderboards', () => {
   it('GET /api/leaderboards/campaign/:campaignId returns campaign board', async () => {
     if (!campaignId) return;
     const res = await api('GET', `/api/leaderboards/campaign/${campaignId}`, undefined, fanToken);
-    // 500 indicates a query-level bug in the campaign leaderboard (pre-existing)
-    expect([200, 404, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
   });
 });
 

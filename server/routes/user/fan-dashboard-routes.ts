@@ -207,14 +207,17 @@ export function registerFanDashboardRoutes(app: Express) {
       const userId = req.user!.id;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
 
-      // Get recent point transactions
-      const recentTransactions = await db.query.pointTransactions.findMany({
-        where: sql`${pointTransactions.fanProgramId} IN (
-          SELECT id FROM ${fanPrograms} WHERE ${fanPrograms.fanId} = ${userId}
-        )`,
-        orderBy: sql`${pointTransactions.createdAt} DESC`,
-        limit,
-      });
+      // Get recent point transactions for this user's fan programs
+      const recentTransactions = await db
+        .select()
+        .from(pointTransactions)
+        .where(
+          sql`${pointTransactions.fanProgramId} IN (
+            SELECT id FROM fan_programs WHERE fan_id = ${userId}
+          )`
+        )
+        .orderBy(sql`${pointTransactions.createdAt} DESC`)
+        .limit(limit);
 
       // Get recent platform task completions
       const recentPlatformCompletions = await db.query.platformTaskCompletions.findMany({
