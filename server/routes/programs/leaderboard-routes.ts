@@ -1,17 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Sprint 8: Leaderboard Routes
  * API endpoints for campaign, program, and platform leaderboards
  * CRITICAL: All data is real-time calculated from database views - NO mock data
  */
 
-import type { Express } from "express";
+import type { Express } from 'express';
 import { db } from '../../db';
-import { sql } from "drizzle-orm";
+import { sql } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { getSafeLeaderboardView } from '../../utils/safe-sql';
 
 export function registerLeaderboardRoutes(app: Express) {
-
   // ============================================
   // CAMPAIGN LEADERBOARDS
   // ============================================
@@ -21,10 +21,10 @@ export function registerLeaderboardRoutes(app: Express) {
    * Get leaderboard for a specific campaign with time period filtering
    * Query params: period (all-time | week | month), limit (default: 100)
    */
-  app.get("/api/leaderboards/campaign/:campaignId", async (req, res) => {
+  app.get('/api/leaderboards/campaign/:campaignId', async (req, res) => {
     try {
       const { campaignId } = req.params;
-      const period = req.query.period as string || 'all-time';
+      const period = (req.query.period as string) || 'all-time';
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
 
@@ -71,10 +71,10 @@ export function registerLeaderboardRoutes(app: Express) {
         pagination: {
           limit,
           offset,
-          total: parseInt(total.toString())
+          total: parseInt(total.toString()),
         },
         period,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       });
     } catch (error: any) {
       console.error('❌ Failed to fetch campaign leaderboard:', error);
@@ -86,10 +86,10 @@ export function registerLeaderboardRoutes(app: Express) {
    * GET /api/leaderboards/campaign/:campaignId/user/:userId
    * Get specific user's rank and stats in a campaign
    */
-  app.get("/api/leaderboards/campaign/:campaignId/user/:userId", async (req, res) => {
+  app.get('/api/leaderboards/campaign/:campaignId/user/:userId', async (req, res) => {
     try {
       const { campaignId, userId } = req.params;
-      const period = req.query.period as string || 'all-time';
+      const period = (req.query.period as string) || 'all-time';
 
       // Use safe view name lookup to prevent SQL injection
       const viewName = getSafeLeaderboardView('campaign', period);
@@ -129,7 +129,7 @@ export function registerLeaderboardRoutes(app: Express) {
    * Get leaderboard for a specific loyalty program
    * Query params: limit (default: 100), offset (default: 0)
    */
-  app.get("/api/leaderboards/program/:programId", async (req, res) => {
+  app.get('/api/leaderboards/program/:programId', async (req, res) => {
     try {
       const { programId } = req.params;
       const limit = parseInt(req.query.limit as string) || 100;
@@ -186,8 +186,10 @@ export function registerLeaderboardRoutes(app: Express) {
 
       // Fallback: If materialized view is empty or doesn't exist, query fan_programs directly
       if (leaderboardRows.length === 0) {
-        console.log(`[Leaderboard] Materialized view empty for program ${programId}, using direct query fallback`);
-        
+        console.log(
+          `[Leaderboard] Materialized view empty for program ${programId}, using direct query fallback`
+        );
+
         const directQuery = await db.execute(sql`
           SELECT
             fp.program_id,
@@ -235,7 +237,7 @@ export function registerLeaderboardRoutes(app: Express) {
         joinedAt: row.joined_at,
         rank: parseInt(row.rank?.toString() || '0'),
         rankChange: parseInt(row.rank_change?.toString() || '0'),
-        pointsChange: parseInt(row.points_change?.toString() || '0')
+        pointsChange: parseInt(row.points_change?.toString() || '0'),
       }));
 
       res.json({
@@ -243,9 +245,9 @@ export function registerLeaderboardRoutes(app: Express) {
         pagination: {
           limit,
           offset,
-          total
+          total,
         },
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       });
     } catch (error: any) {
       console.error('❌ Failed to fetch program leaderboard:', error);
@@ -257,7 +259,7 @@ export function registerLeaderboardRoutes(app: Express) {
    * GET /api/leaderboards/program/:programId/user/:userId
    * Get specific user's rank in a program
    */
-  app.get("/api/leaderboards/program/:programId/user/:userId", async (req, res) => {
+  app.get('/api/leaderboards/program/:programId/user/:userId', async (req, res) => {
     try {
       const { programId, userId } = req.params;
 
@@ -296,9 +298,9 @@ export function registerLeaderboardRoutes(app: Express) {
    * Get platform-wide leaderboard based on Fandomly Points
    * Query params: period (all-time | week | month), limit (default: 100)
    */
-  app.get("/api/leaderboards/platform", async (req, res) => {
+  app.get('/api/leaderboards/platform', async (req, res) => {
     try {
-      const period = req.query.period as string || 'all-time';
+      const period = (req.query.period as string) || 'all-time';
       const limit = parseInt(req.query.limit as string) || 100;
       const offset = parseInt(req.query.offset as string) || 0;
 
@@ -314,15 +316,17 @@ export function registerLeaderboardRoutes(app: Express) {
 
       if (!viewExists.rows[0]?.exists) {
         // Return empty leaderboard if view doesn't exist
-        console.warn(`[Leaderboard] Materialized view ${viewName} does not exist. Run migration 0027_add_sprint8_leaderboard_views.sql`);
+        console.warn(
+          `[Leaderboard] Materialized view ${viewName} does not exist. Run migration 0027_add_sprint8_leaderboard_views.sql`
+        );
         return res.json({
           leaderboard: [],
           pagination: {
             limit,
             offset,
             total: 0,
-            hasMore: false
-          }
+            hasMore: false,
+          },
         });
       }
 
@@ -368,7 +372,7 @@ export function registerLeaderboardRoutes(app: Express) {
         lastActivity: row.last_activity,
         rank: parseInt(row.rank?.toString() || '0'),
         rankChange: parseInt(row.rank_change?.toString() || '0'),
-        pointsChange: parseInt(row.points_change?.toString() || '0')
+        pointsChange: parseInt(row.points_change?.toString() || '0'),
       }));
 
       res.json({
@@ -376,10 +380,10 @@ export function registerLeaderboardRoutes(app: Express) {
         pagination: {
           limit,
           offset,
-          total: parseInt(total.toString())
+          total: parseInt(total.toString()),
         },
         period,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       });
     } catch (error: any) {
       console.error('❌ Failed to fetch platform leaderboard:', error);
@@ -391,10 +395,10 @@ export function registerLeaderboardRoutes(app: Express) {
    * GET /api/leaderboards/platform/user/:userId
    * Get specific user's platform rank
    */
-  app.get("/api/leaderboards/platform/user/:userId", async (req, res) => {
+  app.get('/api/leaderboards/platform/user/:userId', async (req, res) => {
     try {
       const { userId } = req.params;
-      const period = req.query.period as string || 'all-time';
+      const period = (req.query.period as string) || 'all-time';
 
       // Use safe view name lookup to prevent SQL injection
       const viewName = getSafeLeaderboardView('platform', period);
@@ -433,9 +437,9 @@ export function registerLeaderboardRoutes(app: Express) {
    * Get top performers across all leaderboards for badge rewards
    * Query params: type (platform | campaign | program), limit (default: 10)
    */
-  app.get("/api/leaderboards/top-performers", async (req, res) => {
+  app.get('/api/leaderboards/top-performers', async (req, res) => {
     try {
-      const type = req.query.type as string || 'platform';
+      const type = (req.query.type as string) || 'platform';
       const limit = parseInt(req.query.limit as string) || 10;
       const scopeId = req.query.scopeId as string; // campaign_id or program_id
 
@@ -466,7 +470,7 @@ export function registerLeaderboardRoutes(app: Express) {
         topPerformers: result.rows,
         type,
         scopeId,
-        limit
+        limit,
       });
     } catch (error: any) {
       console.error('❌ Failed to fetch top performers:', error);
@@ -482,17 +486,20 @@ export function registerLeaderboardRoutes(app: Express) {
    * GET /api/leaderboards/user/:userId/all-ranks
    * Get user's ranks across all campaigns, programs, and platform
    */
-  app.get("/api/leaderboards/user/:userId/all-ranks", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const { userId } = req.params;
+  app.get(
+    '/api/leaderboards/user/:userId/all-ranks',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { userId } = req.params;
 
-      // Verify user can only access their own ranks (unless admin)
-      if (req.user?.id !== userId && req.user?.userType !== 'admin') {
-        return res.status(403).json({ error: 'Unauthorized' });
-      }
+        // Verify user can only access their own ranks (unless admin)
+        if (req.user?.id !== userId && req.user?.userType !== 'admin') {
+          return res.status(403).json({ error: 'Unauthorized' });
+        }
 
-      // Get platform rank
-      const platformRank = await db.execute(sql`
+        // Get platform rank
+        const platformRank = await db.execute(sql`
         SELECT
           pl.*,
           COALESCE(rh.rank_change, 0) AS rank_change
@@ -504,8 +511,8 @@ export function registerLeaderboardRoutes(app: Express) {
         WHERE pl.user_id = ${userId}
       `);
 
-      // Get all campaign ranks
-      const campaignRanks = await db.execute(sql`
+        // Get all campaign ranks
+        const campaignRanks = await db.execute(sql`
         SELECT
           cl.*,
           c.name AS campaign_name,
@@ -521,8 +528,8 @@ export function registerLeaderboardRoutes(app: Express) {
         ORDER BY cl.rank
       `);
 
-      // Get all program ranks
-      const programRanks = await db.execute(sql`
+        // Get all program ranks
+        const programRanks = await db.execute(sql`
         SELECT
           pl.*,
           lp.name AS program_name,
@@ -538,17 +545,18 @@ export function registerLeaderboardRoutes(app: Express) {
         ORDER BY pl.rank
       `);
 
-      res.json({
-        userId,
-        platform: platformRank.rows[0] || null,
-        campaigns: campaignRanks.rows,
-        programs: programRanks.rows
-      });
-    } catch (error: any) {
-      console.error('❌ Failed to fetch user ranks:', error);
-      res.status(500).json({ error: 'Failed to fetch user ranks' });
+        res.json({
+          userId,
+          platform: platformRank.rows[0] || null,
+          campaigns: campaignRanks.rows,
+          programs: programRanks.rows,
+        });
+      } catch (error: any) {
+        console.error('❌ Failed to fetch user ranks:', error);
+        res.status(500).json({ error: 'Failed to fetch user ranks' });
+      }
     }
-  });
+  );
 
   // ============================================
   // ADMIN: MANUAL REFRESH
@@ -558,48 +566,55 @@ export function registerLeaderboardRoutes(app: Express) {
    * POST /api/leaderboards/refresh
    * Manually trigger leaderboard refresh (admin only)
    */
-  app.post("/api/leaderboards/refresh", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      // Only allow admins to manually refresh
-      if (req.user?.userType !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
+  app.post(
+    '/api/leaderboards/refresh',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        // Only allow admins to manually refresh
+        if (req.user?.userType !== 'admin') {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        await db.execute(sql`SELECT refresh_leaderboards()`);
+
+        res.json({
+          success: true,
+          message: 'Leaderboards refreshed successfully',
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        console.error('❌ Failed to refresh leaderboards:', error);
+        res.status(500).json({ error: 'Failed to refresh leaderboards' });
       }
-
-      await db.execute(sql`SELECT refresh_leaderboards()`);
-
-      res.json({
-        success: true,
-        message: 'Leaderboards refreshed successfully',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: any) {
-      console.error('❌ Failed to refresh leaderboards:', error);
-      res.status(500).json({ error: 'Failed to refresh leaderboards' });
     }
-  });
+  );
 
   /**
    * POST /api/leaderboards/capture-snapshot
    * Manually trigger daily rank snapshot capture (admin only)
    */
-  app.post("/api/leaderboards/capture-snapshot", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      // Only allow admins to manually capture snapshots
-      if (req.user?.userType !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
+  app.post(
+    '/api/leaderboards/capture-snapshot',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        // Only allow admins to manually capture snapshots
+        if (req.user?.userType !== 'admin') {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        await db.execute(sql`SELECT capture_rank_snapshot()`);
+
+        res.json({
+          success: true,
+          message: 'Rank snapshot captured successfully',
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        console.error('❌ Failed to capture rank snapshot:', error);
+        res.status(500).json({ error: 'Failed to capture rank snapshot' });
       }
-
-      await db.execute(sql`SELECT capture_rank_snapshot()`);
-
-      res.json({
-        success: true,
-        message: 'Rank snapshot captured successfully',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: any) {
-      console.error('❌ Failed to capture rank snapshot:', error);
-      res.status(500).json({ error: 'Failed to capture rank snapshot' });
     }
-  });
-
+  );
 }

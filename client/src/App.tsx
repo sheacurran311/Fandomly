@@ -39,6 +39,7 @@ import CreatorActivity from '@/pages/creator-dashboard/activity';
 import CreatorNIL from '@/pages/creator-dashboard/nil';
 import CreatorCampaigns from '@/pages/creator-dashboard/campaigns';
 import CreatorSettings from '@/pages/creator-dashboard/settings';
+import CreatorSubscriptions from '@/pages/creator-dashboard/subscriptions';
 import ProgramBuilder from '@/pages/creator-dashboard/program-builder';
 import CampaignBuilderNew from '@/pages/creator-dashboard/campaign-builder-new';
 import ProgramPublic from '@/pages/program-public';
@@ -98,6 +99,8 @@ import ReputationPage from '@/pages/reputation';
 import CreatorTokenPage from '@/pages/creator-dashboard/token';
 import CreatorPlatformTasksPage from '@/pages/creator-dashboard/platform-tasks';
 import StakingPage from '@/pages/staking';
+import { useLimitExceededHandler } from '@/hooks/use-limit-exceeded-handler';
+import CookieConsentBanner from '@/components/gdpr/cookie-consent-banner';
 
 function RedirectTo({ href }: { href: string }) {
   useEffect(() => {
@@ -153,6 +156,7 @@ function Router() {
       <Route path="/creator-dashboard/token" component={CreatorTokenPage} />
       <Route path="/creator-dashboard/platform-tasks" component={CreatorPlatformTasksPage} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
+      <Route path="/creator-dashboard/subscriptions" component={CreatorSubscriptions} />
       <Route path="/creator-dashboard/settings" component={CreatorSettings} />
       <Route path="/fan-dashboard" component={FanDashboard} />
       <Route path="/fan-dashboard/campaigns" component={FanCampaigns} />
@@ -234,6 +238,9 @@ function Router() {
 function App() {
   const [location] = useLocation();
 
+  // Global handler for subscription limit exceeded errors
+  useLimitExceededHandler();
+
   // Initialize TikTok error handler on app start
   useEffect(() => {
     initTikTokErrorHandler();
@@ -294,6 +301,7 @@ function App() {
                       {isPublicRoute && location !== '/' && <Footer />}
                     </div>
                     <Toaster />
+                    <CookieConsentBanner />
                   </NewAuthRouter>
                 </AuthModalProvider>
               </TooltipProvider>

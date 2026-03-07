@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Campaign V2 Routes
  *
@@ -13,6 +14,7 @@ import { campaignVerificationService } from '../../services/campaigns/campaign-v
 import { db } from '../../db';
 import { campaigns, taskAssignments, tasks, creators, campaignSponsors } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
+import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
 
 export function registerCampaignV2Routes(app: Express) {
   // ============================================================================
@@ -97,6 +99,25 @@ export function registerCampaignV2Routes(app: Express) {
         where: eq(creators.userId, userId!),
       });
       if (!creator) return res.status(403).json({ error: 'Creator profile required' });
+
+      // Enforce subscription limit for campaign creation
+      if (creator.tenantId) {
+        try {
+          await enforceSubscriptionLimit(creator.tenantId, 'campaigns');
+        } catch (limitErr: unknown) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((limitErr as any).code === 'LIMIT_EXCEEDED') {
+            return res.status(403).json({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              error: (limitErr as any).message,
+              code: 'LIMIT_EXCEEDED',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ...(limitErr as any).details,
+            });
+          }
+          throw limitErr;
+        }
+      }
 
       const body = req.body;
 
@@ -486,20 +507,24 @@ export function registerCampaignV2Routes(app: Express) {
 
         if (Array.isArray(orderedAssignmentIds)) {
           // Client format: array of assignment IDs in desired order
-          for (let i = 0; i < orderedAssignmentIds.length; i++) {
-            await db
-              .update(taskAssignments)
-              .set({ taskOrder: i, updatedAt: new Date() })
-              .where(eq(taskAssignments.id, orderedAssignmentIds[i]));
-          }
+          await db.transaction(async (tx) => {
+            for (let i = 0; i < orderedAssignmentIds.length; i++) {
+              await tx
+                .update(taskAssignments)
+                .set({ taskOrder: i, updatedAt: new Date() })
+                .where(eq(taskAssignments.id, orderedAssignmentIds[i]));
+            }
+          });
         } else if (Array.isArray(order)) {
           // Legacy format: explicit { assignmentId, taskOrder } objects
-          for (const item of order) {
-            await db
-              .update(taskAssignments)
-              .set({ taskOrder: item.taskOrder, updatedAt: new Date() })
-              .where(eq(taskAssignments.id, item.assignmentId));
-          }
+          await db.transaction(async (tx) => {
+            for (const item of order) {
+              await tx
+                .update(taskAssignments)
+                .set({ taskOrder: item.taskOrder, updatedAt: new Date() })
+                .where(eq(taskAssignments.id, item.assignmentId));
+            }
+          });
         } else {
           return res.status(400).json({
             error:

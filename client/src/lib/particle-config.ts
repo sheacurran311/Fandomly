@@ -129,7 +129,7 @@ export function createParticleConfig() {
 
         // Wallet label
         '--pcm-wallet-label-color': '#14feee',
-      },
+      } as Record<string, string>,
     },
 
     walletConnectors: [

@@ -135,6 +135,12 @@ export const creatorNavItems: NavigationItem[] = [
   },
   { label: 'Reputation', href: '/reputation', icon: Shield, color: 'text-indigo-400' },
   { label: 'Profile', href: '/profile', icon: User, showInBottomNav: true },
+  {
+    label: 'Subscription',
+    href: '/creator-dashboard/subscriptions',
+    icon: CreditCard,
+    color: 'text-amber-400',
+  },
   { label: 'Settings', href: '/creator-dashboard/settings', icon: Settings },
 ];
 

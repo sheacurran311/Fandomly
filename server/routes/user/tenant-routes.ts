@@ -1,8 +1,13 @@
-import type { Express } from "express";
+import type { Express } from 'express';
 import { storage } from '../../core/storage';
-import { z } from "zod";
+import { z } from 'zod';
 import { authenticateUser, requireRole, AuthenticatedRequest } from '../../middleware/rbac';
-import { validateTenantContext, requireTenantModifyPermission, requireTenantViewPermission, validateUserResourceAccess } from '../../middleware/tenant-context';
+import {
+  validateTenantContext,
+  requireTenantModifyPermission,
+  requireTenantViewPermission,
+  validateUserResourceAccess,
+} from '../../middleware/tenant-context';
 
 const createTenantSchema = z.object({
   name: z.string().min(1),
@@ -32,79 +37,95 @@ const createTenantSchema = z.object({
     allowRegistration: z.boolean(),
     requireEmailVerification: z.boolean(),
     enableSocialLogin: z.boolean(),
-  })
+  }),
 });
 
 export function registerTenantRoutes(app: Express) {
   // Create tenant
-  app.post("/api/tenants", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), async (req: AuthenticatedRequest, res) => {
-    try {
-      console.log("Creating tenant with data:", req.body);
-      const tenantData = createTenantSchema.parse(req.body);
-      console.log("Parsed tenant data:", tenantData);
-      
-      // Verify the owner exists and has proper permissions
-      const owner = await storage.getUser(tenantData.ownerId);
-      if (!owner) {
-        return res.status(400).json({ error: "Owner user not found" });
+  app.post(
+    '/api/tenants',
+    authenticateUser,
+    requireRole(['customer_admin', 'fandomly_admin']),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        console.log('Creating tenant with data:', req.body);
+        const tenantData = createTenantSchema.parse(req.body);
+        console.log('Parsed tenant data:', tenantData);
+
+        // Verify the owner exists and has proper permissions
+        const owner = await storage.getUser(tenantData.ownerId);
+        if (!owner) {
+          return res.status(400).json({ error: 'Owner user not found' });
+        }
+
+        if (owner.userType !== 'creator') {
+          return res
+            .status(403)
+            .json({
+              error:
+                "Only creators can create tenants. Please ensure you're registered as a creator.",
+            });
+        }
+
+        if (owner.role !== 'customer_admin' && owner.role !== 'fandomly_admin') {
+          return res.status(403).json({ error: 'Insufficient permissions to create tenant' });
+        }
+
+        // Check if slug is already taken
+        const existingTenant = await storage.getTenantBySlug(tenantData.slug);
+        if (existingTenant) {
+          return res.status(400).json({ error: 'Store URL is already taken' });
+        }
+
+        const tenant = await storage.createTenant({
+          ...tenantData,
+          status: 'trial',
+          subscriptionTier: 'free',
+          subscriptionStatus: 'trial',
+        });
+
+        console.log('Created tenant:', tenant.id);
+        res.json(tenant);
+      } catch (error) {
+        console.error('Error creating tenant:', error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ error: 'Invalid tenant data', details: error.errors });
+        }
+        res.status(500).json({ error: 'Failed to create tenant' });
       }
-      
-      if (owner.userType !== 'creator') {
-        return res.status(403).json({ error: "Only creators can create tenants. Please ensure you're registered as a creator." });
-      }
-      
-      if (owner.role !== 'customer_admin' && owner.role !== 'fandomly_admin') {
-        return res.status(403).json({ error: "Insufficient permissions to create tenant" });
-      }
-      
-      // Check if slug is already taken
-      const existingTenant = await storage.getTenantBySlug(tenantData.slug);
-      if (existingTenant) {
-        return res.status(400).json({ error: "Store URL is already taken" });
-      }
-      
-      const tenant = await storage.createTenant({
-        ...tenantData,
-        status: 'trial',
-        subscriptionTier: 'starter',
-        subscriptionStatus: 'trial'
-      });
-      
-      console.log("Created tenant:", tenant.id);
-      res.json(tenant);
-    } catch (error) {
-      console.error("Error creating tenant:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Invalid tenant data", details: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create tenant" });
     }
-  });
+  );
 
   // Get tenant by ID (protected - requires tenant membership)
-  app.get("/api/tenants/:id", authenticateUser, validateTenantContext('id'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const tenant = await storage.getTenant(req.params.id);
-      if (!tenant) {
-        return res.status(404).json({ error: "Tenant not found" });
+  app.get(
+    '/api/tenants/:id',
+    authenticateUser,
+    validateTenantContext('id'),
+    requireTenantViewPermission(),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenant = await storage.getTenant(req.params.id);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        // Return full tenant data for authorized users
+        res.json(tenant);
+      } catch (error) {
+        console.error('Error fetching tenant:', error);
+        res.status(500).json({ error: 'Failed to fetch tenant' });
       }
-      
-      // Return full tenant data for authorized users
-      res.json(tenant);
-    } catch (error) {
-      console.error("Error fetching tenant:", error);
-      res.status(500).json({ error: "Failed to fetch tenant" });
     }
-  });
+  );
 
   // Get tenant by slug (public endpoint with sanitized data)
-  app.get("/api/tenants/slug/:slug", async (req, res) => {
+  app.get('/api/tenants/slug/:slug', async (req, res) => {
     try {
       const tenant = await storage.getTenantBySlug(req.params.slug);
       if (!tenant) {
-        return res.status(404).json({ error: "Tenant not found" });
+        return res.status(404).json({ error: 'Tenant not found' });
       }
-      
+
       // Sanitize tenant data for public access - only expose safe fields
       const publicTenant = {
         id: tenant.id,
@@ -113,72 +134,96 @@ export function registerTenantRoutes(app: Express) {
         branding: tenant.branding,
         settings: {
           publicProfile: tenant.settings?.publicProfile || false,
-          allowRegistration: tenant.settings?.allowRegistration || false
-        }
+          allowRegistration: tenant.settings?.allowRegistration || false,
+        },
       };
       res.json(publicTenant);
     } catch (error) {
-      console.error("Error fetching tenant:", error);
-      res.status(500).json({ error: "Failed to fetch tenant" });
+      console.error('Error fetching tenant:', error);
+      res.status(500).json({ error: 'Failed to fetch tenant' });
     }
   });
 
   // Update tenant
-  app.patch("/api/tenants/:id", authenticateUser, requireRole(['customer_admin', 'fandomly_admin']), validateTenantContext('id'), requireTenantModifyPermission(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const tenant = await storage.updateTenant(req.params.id, req.body);
-      if (!tenant) {
-        return res.status(404).json({ error: "Tenant not found" });
+  app.patch(
+    '/api/tenants/:id',
+    authenticateUser,
+    requireRole(['customer_admin', 'fandomly_admin']),
+    validateTenantContext('id'),
+    requireTenantModifyPermission(),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenant = await storage.updateTenant(req.params.id, req.body);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+        res.json(tenant);
+      } catch (error) {
+        console.error('Error updating tenant:', error);
+        res.status(500).json({ error: 'Failed to update tenant' });
       }
-      res.json(tenant);
-    } catch (error) {
-      console.error("Error updating tenant:", error);
-      res.status(500).json({ error: "Failed to update tenant" });
     }
-  });
+  );
 
   // Get user's tenants
-  app.get("/api/users/:userId/tenants", authenticateUser, validateUserResourceAccess('userId'), async (req: AuthenticatedRequest, res) => {
-    try {
-      const tenants = await storage.getUserTenants(req.params.userId);
-      res.json(tenants);
-    } catch (error) {
-      console.error("Error fetching user tenants:", error);
-      res.status(500).json({ error: "Failed to fetch tenants" });
+  app.get(
+    '/api/users/:userId/tenants',
+    authenticateUser,
+    validateUserResourceAccess('userId'),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenants = await storage.getUserTenants(req.params.userId);
+        res.json(tenants);
+      } catch (error) {
+        console.error('Error fetching user tenants:', error);
+        res.status(500).json({ error: 'Failed to fetch tenants' });
+      }
     }
-  });
+  );
 
   // Join tenant as member
-  app.post("/api/tenants/:tenantId/members", authenticateUser, validateTenantContext('tenantId'), requireTenantModifyPermission(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const { userId, role = 'member' } = req.body;
-      
-      const membership = await storage.createTenantMembership({
-        tenantId: req.params.tenantId,
-        userId,
-        role,
-        memberData: {
-          points: 0,
-          tier: 'basic'
-        },
-        status: 'active'
-      });
-      
-      res.json(membership);
-    } catch (error) {
-      console.error("Error creating tenant membership:", error);
-      res.status(500).json({ error: "Failed to join tenant" });
+  app.post(
+    '/api/tenants/:tenantId/members',
+    authenticateUser,
+    validateTenantContext('tenantId'),
+    requireTenantModifyPermission(),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { userId, role = 'member' } = req.body;
+
+        const membership = await storage.createTenantMembership({
+          tenantId: req.params.tenantId,
+          userId,
+          role,
+          memberData: {
+            points: 0,
+            tier: 'basic',
+          },
+          status: 'active',
+        });
+
+        res.json(membership);
+      } catch (error) {
+        console.error('Error creating tenant membership:', error);
+        res.status(500).json({ error: 'Failed to join tenant' });
+      }
     }
-  });
+  );
 
   // Get tenant members
-  app.get("/api/tenants/:tenantId/members", authenticateUser, validateTenantContext('tenantId'), requireTenantViewPermission(), async (req: AuthenticatedRequest, res) => {
-    try {
-      const members = await storage.getTenantMembers(req.params.tenantId);
-      res.json(members);
-    } catch (error) {
-      console.error("Error fetching tenant members:", error);
-      res.status(500).json({ error: "Failed to fetch members" });
+  app.get(
+    '/api/tenants/:tenantId/members',
+    authenticateUser,
+    validateTenantContext('tenantId'),
+    requireTenantViewPermission(),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const members = await storage.getTenantMembers(req.params.tenantId);
+        res.json(members);
+      } catch (error) {
+        console.error('Error fetching tenant members:', error);
+        res.status(500).json({ error: 'Failed to fetch members' });
+      }
     }
-  });
+  );
 }

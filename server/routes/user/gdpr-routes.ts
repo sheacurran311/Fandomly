@@ -1,29 +1,27 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * GDPR Compliance Routes
  * Sprint 9: Data export, account deletion, and consent management
- * 
+ *
  * Implements:
  * - Article 15: Right of access
  * - Article 17: Right to erasure
  * - Article 20: Right to data portability
  */
 
-import type { Express } from "express";
+import type { Express } from 'express';
 import { db } from '../../db';
-import { sql } from "drizzle-orm";
+import { sql } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { z } from 'zod';
 
 // Validation schemas
 const exportRequestSchema = z.object({
-  dataTypes: z.array(z.enum([
-    'profile', 
-    'transactions', 
-    'completions', 
-    'social_connections', 
-    'consents',
-    'all'
-  ])).default(['all']),
+  dataTypes: z
+    .array(
+      z.enum(['profile', 'transactions', 'completions', 'social_connections', 'consents', 'all'])
+    )
+    .default(['all']),
   format: z.enum(['json', 'csv']).default('json'),
 });
 
@@ -43,16 +41,16 @@ export function registerGdprRoutes(app: Express) {
    * POST /api/gdpr/export
    * Request a data export (Article 20 - Data Portability)
    */
-  app.post("/api/gdpr/export", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/gdpr/export', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.id;
 
       // Validate request
       const validation = exportRequestSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: "Invalid request data",
-          details: validation.error.issues 
+        return res.status(400).json({
+          error: 'Invalid request data',
+          details: validation.error.issues,
         });
       }
 
@@ -67,10 +65,11 @@ export function registerGdprRoutes(app: Express) {
         LIMIT 1
       `);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((pendingResult as any).rows?.length > 0) {
-        return res.status(429).json({ 
-          error: "Export request already pending",
-          message: "Please wait for your current export to complete before requesting another."
+        return res.status(429).json({
+          error: 'Export request already pending',
+          message: 'Please wait for your current export to complete before requesting another.',
         });
       }
 
@@ -83,21 +82,24 @@ export function registerGdprRoutes(app: Express) {
         RETURNING id, status, requested_at
       `);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const exportRequest = (result as any).rows?.[0];
 
-      // In production, this would queue a background job
-      // For now, generate the export immediately
-      await processExportRequest(exportRequest.id, userId);
+      // Process export in the background — don't block the response
+      processExportRequest(exportRequest.id, userId).catch((err) => {
+        console.error(`[GDPR] Background export processing failed for ${exportRequest.id}:`, err);
+      });
 
       res.status(202).json({
-        message: "Data export request submitted",
+        message: 'Data export request submitted',
         requestId: exportRequest.id,
         status: 'processing',
-        estimatedTime: "Your export will be ready within 24 hours",
+        estimatedTime: 'Your export will be ready within 24 hours',
+        downloadUrl: `/api/gdpr/export/${exportRequest.id}/download`,
       });
     } catch (error) {
-      console.error("Error creating export request:", error);
-      res.status(500).json({ error: "Failed to create export request" });
+      console.error('Error creating export request:', error);
+      res.status(500).json({ error: 'Failed to create export request' });
     }
   });
 
@@ -105,99 +107,119 @@ export function registerGdprRoutes(app: Express) {
    * GET /api/gdpr/export/:requestId
    * Check export request status
    */
-  app.get("/api/gdpr/export/:requestId", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { requestId } = req.params;
+  app.get(
+    '/api/gdpr/export/:requestId',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const { requestId } = req.params;
 
-      const result = await db.execute(sql`
-        SELECT 
-          id, status, download_url, download_expires_at, 
+        const result = await db.execute(sql`
+        SELECT
+          id, status, download_url, download_expires_at,
           requested_at, completed_at, error_message
         FROM data_export_requests
         WHERE id = ${requestId} AND user_id = ${userId}
       `);
 
-      const request = (result as any).rows?.[0];
-      if (!request) {
-        return res.status(404).json({ error: "Export request not found" });
-      }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const request = (result as any).rows?.[0];
+        if (!request) {
+          return res.status(404).json({ error: 'Export request not found' });
+        }
 
-      res.json({
-        request,
-        isReady: request.status === 'completed' && request.download_url,
-        isExpired: request.download_expires_at && new Date(request.download_expires_at) < new Date(),
-      });
-    } catch (error) {
-      console.error("Error fetching export status:", error);
-      res.status(500).json({ error: "Failed to fetch export status" });
+        res.json({
+          request,
+          isReady: request.status === 'completed' && request.download_url,
+          isExpired:
+            request.download_expires_at && new Date(request.download_expires_at) < new Date(),
+        });
+      } catch (error) {
+        console.error('Error fetching export status:', error);
+        res.status(500).json({ error: 'Failed to fetch export status' });
+      }
     }
-  });
+  );
 
   /**
    * GET /api/gdpr/export/:requestId/download
    * Download the exported data
    */
-  app.get("/api/gdpr/export/:requestId/download", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { requestId } = req.params;
+  app.get(
+    '/api/gdpr/export/:requestId/download',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const { requestId } = req.params;
 
-      const result = await db.execute(sql`
+        const result = await db.execute(sql`
         SELECT * FROM data_export_requests
         WHERE id = ${requestId} AND user_id = ${userId}
       `);
 
-      const request = (result as any).rows?.[0];
-      if (!request) {
-        return res.status(404).json({ error: "Export request not found" });
-      }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const request = (result as any).rows?.[0];
+        if (!request) {
+          return res.status(404).json({ error: 'Export request not found' });
+        }
 
-      if (request.status !== 'completed') {
-        return res.status(400).json({ error: "Export not yet ready" });
-      }
+        if (request.status !== 'completed') {
+          return res.status(400).json({ error: 'Export not yet ready' });
+        }
 
-      if (request.download_expires_at && new Date(request.download_expires_at) < new Date()) {
-        return res.status(410).json({ error: "Download link has expired. Please request a new export." });
-      }
+        if (request.download_expires_at && new Date(request.download_expires_at) < new Date()) {
+          return res
+            .status(410)
+            .json({ error: 'Download link has expired. Please request a new export.' });
+        }
 
-      // Generate export data on-the-fly
-      const exportData = await db.execute(sql`
+        // Generate export data on-the-fly
+        const exportData = await db.execute(sql`
         SELECT get_user_export_data(${userId}) as data
       `);
 
-      const data = (exportData as any).rows?.[0]?.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = (exportData as any).rows?.[0]?.data;
 
-      if (request.export_format === 'json') {
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename="fandomly-data-export-${userId}.json"`);
-        res.json(data);
-      } else {
-        // CSV export would require flattening the JSON structure
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename="fandomly-data-export-${userId}.json"`);
-        res.json(data);
+        if (request.export_format === 'json') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="fandomly-data-export-${userId}.json"`
+          );
+          res.json(data);
+        } else {
+          // CSV export would require flattening the JSON structure
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="fandomly-data-export-${userId}.json"`
+          );
+          res.json(data);
+        }
+      } catch (error) {
+        console.error('Error downloading export:', error);
+        res.status(500).json({ error: 'Failed to download export' });
       }
-    } catch (error) {
-      console.error("Error downloading export:", error);
-      res.status(500).json({ error: "Failed to download export" });
     }
-  });
+  );
 
   /**
    * POST /api/gdpr/delete
    * Request account deletion or anonymization (Article 17 - Right to Erasure)
    */
-  app.post("/api/gdpr/delete", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/gdpr/delete', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.id;
 
       // Validate request
       const validation = deletionRequestSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: "Invalid request data",
-          details: validation.error.issues 
+        return res.status(400).json({
+          error: 'Invalid request data',
+          details: validation.error.issues,
         });
       }
 
@@ -211,10 +233,11 @@ export function registerGdprRoutes(app: Express) {
         LIMIT 1
       `);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((pendingResult as any).rows?.length > 0) {
-        return res.status(429).json({ 
-          error: "Deletion request already pending",
-          message: "You already have a pending account deletion request."
+        return res.status(429).json({
+          error: 'Deletion request already pending',
+          message: 'You already have a pending account deletion request.',
         });
       }
 
@@ -234,21 +257,23 @@ export function registerGdprRoutes(app: Express) {
         RETURNING id, status, scheduled_deletion_at
       `);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const deletionRequest = (result as any).rows?.[0];
 
       // In production, send confirmation email with token
 
       res.status(202).json({
-        message: "Account deletion request submitted",
+        message: 'Account deletion request submitted',
         requestId: deletionRequest.id,
         type,
         scheduledDeletion: deletionRequest.scheduled_deletion_at,
         confirmationRequired: true,
-        confirmationInstructions: "Please check your email to confirm this request. You have 30 days to cancel.",
+        confirmationInstructions:
+          'Please check your email to confirm this request. You have 30 days to cancel.',
       });
     } catch (error) {
-      console.error("Error creating deletion request:", error);
-      res.status(500).json({ error: "Failed to create deletion request" });
+      console.error('Error creating deletion request:', error);
+      res.status(500).json({ error: 'Failed to create deletion request' });
     }
   });
 
@@ -256,18 +281,21 @@ export function registerGdprRoutes(app: Express) {
    * POST /api/gdpr/delete/:requestId/confirm
    * Confirm account deletion request
    */
-  app.post("/api/gdpr/delete/:requestId/confirm", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { requestId } = req.params;
-      const { token } = req.body;
+  app.post(
+    '/api/gdpr/delete/:requestId/confirm',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const { requestId } = req.params;
+        const { token } = req.body;
 
-      if (!token) {
-        return res.status(400).json({ error: "Confirmation token required" });
-      }
+        if (!token) {
+          return res.status(400).json({ error: 'Confirmation token required' });
+        }
 
-      // Verify and update request
-      const result = await db.execute(sql`
+        // Verify and update request
+        const result = await db.execute(sql`
         UPDATE account_deletion_requests
         SET status = 'confirmed', confirmed_at = NOW()
         WHERE id = ${requestId} 
@@ -277,33 +305,39 @@ export function registerGdprRoutes(app: Express) {
         RETURNING id, status, scheduled_deletion_at
       `);
 
-      if ((result as any).rowCount === 0) {
-        return res.status(404).json({ error: "Invalid or expired confirmation token" });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((result as any).rowCount === 0) {
+          return res.status(404).json({ error: 'Invalid or expired confirmation token' });
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const request = (result as any).rows?.[0];
+
+        res.json({
+          message: 'Deletion request confirmed',
+          scheduledDeletion: request.scheduled_deletion_at,
+          note: 'Your account will be deleted on the scheduled date. You can cancel this request before then.',
+        });
+      } catch (error) {
+        console.error('Error confirming deletion:', error);
+        res.status(500).json({ error: 'Failed to confirm deletion request' });
       }
-
-      const request = (result as any).rows?.[0];
-
-      res.json({
-        message: "Deletion request confirmed",
-        scheduledDeletion: request.scheduled_deletion_at,
-        note: "Your account will be deleted on the scheduled date. You can cancel this request before then.",
-      });
-    } catch (error) {
-      console.error("Error confirming deletion:", error);
-      res.status(500).json({ error: "Failed to confirm deletion request" });
     }
-  });
+  );
 
   /**
    * POST /api/gdpr/delete/:requestId/cancel
    * Cancel account deletion request
    */
-  app.post("/api/gdpr/delete/:requestId/cancel", authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { requestId } = req.params;
+  app.post(
+    '/api/gdpr/delete/:requestId/cancel',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
+        const { requestId } = req.params;
 
-      const result = await db.execute(sql`
+        const result = await db.execute(sql`
         UPDATE account_deletion_requests
         SET status = 'cancelled'
         WHERE id = ${requestId} 
@@ -312,24 +346,26 @@ export function registerGdprRoutes(app: Express) {
         RETURNING id
       `);
 
-      if ((result as any).rowCount === 0) {
-        return res.status(404).json({ error: "Deletion request not found or already processed" });
-      }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((result as any).rowCount === 0) {
+          return res.status(404).json({ error: 'Deletion request not found or already processed' });
+        }
 
-      res.json({
-        message: "Deletion request cancelled successfully",
-      });
-    } catch (error) {
-      console.error("Error cancelling deletion:", error);
-      res.status(500).json({ error: "Failed to cancel deletion request" });
+        res.json({
+          message: 'Deletion request cancelled successfully',
+        });
+      } catch (error) {
+        console.error('Error cancelling deletion:', error);
+        res.status(500).json({ error: 'Failed to cancel deletion request' });
+      }
     }
-  });
+  );
 
   /**
    * GET /api/gdpr/consents
    * Get user's consent records
    */
-  app.get("/api/gdpr/consents", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/gdpr/consents', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.id;
 
@@ -347,11 +383,12 @@ export function registerGdprRoutes(app: Express) {
       `);
 
       res.json({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         consents: (result as any).rows || [],
       });
     } catch (error) {
-      console.error("Error fetching consents:", error);
-      res.status(500).json({ error: "Failed to fetch consent records" });
+      console.error('Error fetching consents:', error);
+      res.status(500).json({ error: 'Failed to fetch consent records' });
     }
   });
 
@@ -359,16 +396,16 @@ export function registerGdprRoutes(app: Express) {
    * PUT /api/gdpr/consents
    * Update consent preference
    */
-  app.put("/api/gdpr/consents", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.put('/api/gdpr/consents', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.id;
 
       // Validate request
       const validation = consentUpdateSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: "Invalid request data",
-          details: validation.error.issues 
+        return res.status(400).json({
+          error: 'Invalid request data',
+          details: validation.error.issues,
         });
       }
 
@@ -400,8 +437,8 @@ export function registerGdprRoutes(app: Express) {
         isGranted,
       });
     } catch (error) {
-      console.error("Error updating consent:", error);
-      res.status(500).json({ error: "Failed to update consent" });
+      console.error('Error updating consent:', error);
+      res.status(500).json({ error: 'Failed to update consent' });
     }
   });
 }
@@ -436,7 +473,7 @@ async function processExportRequest(requestId: string, userId: string): Promise<
     console.log(`[GDPR] Export request ${requestId} completed for user ${userId}`);
   } catch (error) {
     console.error(`[GDPR] Export request ${requestId} failed:`, error);
-    
+
     await db.execute(sql`
       UPDATE data_export_requests
       SET status = 'failed', error_message = ${String(error)}

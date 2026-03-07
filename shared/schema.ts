@@ -36,8 +36,10 @@ export const tenantStatusEnum = pgEnum('tenant_status', [
   'trial',
 ]);
 export const subscriptionTierEnum = pgEnum('subscription_tier', [
-  'starter',
-  'professional',
+  'free',
+  'beginner',
+  'rising',
+  'allstar',
   'enterprise',
 ]);
 
@@ -57,7 +59,7 @@ export const tenants = pgTable('tenants', {
 
   // Tenant Settings
   status: tenantStatusEnum('status').notNull().default('trial'),
-  subscriptionTier: subscriptionTierEnum('subscription_tier').notNull().default('starter'),
+  subscriptionTier: subscriptionTierEnum('subscription_tier').notNull().default('free'),
   subscriptionStatus: text('subscription_status').default('trial'), // "trial" | "active" | "past_due" | "canceled"
 
   // Branding & Customization
@@ -101,6 +103,9 @@ export const tenants = pgTable('tenants', {
     customDomain: boolean;
     advancedAnalytics: boolean;
     whiteLabel: boolean;
+    maxTasks: number;
+    maxSocialConnections: number;
+    maxPrograms: number;
   }>(),
 
   // Usage Tracking
@@ -111,6 +116,9 @@ export const tenants = pgTable('tenants', {
       currentRewards: number;
       apiCallsThisMonth: number;
       storageUsed: number;
+      currentTasks: number;
+      currentSocialConnections: number;
+      currentPrograms: number;
     }>()
     .default({
       currentMembers: 0,
@@ -118,6 +126,9 @@ export const tenants = pgTable('tenants', {
       currentRewards: 0,
       apiCallsThisMonth: 0,
       storageUsed: 0,
+      currentTasks: 0,
+      currentSocialConnections: 0,
+      currentPrograms: 0,
     }),
 
   // Billing
@@ -4316,3 +4327,131 @@ export const raffleEntries = pgTable(
 
 export type RaffleEntry = typeof raffleEntries.$inferSelect;
 export type InsertRaffleEntry = typeof raffleEntries.$inferInsert;
+
+// ============================================================================
+// GDPR Compliance Tables (from migration 0040)
+// ============================================================================
+
+export const dataExportRequests = pgTable(
+  'data_export_requests',
+  {
+    id: varchar('id', { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id', { length: 36 })
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    requestType: varchar('request_type', { length: 20 }).notNull().default('full_export'),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    requestedDataTypes: text('requested_data_types').array(),
+    exportFormat: varchar('export_format', { length: 10 }).notNull().default('json'),
+    downloadUrl: varchar('download_url', { length: 500 }),
+    downloadExpiresAt: timestamp('download_expires_at'),
+    requestedAt: timestamp('requested_at').defaultNow(),
+    processedAt: timestamp('processed_at'),
+    completedAt: timestamp('completed_at'),
+    errorMessage: text('error_message'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  },
+  (table) => [
+    index('data_export_requests_user_id_idx').on(table.userId),
+    index('data_export_requests_status_idx').on(table.status),
+  ]
+);
+
+export const dataExportRequestsRelations = relations(dataExportRequests, ({ one }) => ({
+  user: one(users, {
+    fields: [dataExportRequests.userId],
+    references: [users.id],
+  }),
+}));
+
+export type DataExportRequest = typeof dataExportRequests.$inferSelect;
+export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;
+
+export const accountDeletionRequests = pgTable(
+  'account_deletion_requests',
+  {
+    id: varchar('id', { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id', { length: 36 })
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    requestType: varchar('request_type', { length: 20 }).notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    confirmationToken: varchar('confirmation_token', { length: 64 }),
+    reason: text('reason'),
+    scheduledDeletionAt: timestamp('scheduled_deletion_at'),
+    confirmedAt: timestamp('confirmed_at'),
+    completedAt: timestamp('completed_at'),
+    requestedAt: timestamp('requested_at').defaultNow(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  },
+  (table) => [
+    index('account_deletion_requests_user_id_idx').on(table.userId),
+    index('account_deletion_requests_status_idx').on(table.status),
+  ]
+);
+
+export const accountDeletionRequestsRelations = relations(accountDeletionRequests, ({ one }) => ({
+  user: one(users, {
+    fields: [accountDeletionRequests.userId],
+    references: [users.id],
+  }),
+}));
+
+export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;
+export type InsertAccountDeletionRequest = typeof accountDeletionRequests.$inferInsert;
+
+export const userConsents = pgTable(
+  'user_consents',
+  {
+    id: varchar('id', { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id', { length: 36 })
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    consentType: varchar('consent_type', { length: 50 }).notNull(),
+    consentVersion: varchar('consent_version', { length: 20 }).notNull().default('1.0'),
+    isGranted: boolean('is_granted').notNull().default(false),
+    grantedAt: timestamp('granted_at'),
+    revokedAt: timestamp('revoked_at'),
+    ipAddress: varchar('ip_address', { length: 45 }),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [uniqueIndex('user_consents_user_type_idx').on(table.userId, table.consentType)]
+);
+
+export const userConsentsRelations = relations(userConsents, ({ one }) => ({
+  user: one(users, {
+    fields: [userConsents.userId],
+    references: [users.id],
+  }),
+}));
+
+export type UserConsent = typeof userConsents.$inferSelect;
+export type InsertUserConsent = typeof userConsents.$inferInsert;
+
+export const dataRetentionPolicies = pgTable(
+  'data_retention_policies',
+  {
+    id: varchar('id', { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tableName: varchar('table_name', { length: 100 }).notNull(),
+    retentionDays: integer('retention_days').notNull(),
+    retentionType: varchar('retention_type', { length: 20 }).notNull().default('hard_delete'),
+    filterCondition: text('filter_condition'),
+    isActive: boolean('is_active').notNull().default(true),
+    lastRunAt: timestamp('last_run_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [index('data_retention_policies_table_name_idx').on(table.tableName)]
+);
+
+export type DataRetentionPolicy = typeof dataRetentionPolicies.$inferSelect;
+export type InsertDataRetentionPolicy = typeof dataRetentionPolicies.$inferInsert;

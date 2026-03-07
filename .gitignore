@@ -1,9 +1,48 @@
-node_modules
-dist
-.DS_Store
-server/public
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+server/public/
 vite.config.ts.*
-*.tar.gz*.patch
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Testing
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+playwright-admin-auth.json
+playwright-auth.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE and editors
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Lint/format cache
+.eslintcache
+
+# Archives and patches
+*.tar.gz
+*.patch
 
 # Database backups - never commit these
 *.sql
@@ -12,3 +51,12 @@ backup_*.sql
 *_backup.sql
 *.dump
 *.pgdump
+
+# Replit
+.replit
+replit.md
+replit.nix
+.config/
+
+# User-uploaded assets (Cursor/Replit paste dumps)
+attached_assets/
