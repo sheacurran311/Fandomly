@@ -245,12 +245,27 @@ function ParticleAuthListenerInner() {
     }
   }, [isConnected, address, isFandomlyAuthed, isParticleSocialLogin, bridgeAuth]);
 
-  // Handle Particle disconnect → log out of Fandomly too
-  // Guard with ref to prevent re-entrant logout loop (H3 fix)
+  // Handle Particle disconnect → log out of Fandomly too.
+  // Only triggers if Particle was previously connected in this session
+  // (i.e., the user logged in via Particle and then disconnected).
+  // Without this guard, any non-Particle login (social auth modal) would
+  // be immediately logged out because isConnected is always false.
+  const wasParticleConnected = useRef(false);
+
   useEffect(() => {
-    if (!isConnected && isFandomlyAuthed && !logoutInProgressRef.current) {
+    if (isConnected && isParticleSocialLogin) {
+      wasParticleConnected.current = true;
+    }
+  }, [isConnected, isParticleSocialLogin]);
+
+  useEffect(() => {
+    if (
+      !isConnected &&
+      isFandomlyAuthed &&
+      wasParticleConnected.current &&
+      !logoutInProgressRef.current
+    ) {
       logoutInProgressRef.current = true;
-      // Clear any bridge lock so the next login attempt can proceed
       if (address) {
         try {
           sessionStorage.removeItem(`particle_bridge_${address}`);
