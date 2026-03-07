@@ -28,7 +28,7 @@ const KEY_ID = 'fandomly-auth-key-1';
 
 // JWT configuration
 const JWT_ISSUER = process.env.JWT_ISSUER || 'https://fandomly.com';
-const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'crossmint';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'fandomly';
 const JWT_EXPIRY_SECONDS = parseInt(process.env.JWT_EXPIRY_SECONDS || '86400', 10); // 24 hours default
 const REFRESH_TOKEN_EXPIRY_SECONDS = parseInt(process.env.REFRESH_TOKEN_EXPIRY_SECONDS || '604800', 10); // 7 days default
 
