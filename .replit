@@ -48,7 +48,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "kill $(ps aux | grep -E 'tsx|dev-ws-proxy|node.*server' | grep -v grep | awk '{print $2}') 2>/dev/null; sleep 1; npm run dev"
+args = "pkill -f 'tsx.*server/index' 2>/dev/null; pkill -f 'dev-ws-proxy' 2>/dev/null; pkill -f 'node.*server/index' 2>/dev/null; sleep 2; npm run dev"
 waitForPort = 5000
 
 [agent]
