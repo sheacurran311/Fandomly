@@ -1,0 +1,98 @@
+---
+description: Social auth architecture rules — primary login vs in-app social connections
+globs:
+  - client/src/components/auth/**
+  - client/src/contexts/auth-context.tsx
+  - client/src/contexts/particle-provider.tsx
+  - client/src/lib/social-integrations.ts
+  - client/src/lib/twitter.ts
+  - client/src/lib/facebook.ts
+  - client/src/lib/instagram.ts
+  - client/src/hooks/use-social-connections.ts
+  - client/src/lib/social-connection-api.ts
+  - server/routes/auth/**
+  - server/routes/social/**
+  - server/services/auth/**
+---
+
+# Social Auth Architecture
+
+Fandomly has TWO separate social auth systems that serve different purposes. They must NEVER be conflated.
+
+## 1. Primary Login (auth-modal.tsx → /api/auth/social/callback)
+
+**Purpose:** User identity + Fandomly JWT issuance.
+
+**Entry point:** `client/src/components/auth/auth-modal.tsx` renders social login buttons (Google, Twitter, Facebook, TikTok, Discord, Twitch, YouTube, Spotify).
+
+**Flow:**
+1. User clicks a social provider in the auth modal
+2. OAuth popup opens using Fandomly's own app credentials + scopes
+3. Callback exchanges code for tokens
+4. `loginWithCallback()` calls `POST /api/auth/social/callback` with provider + token + profile
+5. Server checks for duplicate accounts by email → may return `linkRequired`
+6. Server creates/finds user → issues Fandomly JWT + sets refresh_token cookie
+7. Particle Auth Listener detects `isAuthenticated: true` + `accessToken` → calls Particle `connectAsync` with JWT to create embedded wallet
+8. User is authenticated with both Fandomly session AND Particle wallet
+
+**Server endpoint:** `server/routes/auth/auth-routes.ts` → `POST /api/auth/social/callback`
+
+**Rules:**
+- The auth modal is the ONLY entry point for primary login
+- Particle Network does NOT handle primary auth — it only creates the embedded wallet AFTER login
+- The Particle Auth Listener (`particle-auth-listener.tsx`) is PASSIVE — it never initiates login
+- The Particle Auth Listener must NEVER log out a user who authenticated via social auth
+- Account linking/dupe check MUST complete before Particle wallet creation
+
+## 2. In-App Social Connections (dashboard pages → /api/social-connections)
+
+**Purpose:** Platform API access for task verification, analytics sync, content publishing.
+
+**Entry points:** Dashboard social settings, program builder, task completion flows.
+
+**Flow:**
+1. Authenticated user clicks "Connect Twitter" (or any platform) on a dashboard page
+2. OAuth popup opens via `client/src/lib/social-integrations.ts` with Fandomly's app credentials
+3. Callback page exchanges code → gets platform OAuth tokens (access + refresh)
+4. Tokens saved to `socialConnections` table via `POST /api/social-connections`
+5. Platform API access is now available for task verification, etc.
+
+**Key files:**
+- `client/src/lib/social-integrations.ts` — main OAuth popup flows for all 10 platforms
+- `client/src/lib/twitter.ts` — Twitter PKCE flow
+- `client/src/lib/facebook.ts` — Facebook SDK manager
+- `client/src/lib/instagram.ts` — Instagram OAuth flow
+- `client/src/hooks/use-social-connections.ts` — React Query hook for connection state
+- `client/src/lib/social-connection-api.ts` — API client for connection CRUD
+- `server/routes/social/social-connection-routes.ts` — server CRUD (all routes require `authenticateUser`)
+- `client/src/pages/*-callback.tsx` — 9 OAuth callback pages (TikTok, YouTube, Spotify, Discord, Twitch, X/Twitter, Patreon, Kick, Instagram)
+
+**Rules:**
+- These flows run on PROTECTED pages — user is already authenticated
+- All `social-connection-routes.ts` endpoints require `authenticateUser` middleware
+- These connections are SEPARATE from the primary login — a user can log in with Google but connect Twitter for tasks
+- NEVER modify callback pages, social-integrations.ts, or the SDK managers when working on primary auth
+- Token exchange endpoints (`/api/social/*/token`) must NOT have `authenticateUser` — they run in popup windows without Fandomly session cookies
+- Platform profile endpoints (`/api/social/twitter/user`, `/discord/me`, `/twitch/me`) must NOT have `authenticateUser` — they use the platform's OAuth token from the Authorization header, not a Fandomly JWT
+
+## 3. Particle Network (wallet only)
+
+**Purpose:** Embedded wallet creation, gas sponsorship, on-chain operations.
+
+**Configuration:** Custom JWT auth via Particle Dashboard — JWKS URI points to `/.well-known/jwks.json`, validates `sub` claim, checks `iss=https://fandomly.com` and `aud=fandomly`.
+
+**Rules:**
+- Particle ConnectKit wraps the app via `ParticleProvider` for wallet context
+- The `ConnectButton` is shown as a wallet widget in the nav for authenticated users (NOT as login)
+- Wallet creation happens in `particle-auth-listener.tsx` AFTER social auth + dupe check completes
+- If wallet creation fails, the Fandomly session is unaffected (non-blocking)
+- Particle disconnect only fires on Fandomly logout (via `auth:fandomly-logout` event)
+- NEVER use Particle's social login for primary auth — it doesn't provide API scopes
+
+## Critical Don'ts
+
+- NEVER add `authenticateUser` to `/api/social/twitter/user`, `/api/social/discord/me`, `/api/social/twitch/me` — they use platform tokens, not Fandomly JWTs
+- NEVER let the Particle Auth Listener initiate login or logout independently
+- NEVER modify the in-app social OAuth flows (social-integrations.ts, callback pages) when changing primary auth
+- NEVER skip the account dupe check before creating a Particle wallet
+- NEVER use `access_token` from Particle's `getUserInfo()` as a platform API token — it's Particle's internal token
