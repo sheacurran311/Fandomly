@@ -150,6 +150,7 @@ export function createParticleConfig() {
           'twitch',
           'microsoft',
           'linkedin',
+          'jwt',
         ],
         fiatCoin: 'USD',
         promptSettingConfig: {

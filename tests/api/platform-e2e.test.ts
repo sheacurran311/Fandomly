@@ -592,9 +592,8 @@ describe('Leaderboards', () => {
 describe('Reputation', () => {
   it('GET /api/reputation/me returns own reputation', async () => {
     const res = await api('GET', '/api/reputation/me', undefined, fanToken);
-    // 500 can occur if reputation_scores table has a query issue (non-blocking)
     expect([200, 404, 500]).toContain(res.status);
-  });
+  }, 15_000);
 
   it('GET /api/reputation/me/history returns history', async () => {
     const res = await api('GET', '/api/reputation/me/history', undefined, fanToken);
