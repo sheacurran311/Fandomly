@@ -1,8 +1,9 @@
+#!/usr/bin/env node
 /**
  * dev-start.mjs
  *
  * Single canonical dev server launcher. Used by both the workflow and
- * manual shell invocations (`node dev-start.mjs` from ~/workspace).
+ * manual shell invocations (`./dev-start.mjs` from ~/workspace).
  *
  * Handles:
  *  1. Killing any stale tsx/server/proxy processes before starting
