@@ -1211,6 +1211,7 @@ export const PLATFORM_TASK_TYPES = {
   spotify: [
     { value: 'spotify_follow', label: 'Follow Artist', icon: 'UserPlus' },
     { value: 'spotify_playlist', label: 'Follow Playlist', icon: 'Music' },
+    { value: 'spotify_save_track', label: 'Save Track', icon: 'Music' },
     { value: 'spotify_album', label: 'Save Album', icon: 'Disc' },
   ],
   kick: [
