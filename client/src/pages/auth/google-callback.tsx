@@ -31,9 +31,13 @@ export default function GoogleCallback() {
   const [showLinkConfirmation, setShowLinkConfirmation] = useState(false);
 
   useEffect(() => {
+    // Guard against double-invocation (React 18 Strict Mode runs effects twice
+    // in development). Google auth codes are single-use, so the second call
+    // would always fail with `invalid_grant`.
+    let cancelled = false;
+
     async function handleCallback() {
       try {
-        // Parse URL parameters
         const params = new URLSearchParams(search);
         const code = params.get('code');
         const errorParam = params.get('error');
@@ -46,16 +50,18 @@ export default function GoogleCallback() {
           throw new Error('No authorization code received from Google');
         }
 
+        if (cancelled) return;
+
         console.log('[Google Callback] Processing callback with code');
 
-        // Exchange code for tokens — no userType passed, backend creates with 'pending'
         const result = await loginWithCallback('google', {
           code,
           redirect_uri: `${window.location.origin}/auth/google/callback`,
         });
 
+        if (cancelled) return;
+
         if (result.linkRequired) {
-          // Show link confirmation UI
           setShowLinkConfirmation(true);
           setIsProcessing(false);
           return;
@@ -64,7 +70,6 @@ export default function GoogleCallback() {
         if (result.success) {
           const user = result.user;
 
-          // New user OR user without a type → MUST go to type selection
           if (result.isNewUser || !user?.userType || user.userType === 'pending') {
             setLocation('/user-type-selection');
           } else if (user?.userType === 'creator') {
@@ -80,13 +85,13 @@ export default function GoogleCallback() {
               setLocation('/fan-onboarding/profile');
             }
           } else {
-            // Any other case → type selection
             setLocation('/user-type-selection');
           }
         } else {
           throw new Error(result.message || 'Authentication failed');
         }
       } catch (err: any) {
+        if (cancelled) return;
         console.error('[Google Callback] Error:', err);
         setError(err.message || 'An error occurred during authentication');
         setIsProcessing(false);
@@ -94,6 +99,10 @@ export default function GoogleCallback() {
     }
 
     handleCallback();
+
+    return () => {
+      cancelled = true;
+    };
   }, [search, loginWithCallback, setLocation]);
 
   // Handle link confirmation

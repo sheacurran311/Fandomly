@@ -36,6 +36,29 @@ function isAllowedRedirectUri(uri: string, host: string): boolean {
   }
 }
 
+// Tracks recently used Google auth codes to reject duplicate exchange attempts
+// (e.g. React 18 Strict Mode double-firing effects). TTL: 2 minutes.
+const recentlyUsedCodes = new Map<string, number>();
+const CODE_TTL_MS = 2 * 60 * 1000;
+
+function markCodeUsed(code: string) {
+  recentlyUsedCodes.set(code, Date.now());
+  // Prune expired entries
+  for (const [key, ts] of recentlyUsedCodes) {
+    if (Date.now() - ts > CODE_TTL_MS) recentlyUsedCodes.delete(key);
+  }
+}
+
+function isCodeAlreadyUsed(code: string): boolean {
+  const ts = recentlyUsedCodes.get(code);
+  if (!ts) return false;
+  if (Date.now() - ts > CODE_TTL_MS) {
+    recentlyUsedCodes.delete(code);
+    return false;
+  }
+  return true;
+}
+
 export function registerGoogleAuthRoutes(app: Express) {
   /**
    * GET /api/auth/google
@@ -109,6 +132,15 @@ export function registerGoogleAuthRoutes(app: Express) {
       if (!redirect_uri) {
         return res.status(400).json({ error: 'redirect_uri is required' });
       }
+
+      if (isCodeAlreadyUsed(code)) {
+        console.warn('[Google Auth] Duplicate code exchange attempt — ignoring');
+        return res.status(409).json({
+          error: 'Authorization code already used',
+          message: 'This login request was already processed. Please try again.',
+        });
+      }
+      markCodeUsed(code);
 
       console.log('[Google Auth] Processing callback', {
         codeLength: code.length,
