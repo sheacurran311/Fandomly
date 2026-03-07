@@ -48,7 +48,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "fuser -k 5000/tcp 5488/tcp 2>/dev/null; pkill -f 'tsx.*server/index' 2>/dev/null; pkill -f 'dev-ws-proxy' 2>/dev/null; sleep 2; npm run dev"
+args = "for port in 5000 5488; do lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null; done; sleep 1; npm run dev"
 waitForPort = 5000
 
 [agent]
