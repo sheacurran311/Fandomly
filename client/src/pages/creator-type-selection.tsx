@@ -879,14 +879,28 @@ export default function CreatorTypeSelection() {
 
             {currentStep < STEPS.length - 1 ? (
               <div className="flex items-center gap-3">
-                {/* Skip button for photo (step 3) and socials (step 4) */}
-                {(currentStep === 3 || currentStep === 4) && (
+                {/* Skip to Dashboard — available after creator type (step 0) is selected */}
+                {currentStep >= 1 && state.creatorType && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleFinish}
+                    disabled={finishMutation.isPending}
+                    className="text-gray-400 hover:text-white text-sm"
+                  >
+                    {finishMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : null}
+                    Skip to Dashboard
+                  </Button>
+                )}
+                {/* Skip step — for optional steps (photo, socials, plan) */}
+                {currentStep >= 2 && (
                   <Button
                     variant="ghost"
                     onClick={goNext}
-                    className="text-gray-400 hover:text-white"
+                    className="text-gray-400 hover:text-white text-sm"
                   >
-                    Skip for now
+                    Skip
                   </Button>
                 )}
                 <Button
@@ -899,23 +913,36 @@ export default function CreatorTypeSelection() {
                 </Button>
               </div>
             ) : (
-              <Button
-                onClick={handleFinish}
-                disabled={finishMutation.isPending}
-                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold"
-              >
-                {finishMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    Finish Setup
-                    <Sparkles className="h-4 w-4 ml-2" />
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={handleFinish}
+                  disabled={finishMutation.isPending}
+                  className="text-gray-400 hover:text-white text-sm"
+                >
+                  {finishMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : null}
+                  Skip to Dashboard
+                </Button>
+                <Button
+                  onClick={handleFinish}
+                  disabled={finishMutation.isPending}
+                  className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 h-11 rounded-xl font-semibold"
+                >
+                  {finishMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Finish Setup
+                      <Sparkles className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </div>
