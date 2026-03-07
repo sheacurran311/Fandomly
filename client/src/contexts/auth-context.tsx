@@ -309,11 +309,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       if (provider === 'google') {
-        // Server-driven OAuth: navigate to the server route which handles
-        // the redirect_uri construction and Google redirect internally.
-        // This avoids redirect_uri mismatches with dynamic hostnames (Replit, etc.)
-        window.location.href = `${API_BASE}/api/auth/google`;
-        return;
+        // Get Google OAuth URL and redirect
+        const redirectUri = `${window.location.origin}/auth/google/callback`;
+
+        const response = await fetch(
+          `${API_BASE}/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to get Google auth URL');
+        }
+
+        const { url } = await response.json();
+        window.location.href = url;
       } else {
         // For other social providers, they will use the popup flow
         // and call loginWithCallback after OAuth completion
