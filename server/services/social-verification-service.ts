@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { db } from '../db';
 import { socialConnections, taskCompletions, tasks, loyaltyPrograms } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
@@ -30,7 +31,7 @@ async function getSocialConnection(userId: string, platform: string) {
         eq(socialConnections.isActive, true)
       )
     );
-  
+
   return connection;
 }
 
@@ -54,57 +55,57 @@ export async function verifyTwitterFollow(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'twitter');
-    
+
     if (!connection) {
       return {
         verified: false,
         message: 'Twitter account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     if (!connection.accessToken) {
       return {
         verified: false,
         message: 'Twitter access token not found',
-        error: 'NO_TOKEN'
+        error: 'NO_TOKEN',
       };
     }
-    
+
     // Check if token is expired
     if (isTokenExpired(connection.tokenExpiresAt)) {
       return {
         verified: false,
         message: 'Twitter token expired. Please reconnect.',
-        error: 'TOKEN_EXPIRED'
+        error: 'TOKEN_EXPIRED',
       };
     }
-    
+
     // Get user's following list
     const response = await fetch(
       `https://api.twitter.com/2/users/${connection.platformUserId}/following`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       console.error('[Twitter Verification] API error:', error);
       return {
         verified: false,
         message: 'Failed to verify Twitter follow',
-        error: 'API_ERROR'
+        error: 'API_ERROR',
       };
     }
-    
+
     const data = await response.json();
-    
+
     // Check if creator is in the following list
     const isFollowing = data.data?.some((user: any) => user.id === creatorTwitterId);
-    
+
     return {
       verified: isFollowing,
       message: isFollowing ? 'Twitter follow verified' : 'Not following creator',
@@ -112,15 +113,15 @@ export async function verifyTwitterFollow(
         platform: 'twitter',
         action: 'follow',
         creatorId: creatorTwitterId,
-        verifiedAt: new Date().toISOString()
-      }
+        verifiedAt: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('[Twitter Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Twitter follow',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -135,44 +136,44 @@ export async function verifyTwitterLike(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'twitter');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'Twitter account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     if (isTokenExpired(connection.tokenExpiresAt)) {
       return {
         verified: false,
         message: 'Twitter token expired. Please reconnect.',
-        error: 'TOKEN_EXPIRED'
+        error: 'TOKEN_EXPIRED',
       };
     }
-    
+
     // Get user's liked tweets
     const response = await fetch(
       `https://api.twitter.com/2/users/${connection.platformUserId}/liked_tweets`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       return {
         verified: false,
         message: 'Failed to verify Twitter like',
-        error: 'API_ERROR'
+        error: 'API_ERROR',
       };
     }
-    
+
     const data = await response.json();
     const hasLiked = data.data?.some((tweet: any) => tweet.id === tweetId);
-    
+
     return {
       verified: hasLiked,
       message: hasLiked ? 'Twitter like verified' : 'Tweet not liked',
@@ -180,15 +181,15 @@ export async function verifyTwitterLike(
         platform: 'twitter',
         action: 'like',
         tweetId,
-        verifiedAt: new Date().toISOString()
-      }
+        verifiedAt: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('[Twitter Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Twitter like',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -203,29 +204,29 @@ export async function verifyTwitterRetweet(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'twitter');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'Twitter account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // Note: Free tier may not have access to retweeted_by endpoint
     // This is a placeholder - actual implementation depends on API tier
-    
+
     return {
       verified: false,
       message: 'Twitter retweet verification requires paid API tier',
-      error: 'NOT_AVAILABLE_FREE_TIER'
+      error: 'NOT_AVAILABLE_FREE_TIER',
     };
   } catch (error) {
     console.error('[Twitter Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Twitter retweet',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -242,36 +243,36 @@ export async function verifyYouTubeSubscription(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'youtube');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'YouTube account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // Check user's subscriptions for the specific channel
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&forChannelId=${channelId}`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       return {
         verified: false,
         message: 'Failed to verify YouTube subscription',
-        error: 'API_ERROR'
+        error: 'API_ERROR',
       };
     }
-    
+
     const data = await response.json();
     const isSubscribed = data.items && data.items.length > 0;
-    
+
     return {
       verified: isSubscribed,
       message: isSubscribed ? 'YouTube subscription verified' : 'Not subscribed to channel',
@@ -279,15 +280,15 @@ export async function verifyYouTubeSubscription(
         platform: 'youtube',
         action: 'subscribe',
         channelId,
-        verifiedAt: new Date().toISOString()
-      }
+        verifiedAt: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('[YouTube Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying YouTube subscription',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -302,36 +303,36 @@ export async function verifyYouTubeLike(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'youtube');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'YouTube account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // Get user's rating for the video
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/videos/getRating?id=${videoId}`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       return {
         verified: false,
         message: 'Failed to verify YouTube like',
-        error: 'API_ERROR'
+        error: 'API_ERROR',
       };
     }
-    
+
     const data = await response.json();
     const hasLiked = data.items?.[0]?.rating === 'like';
-    
+
     return {
       verified: hasLiked,
       message: hasLiked ? 'YouTube like verified' : 'Video not liked',
@@ -339,15 +340,15 @@ export async function verifyYouTubeLike(
         platform: 'youtube',
         action: 'like',
         videoId,
-        verifiedAt: new Date().toISOString()
-      }
+        verifiedAt: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('[YouTube Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying YouTube like',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -362,42 +363,42 @@ export async function verifyYouTubeComment(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'youtube');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'YouTube account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // Get comments on the video
     // Note: This requires the channelId from the social connection
     const channelId = connection.platformUserId;
-    
+
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&searchTerms=${channelId}`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       return {
         verified: false,
         message: 'Failed to verify YouTube comment',
-        error: 'API_ERROR'
+        error: 'API_ERROR',
       };
     }
-    
+
     const data = await response.json();
     // Check if any comments are from this user
-    const hasCommented = data.items?.some((item: any) => 
-      item.snippet.topLevelComment.snippet.authorChannelId?.value === channelId
+    const hasCommented = data.items?.some(
+      (item: any) => item.snippet.topLevelComment.snippet.authorChannelId?.value === channelId
     );
-    
+
     return {
       verified: hasCommented,
       message: hasCommented ? 'YouTube comment verified' : 'No comment found',
@@ -405,148 +406,103 @@ export async function verifyYouTubeComment(
         platform: 'youtube',
         action: 'comment',
         videoId,
-        verifiedAt: new Date().toISOString()
-      }
+        verifiedAt: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('[YouTube Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying YouTube comment',
-      error: String(error)
+      error: String(error),
     };
   }
 }
 
 // ===== SPOTIFY VERIFICATION =====
+// Updated for Spotify's Feb 2026 API changes — uses unified GET /me/library/contains
 
 /**
  * Verify if user follows an artist on Spotify
- * Uses: GET /v1/me/following/contains
+ * Uses: GET /v1/me/library/contains?uris=spotify:artist:{artistId}
  */
 export async function verifySpotifyFollowArtist(
   userId: string,
   artistId: string
 ): Promise<VerificationResult> {
-  try {
-    const connection = await getSocialConnection(userId, 'spotify');
-    
-    if (!connection || !connection.accessToken) {
-      return {
-        verified: false,
-        message: 'Spotify account not connected',
-        error: 'NO_CONNECTION'
-      };
-    }
-    
-    // Check if user follows the artist
-    const response = await fetch(
-      `https://api.spotify.com/v1/me/following/contains?type=artist&ids=${artistId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
-      }
-    );
-    
-    if (!response.ok) {
-      return {
-        verified: false,
-        message: 'Failed to verify Spotify follow',
-        error: 'API_ERROR'
-      };
-    }
-    
-    const data = await response.json();
-    const isFollowing = data[0] === true;
-    
-    return {
-      verified: isFollowing,
-      message: isFollowing ? 'Spotify artist follow verified' : 'Not following artist',
-      proof: {
-        platform: 'spotify',
-        action: 'follow_artist',
-        artistId,
-        verifiedAt: new Date().toISOString()
-      }
-    };
-  } catch (error) {
-    console.error('[Spotify Verification] Error:', error);
-    return {
-      verified: false,
-      message: 'Error verifying Spotify follow',
-      error: String(error)
-    };
-  }
+  return verifySpotifyLibraryContains(userId, 'artist', artistId, 'follow_artist');
 }
 
 /**
  * Verify if user follows a playlist on Spotify
- * Uses: GET /v1/playlists/{playlist_id}/followers/contains
+ * Uses: GET /v1/me/library/contains?uris=spotify:playlist:{playlistId}
  */
 export async function verifySpotifyFollowPlaylist(
   userId: string,
   playlistId: string
 ): Promise<VerificationResult> {
+  return verifySpotifyLibraryContains(userId, 'playlist', playlistId, 'follow_playlist');
+}
+
+/**
+ * Unified Spotify library/contains check.
+ * Replaces the removed per-type /contains endpoints.
+ */
+async function verifySpotifyLibraryContains(
+  userId: string,
+  itemType: string,
+  itemId: string,
+  action: string
+): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'spotify');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'Spotify account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
-    // Need the Spotify user ID to check playlist follow
-    const spotifyUserId = connection.platformUserId;
-    
-    if (!spotifyUserId) {
-      return {
-        verified: false,
-        message: 'Spotify user ID not found',
-        error: 'NO_USER_ID'
-      };
-    }
-    
-    // Check if user follows the playlist
+
+    const uri = `spotify:${itemType}:${itemId}`;
     const response = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}/followers/contains?ids=${spotifyUserId}`,
+      `https://api.spotify.com/v1/me/library/contains?uris=${encodeURIComponent(uri)}`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       return {
         verified: false,
-        message: 'Failed to verify Spotify playlist follow',
-        error: 'API_ERROR'
+        message: `Failed to verify Spotify ${itemType}`,
+        error: 'API_ERROR',
       };
     }
-    
+
     const data = await response.json();
-    const isFollowing = data[0] === true;
-    
+    const isSaved = data[0] === true;
+
     return {
-      verified: isFollowing,
-      message: isFollowing ? 'Spotify playlist follow verified' : 'Not following playlist',
+      verified: isSaved,
+      message: isSaved ? `Spotify ${itemType} verified` : `Not saved/following ${itemType}`,
       proof: {
         platform: 'spotify',
-        action: 'follow_playlist',
-        playlistId,
-        verifiedAt: new Date().toISOString()
-      }
+        action,
+        [`${itemType}Id`]: itemId,
+        uri,
+        verifiedAt: new Date().toISOString(),
+      },
     };
   } catch (error) {
     console.error('[Spotify Verification] Error:', error);
     return {
       verified: false,
-      message: 'Error verifying Spotify playlist follow',
-      error: String(error)
+      message: `Error verifying Spotify ${itemType}`,
+      error: String(error),
     };
   }
 }
@@ -563,47 +519,47 @@ export async function verifyTikTokFollow(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'tiktok');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'TikTok account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // TikTok API v2 - Get user info
     const response = await fetch(
       `https://open.tiktokapis.com/v2/user/info/?fields=follower_count,following_count`,
       {
         headers: {
-          'Authorization': `Bearer ${connection.accessToken}`,
-        }
+          Authorization: `Bearer ${connection.accessToken}`,
+        },
       }
     );
-    
+
     if (!response.ok) {
       return {
         verified: false,
         message: 'Failed to verify TikTok follow',
-        error: 'API_ERROR'
+        error: 'API_ERROR',
       };
     }
-    
+
     // Note: TikTok API may not provide detailed following list in free tier
     // This is a placeholder - actual implementation depends on API access
-    
+
     return {
       verified: false,
       message: 'TikTok follow verification requires additional API access',
-      error: 'NOT_AVAILABLE'
+      error: 'NOT_AVAILABLE',
     };
   } catch (error) {
     console.error('[TikTok Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying TikTok follow',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -617,29 +573,29 @@ export async function verifyTikTokLike(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'tiktok');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'TikTok account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // TikTok API for likes verification
     // Note: May require specific permissions
-    
+
     return {
       verified: false,
       message: 'TikTok like verification requires additional API access',
-      error: 'NOT_AVAILABLE'
+      error: 'NOT_AVAILABLE',
     };
   } catch (error) {
     console.error('[TikTok Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying TikTok like',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -653,29 +609,29 @@ export async function verifyTikTokComment(
 ): Promise<VerificationResult> {
   try {
     const connection = await getSocialConnection(userId, 'tiktok');
-    
+
     if (!connection || !connection.accessToken) {
       return {
         verified: false,
         message: 'TikTok account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
-    
+
     // TikTok API for comments verification
     // Note: May require specific permissions
-    
+
     return {
       verified: false,
       message: 'TikTok comment verification requires additional API access',
-      error: 'NOT_AVAILABLE'
+      error: 'NOT_AVAILABLE',
     };
   } catch (error) {
     console.error('[TikTok Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying TikTok comment',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -705,7 +661,7 @@ export async function verifyFacebookPageLike(
       return {
         verified: false,
         message: 'Facebook account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
 
@@ -723,15 +679,16 @@ export async function verifyFacebookPageLike(
       if (error.error?.code === 200 || error.error?.message?.includes('permissions')) {
         return {
           verified: false,
-          message: 'Facebook user_likes permission not yet approved. This verification will work once the permission is granted for demo purposes.',
-          error: 'PERMISSION_PENDING'
+          message:
+            'Facebook user_likes permission not yet approved. This verification will work once the permission is granted for demo purposes.',
+          error: 'PERMISSION_PENDING',
         };
       }
 
       return {
         verified: false,
         message: 'Error checking Facebook Page like',
-        error: error.error?.message || 'API_ERROR'
+        error: error.error?.message || 'API_ERROR',
       };
     }
 
@@ -752,7 +709,7 @@ export async function verifyFacebookPageLike(
         return {
           verified: false,
           message: 'You haven not liked this Facebook Page yet',
-          error: 'NOT_LIKED'
+          error: 'NOT_LIKED',
         };
       }
 
@@ -760,7 +717,7 @@ export async function verifyFacebookPageLike(
       return {
         verified: false,
         message: error.error?.message || 'Could not verify Facebook Page like',
-        error: 'VERIFICATION_FAILED'
+        error: 'VERIFICATION_FAILED',
       };
     }
 
@@ -775,15 +732,15 @@ export async function verifyFacebookPageLike(
         pageId: pageId,
         pageName: pageData.name,
         verifiedAt: new Date().toISOString(),
-        userId: connection.platformUserId
-      }
+        userId: connection.platformUserId,
+      },
     };
   } catch (error) {
     console.error('[Facebook Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Facebook Page like',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -809,7 +766,7 @@ export async function verifyFacebookPostLike(
       return {
         verified: false,
         message: 'Facebook account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
 
@@ -823,7 +780,7 @@ export async function verifyFacebookPostLike(
       return {
         verified: false,
         message: error.error?.message || 'Could not verify Facebook Post like',
-        error: 'VERIFICATION_FAILED'
+        error: 'VERIFICATION_FAILED',
       };
     }
 
@@ -837,7 +794,7 @@ export async function verifyFacebookPostLike(
       return {
         verified: false,
         message: 'You have not liked this Facebook Post yet',
-        error: 'NOT_LIKED'
+        error: 'NOT_LIKED',
       };
     }
 
@@ -849,15 +806,15 @@ export async function verifyFacebookPostLike(
         action: 'post_like',
         postId: postId,
         verifiedAt: new Date().toISOString(),
-        userId: userFacebookId
-      }
+        userId: userFacebookId,
+      },
     };
   } catch (error) {
     console.error('[Facebook Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Facebook Post like',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -883,7 +840,7 @@ export async function verifyFacebookComment(
       return {
         verified: false,
         message: 'Facebook account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
 
@@ -897,7 +854,7 @@ export async function verifyFacebookComment(
       return {
         verified: false,
         message: error.error?.message || 'Could not verify Facebook comment',
-        error: 'VERIFICATION_FAILED'
+        error: 'VERIFICATION_FAILED',
       };
     }
 
@@ -911,7 +868,7 @@ export async function verifyFacebookComment(
       return {
         verified: false,
         message: 'You have not commented on this Facebook Post yet',
-        error: 'NOT_COMMENTED'
+        error: 'NOT_COMMENTED',
       };
     }
 
@@ -923,15 +880,15 @@ export async function verifyFacebookComment(
         action: 'comment',
         postId: postId,
         verifiedAt: new Date().toISOString(),
-        userId: userFacebookId
-      }
+        userId: userFacebookId,
+      },
     };
   } catch (error) {
     console.error('[Facebook Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Facebook comment',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -957,7 +914,7 @@ export async function verifyFacebookShare(
       return {
         verified: false,
         message: 'Facebook account not connected',
-        error: 'NO_CONNECTION'
+        error: 'NO_CONNECTION',
       };
     }
 
@@ -967,15 +924,16 @@ export async function verifyFacebookShare(
 
     return {
       verified: false,
-      message: 'Facebook share verification requires webhook setup or manual verification. This feature is in development.',
-      error: 'NOT_AVAILABLE'
+      message:
+        'Facebook share verification requires webhook setup or manual verification. This feature is in development.',
+      error: 'NOT_AVAILABLE',
     };
   } catch (error) {
     console.error('[Facebook Verification] Error:', error);
     return {
       verified: false,
       message: 'Error verifying Facebook share',
-      error: String(error)
+      error: String(error),
     };
   }
 }
@@ -992,35 +950,35 @@ export async function updateTaskCompletion(
 ): Promise<{ pointsAwarded?: number }> {
   try {
     const updates: any = {
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     let pointsAwarded = 0;
-    
+
     if (verificationResult.verified) {
       updates.status = 'completed';
       updates.verifiedAt = new Date();
       updates.completedAt = new Date();
       updates.verificationMethod = verificationMethod;
       updates.progress = 100;
-      
+
       // Get completion and task details for points calculation
       const [completion] = await db
         .select()
         .from(taskCompletions)
         .where(eq(taskCompletions.id, taskCompletionId));
-      
+
       if (completion) {
         const completionData = completion.completionData || {};
-        
+
         // Get the task to calculate points
         const task = await db.query.tasks.findFirst({
           where: eq(tasks.id, completion.taskId),
         });
-        
+
         if (task) {
           const basePoints = task.pointsToReward || 0;
-          
+
           // Calculate multiplier
           const multiplierResult = await multiplierService.calculateMultiplier({
             userId: completion.userId,
@@ -1029,16 +987,16 @@ export async function updateTaskCompletion(
             taskType: task.taskType,
             platform: task.platform,
           });
-          
+
           // Apply multiplier to base points
           pointsAwarded = Math.round(basePoints * multiplierResult.finalMultiplier);
-          
+
           console.log(`[Verification Service] Points calculation:`, {
             basePoints,
             multiplier: multiplierResult.finalMultiplier,
-            pointsAwarded
+            pointsAwarded,
           });
-          
+
           updates.pointsEarned = pointsAwarded;
           updates.completionData = {
             ...completionData,
@@ -1047,9 +1005,9 @@ export async function updateTaskCompletion(
               multiplierApplied: multiplierResult.finalMultiplier,
               multiplierBreakdown: multiplierResult.breakdown,
               basePoints: basePoints,
-            }
+            },
           };
-          
+
           // Award points to user's balance via CreatorPointsService
           if (pointsAwarded > 0 && task.tenantId) {
             try {
@@ -1057,7 +1015,7 @@ export async function updateTaskCompletion(
               const program = await db.query.loyaltyPrograms.findFirst({
                 where: eq(loyaltyPrograms.tenantId, task.tenantId),
               });
-              
+
               if (program?.creatorId) {
                 await creatorPointsService.awardPoints(
                   completion.userId,
@@ -1068,9 +1026,13 @@ export async function updateTaskCompletion(
                   `Task completed: ${task.name}`,
                   { taskId: task.id, taskCompletionId: taskCompletionId }
                 );
-                console.log(`[Verification Service] Awarded ${pointsAwarded} points to user ${completion.userId}`);
+                console.log(
+                  `[Verification Service] Awarded ${pointsAwarded} points to user ${completion.userId}`
+                );
               } else {
-                console.warn(`[Verification Service] No loyalty program found for tenant ${task.tenantId}`);
+                console.warn(
+                  `[Verification Service] No loyalty program found for tenant ${task.tenantId}`
+                );
               }
             } catch (pointsError) {
               console.error('[Verification Service] Failed to award points:', pointsError);
@@ -1079,27 +1041,23 @@ export async function updateTaskCompletion(
         } else {
           updates.completionData = {
             ...completionData,
-            verificationProof: verificationResult.proof
+            verificationProof: verificationResult.proof,
           };
         }
       }
     }
-    
-    await db
-      .update(taskCompletions)
-      .set(updates)
-      .where(eq(taskCompletions.id, taskCompletionId));
-    
+
+    await db.update(taskCompletions).set(updates).where(eq(taskCompletions.id, taskCompletionId));
+
     console.log(`[Verification Service] Task completion ${taskCompletionId} updated:`, {
       verified: verificationResult.verified,
       method: verificationMethod,
-      pointsAwarded
+      pointsAwarded,
     });
-    
+
     return { pointsAwarded };
   } catch (error) {
     console.error('[Verification Service] Error updating task completion:', error);
     throw error;
   }
 }
-
