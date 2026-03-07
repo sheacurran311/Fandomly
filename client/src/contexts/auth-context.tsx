@@ -127,6 +127,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   });
   const [linkRequired, setLinkRequired] = useState<LinkRequiredResponse | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const queryClient = useQueryClient();
 
@@ -229,6 +231,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Uses GET /api/auth/session which always returns 200, avoiding
   // noisy 401 errors in the browser console for unauthenticated visitors.
   const fetchCurrentUser = useCallback(async () => {
+    // Skip session check if we already have a valid in-memory auth state.
+    // This prevents the session endpoint from racing with loginWithCallback
+    // during post-login redirects (the cookie may not have round-tripped yet).
+    const currentlyAuthed = stateRef.current;
+    if (currentlyAuthed.isAuthenticated && currentlyAuthed.user && currentlyAuthed.accessToken) {
+      setState((prev) => ({ ...prev, isLoading: false }));
+      return;
+    }
+
     try {
       setState((prev) => ({ ...prev, isLoading: true }));
 
