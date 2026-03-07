@@ -1,50 +1,48 @@
 /**
  * dev-start.mjs
  *
- * Dev server launcher. Handles:
- *  1. Killing any stale processes on ports 5000 and 5488 before starting
- *  2. Starting the WS proxy (dev-ws-proxy.mjs) as a child process
- *  3. Starting the Express/Vite dev server (tsx with dev-preload.mjs)
+ * Single canonical dev server launcher. Used by both the workflow and
+ * manual shell invocations (`node dev-start.mjs` from ~/workspace).
+ *
+ * Handles:
+ *  1. Killing any stale tsx/server/proxy processes before starting
+ *  2. Starting dev-ws-proxy.mjs as a managed child process
+ *  3. Starting the Express/Vite server via tsx with dev-preload.mjs
  *  4. Forwarding SIGINT/SIGTERM so both children exit cleanly
  */
 
-import { spawn } from 'child_process';
-import { createServer } from 'net';
+import { spawn, execSync } from 'child_process';
 
-// Kill whatever is on a given port by attempting to bind it
-async function freePort(port) {
-  return new Promise((resolve) => {
-    const server = createServer();
-    server.once('error', () => {
-      // Port in use — nothing we can do from JS without root; just continue
-      resolve();
-    });
-    server.once('listening', () => {
-      server.close(resolve);
-    });
-    server.listen(port, '0.0.0.0');
-  });
+// --- 1. Kill stale processes by name (avoids fuser which segfaults on NixOS) ---
+const stalePatterns = [
+  "tsx.*server/index",
+  "dev-ws-proxy",
+  "node.*server/index",
+];
+for (const pattern of stalePatterns) {
+  try { execSync(`pkill -f '${pattern}' 2>/dev/null`); } catch (_) { /* nothing to kill */ }
 }
 
+// Brief pause so the OS reclaims ports before we bind them
+await new Promise((r) => setTimeout(r, 1500));
+
+// --- 2. Start child processes ---
 function spawnChild(cmd, args, env = {}) {
   const child = spawn(cmd, args, {
     stdio: 'inherit',
     env: { ...process.env, ...env },
   });
-  child.on('error', (err) => console.error(`[dev-start] Child error (${cmd}):`, err.message));
+  child.on('error', (err) =>
+    console.error(`[dev-start] Child error (${cmd}):`, err.message)
+  );
   return child;
 }
 
-// Attempt to free ports first (noop if we don't own them, Replit handles this)
-await freePort(5488);
-
-// 1. Start WS proxy
 const proxy = spawnChild('node', ['dev-ws-proxy.mjs']);
 
-// Give the proxy a moment to start listening
+// Give the proxy a moment to bind its port
 await new Promise((r) => setTimeout(r, 500));
 
-// 2. Start the app server with the Neon WebSocket preload
 const server = spawnChild(
   'node',
   [
@@ -56,7 +54,7 @@ const server = spawnChild(
   { NODE_ENV: 'development' }
 );
 
-// 3. Forward signals so both children exit when Replit stops the run
+// --- 3. Forward signals so both children exit when the workflow stops ---
 function shutdown(signal) {
   proxy.kill(signal);
   server.kill(signal);
@@ -65,5 +63,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// Exit this wrapper when the main server exits
 server.on('exit', (code) => process.exit(code ?? 0));
