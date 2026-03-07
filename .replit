@@ -48,7 +48,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "for port in 5000 5488; do lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null; done; sleep 1; npm run dev"
+args = "kill $(ps aux | grep -E 'tsx|dev-ws-proxy|node.*server' | grep -v grep | awk '{print $2}') 2>/dev/null; sleep 1; npm run dev"
 waitForPort = 5000
 
 [agent]
