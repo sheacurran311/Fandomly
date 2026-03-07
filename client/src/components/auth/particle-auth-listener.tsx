@@ -1,35 +1,83 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Particle Auth Listener (Passive Mode)
+ * Particle Auth Listener
  *
- * Now that social auth is the primary login method, this listener is
- * purely passive. It does NOT initiate any authentication flows.
+ * Manages the Particle wallet lifecycle alongside Fandomly's social auth:
  *
- * Responsibilities:
- * 1. Sync Fandomly logout → Particle disconnect (clear wallet session)
- * 2. Future: when Particle JWT integration is wired, this will listen
- *    for wallet creation events AFTER the social auth + dupe check flow
- *    has fully completed.
+ * 1. AFTER social auth + dupe check completes → create embedded wallet via JWT
+ * 2. Fandomly logout → disconnect Particle wallet
  *
- * What it does NOT do:
- * - Bridge Particle social login to Fandomly auth (removed)
- * - Log out Fandomly when Particle is not connected (removed)
- * - Interfere with the social auth modal login flow in any way
+ * This listener is purely reactive — it never initiates login flows.
+ * It waits for Fandomly auth to succeed, then provisions the wallet.
  */
 
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
-import { useAccount, useDisconnect } from '@particle-network/connectkit';
+import {
+  useAccount,
+  useConnect,
+  useConnectors,
+  useDisconnect,
+} from '@particle-network/connectkit';
 
 function ParticleAuthListenerInner() {
-  const { isAuthenticated: isFandomlyAuthed } = useAuth();
+  const { isAuthenticated, user, accessToken } = useAuth();
   const { isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  const { connectAsync } = useConnect();
+  const connectors = useConnectors();
+  const walletCreationAttempted = useRef(false);
   const logoutInProgressRef = useRef(false);
 
-  // Handle Fandomly logout → disconnect Particle wallet session.
-  // Dispatched from auth-context.tsx logout() via custom event.
+  // After Fandomly auth succeeds, create an embedded wallet via Particle JWT.
+  // This only runs once per session — walletCreationAttempted prevents retries.
+  useEffect(() => {
+    if (
+      !isAuthenticated ||
+      !accessToken ||
+      !user ||
+      isConnected ||
+      walletCreationAttempted.current
+    ) {
+      return;
+    }
+
+    const particleAuthConnector = connectors.find(
+      (c: any) => c.walletConnectorType === 'particleAuth'
+    );
+
+    if (!particleAuthConnector) {
+      return;
+    }
+
+    walletCreationAttempted.current = true;
+
+    connectAsync({
+      connector: particleAuthConnector,
+      authParams: {
+        provider: 'jwt' as any,
+        thirdpartyCode: accessToken,
+      },
+    })
+      .then((result) => {
+        console.log('[Particle] Embedded wallet created:', result.accounts?.[0]);
+      })
+      .catch((err) => {
+        // Non-blocking — wallet creation failure doesn't affect the Fandomly session.
+        // User can still use the app; wallet can be retried later.
+        console.warn('[Particle] Wallet creation failed (non-blocking):', err?.message || err);
+      });
+  }, [isAuthenticated, accessToken, user, isConnected, connectors, connectAsync]);
+
+  // Reset the wallet creation flag when user logs out so it can fire again on next login
+  useEffect(() => {
+    if (!isAuthenticated) {
+      walletCreationAttempted.current = false;
+    }
+  }, [isAuthenticated]);
+
+  // Fandomly logout → disconnect Particle wallet session
   useEffect(() => {
     const handleFandomlyLogout = () => {
       if (isConnected && !logoutInProgressRef.current) {
@@ -51,10 +99,6 @@ function ParticleAuthListenerInner() {
   return null;
 }
 
-/**
- * Conditionally renders the Particle auth listener.
- * When Particle is not enabled, renders nothing.
- */
 export default function ParticleAuthListener() {
   if (!isParticleAuthEnabled()) {
     return null;
