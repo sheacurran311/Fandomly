@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * ⛔ SINGLE SOURCE OF TRUTH — TikTok, YouTube, Spotify, Discord, Twitch OAuth
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This file is the ONLY place where OAuth config (scopes, redirect URIs, popup
+ * flows, COOP fallbacks) for TikTok, YouTube, Spotify, Discord, and Twitch
+ * should be defined. All UI layers must import and call secureLogin() from here.
+ * NEVER duplicate this logic elsewhere.
+ */
 // Social Media Integration APIs
 import FacebookSDK, { type FacebookPage } from './facebook';
 import { KickAPI } from './kick';

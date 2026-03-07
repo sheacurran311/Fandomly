@@ -1,5 +1,7 @@
 /**
  * YouTube OAuth Callback Page
+ * ⛔ YouTube auth source of truth: client/src/lib/social-integrations.ts (YouTubeAPI)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
  *
  * Handles the OAuth callback from YouTube/Google
  * Exchanges authorization code for access token

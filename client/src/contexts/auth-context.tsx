@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * ⛔ SOCIAL AUTH — CONSUMER ONLY, NOT A SOURCE OF TRUTH
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This context delegates social login to source-of-truth modules. Do NOT add
+ * OAuth URLs, scopes, popup logic, or provider-specific code here. Fix auth
+ * bugs in the source files: twitter.ts, facebook.ts, social-integrations.ts,
+ * google-auth.ts.
+ */
 import React, {
   createContext,
   useContext,
@@ -300,19 +309,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       if (provider === 'google') {
-        // Get Google OAuth URL and redirect
-        const redirectUri = `${window.location.origin}/auth/google/callback`;
-
-        const response = await fetch(
-          `${API_BASE}/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to get Google auth URL');
-        }
-
-        const { url } = await response.json();
-        window.location.href = url;
+        // Server-driven OAuth: navigate to the server route which handles
+        // the redirect_uri construction and Google redirect internally.
+        // This avoids redirect_uri mismatches with dynamic hostnames (Replit, etc.)
+        window.location.href = `${API_BASE}/api/auth/google`;
+        return;
       } else {
         // For other social providers, they will use the popup flow
         // and call loginWithCallback after OAuth completion

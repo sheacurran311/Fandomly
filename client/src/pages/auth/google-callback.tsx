@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// ⛔ Google auth source of truth: server/services/auth/google-auth.ts + server/routes/auth/google-routes.ts
+// See rule: .cursor/rules/social-auth-single-source.mdc
 import { useEffect, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
@@ -6,90 +8,61 @@ import { useAuth } from '@/contexts/auth-context';
 /**
  * Google OAuth callback page
  *
- * @deprecated This page handles the legacy Google OAuth redirect flow that was used
- * before Particle Network ConnectKit was integrated. When Particle is configured,
- * Google sign-in is handled natively by Particle ConnectKit's Google social auth
- * connector and this page is not reached.
+ * The server-driven flow works like this:
+ *   1. GET /api/auth/google → Google consent → GET /api/auth/google/callback (server)
+ *   2. Server exchanges the code, sets the session cookie, and redirects here with query params:
+ *      - ?success=true&is_new_user=true/false   (on success)
+ *      - ?error=...                              (on failure)
+ *      - ?link_required=true&providers=...&pending_link_id=...  (account linking needed)
  *
- * This page is kept as a fallback for:
- *   1. Environments where VITE_PARTICLE_PROJECT_ID is not set
- *   2. Backward compatibility for any session that was initiated via the old Google flow
- *
- * Do NOT remove until all Google OAuth users are fully migrated to Particle auth.
- *
- * After auth, routes users based on their stored type:
- * - New users / pending type → /user-type-selection (ALWAYS)
- * - Existing creators → /creator-dashboard or /creator-type-selection
- * - Existing fans → /fan-dashboard or /fan-onboarding/profile
+ * This page reads those params, loads the session from the cookie the server just set,
+ * and routes the user to the appropriate page.
  */
 export default function GoogleCallback() {
   const [, setLocation] = useLocation();
   const search = useSearch();
-  const { loginWithCallback, confirmAccountLink, linkRequired, clearLinkRequired } = useAuth();
+  const { refreshUser, refreshToken, isAuthenticated, user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
-  const [showLinkConfirmation, setShowLinkConfirmation] = useState(false);
 
   useEffect(() => {
-    // Guard against double-invocation (React 18 Strict Mode runs effects twice
-    // in development). Google auth codes are single-use, so the second call
-    // would always fail with `invalid_grant`.
     let cancelled = false;
 
     async function handleCallback() {
       try {
         const params = new URLSearchParams(search);
-        const code = params.get('code');
         const errorParam = params.get('error');
+        const success = params.get('success');
+        const isNewUser = params.get('is_new_user') === 'true';
+        const linkRequired = params.get('link_required') === 'true';
 
         if (errorParam) {
-          throw new Error(`Google auth error: ${errorParam}`);
+          throw new Error(decodeURIComponent(errorParam));
         }
 
-        if (!code) {
-          throw new Error('No authorization code received from Google');
+        if (linkRequired) {
+          // TODO: implement link confirmation UI if needed
+          throw new Error(
+            'An account with this email already exists with a different provider. ' +
+            'Please sign in with your original method.'
+          );
+        }
+
+        if (success !== 'true') {
+          throw new Error('Authentication did not complete successfully');
         }
 
         if (cancelled) return;
 
-        console.log('[Google Callback] Processing callback with code');
-
-        const result = await loginWithCallback('google', {
-          code,
-          redirect_uri: `${window.location.origin}/auth/google/callback`,
-        });
+        // The server set the refresh_token cookie during the redirect.
+        // Call refreshToken to pick up the session and get an access token.
+        await refreshToken();
 
         if (cancelled) return;
 
-        if (result.linkRequired) {
-          setShowLinkConfirmation(true);
-          setIsProcessing(false);
-          return;
-        }
-
-        if (result.success) {
-          const user = result.user;
-
-          if (result.isNewUser || !user?.userType || user.userType === 'pending') {
-            setLocation('/user-type-selection');
-          } else if (user?.userType === 'creator') {
-            if (user.onboardingState?.isCompleted) {
-              setLocation('/creator-dashboard');
-            } else {
-              setLocation('/creator-type-selection');
-            }
-          } else if (user?.userType === 'fan') {
-            if (user.onboardingState?.isCompleted) {
-              setLocation('/fan-dashboard');
-            } else {
-              setLocation('/fan-onboarding/profile');
-            }
-          } else {
-            setLocation('/user-type-selection');
-          }
-        } else {
-          throw new Error(result.message || 'Authentication failed');
-        }
+        // Give the auth state a moment to propagate, then route
+        // based on the user's state.
+        routeUser(isNewUser);
       } catch (err: any) {
         if (cancelled) return;
         console.error('[Google Callback] Error:', err);
@@ -98,82 +71,52 @@ export default function GoogleCallback() {
       }
     }
 
+    function routeUser(isNewUser: boolean) {
+      // After refreshToken, the auth context should be updated.
+      // We use a short delay to let React state settle, then read the user.
+      setTimeout(() => {
+        if (cancelled) return;
+        // Always route new users to type selection
+        if (isNewUser) {
+          setLocation('/user-type-selection');
+          return;
+        }
+        // For existing users, the auth-router will handle routing
+        // based on their userType/onboarding state. Send them to root.
+        setLocation('/');
+      }, 100);
+    }
+
     handleCallback();
 
     return () => {
       cancelled = true;
     };
-  }, [search, loginWithCallback, setLocation]);
+  }, [search, refreshToken, refreshUser, setLocation]);
 
-  // Handle link confirmation
-  const handleConfirmLink = async () => {
-    if (!linkRequired) return;
-
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams(search);
-      const code = params.get('code');
-
-      if (!code) {
-        throw new Error('Authorization code no longer available');
+  // Once auth state updates and we're authenticated, route immediately
+  useEffect(() => {
+    if (isAuthenticated && user && isProcessing) {
+      if (!user.userType || user.userType === 'pending') {
+        setLocation('/user-type-selection');
+      } else if (user.userType === 'creator') {
+        if (user.onboardingState?.isCompleted) {
+          setLocation('/creator-dashboard');
+        } else {
+          setLocation('/creator-type-selection');
+        }
+      } else if (user.userType === 'fan') {
+        if (user.onboardingState?.isCompleted) {
+          setLocation('/fan-dashboard');
+        } else {
+          setLocation('/fan-onboarding/profile');
+        }
+      } else {
+        setLocation('/user-type-selection');
       }
-
-      await confirmAccountLink(linkRequired.pendingLinkId, 'google', {
-        code,
-        redirect_uri: `${window.location.origin}/auth/google/callback`,
-      });
-
-      // Redirect to dashboard after successful link
-      setLocation('/');
-    } catch (err: any) {
-      console.error('[Google Callback] Link error:', err);
-      setError(err.message || 'Failed to link account');
-      setIsProcessing(false);
     }
-  };
+  }, [isAuthenticated, user, isProcessing, setLocation]);
 
-  const handleCancelLink = () => {
-    clearLinkRequired();
-    setLocation('/');
-  };
-
-  // Show link confirmation dialog
-  if (showLinkConfirmation && linkRequired) {
-    return (
-      <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
-        <div className="bg-brand-card rounded-lg p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-white mb-4">Account Found</h2>
-          <p className="text-gray-300 mb-6">{linkRequired.message}</p>
-          <p className="text-gray-400 text-sm mb-6">
-            Existing login method: {linkRequired.existingProviders.join(', ')}
-          </p>
-
-          <div className="flex gap-4">
-            <button
-              onClick={handleConfirmLink}
-              disabled={isProcessing}
-              className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {isProcessing ? 'Linking...' : 'Link Accounts'}
-            </button>
-            <button
-              onClick={handleCancelLink}
-              disabled={isProcessing}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
-
-          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
   if (error) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center p-4">
@@ -192,7 +135,6 @@ export default function GoogleCallback() {
     );
   }
 
-  // Show loading state
   return (
     <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
       <div className="text-center">

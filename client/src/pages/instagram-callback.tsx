@@ -1,3 +1,5 @@
+// ⛔ Instagram auth source of truth: client/src/lib/facebook.ts (FacebookSDKManager)
+// See rule: .cursor/rules/social-auth-single-source.mdc
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

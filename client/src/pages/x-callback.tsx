@@ -1,3 +1,4 @@
+// ⛔ Twitter auth source of truth: client/src/lib/twitter.ts — see .cursor/rules/social-auth-single-source.mdc
 import { useEffect, useRef } from "react";
 import { TwitterSDKManager, TwitterLoginResult } from "@/lib/twitter";
 

@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * ⛔ SOCIAL AUTH — CONSUMER ONLY, NOT A SOURCE OF TRUTH
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This file IMPORTS social auth from source-of-truth modules. It must NEVER
+ * define its own OAuth URLs, scopes, popup logic, or postMessage handling.
+ * To fix a social auth bug, fix it in the source file (twitter.ts,
+ * facebook.ts, or social-integrations.ts), NOT here.
+ */
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
@@ -16,6 +25,13 @@ import {
 } from 'react-icons/fa';
 import { TwitterSDKManager } from '@/lib/twitter';
 import { FacebookSDKManager } from '@/lib/facebook';
+import {
+  TikTokAPI,
+  YouTubeAPI,
+  SpotifyAPI,
+  DiscordAPI,
+  TwitchAPI,
+} from '@/lib/social-integrations';
 import { useToast } from '@/hooks/use-toast';
 import { getPostAuthRedirect } from '@/lib/auth-redirect';
 
@@ -80,114 +96,12 @@ const moreProviders: AuthProvider[] = [
   },
 ];
 
-async function openOAuthPopup(
-  providerId: string,
-  stateTag: string = 'auth'
-): Promise<{
-  success: boolean;
-  accessToken?: string;
-  userId?: string;
-  username?: string;
-  displayName?: string;
-  email?: string;
-  profileData?: any;
-  error?: string;
-}> {
-  const redirectUrls: Record<string, string> = {
-    tiktok: '/tiktok-callback',
-    youtube: '/youtube-callback',
-    spotify: '/spotify-callback',
-    discord: '/discord-callback',
-    twitch: '/twitch-callback',
-  };
-
-  const state = `${providerId}_${stateTag}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  localStorage.setItem(`${providerId}_oauth_state`, state);
-
-  const origin = window.location.origin;
-  const redirectUri = `${origin}${redirectUrls[providerId]}`;
-
-  let authUrl: string;
-
-  switch (providerId) {
-    case 'tiktok': {
-      const tiktokClientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY || '';
-      authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${tiktokClientKey}&scope=user.info.basic&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
-      break;
-    }
-    case 'youtube': {
-      const youtubeClientId = import.meta.env.VITE_GOOGLE_YOUTUBE_CLIENT_ID || '';
-      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${youtubeClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=https://www.googleapis.com/auth/youtube.readonly%20openid%20email%20profile&response_type=code&state=${state}&access_type=offline&prompt=consent`;
-      break;
-    }
-    case 'spotify': {
-      const spotifyClientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
-      authUrl = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user-read-private%20user-read-email&response_type=code&state=${state}`;
-      break;
-    }
-    case 'discord': {
-      const discordClientId = import.meta.env.VITE_DISCORD_CLIENT_ID || '';
-      authUrl = `https://discord.com/oauth2/authorize?client_id=${discordClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=identify%20email&response_type=code&state=${state}`;
-      break;
-    }
-    case 'twitch': {
-      const twitchClientId = import.meta.env.VITE_TWITCH_CLIENT_ID || '';
-      authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${twitchClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:read:email&response_type=code&state=${state}`;
-      break;
-    }
-    default:
-      return { success: false, error: `Unknown provider: ${providerId}` };
-  }
-
-  return new Promise((resolve) => {
-    const popup = window.open(
-      authUrl,
-      `${providerId}-oauth`,
-      'width=600,height=700,scrollbars=yes,resizable=yes'
-    );
-
-    if (!popup) {
-      resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
-      return;
-    }
-
-    let settled = false;
-    const cleanup = () => {
-      window.removeEventListener('message', onMessage);
-      try {
-        popup?.close();
-      } catch {
-        /* noop */
-      }
-    };
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== `${providerId}-oauth-result`) return;
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(event.data.result);
-    };
-
-    window.addEventListener('message', onMessage);
-
-    const poll = setInterval(() => {
-      try {
-        if (!popup || popup.closed) {
-          clearInterval(poll);
-          if (!settled) {
-            settled = true;
-            cleanup();
-            resolve({ success: false, error: `${providerId} authorization was cancelled` });
-          }
-        }
-      } catch {
-        /* noop */
-      }
-    }, 500);
-  });
-}
+// Reuse the single configured instances from social-integrations.ts
+const tiktokApi = new TikTokAPI();
+const youtubeApi = new YouTubeAPI();
+const spotifyApi = new SpotifyAPI();
+const discordApi = new DiscordAPI();
+const twitchApi = new TwitchAPI();
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -237,81 +151,102 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoadingProvider(providerId);
 
     try {
-      let result: any;
+      // Each provider uses its single configured API class from social-integrations.ts.
+      // secureLogin() handles popup, postMessage, COOP fallback, and timeouts.
+      // The callback pages exchange the code, fetch user data, save the connection,
+      // and post the full result back to the opener.
+      const popupResult: any = await (async () => {
+        switch (providerId) {
+          case 'twitter':
+            return TwitterSDKManager.secureLogin('auth');
+          case 'facebook':
+            return FacebookSDKManager.secureLogin('fan');
+          case 'tiktok':
+            return tiktokApi.secureLogin();
+          case 'youtube':
+            return youtubeApi.secureLogin();
+          case 'spotify':
+            return spotifyApi.secureLogin();
+          case 'discord':
+            return discordApi.secureLogin();
+          case 'twitch':
+            return twitchApi.secureLogin();
+          default:
+            throw new Error(`Provider ${providerId} not configured`);
+        }
+      })();
 
-      switch (providerId) {
-        case 'twitter':
-          result = await TwitterSDKManager.secureLogin('auth');
-          if (result.success && result.user) {
-            result = {
-              success: true,
-              accessToken: result.accessToken,
-              userId: result.user.id,
-              username: result.user.username,
-              displayName: result.user.name || result.user.username,
-              profileData: {
-                profileImageUrl: result.user.profileImageUrl,
-                followersCount: result.user.followersCount,
-                followingCount: result.user.followingCount,
-              },
-            };
-          }
-          break;
-        case 'facebook':
-          result = await FacebookSDKManager.secureLogin('fan');
-          if (result.success && result.user) {
-            result = {
-              success: true,
-              accessToken: result.accessToken,
-              userId: result.user.id,
-              username: result.user.name,
-              displayName: result.user.name,
-              email: result.user.email,
-              profileData: { picture: result.user.picture },
-            };
-          }
-          break;
-        case 'tiktok':
-        case 'youtube':
-        case 'spotify':
-        case 'discord':
-        case 'twitch':
-          result = await openOAuthPopup(providerId, 'auth');
-          break;
-        default:
-          throw new Error(`Provider ${providerId} not configured`);
+      if (!popupResult.success) {
+        throw new Error(popupResult.error || `Failed to connect with ${providerId}`);
       }
 
-      if (result.success) {
-        const authResult = await loginWithCallback(providerId, {
-          access_token: result.accessToken,
-          platform_user_id: result.userId || result.platformUserId,
-          email: result.email,
-          username: result.username,
-          display_name: result.displayName,
-          profile_data: result.profileData || {},
-        });
+      // Normalize the result shape — each provider's secureLogin/callback returns
+      // slightly different field names. Map to the flat shape loginWithCallback expects.
+      let accessToken: string | undefined;
+      let platformUserId: string | undefined;
+      let username: string | undefined;
+      let displayName: string | undefined;
+      let email: string | undefined;
+      let profileData: any = {};
 
-        if (authResult.success) {
-          toast({ title: 'Welcome!', description: `Signed in with ${providerId}` });
-          onClose();
-          const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
-          setLocation(redirectUrl);
-        } else if (authResult.linkRequired) {
-          setPendingLinkData({
-            provider: providerId,
-            callbackData: {
-              access_token: result.accessToken,
-              platform_user_id: result.userId || result.platformUserId,
-              email: result.email,
-              username: result.username,
-              display_name: result.displayName,
-              profile_data: result.profileData,
-            },
-          });
-        }
+      if (providerId === 'twitter') {
+        accessToken = popupResult.accessToken;
+        platformUserId = popupResult.user?.id;
+        username = popupResult.user?.username;
+        displayName = popupResult.user?.name || popupResult.user?.username;
+        profileData = {
+          profileImageUrl: popupResult.user?.profileImageUrl,
+          followersCount: popupResult.user?.followersCount,
+          followingCount: popupResult.user?.followingCount,
+        };
+      } else if (providerId === 'facebook') {
+        accessToken = popupResult.accessToken;
+        platformUserId = popupResult.user?.id;
+        username = popupResult.user?.name;
+        displayName = popupResult.user?.name;
+        email = popupResult.user?.email;
+        profileData = { picture: popupResult.user?.picture };
       } else {
-        throw new Error(result.error || `Failed to connect with ${providerId}`);
+        // TikTok, YouTube, Spotify, Discord, Twitch —
+        // Their callback pages post back: { success, accessToken, userId, username, displayName, email, profileData }
+        accessToken = popupResult.accessToken;
+        platformUserId = popupResult.userId || popupResult.platformUserId;
+        username = popupResult.username;
+        displayName = popupResult.displayName || popupResult.channelName;
+        email = popupResult.email;
+        profileData = popupResult.profileData || {};
+      }
+
+      if (!accessToken || !platformUserId) {
+        throw new Error(`${providerId} auth completed but returned incomplete data`);
+      }
+
+      const authResult = await loginWithCallback(providerId, {
+        access_token: accessToken,
+        platform_user_id: platformUserId,
+        email,
+        username,
+        display_name: displayName,
+        profile_data: profileData,
+      });
+
+      if (authResult.success) {
+        toast({ title: 'Welcome!', description: `Signed in with ${providerId}` });
+        onClose();
+        const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
+        setLocation(redirectUrl);
+      } else if (authResult.linkRequired) {
+        setPendingLinkData({
+          provider: providerId,
+          callbackData: {
+            access_token: accessToken,
+            platform_user_id: platformUserId,
+            email,
+            username,
+            display_name: displayName,
+            profile_data: profileData,
+          },
+        });
       }
     } catch (err: any) {
       toast({

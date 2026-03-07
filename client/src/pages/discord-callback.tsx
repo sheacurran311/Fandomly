@@ -1,5 +1,7 @@
 /**
  * Discord OAuth Callback Page
+ * ⛔ Discord auth source of truth: client/src/lib/social-integrations.ts (DiscordAPI)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
  *
  * Handles the OAuth callback from Discord
  * Exchanges authorization code for access token
