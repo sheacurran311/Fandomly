@@ -432,27 +432,16 @@
   }
 }
 
-/* Hide ALL Particle Network floating wallet widget elements.
-   Wallet access is through the app's own UI (sidebar profile, dropdown menu).
-   The wallet plugin is set to visible:false in particle-config.ts; this CSS
-   is a safety net in case any Particle DOM still leaks through. */
-.particle-pwe-btn,
-.particle-wallet-entry-container,
-.particle-wallet-entry-style,
-[id^='particle-wallet'],
-[id^='particle-auth-core-iframe-wallet'],
-[class*='particle-wallet-entry'],
-[class*='particle-pn-wallet'],
-[class*='particle-pwe-'],
-iframe[src*='particle'] {
+/* Hide ONLY the Particle Network floating wallet entry BUTTON.
+   Do NOT hide Particle iframes or auth core elements — those are needed
+   for wallet operations and the auth flow to work properly.
+   The wallet plugin is set to visible:false in particle-config.ts;
+   this CSS is a safety net for the circular FAB only. */
+.particle-pwe-btn {
   display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
   width: 0 !important;
   height: 0 !important;
-  overflow: hidden !important;
-  position: fixed !important;
-  left: -9999px !important;
-  top: -9999px !important;
   opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
 }
