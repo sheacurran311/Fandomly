@@ -220,6 +220,7 @@ export default function CreatorTypeSelection() {
       youtube: 'YouTube',
       spotify: 'Spotify',
       twitch: 'Twitch',
+      apple_music: 'Apple Music',
     };
     const platformName = platformNames[platformId] || platformId;
     setConnectingPlatform(platformId);
@@ -262,6 +263,10 @@ export default function CreatorTypeSelection() {
           'pages_show_list,pages_read_engagement,business_management'
         );
         result.success = result.success && !!result.accessToken;
+      } else if (platformId === 'apple_music') {
+        const { AppleMusicAPI } = await import('@/lib/social-integrations');
+        const appleMusic = new AppleMusicAPI();
+        result = await appleMusic.secureLogin();
       } else {
         const api = (socialManager as any)[platformId as keyof typeof socialManager];
         if (!api) {

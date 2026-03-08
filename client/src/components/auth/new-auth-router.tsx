@@ -106,6 +106,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
     '/spotify-callback',
     '/discord-callback',
     '/twitch-callback',
+    '/apple-music-callback',
   ];
 
   // Check route types

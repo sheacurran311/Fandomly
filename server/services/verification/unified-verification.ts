@@ -26,6 +26,7 @@ import { youtubeVerification } from './platforms/youtube-verification';
 import { kickVerification } from './platforms/kick-verification';
 import { patreonVerification } from './platforms/patreon-verification';
 import { facebookVerification } from './platforms/facebook-verification';
+import { appleMusicVerification } from './platforms/apple-music-verification';
 import { getTaskVerificationInfo } from '@shared/taskTemplates';
 
 export interface UnifiedVerificationRequest {
@@ -397,6 +398,14 @@ export class UnifiedVerificationService {
       case 'spotify':
         // Spotify has T1 API verification for follows/saves
         return await spotifyVerification.verifyTask({
+          fanUserId: userId,
+          taskType,
+          taskSettings: taskSettings || {},
+        });
+
+      case 'apple_music':
+        // Apple Music has T1 API verification for library adds
+        return await appleMusicVerification.verifyTask({
           fanUserId: userId,
           taskType,
           taskSettings: taskSettings || {},
@@ -822,6 +831,7 @@ export class UnifiedVerificationService {
       case 'x':
       case 'youtube':
       case 'spotify':
+      case 'apple_music':
       case 'twitch':
       case 'discord':
       case 'kick':

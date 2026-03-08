@@ -15,7 +15,8 @@ export interface SocialMediaAccount {
     | 'discord'
     | 'twitch'
     | 'kick'
-    | 'patreon';
+    | 'patreon'
+    | 'apple_music';
   username: string;
   displayName: string;
   profileUrl: string;
@@ -754,6 +755,146 @@ export class SpotifyAPI {
   }
 }
 
+// Apple Music API (via MusicKit JS)
+export class AppleMusicAPI {
+  private developerToken: string | null = null;
+  private musicKitLoaded = false;
+
+  /**
+   * Load MusicKit JS script into the page if not already loaded.
+   */
+  private async loadMusicKitJS(): Promise<void> {
+    if (this.musicKitLoaded) return;
+    if (typeof window !== 'undefined' && (window as any).MusicKit) {
+      this.musicKitLoaded = true;
+      return;
+    }
+
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://js-cdn.music.apple.com/musickit/v3/musickit.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        this.musicKitLoaded = true;
+        resolve();
+      };
+      script.onerror = () => reject(new Error('Failed to load MusicKit JS'));
+      document.head.appendChild(script);
+    });
+  }
+
+  /**
+   * Fetch the developer token from our server.
+   */
+  async getDeveloperToken(): Promise<string> {
+    if (this.developerToken) return this.developerToken;
+
+    const res = await fetch('/api/social/apple-music/developer-token');
+    if (!res.ok) {
+      throw new Error('Failed to fetch Apple Music developer token');
+    }
+    const data = await res.json();
+    this.developerToken = data.token;
+    return data.token;
+  }
+
+  /**
+   * Initialize MusicKit and authorize the user.
+   * Returns the Music-User-Token on success.
+   */
+  async authorize(): Promise<{ success: boolean; musicUserToken?: string; error?: string }> {
+    try {
+      await this.loadMusicKitJS();
+      const devToken = await this.getDeveloperToken();
+
+      const MusicKit = (window as any).MusicKit;
+      if (!MusicKit) {
+        return { success: false, error: 'MusicKit JS failed to load' };
+      }
+
+      // Configure MusicKit instance
+      await MusicKit.configure({
+        developerToken: devToken,
+        app: {
+          name: 'Fandomly',
+          build: '1.0.0',
+        },
+      });
+
+      const music = MusicKit.getInstance();
+      const musicUserToken = await music.authorize();
+
+      if (!musicUserToken) {
+        return { success: false, error: 'Apple Music authorization was cancelled' };
+      }
+
+      return { success: true, musicUserToken };
+    } catch (error) {
+      console.error('[AppleMusic] Authorization error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Apple Music authorization failed',
+      };
+    }
+  }
+
+  /**
+   * Full login flow: authorize via MusicKit JS, then save token to server.
+   */
+  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+    try {
+      const authResult = await this.authorize();
+      if (!authResult.success || !authResult.musicUserToken) {
+        return { success: false, error: authResult.error };
+      }
+
+      // Save the token to our server
+      const saveRes = await fetch('/api/social/apple-music/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          musicUserToken: authResult.musicUserToken,
+        }),
+        credentials: 'include',
+      });
+
+      if (!saveRes.ok) {
+        const errData = await saveRes.json().catch(() => ({}));
+        return { success: false, error: errData.error || 'Failed to save Apple Music connection' };
+      }
+
+      const data = await saveRes.json();
+      return {
+        success: true,
+        displayName: data.connection?.platformDisplayName || 'Apple Music User',
+      };
+    } catch (error) {
+      console.error('[AppleMusic] Login error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Apple Music login failed',
+      };
+    }
+  }
+
+  async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
+    // Apple Music doesn't have a traditional user profile endpoint.
+    // Use the storefront as a proxy.
+    return {
+      platform: 'apple_music',
+      username: 'apple_music_user',
+      displayName: 'Apple Music User',
+      profileUrl: '',
+      followers: 0,
+      verified: false,
+      profileImage: '',
+      accessToken,
+      connectedAt: new Date(),
+    };
+  }
+}
+
 // Discord API
 export class DiscordAPI {
   private clientId: string;
@@ -1125,6 +1266,7 @@ export class SocialIntegrationManager {
   private twitch: TwitchAPI;
   private kick: KickAPI;
   private patreon: PatreonAPI;
+  private appleMusic: AppleMusicAPI;
 
   constructor() {
     this.facebook = new FacebookAPI();
@@ -1137,6 +1279,7 @@ export class SocialIntegrationManager {
     this.twitch = new TwitchAPI();
     this.kick = new KickAPI();
     this.patreon = new PatreonAPI();
+    this.appleMusic = new AppleMusicAPI();
   }
 
   getAuthUrl(platform: string): string {
@@ -1161,6 +1304,8 @@ export class SocialIntegrationManager {
         return '#'; // Kick uses popup flow via secureLogin()
       case 'patreon':
         return '#'; // Patreon uses popup flow via secureLogin()
+      case 'apple_music':
+        return '#'; // Apple Music uses MusicKit JS flow via secureLogin()
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -1207,6 +1352,11 @@ export class SocialIntegrationManager {
       case 'patreon':
         // Patreon uses popup flow via secureLogin() - this path should not be called
         throw new Error('Patreon integration uses popup flow via PatreonAPI.secureLogin()');
+      case 'apple_music':
+        // Apple Music uses MusicKit JS flow via AppleMusicAPI.secureLogin()
+        throw new Error(
+          'Apple Music integration uses MusicKit JS flow via AppleMusicAPI.secureLogin()'
+        );
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -1262,6 +1412,8 @@ export class SocialIntegrationManager {
         return this.discord.getUserProfile(account.accessToken);
       case 'twitch':
         return this.twitch.getUserProfile(account.accessToken);
+      case 'apple_music':
+        return this.appleMusic.getUserProfile(account.accessToken);
       default:
         return account;
     }
