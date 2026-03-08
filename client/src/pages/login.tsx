@@ -1,25 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
-import { isParticleAuthEnabled } from '@/contexts/particle-provider';
-import { Button } from '@/components/ui/button';
-import { Link } from 'wouter';
-
-const ParticleConnectButton = lazy(() =>
-  import('@particle-network/connectkit').then((mod) => ({
-    default: mod.ConnectButton,
-  }))
-);
+import AuthModal from '@/components/auth/auth-modal';
 
 /**
- * Login page — renders the Particle ConnectButton for authentication.
- * Redirects authenticated users to their dashboard.
+ * Login page - displays the auth modal
+ * No userType parameter — all users come through the same door
+ * and choose their type after authenticating on /user-type-selection.
  */
 export default function Login() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, user, isLoading } = useAuth();
-  const particleEnabled = isParticleAuthEnabled();
 
   // Redirect authenticated users based on their actual stored type
   useEffect(() => {
@@ -36,64 +27,28 @@ export default function Login() {
     }
   }, [isAuthenticated, user, isLoading, setLocation]);
 
+  // Handle close - redirect to home
+  const handleClose = () => {
+    setLocation('/');
+  };
+
+  // Show loading state while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
+  // Don't show modal if already authenticated
   if (isAuthenticated) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
-      <div className="w-full max-w-sm mx-auto px-6">
-        <div className="text-center mb-8">
-          <Link href="/">
-            <img src="/fandomly2.png" alt="Fandomly" className="h-16 mx-auto mb-4" />
-          </Link>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome to Fandomly</h1>
-          <p className="text-gray-400 text-sm">Sign in to access your dashboard</p>
-        </div>
-
-        {particleEnabled ? (
-          <div
-            data-particle-connect-btn
-            className="[&>div]:w-full [&>div]:h-12 [&>div]:rounded-xl [&>div]:font-semibold"
-          >
-            <Suspense
-              fallback={
-                <Button
-                  disabled
-                  className="w-full h-12 bg-brand-primary/50 text-white/50 rounded-xl"
-                >
-                  Loading...
-                </Button>
-              }
-            >
-              <ParticleConnectButton label="Sign in with Fandomly" />
-            </Suspense>
-          </div>
-        ) : (
-          <p className="text-center text-gray-500 text-sm">
-            Authentication is not configured. Please check your environment variables.
-          </p>
-        )}
-
-        <p className="text-center text-gray-600 text-xs mt-6">
-          By signing in, you agree to our{' '}
-          <Link href="/terms-of-service" className="text-brand-primary hover:underline">
-            Terms
-          </Link>{' '}
-          and{' '}
-          <Link href="/privacy-policy" className="text-brand-primary hover:underline">
-            Privacy Policy
-          </Link>
-        </p>
-      </div>
+    <div className="min-h-screen bg-brand-dark-bg">
+      <AuthModal isOpen={true} onClose={handleClose} />
     </div>
   );
 }

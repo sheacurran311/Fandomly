@@ -133,11 +133,10 @@ export function createParticleConfig() {
     },
 
     walletConnectors: [
-      // Social + email login (primary auth path)
-      // Full list of Particle-supported SocialAuthTypes:
-      // facebook, google, apple, twitter, discord, github, twitch, microsoft, linkedin
-      // Note: TikTok, YouTube, Spotify are NOT auth providers in Particle — they are
-      // handled as post-login social account linking flows on the social dashboard pages.
+      // Particle Auth connector — used for JWT-based embedded wallet creation.
+      // Primary login is handled by Fandomly's own social auth modal (auth-modal.tsx).
+      // Particle is only used for wallet provisioning after auth completes.
+      // 'jwt' is required for Particle ConnectKit to accept connectAsync with JWT.
       authWalletConnectors({
         authTypes: [
           'email',
@@ -150,6 +149,7 @@ export function createParticleConfig() {
           'twitch',
           'microsoft',
           'linkedin',
+          'jwt',
         ],
         fiatCoin: 'USD',
         promptSettingConfig: {
@@ -169,13 +169,14 @@ export function createParticleConfig() {
       }),
     ],
 
-    // Wallet plugin: visible:false hides the floating entry button completely.
-    // openWallet() calls are wrapped in try-catch by the app's UI components
-    // because the embedded wallet WASM module may fail to load in some environments.
+    // Wallet plugin: visible:true ensures the wallet iframe/DOM is created
+    // (required for openWallet() to work). The floating entry button is hidden
+    // via CSS (.particle-pwe-btn { display: none }) in index.css.
+    // openWallet() calls are wrapped in try-catch in case the WASM module fails to load.
     plugins: [
       wallet({
         entryPosition: EntryPosition.BR,
-        visible: false,
+        visible: true,
       }),
     ],
 

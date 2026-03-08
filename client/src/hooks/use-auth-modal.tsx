@@ -1,46 +1,43 @@
-import { createContext, useContext, ReactNode, useCallback } from 'react';
-import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import AuthModal from '@/components/auth/auth-modal';
 
 interface AuthModalContextType {
+  isOpen: boolean;
   openAuthModal: () => void;
+  closeAuthModal: () => void;
 }
 
 const AuthModalContext = createContext<AuthModalContextType | null>(null);
 
-/**
- * AuthModalProvider — delegates to Particle ConnectKit.
- *
- * `openAuthModal()` programmatically clicks the Particle ConnectButton
- * rendered in the Navigation bar. This keeps the same API for all consumers
- * (auth-router, find-creators, etc.) without conditional hooks.
- */
-export function AuthModalProvider({ children }: { children: ReactNode }) {
+interface AuthModalProviderProps {
+  children: ReactNode;
+}
+
+export function AuthModalProvider({ children }: AuthModalProviderProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // No userType parameter — all users come through the same door.
+  // They choose their type AFTER authenticating on /user-type-selection.
   const openAuthModal = useCallback(() => {
-    if (isParticleAuthEnabled()) {
-      // Click the Particle ConnectButton rendered in Navigation
-      const btn = document.querySelector<HTMLElement>('[data-particle-connect-btn]');
-      if (btn) {
-        btn.click();
-        return;
-      }
-    }
-    // Fallback: navigate to login page
-    window.location.href = '/login';
+    setIsOpen(true);
+  }, []);
+
+  const closeAuthModal = useCallback(() => {
+    setIsOpen(false);
   }, []);
 
   return (
-    <AuthModalContext.Provider value={{ openAuthModal }}>{children}</AuthModalContext.Provider>
+    <AuthModalContext.Provider value={{ isOpen, openAuthModal, closeAuthModal }}>
+      {children}
+      <AuthModal isOpen={isOpen} onClose={closeAuthModal} />
+    </AuthModalContext.Provider>
   );
 }
 
 export function useAuthModal() {
   const context = useContext(AuthModalContext);
   if (!context) {
-    return {
-      openAuthModal: () => {
-        console.warn('[useAuthModal] Provider not ready');
-      },
-    };
+    throw new Error('useAuthModal must be used within an AuthModalProvider');
   }
   return context;
 }

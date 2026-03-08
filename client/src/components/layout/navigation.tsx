@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,17 +13,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Menu, X, User, Settings, LogOut, ChevronDown, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { useAuthModal } from '@/hooks/use-auth-modal';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
 import { transformImageUrl } from '@/lib/image-utils';
 import { BrandSwitcher } from '@/components/brand-switcher';
 import { useEmbeddedWallet } from '@particle-network/connectkit';
-
-// Lazy-load Particle ConnectButton to avoid bundle impact when not configured
-const ParticleConnectButton = lazy(() =>
-  import('@particle-network/connectkit').then((mod) => ({
-    default: mod.ConnectButton,
-  }))
-);
 
 /**
  * Wallet dropdown menu item — only renders inside ConnectKitProvider
@@ -56,6 +50,7 @@ export default function Navigation() {
   // Use new auth context
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const particleEnabled = isParticleAuthEnabled();
+  const { openAuthModal } = useAuthModal();
 
   // Landing page has its own minimal footer with logo — no nav bar needed
   if (location === '/') return null;
@@ -223,30 +218,13 @@ export default function Navigation() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              ) : particleEnabled ? (
-                <div
-                  data-particle-connect-btn
-                  className="[&>div]:rounded-xl [&>div]:font-semibold [&>div]:transition-all [&>div]:duration-200 [&>div]:hover:scale-105 [&>div]:min-w-[100px]"
-                >
-                  <Suspense
-                    fallback={
-                      <Button
-                        disabled
-                        className="bg-brand-primary/50 text-white/50 px-6 py-2 rounded-xl"
-                      >
-                        Loading...
-                      </Button>
-                    }
-                  >
-                    <ParticleConnectButton label="Sign In" />
-                  </Suspense>
-                </div>
               ) : (
-                <Link href="/login">
-                  <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105">
-                    Sign In
-                  </Button>
-                </Link>
+                <Button
+                  onClick={() => openAuthModal()}
+                  className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105"
+                >
+                  Sign In
+                </Button>
               )}
             </div>
 
@@ -303,36 +281,17 @@ export default function Navigation() {
                     </Link>
                   </>
                 )}
-                {!isAuthenticated &&
-                  (particleEnabled ? (
-                    <div
-                      data-particle-connect-btn
-                      className="[&>div]:w-full [&>div]:rounded-xl [&>div]:font-semibold"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <Suspense
-                        fallback={
-                          <Button
-                            disabled
-                            className="w-full bg-brand-primary/50 text-white/50 py-2 rounded-xl"
-                          >
-                            Loading...
-                          </Button>
-                        }
-                      >
-                        <ParticleConnectButton label="Sign In" />
-                      </Suspense>
-                    </div>
-                  ) : (
-                    <Link href="/login">
-                      <Button
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
-                      >
-                        Sign In
-                      </Button>
-                    </Link>
-                  ))}
+                {!isAuthenticated && (
+                  <Button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      openAuthModal();
+                    }}
+                    className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
+                  >
+                    Sign In
+                  </Button>
+                )}
               </div>
             </div>
           )}
