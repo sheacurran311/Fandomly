@@ -32,6 +32,7 @@ app.use(
           'https://apis.google.com',
           'https://accounts.google.com',
           'https://www.googletagmanager.com',
+          'https://js-cdn.music.apple.com', // Apple MusicKit JS
           'https://replit.com', // For Replit dev banner
         ],
         styleSrc: [

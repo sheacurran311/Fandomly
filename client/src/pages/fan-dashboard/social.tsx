@@ -12,7 +12,6 @@ import {
   Instagram,
   Twitter,
   Facebook,
-  Youtube,
   Eye,
   CheckCircle,
   AlertCircle,
@@ -24,7 +23,7 @@ import {
   Music,
   Edit as EditIcon,
 } from 'lucide-react';
-import { FaSpotify, FaPatreon } from 'react-icons/fa';
+import { FaSpotify, FaPatreon, FaYoutube } from 'react-icons/fa';
 import { SiKick } from 'react-icons/si';
 import { useTwitterConnection } from '@/hooks/use-twitter-connection';
 import {
@@ -189,8 +188,8 @@ export default function FanSocial() {
       description: 'Connect to participate in TikTok campaigns',
     },
     {
-      platform: 'YouTube',
-      icon: Youtube,
+      platform: 'YouTube Channel',
+      icon: FaYoutube,
       handle: youtubeConnected && youtubeChannelName ? youtubeChannelName : 'Your Channel',
       followers: youtubeSubscribers,
       connected: youtubeConnected,

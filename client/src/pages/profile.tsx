@@ -31,7 +31,8 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
-import { Twitter, Youtube } from 'lucide-react';
+import { Twitter } from 'lucide-react';
+import { FaYoutube } from 'react-icons/fa';
 import { FaSpotify, FaDiscord, FaTwitch } from 'react-icons/fa';
 import {
   useTikTokConnection,
@@ -253,15 +254,10 @@ export default function Profile() {
                                     onClick={async () => {
                                       if (isAvailable && editedUsername) {
                                         try {
-                                          const response = await apiRequest(
-                                            'POST',
-                                            '/api/auth/profile',
-                                            {
-                                              userId: user.id,
-                                              username: editedUsername,
-                                            }
-                                          );
-                                          await response.json();
+                                          await apiRequest('POST', '/api/auth/profile', {
+                                            userId: user.id,
+                                            username: editedUsername,
+                                          });
 
                                           toast({
                                             title: 'Success!',
@@ -722,9 +718,9 @@ export default function Profile() {
                       {user?.userType === 'creator' && (
                         <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                           <div className="flex items-center gap-3">
-                            <Youtube className="h-5 w-5 text-red-500" />
+                            <FaYoutube className="h-5 w-5 text-red-500" />
                             <div>
-                              <div className="text-white font-medium">YouTube</div>
+                              <div className="text-white font-medium">YouTube Channel</div>
                               <div className="text-xs text-gray-400">
                                 {youtubeConnected && youtubeChannelName
                                   ? `Connected as ${youtubeChannelName}`

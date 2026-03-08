@@ -173,7 +173,7 @@ export function createParticleConfig() {
     plugins: [
       wallet({
         entryPosition: EntryPosition.BR,
-        visible: true,
+        visible: false,
       }),
     ],
 

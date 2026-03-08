@@ -18,7 +18,7 @@ import {
   creators,
   rewards,
 } from '@shared/schema';
-import { eq, and, desc, or, gte, lt, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, or, gte, lt, sql, inArray, isNotNull } from 'drizzle-orm';
 
 export function registerCreatorActivityRoutes(app: Express) {
   // Creator Activity Feed
@@ -360,12 +360,14 @@ export function registerCreatorActivityRoutes(app: Express) {
             ? and(
                 eq(tasks.programId, programId),
                 or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
+                isNotNull(taskCompletions.completedAt),
                 gte(taskCompletions.completedAt, startDate),
                 lt(taskCompletions.completedAt, endDate)
               )
             : and(
                 eq(tasks.programId, programId),
                 or(eq(taskCompletions.status, 'completed'), eq(taskCompletions.status, 'claimed')),
+                isNotNull(taskCompletions.completedAt),
                 gte(taskCompletions.completedAt, startDate)
               );
 

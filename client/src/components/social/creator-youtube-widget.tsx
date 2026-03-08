@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { socialManager } from '@/lib/social-integrations';
 import { getAuthHeaders } from '@/lib/queryClient';
-import { Youtube, Users, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Users, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { FaYoutube } from 'react-icons/fa';
 
 interface YouTubeUserInfo {
   id?: string;
@@ -134,8 +135,8 @@ export default function CreatorYouTubeWidget() {
       <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
         <CardHeader className="pb-3">
           <CardTitle className="text-white text-sm flex items-center gap-2">
-            <Youtube className="h-4 w-4 text-red-500" />
-            YouTube
+            <FaYoutube className="h-4 w-4 text-red-500" />
+            YouTube Channel
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -171,7 +172,7 @@ export default function CreatorYouTubeWidget() {
             </div>
             <div className="bg-white/5 rounded-lg p-3">
               <div className="flex items-center gap-2">
-                <Youtube className="h-4 w-4 text-pink-400" />
+                <FaYoutube className="h-4 w-4 text-pink-400" />
                 <div>
                   <p className="text-xs text-gray-400">Channel</p>
                   <p className="text-sm font-medium text-white">Active</p>
@@ -219,14 +220,14 @@ export default function CreatorYouTubeWidget() {
     <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
       <CardHeader className="pb-3">
         <CardTitle className="text-white text-sm flex items-center gap-2">
-          <Youtube className="h-4 w-4 text-red-500" />
+          <FaYoutube className="h-4 w-4 text-red-500" />
           YouTube
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="text-center py-4">
           <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-            <Youtube className="h-6 w-6 text-red-400" />
+            <FaYoutube className="h-6 w-6 text-red-400" />
           </div>
           <p className="text-sm text-gray-300 mb-2">Connect your YouTube channel</p>
           <p className="text-xs text-gray-400 mb-2">Engage with your video audience</p>
@@ -244,7 +245,7 @@ export default function CreatorYouTubeWidget() {
             </>
           ) : (
             <>
-              <Youtube className="h-4 w-4 mr-2" />
+              <FaYoutube className="h-4 w-4 mr-2" />
               Connect YouTube
             </>
           )}

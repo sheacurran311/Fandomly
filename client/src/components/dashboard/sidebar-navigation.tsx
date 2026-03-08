@@ -17,7 +17,31 @@ import {
   Plus,
   Target,
   Megaphone,
+  Wallet,
 } from 'lucide-react';
+import { useEmbeddedWallet } from '@particle-network/connectkit';
+
+/**
+ * Wallet button for sidebar — only renders when Particle wallet is available.
+ */
+function SidebarWalletButton({ isCollapsed }: { isCollapsed: boolean }) {
+  const embeddedWallet = useEmbeddedWallet();
+  if (!embeddedWallet?.isCanOpen) return null;
+  return (
+    <button
+      onClick={() => embeddedWallet.openWallet()}
+      className={cn(
+        'w-full flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200',
+        'text-gray-300 hover:text-white hover:bg-brand-primary/20 border border-white/10',
+        isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2.5'
+      )}
+      title="Open Wallet"
+    >
+      <Wallet className={cn('flex-shrink-0 h-5 w-5 text-brand-secondary', !isCollapsed && '')} />
+      {!isCollapsed && <span>Wallet</span>}
+    </button>
+  );
+}
 
 interface SidebarNavigationProps {
   userType: 'creator' | 'fan';
@@ -256,6 +280,9 @@ export default function SidebarNavigation({
             )}
           </div>
         )}
+
+        {/* Wallet Button */}
+        {particleEnabled && <SidebarWalletButton isCollapsed={isCollapsed} />}
 
         {/* Profile Section */}
         <div className="p-3 border border-white/10 rounded-lg bg-white/5">

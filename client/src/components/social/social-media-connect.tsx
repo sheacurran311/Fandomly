@@ -1,22 +1,33 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import {
-  Instagram, Music, Twitter, Youtube, Zap,
-  Check, AlertCircle, ExternalLink, Loader2,
-  Users, Heart, MessageCircle, Share2, Video
-} from "lucide-react";
-import { FaTiktok, FaSpotify, FaDiscord, FaTwitch } from "react-icons/fa";
-import { socialManager, type SocialMediaAccount } from "@/lib/social-integrations";
-import { TwitterSDKManager } from "@/lib/twitter";
-import { useToast } from "@/hooks/use-toast";
-import { invalidateSocialConnections } from "@/hooks/use-social-connections";
-import { fetchApi } from "@/lib/queryClient";
-import { disconnectSocialPlatform } from "@/lib/social-connection-api";
+  Instagram,
+  Music,
+  Twitter,
+  Zap,
+  Check,
+  AlertCircle,
+  ExternalLink,
+  Loader2,
+  Users,
+  Heart,
+  MessageCircle,
+  Share2,
+  Video,
+} from 'lucide-react';
+import { FaTiktok, FaSpotify, FaDiscord, FaTwitch, FaYoutube } from 'react-icons/fa';
+import { socialManager, type SocialMediaAccount } from '@/lib/social-integrations';
+import { TwitterSDKManager } from '@/lib/twitter';
+import { useToast } from '@/hooks/use-toast';
+import { invalidateSocialConnections } from '@/hooks/use-social-connections';
+import { fetchApi } from '@/lib/queryClient';
+import { disconnectSocialPlatform } from '@/lib/social-connection-api';
 
 interface SocialPlatform {
   id: string;
@@ -55,10 +66,10 @@ const platforms: SocialPlatform[] = [
   },
   {
     id: 'youtube',
-    name: 'YouTube',
-    icon: Youtube,
+    name: 'YouTube Channel',
+    icon: FaYoutube,
     color: '#FF0000',
-    description: 'Link YouTube channel for subscriber and video performance data',
+    description: 'Link your YouTube channel (separate from Google sign-in)',
     benefits: ['Subscriber analytics', 'Video metrics', 'Revenue tracking'],
   },
   {
@@ -84,7 +95,7 @@ const platforms: SocialPlatform[] = [
     color: '#9146FF',
     description: 'Link Twitch for streaming analytics and subscriber data',
     benefits: ['Subscriber tracking', 'Stream analytics', 'Follower insights'],
-  }
+  },
 ];
 
 interface ConnectedAccount {
@@ -104,10 +115,10 @@ interface SocialMediaConnectProps {
   requiredPlatforms?: string[];
 }
 
-export default function SocialMediaConnect({ 
-  onAccountsChange, 
+export default function SocialMediaConnect({
+  onAccountsChange,
   showMetrics = true,
-  requiredPlatforms = []
+  requiredPlatforms = [],
 }: SocialMediaConnectProps) {
   const { user } = useAuth();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
@@ -129,7 +140,7 @@ export default function SocialMediaConnect({
           verified: Boolean(a.verified || false),
           profileUrl: a.profileUrl || (a.username ? `https://twitter.com/${a.username}` : '#'),
           lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-          status: a.isActive === false ? 'expired' : 'connected'
+          status: a.isActive === false ? 'expired' : 'connected',
         }));
         setConnectedAccounts(mapped);
         onAccountsChange?.(mapped);
@@ -150,9 +161,9 @@ export default function SocialMediaConnect({
 
       if (error) {
         toast({
-          title: "Connection Failed",
+          title: 'Connection Failed',
           description: `OAuth error: ${error}`,
-          variant: "destructive"
+          variant: 'destructive',
         });
         return;
       }
@@ -180,11 +191,11 @@ export default function SocialMediaConnect({
     setIsLoading(true);
     try {
       const account = await socialManager.connectAccount(platform, code);
-      
+
       if (!account) {
         throw new Error('Failed to connect account - no account data received');
       }
-      
+
       const connectedAccount: ConnectedAccount = {
         platform: account.platform,
         username: account.username,
@@ -193,27 +204,26 @@ export default function SocialMediaConnect({
         verified: account.verified,
         profileUrl: account.profileUrl,
         lastSync: new Date(),
-        status: 'connected'
+        status: 'connected',
       };
 
-      setConnectedAccounts(prev => {
-        const filtered = prev.filter(acc => acc.platform !== platform);
+      setConnectedAccounts((prev) => {
+        const filtered = prev.filter((acc) => acc.platform !== platform);
         const updated = [...filtered, connectedAccount];
         onAccountsChange?.(updated);
         return updated;
       });
 
       toast({
-        title: "Account Connected",
+        title: 'Account Connected',
         description: `Successfully connected your ${platform} account`,
       });
-
     } catch (error) {
       console.error('OAuth success handling error:', error);
       toast({
-        title: "Connection Failed",
+        title: 'Connection Failed',
         description: `Failed to connect ${platform} account`,
-        variant: "destructive"
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -223,7 +233,7 @@ export default function SocialMediaConnect({
 
   const connectPlatform = async (platformId: string) => {
     if (connectingPlatform) return;
-    
+
     setConnectingPlatform(platformId);
     try {
       if (platformId === 'twitter') {
@@ -244,8 +254,8 @@ export default function SocialMediaConnect({
             lastSync: new Date(),
             status: 'connected',
           };
-          setConnectedAccounts(prev => {
-            const filtered = prev.filter(acc => acc.platform !== 'twitter');
+          setConnectedAccounts((prev) => {
+            const filtered = prev.filter((acc) => acc.platform !== 'twitter');
             const updated = [...filtered, connectedAccount];
             onAccountsChange?.(updated);
             return updated;
@@ -272,8 +282,8 @@ export default function SocialMediaConnect({
             console.warn('[SocialMediaConnect] Save failed (popup may have saved):', saveErr);
           }
           toast({
-            title: "X Connected! 🎉",
-            description: "Successfully connected to X (Twitter).",
+            title: 'X Connected! 🎉',
+            description: 'Successfully connected to X (Twitter).',
           });
         } else if (!result.success) {
           throw new Error(result.error || 'Twitter connect failed');
@@ -284,8 +294,8 @@ export default function SocialMediaConnect({
         const result = await tiktokAPI.secureLogin();
         if (result.success) {
           toast({
-            title: "TikTok Connected! 🎉",
-            description: "Successfully connected to TikTok.",
+            title: 'TikTok Connected! 🎉',
+            description: 'Successfully connected to TikTok.',
           });
           // Reload accounts to get the new connection
           const res = await fetch('/api/social/accounts', { credentials: 'include' });
@@ -298,7 +308,7 @@ export default function SocialMediaConnect({
             verified: Boolean(a.verified || false),
             profileUrl: a.profileUrl || '#',
             lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-            status: a.isActive === false ? 'expired' : 'connected'
+            status: a.isActive === false ? 'expired' : 'connected',
           }));
           setConnectedAccounts(mapped);
           onAccountsChange?.(mapped);
@@ -311,8 +321,10 @@ export default function SocialMediaConnect({
         const result = await youtubeAPI.secureLogin();
         if (result.success) {
           toast({
-            title: "YouTube Connected! 🎉",
-            description: result.channelName ? `Successfully connected ${result.channelName}` : "Successfully connected to YouTube.",
+            title: 'YouTube Connected! 🎉',
+            description: result.channelName
+              ? `Successfully connected ${result.channelName}`
+              : 'Successfully connected to YouTube.',
           });
           // Reload accounts to get the new connection
           const res = await fetch('/api/social/accounts', { credentials: 'include' });
@@ -325,7 +337,7 @@ export default function SocialMediaConnect({
             verified: Boolean(a.verified || false),
             profileUrl: a.profileUrl || '#',
             lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-            status: a.isActive === false ? 'expired' : 'connected'
+            status: a.isActive === false ? 'expired' : 'connected',
           }));
           setConnectedAccounts(mapped);
           onAccountsChange?.(mapped);
@@ -338,8 +350,10 @@ export default function SocialMediaConnect({
         const result = await spotifyAPI.secureLogin();
         if (result.success) {
           toast({
-            title: "Spotify Connected! 🎉",
-            description: result.displayName ? `Successfully connected ${result.displayName}` : "Successfully connected to Spotify.",
+            title: 'Spotify Connected! 🎉',
+            description: result.displayName
+              ? `Successfully connected ${result.displayName}`
+              : 'Successfully connected to Spotify.',
           });
           // Reload accounts to get the new connection
           const res = await fetch('/api/social/accounts', { credentials: 'include' });
@@ -352,7 +366,7 @@ export default function SocialMediaConnect({
             verified: Boolean(a.verified || false),
             profileUrl: a.profileUrl || '#',
             lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-            status: a.isActive === false ? 'expired' : 'connected'
+            status: a.isActive === false ? 'expired' : 'connected',
           }));
           setConnectedAccounts(mapped);
           onAccountsChange?.(mapped);
@@ -366,8 +380,10 @@ export default function SocialMediaConnect({
           const result = await discordAPI.secureLogin();
           if (result.success) {
             toast({
-              title: "Discord Connected! 🎉",
-              description: result.displayName ? `Successfully connected ${result.displayName}` : "Successfully connected to Discord.",
+              title: 'Discord Connected! 🎉',
+              description: result.displayName
+                ? `Successfully connected ${result.displayName}`
+                : 'Successfully connected to Discord.',
             });
             // Reload accounts to get the new connection
             const res = await fetch('/api/social/accounts', { credentials: 'include' });
@@ -380,7 +396,7 @@ export default function SocialMediaConnect({
               verified: Boolean(a.verified || false),
               profileUrl: a.profileUrl || '#',
               lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-              status: a.isActive === false ? 'expired' : 'connected'
+              status: a.isActive === false ? 'expired' : 'connected',
             }));
             setConnectedAccounts(mapped);
             onAccountsChange?.(mapped);
@@ -397,8 +413,10 @@ export default function SocialMediaConnect({
           const result = await twitchAPI.secureLogin();
           if (result.success) {
             toast({
-              title: "Twitch Connected! 🎉",
-              description: result.displayName ? `Successfully connected ${result.displayName}` : "Successfully connected to Twitch.",
+              title: 'Twitch Connected! 🎉',
+              description: result.displayName
+                ? `Successfully connected ${result.displayName}`
+                : 'Successfully connected to Twitch.',
             });
             // Reload accounts to get the new connection
             const res = await fetch('/api/social/accounts', { credentials: 'include' });
@@ -411,7 +429,7 @@ export default function SocialMediaConnect({
               verified: Boolean(a.verified || false),
               profileUrl: a.profileUrl || '#',
               lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-              status: a.isActive === false ? 'expired' : 'connected'
+              status: a.isActive === false ? 'expired' : 'connected',
             }));
             setConnectedAccounts(mapped);
             onAccountsChange?.(mapped);
@@ -431,9 +449,12 @@ export default function SocialMediaConnect({
     } catch (error) {
       console.error('Connect platform error:', error);
       toast({
-        title: "Connection Error",
-        description: error instanceof Error ? error.message : `Failed to initiate ${platformId} connection. Please check your API keys.`,
-        variant: "destructive"
+        title: 'Connection Error',
+        description:
+          error instanceof Error
+            ? error.message
+            : `Failed to initiate ${platformId} connection. Please check your API keys.`,
+        variant: 'destructive',
       });
     } finally {
       setConnectingPlatform(null);
@@ -447,8 +468,8 @@ export default function SocialMediaConnect({
         throw new Error(result.error);
       }
 
-      setConnectedAccounts(prev => {
-        const updated = prev.filter(acc => acc.platform !== platformId);
+      setConnectedAccounts((prev) => {
+        const updated = prev.filter((acc) => acc.platform !== platformId);
         onAccountsChange?.(updated);
         return updated;
       });
@@ -457,14 +478,14 @@ export default function SocialMediaConnect({
       invalidateSocialConnections();
 
       toast({
-        title: "Account Disconnected",
+        title: 'Account Disconnected',
         description: `${platformId} account has been disconnected`,
       });
     } catch (error) {
       toast({
-        title: "Disconnection Failed",
+        title: 'Disconnection Failed',
         description: `Failed to disconnect ${platformId} account`,
-        variant: "destructive"
+        variant: 'destructive',
       });
     }
   };
@@ -476,11 +497,11 @@ export default function SocialMediaConnect({
   };
 
   const isAccountConnected = (platformId: string) => {
-    return connectedAccounts.some(acc => acc.platform === platformId);
+    return connectedAccounts.some((acc) => acc.platform === platformId);
   };
 
   const getConnectedAccount = (platformId: string) => {
-    return connectedAccounts.find(acc => acc.platform === platformId);
+    return connectedAccounts.find((acc) => acc.platform === platformId);
   };
 
   return (
@@ -498,7 +519,9 @@ export default function SocialMediaConnect({
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-300">Connected Accounts</span>
-                <span className="text-white">{connectedAccounts.length} of {requiredPlatforms.length}</span>
+                <span className="text-white">
+                  {connectedAccounts.length} of {requiredPlatforms.length}
+                </span>
               </div>
               <Progress value={getConnectionProgress()} className="h-2" />
               {getConnectionProgress() === 100 && (
@@ -517,7 +540,9 @@ export default function SocialMediaConnect({
       {/* Platform Connection Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {platforms
-          .filter(platform => requiredPlatforms.length === 0 || requiredPlatforms.includes(platform.id))
+          .filter(
+            (platform) => requiredPlatforms.length === 0 || requiredPlatforms.includes(platform.id)
+          )
           .map((platform) => {
             const Icon = platform.icon;
             const isConnected = isAccountConnected(platform.id);
@@ -525,7 +550,7 @@ export default function SocialMediaConnect({
             const isConnecting = connectingPlatform === platform.id;
 
             return (
-              <Card 
+              <Card
                 key={platform.id}
                 className={`bg-white/10 border-white/20 transition-all duration-300 ${
                   isConnected ? 'border-green-500/30 bg-green-500/5' : 'hover:bg-white/15'
@@ -534,14 +559,11 @@ export default function SocialMediaConnect({
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         className="w-10 h-10 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: `${platform.color}20` }}
                       >
-                        <Icon 
-                          className="h-5 w-5" 
-                          style={{ color: platform.color }}
-                        />
+                        <Icon className="h-5 w-5" style={{ color: platform.color }} />
                       </div>
                       <div>
                         <CardTitle className="text-white text-lg">{platform.name}</CardTitle>
@@ -650,8 +672,8 @@ export default function SocialMediaConnect({
         <Alert className="border-yellow-500/20 bg-yellow-500/10">
           <AlertCircle className="h-4 w-4 text-yellow-400" />
           <AlertDescription className="text-yellow-300">
-            <strong>Developer Setup Required:</strong> To connect social media accounts, you need to set up API keys for each platform. 
-            Please add the following environment variables:
+            <strong>Developer Setup Required:</strong> To connect social media accounts, you need to
+            set up API keys for each platform. Please add the following environment variables:
             <ul className="mt-2 ml-4 space-y-1 text-sm">
               <li>• VITE_INSTAGRAM_CLIENT_ID</li>
               <li>• VITE_TIKTOK_CLIENT_KEY</li>

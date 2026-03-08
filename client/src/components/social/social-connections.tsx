@@ -10,9 +10,9 @@ import {
   Check,
   MessageSquare,
   Radio,
-  Youtube,
   Music,
 } from 'lucide-react';
+import { FaYoutube } from 'react-icons/fa';
 import { useToast } from '@/hooks/use-toast';
 import { FacebookSDKManager } from '@/lib/facebook';
 import { useTwitterConnection } from '@/hooks/use-twitter-connection';
@@ -413,8 +413,8 @@ export default function SocialConnections({ userType = 'fan' }: SocialConnection
           'button-connect-tiktok-social'
         )}
         {renderButton(
-          'YouTube',
-          <Youtube className="h-4 w-4 mr-2" />,
+          'YouTube Channel',
+          <FaYoutube className="h-4 w-4 mr-2 text-red-500" />,
           youtubeConnected,
           youtubeConnecting,
           handleYoutubeConnect,

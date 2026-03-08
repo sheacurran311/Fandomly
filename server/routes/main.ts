@@ -1475,6 +1475,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update profile (username, displayName, privacy settings)
+  app.post(
+    '/api/auth/profile',
+    authRateLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.body.userId || req.user?.id;
+        if (!userId) {
+          return res.status(400).json({ error: 'User ID is required' });
+        }
+
+        // Only allow users to update their own profile (or admins)
+        if (req.user?.id !== userId && req.user?.role !== 'fandomly_admin') {
+          return res.status(403).json({ error: 'Unauthorized to modify this profile' });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        const { username, displayName, email, privacySettings } = req.body;
+        const updates: Record<string, unknown> = {};
+
+        // Validate and update username if provided
+        if (username && username !== user.username) {
+          if (username.length < 3 || username.length > 30) {
+            return res.status(400).json({ error: 'Username must be between 3 and 30 characters' });
+          }
+          if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+            return res.status(400).json({
+              error: 'Username can only contain letters, numbers, underscores, dots, and hyphens',
+            });
+          }
+          const existingByUsername = await storage.getUserByUsername(username);
+          if (existingByUsername && existingByUsername.id !== userId) {
+            return res.status(400).json({ error: 'Username is already taken' });
+          }
+          updates.username = username;
+        }
+
+        // Update display name if provided
+        if (displayName !== undefined) {
+          updates.profileData = {
+            ...((user.profileData as Record<string, unknown>) || {}),
+            name: displayName,
+          };
+        }
+
+        // Update email if provided
+        if (email !== undefined && email !== user.email) {
+          updates.email = email;
+        }
+
+        // Update privacy settings if provided
+        if (privacySettings !== undefined) {
+          const currentProfileData = (user.profileData as Record<string, unknown>) || {};
+          updates.profileData = {
+            ...(updates.profileData || currentProfileData),
+            privacySettings,
+          };
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return res.json({ success: true, message: 'No changes to save', user });
+        }
+
+        const updatedUser = await storage.updateUser(userId, updates);
+        res.json({ success: true, user: updatedUser });
+      } catch (error) {
+        console.error('Failed to update profile:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+      }
+    }
+  );
+
+  // PATCH version of profile update (used by settings pages)
+  app.patch(
+    '/api/auth/profile',
+    authRateLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        const { displayName, email, privacySettings } = req.body;
+        const updates: Record<string, unknown> = {};
+
+        if (displayName !== undefined) {
+          updates.profileData = {
+            ...((user.profileData as Record<string, unknown>) || {}),
+            name: displayName,
+          };
+        }
+
+        if (email !== undefined && email !== user.email) {
+          updates.email = email;
+        }
+
+        if (privacySettings !== undefined) {
+          const currentProfileData = (user.profileData as Record<string, unknown>) || {};
+          updates.profileData = {
+            ...(updates.profileData || currentProfileData),
+            privacySettings,
+          };
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return res.json({ success: true, message: 'No changes to save', user });
+        }
+
+        const updatedUser = await storage.updateUser(userId, updates);
+        res.json({ success: true, user: updatedUser });
+      } catch (error) {
+        console.error('Failed to update profile:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+      }
+    }
+  );
+
   // Switch user type endpoint
   app.patch(
     '/api/auth/user/:userId/switch-type',

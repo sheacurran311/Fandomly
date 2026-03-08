@@ -16,7 +16,6 @@ import {
   Instagram,
   Twitter,
   Facebook,
-  Youtube,
   Link as LinkIcon,
   Plus,
   Settings,
@@ -29,7 +28,7 @@ import {
   Video,
   Music,
 } from 'lucide-react';
-import { FaSpotify, FaDiscord, FaTwitch, FaPatreon } from 'react-icons/fa';
+import { FaSpotify, FaDiscord, FaTwitch, FaPatreon, FaYoutube } from 'react-icons/fa';
 import { SiKick } from 'react-icons/si';
 import { useTwitterConnection } from '@/hooks/use-twitter-connection';
 import {
@@ -417,8 +416,8 @@ export default function CreatorSocial() {
       bgColor: 'bg-purple-400/20',
     },
     {
-      platform: 'YouTube',
-      icon: Youtube,
+      platform: 'YouTube Channel',
+      icon: FaYoutube,
       handle: youtubeConnected && youtubeChannelName ? youtubeChannelName : 'Your Channel',
       followers: youtubeConnected
         ? `${formatFollowers(youtubeSubscribers)} Subscribers`

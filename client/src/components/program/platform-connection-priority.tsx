@@ -21,10 +21,9 @@ import {
   Twitter,
   Instagram,
   Facebook,
-  Youtube,
   Music,
 } from 'lucide-react';
-import { FaDiscord, FaTwitch, FaSpotify, FaTiktok } from 'react-icons/fa';
+import { FaDiscord, FaTwitch, FaSpotify, FaTiktok, FaYoutube } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
 import { getCreatorTemplate, type CreatorType } from './creator-program-templates';
 
@@ -93,8 +92,8 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
   },
   youtube: {
     id: 'youtube',
-    name: 'YouTube',
-    icon: <Youtube className="h-5 w-5" />,
+    name: 'YouTube Channel',
+    icon: <FaYoutube className="h-5 w-5" />,
     iconBgClass: 'bg-red-500/20',
     iconColorClass: 'text-red-500',
     buttonBorderClass: 'border-red-500/30',
