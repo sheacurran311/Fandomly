@@ -1,11 +1,20 @@
 /**
  * Spotify Verification Service
- * 
- * T1 (API) Verification for Spotify tasks:
- * - Artist follows: GET /v1/me/following/contains?type=artist&ids={artistId}
- * - Playlist follows: GET /v1/playlists/{id}/followers/contains?ids={userId}
- * - Saved tracks: GET /v1/me/tracks/contains?ids={trackId}
- * - Saved albums: GET /v1/me/albums/contains?ids={albumId}
+ *
+ * T1 (API) Verification for Spotify tasks using the unified library/contains endpoint.
+ *
+ * As of Spotify's February 2026 API changes, all per-type /contains endpoints are removed:
+ *   - GET /me/following/contains          → REMOVED
+ *   - GET /playlists/{id}/followers/contains → REMOVED
+ *   - GET /me/tracks/contains             → REMOVED
+ *   - GET /me/albums/contains             → REMOVED
+ *
+ * Replaced by a single unified endpoint:
+ *   GET /me/library/contains?uris=spotify:artist:xxx,spotify:track:yyy
+ *
+ * Supports: tracks, albums, episodes, shows, audiobooks, artists, users, playlists
+ * Scopes required: user-library-read, user-follow-read, playlist-read-private
+ * Max 40 URIs per request.
  */
 
 import { db } from '@db';
@@ -20,7 +29,7 @@ export interface SpotifyVerificationResult {
   requiresManualReview: boolean;
   confidence: 'high' | 'medium' | 'low';
   reason?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SpotifyVerificationParams {
@@ -45,7 +54,7 @@ class SpotifyVerificationService {
     try {
       // Get fan's Spotify connection
       const fanConnection = await this.getFanSpotifyConnection(fanUserId);
-      
+
       if (!fanConnection || !fanConnection.accessToken) {
         return {
           verified: false,
@@ -64,31 +73,48 @@ class SpotifyVerificationService {
             verified: false,
             requiresManualReview: false,
             confidence: 'low',
-            reason: 'Failed to refresh Spotify access token. Please reconnect your Spotify account.',
+            reason:
+              'Failed to refresh Spotify access token. Please reconnect your Spotify account.',
             metadata: { tokenRefreshFailed: true },
           };
         }
       }
 
-      // Route to specific verification method
+      // Route to specific verification — all use the unified /me/library/contains endpoint
       switch (taskType) {
         case 'spotify_follow':
-          return await this.verifyArtistFollow(fanConnection.accessToken, taskSettings.artistId);
-          
-        case 'spotify_playlist':
-          return await this.verifyPlaylistFollow(
-            fanConnection.accessToken, 
-            fanConnection.platformUserId,
-            taskSettings.playlistId
+          return await this.verifyLibraryContains(
+            fanConnection.accessToken,
+            'artist',
+            taskSettings.artistId,
+            'Artist follow'
           );
-          
+
+        case 'spotify_playlist':
+          return await this.verifyLibraryContains(
+            fanConnection.accessToken,
+            'playlist',
+            taskSettings.playlistId,
+            'Playlist save'
+          );
+
         case 'spotify_save_track':
-          return await this.verifySavedTrack(fanConnection.accessToken, taskSettings.trackId);
-          
+          return await this.verifyLibraryContains(
+            fanConnection.accessToken,
+            'track',
+            taskSettings.trackId,
+            'Track save'
+          );
+
         case 'spotify_album':
         case 'spotify_save_album':
-          return await this.verifySavedAlbum(fanConnection.accessToken, taskSettings.albumId);
-          
+          return await this.verifyLibraryContains(
+            fanConnection.accessToken,
+            'album',
+            taskSettings.albumId,
+            'Album save'
+          );
+
         default:
           return {
             verified: false,
@@ -97,230 +123,75 @@ class SpotifyVerificationService {
             reason: `Unknown Spotify task type: ${taskType}`,
           };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Spotify verification failed';
       console.error('[SpotifyVerification] Error:', error);
       return {
         verified: false,
         requiresManualReview: false,
         confidence: 'low',
-        reason: error.message || 'Spotify verification failed',
-        metadata: { error: error.message },
+        reason: message,
+        metadata: { error: message },
       };
     }
   }
 
   /**
-   * Verify artist follow
-   * API: GET /v1/me/following/contains?type=artist&ids={artistId}
+   * Unified verification via GET /me/library/contains
+   *
+   * This single endpoint replaces the four legacy per-type /contains endpoints.
+   * It accepts Spotify URIs (spotify:artist:xxx, spotify:track:yyy, etc.)
+   * and returns an array of booleans.
    */
-  async verifyArtistFollow(accessToken: string, artistId?: string): Promise<SpotifyVerificationResult> {
-    if (!artistId) {
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'No artist ID provided',
-      };
-    }
-
-    const response = await fetch(
-      `${SPOTIFY_API_BASE}/me/following/contains?type=artist&ids=${artistId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[SpotifyVerification] Artist follow check failed:', error);
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'Failed to check artist follow status',
-        metadata: { apiError: error },
-      };
-    }
-
-    const [isFollowing] = await response.json();
-    
-    return {
-      verified: isFollowing === true,
-      requiresManualReview: false,
-      confidence: 'high',
-      reason: isFollowing ? 'Artist follow verified via API' : 'Not following the artist',
-      metadata: {
-        verificationTier: 'T1',
-        verificationMethod: 'api',
-        artistId,
-        isFollowing,
-      },
-    };
-  }
-
-  /**
-   * Verify playlist follow
-   * API: GET /v1/playlists/{id}/followers/contains?ids={userId}
-   */
-  async verifyPlaylistFollow(
-    accessToken: string, 
-    fanSpotifyUserId: string | null,
-    playlistId?: string
+  private async verifyLibraryContains(
+    accessToken: string,
+    itemType: 'artist' | 'track' | 'album' | 'playlist',
+    itemId: string | undefined,
+    label: string
   ): Promise<SpotifyVerificationResult> {
-    if (!playlistId) {
+    if (!itemId) {
       return {
         verified: false,
         requiresManualReview: false,
         confidence: 'low',
-        reason: 'No playlist ID provided',
+        reason: `No ${itemType} ID provided`,
       };
     }
 
-    if (!fanSpotifyUserId) {
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'Fan Spotify user ID not available',
-      };
-    }
-
+    const uri = `spotify:${itemType}:${itemId}`;
     const response = await fetch(
-      `${SPOTIFY_API_BASE}/playlists/${playlistId}/followers/contains?ids=${fanSpotifyUserId}`,
+      `${SPOTIFY_API_BASE}/me/library/contains?uris=${encodeURIComponent(uri)}`,
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       }
     );
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[SpotifyVerification] Playlist follow check failed:', error);
+      console.error(`[SpotifyVerification] ${label} check failed:`, error);
       return {
         verified: false,
         requiresManualReview: false,
         confidence: 'low',
-        reason: 'Failed to check playlist follow status',
-        metadata: { apiError: error },
-      };
-    }
-
-    const [isFollowing] = await response.json();
-    
-    return {
-      verified: isFollowing === true,
-      requiresManualReview: false,
-      confidence: 'high',
-      reason: isFollowing ? 'Playlist follow verified via API' : 'Not following the playlist',
-      metadata: {
-        verificationTier: 'T1',
-        verificationMethod: 'api',
-        playlistId,
-        isFollowing,
-      },
-    };
-  }
-
-  /**
-   * Verify saved track
-   * API: GET /v1/me/tracks/contains?ids={trackId}
-   */
-  async verifySavedTrack(accessToken: string, trackId?: string): Promise<SpotifyVerificationResult> {
-    if (!trackId) {
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'No track ID provided',
-      };
-    }
-
-    const response = await fetch(
-      `${SPOTIFY_API_BASE}/me/tracks/contains?ids=${trackId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[SpotifyVerification] Saved track check failed:', error);
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'Failed to check saved track status',
+        reason: `Failed to check ${label.toLowerCase()} status`,
         metadata: { apiError: error },
       };
     }
 
     const [isSaved] = await response.json();
-    
+
     return {
       verified: isSaved === true,
       requiresManualReview: false,
       confidence: 'high',
-      reason: isSaved ? 'Track save verified via API' : 'Track not saved',
+      reason: isSaved ? `${label} verified via API` : `${label} not confirmed`,
       metadata: {
         verificationTier: 'T1',
         verificationMethod: 'api',
-        trackId,
-        isSaved,
-      },
-    };
-  }
-
-  /**
-   * Verify saved album
-   * API: GET /v1/me/albums/contains?ids={albumId}
-   */
-  async verifySavedAlbum(accessToken: string, albumId?: string): Promise<SpotifyVerificationResult> {
-    if (!albumId) {
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'No album ID provided',
-      };
-    }
-
-    const response = await fetch(
-      `${SPOTIFY_API_BASE}/me/albums/contains?ids=${albumId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[SpotifyVerification] Saved album check failed:', error);
-      return {
-        verified: false,
-        requiresManualReview: false,
-        confidence: 'low',
-        reason: 'Failed to check saved album status',
-        metadata: { apiError: error },
-      };
-    }
-
-    const [isSaved] = await response.json();
-    
-    return {
-      verified: isSaved === true,
-      requiresManualReview: false,
-      confidence: 'high',
-      reason: isSaved ? 'Album save verified via API' : 'Album not saved',
-      metadata: {
-        verificationTier: 'T1',
-        verificationMethod: 'api',
-        albumId,
+        [`${itemType}Id`]: itemId,
+        uri,
         isSaved,
       },
     };
@@ -334,7 +205,7 @@ class SpotifyVerificationService {
       where: and(
         eq(socialConnections.userId, userId),
         eq(socialConnections.platform, 'spotify'),
-        eq(socialConnections.isActive, true),
+        eq(socialConnections.isActive, true)
       ),
     });
   }
@@ -351,6 +222,7 @@ class SpotifyVerificationService {
   /**
    * Refresh access token
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async refreshAccessToken(connection: any): Promise<boolean> {
     if (!connection.refreshToken) {
       return false;
@@ -359,7 +231,7 @@ class SpotifyVerificationService {
     try {
       const clientId = process.env.SPOTIFY_CLIENT_ID;
       const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-      
+
       if (!clientId || !clientSecret) {
         console.error('[SpotifyVerification] Missing Spotify credentials');
         return false;
@@ -369,7 +241,7 @@ class SpotifyVerificationService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
@@ -383,7 +255,7 @@ class SpotifyVerificationService {
       }
 
       const data = await response.json();
-      
+
       // Update connection with new tokens
       await db
         .update(socialConnections)

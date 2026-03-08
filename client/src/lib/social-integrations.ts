@@ -612,7 +612,7 @@ export class SpotifyAPI {
       response_type: 'code',
       client_id: this.clientId,
       scope:
-        'user-follow-modify user-follow-read user-library-modify user-library-read user-read-private user-read-email',
+        'user-follow-read user-library-read playlist-read-private user-read-private user-read-email',
       redirect_uri: this.redirectUri,
       state: csrfState,
       show_dialog: 'true',
