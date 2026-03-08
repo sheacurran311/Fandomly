@@ -29,6 +29,17 @@ function ParticleAuthListenerInner() {
   // Guards: ref prevents re-runs within same mount, sessionStorage prevents
   // duplicate attempts across React remounts (StrictMode, Suspense boundaries).
   useEffect(() => {
+    // Detailed logging to diagnose wallet creation issues
+    console.log('[Particle] Auth listener check:', {
+      isAuthenticated,
+      hasAccessToken: !!accessToken,
+      hasUser: !!user,
+      userId: user?.id,
+      isConnected,
+      walletCreationAttempted: walletCreationAttempted.current,
+      connectorCount: connectors.length,
+    });
+
     if (
       !isAuthenticated ||
       !accessToken ||
@@ -43,6 +54,7 @@ function ParticleAuthListenerInner() {
     const lockKey = `particle_wallet_${user.id || 'pending'}`;
     try {
       if (sessionStorage.getItem(lockKey) === 'created') {
+        console.log('[Particle] Skipping wallet creation — sessionStorage lock exists');
         return;
       }
     } catch {
@@ -54,10 +66,18 @@ function ParticleAuthListenerInner() {
     );
 
     if (!particleAuthConnector) {
+      console.warn(
+        '[Particle] No particleAuth connector found among:',
+        connectors.map((c: any) => c.walletConnectorType || c.id)
+      );
       return;
     }
 
     walletCreationAttempted.current = true;
+    console.log(
+      '[Particle] Attempting JWT wallet creation with token (first 20 chars):',
+      accessToken.slice(0, 20) + '...'
+    );
 
     const attemptConnect = async (retriesLeft = 1): Promise<void> => {
       try {
@@ -68,7 +88,7 @@ function ParticleAuthListenerInner() {
             thirdpartyCode: accessToken,
           },
         });
-        console.log('[Particle] Embedded wallet created:', result.accounts?.[0]);
+        console.log('[Particle] Embedded wallet created successfully:', result.accounts?.[0]);
         try {
           sessionStorage.setItem(lockKey, 'created');
         } catch {
@@ -80,11 +100,13 @@ function ParticleAuthListenerInner() {
           retriesLeft > 0 &&
           (err?.message?.includes('not initialized') || err?.message?.includes('not ready'))
         ) {
+          console.log('[Particle] SDK not ready, retrying in 500ms...');
           await new Promise((resolve) => setTimeout(resolve, 500));
           return attemptConnect(retriesLeft - 1);
         }
         // Non-blocking -- wallet creation failure doesn't affect the Fandomly session.
         console.warn('[Particle] Wallet creation failed (non-blocking):', err?.message || err);
+        console.warn('[Particle] Full error:', err);
       }
     };
 

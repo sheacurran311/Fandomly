@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,13 +16,7 @@ import { isParticleAuthEnabled } from '@/contexts/particle-provider';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
 import { transformImageUrl } from '@/lib/image-utils';
 import { BrandSwitcher } from '@/components/brand-switcher';
-import { useEmbeddedWallet } from '@particle-network/connectkit';
-
-const ParticleConnectButton = lazy(() =>
-  import('@particle-network/connectkit').then((mod) => ({
-    default: mod.ConnectButton,
-  }))
-);
+import { useEmbeddedWallet, useAccount } from '@particle-network/connectkit';
 
 /**
  * Wallet dropdown menu item — only renders inside ConnectKitProvider
@@ -45,6 +39,36 @@ function WalletDropdownItem() {
       <Wallet className="mr-2 h-4 w-4" />
       Wallet
     </DropdownMenuItem>
+  );
+}
+
+/**
+ * Nav bar wallet button — only renders when the Particle embedded wallet is
+ * connected and openable.  Never shows Particle's auth/connect modal.
+ */
+function NavWalletButton() {
+  const { isConnected, address } = useAccount();
+  const embeddedWallet = useEmbeddedWallet();
+
+  if (!isConnected || !embeddedWallet?.isCanOpen) return null;
+
+  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Wallet';
+
+  return (
+    <button
+      onClick={() => {
+        try {
+          embeddedWallet.openWallet();
+        } catch (err) {
+          console.warn('[Navigation] Wallet open failed:', err);
+        }
+      }}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
+      title={address || 'Open Wallet'}
+    >
+      <Wallet className="h-3.5 w-3.5 text-brand-secondary" />
+      <span>{shortAddr}</span>
+    </button>
   );
 }
 
@@ -119,14 +143,8 @@ export default function Navigation() {
                 <div className="flex items-center space-x-3">
                   {user.profileData?.brandType === 'agency' && <BrandSwitcher />}
 
-                  {/* Particle Wallet Widget — shows chain, address, balance for authenticated users */}
-                  {particleEnabled && (
-                    <div className="[&>div]:rounded-xl [&>div]:text-xs [&>div]:h-9 [&>div]:min-w-0">
-                      <Suspense fallback={null}>
-                        <ParticleConnectButton label="Wallet" />
-                      </Suspense>
-                    </div>
-                  )}
+                  {/* Wallet button — only shows when Particle wallet is connected and ready */}
+                  {particleEnabled && <NavWalletButton />}
 
                   {/* Dashboard button */}
                   {!isLoading && user ? (
