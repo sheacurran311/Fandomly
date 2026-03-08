@@ -116,22 +116,32 @@ export default defineConfig({
   optimizeDeps: {
     include: ['buffer', 'process', 'stream-browserify', 'readable-stream', 'crypto-browserify'],
     esbuildOptions: {
+      // Inject Buffer/process globals into every pre-bundled dependency.
+      // This ensures Particle SDK's crypto chain has Buffer available
+      // before any module-level code runs.
+      define: {
+        global: 'globalThis',
+      },
       plugins: [
         {
-          name: 'patch-particle-evm-provider',
+          name: 'inject-buffer-global',
           setup(build: any) {
-            // Patch Particle's EVM connector source during dep optimization so
-            // provider.on() calls use optional chaining. This prevents the
-            // "provider.on is not a function" crash in environments with a
-            // partial window.ethereum (Replit preview, some browser extensions).
-            build.onLoad({ filter: /evm-connectors/ }, async (args: any) => {
+            // Inject Buffer global at the start of every pre-bundled module
+            build.onLoad({ filter: /node_modules/ }, async (args: any) => {
               const { readFileSync } = await import('node:fs');
-              const src = readFileSync(args.path, 'utf8');
-              const patched = src
-                .replace(/\bprovider\.on\(/g, 'provider?.on?.(')
-                .replace(/\bprovider\.removeListener\(/g, 'provider?.removeListener?.(')
-                .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
-              return { contents: patched, loader: 'js' };
+              let src = readFileSync(args.path, 'utf8');
+              // Only inject into files that reference Buffer
+              if (src.includes('Buffer') && !src.includes('import { Buffer }') && !src.includes("require('buffer')")) {
+                src = `import { Buffer as __Buffer } from 'buffer'; if(typeof globalThis.Buffer==='undefined'){globalThis.Buffer=__Buffer;}\n${src}`;
+              }
+              // Patch Particle EVM connector provider.on() calls
+              if (args.path.includes('evm-connector')) {
+                src = src
+                  .replace(/\bprovider\.on\(/g, 'provider?.on?.(')
+                  .replace(/\bprovider\.removeListener\(/g, 'provider?.removeListener?.(')
+                  .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
+              }
+              return { contents: src, loader: args.path.endsWith('.ts') ? 'ts' : 'js' };
             });
           },
         },
