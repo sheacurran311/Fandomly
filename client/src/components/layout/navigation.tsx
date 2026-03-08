@@ -10,12 +10,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Menu, X, User, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, ChevronDown, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
 import { transformImageUrl } from '@/lib/image-utils';
 import { BrandSwitcher } from '@/components/brand-switcher';
+import { useEmbeddedWallet } from '@particle-network/connectkit';
 
 // Lazy-load Particle ConnectButton to avoid bundle impact when not configured
 const ParticleConnectButton = lazy(() =>
@@ -23,6 +24,24 @@ const ParticleConnectButton = lazy(() =>
     default: mod.ConnectButton,
   }))
 );
+
+/**
+ * Wallet dropdown menu item — only renders inside ConnectKitProvider
+ * when Particle is enabled and the embedded wallet is available.
+ */
+function WalletDropdownItem() {
+  const embeddedWallet = useEmbeddedWallet();
+  if (!embeddedWallet?.isCanOpen) return null;
+  return (
+    <DropdownMenuItem
+      onClick={() => embeddedWallet.openWallet()}
+      className="text-gray-300 hover:text-white hover:bg-brand-primary/60"
+    >
+      <Wallet className="mr-2 h-4 w-4" />
+      Wallet
+    </DropdownMenuItem>
+  );
+}
 
 export default function Navigation() {
   const [location] = useLocation();
@@ -175,6 +194,7 @@ export default function Navigation() {
                               Settings
                             </DropdownMenuItem>
                           </Link>
+                          {particleEnabled && <WalletDropdownItem />}
                         </>
                       )}
                       <DropdownMenuSeparator className="bg-brand-primary/20" />

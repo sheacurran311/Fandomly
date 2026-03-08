@@ -405,12 +405,15 @@ export class YouTubeAPI {
   private redirectUri: string;
 
   constructor() {
-    this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    // Use the dedicated YouTube client ID, NOT the basic Google auth client ID.
+    // GOOGLE_YOUTUBE_CLIENT_ID has YouTube-specific scopes and must match the
+    // server-side GOOGLE_YOUTUBE_CLIENT_ID used for token exchange.
+    this.clientId = import.meta.env.VITE_GOOGLE_YOUTUBE_CLIENT_ID || '';
     const origin = window.location.origin;
     this.redirectUri = import.meta.env.VITE_YOUTUBE_REDIRECT_URI || `${origin}/youtube-callback`;
 
     if (!this.clientId) {
-      console.warn('YouTube: VITE_GOOGLE_CLIENT_ID not configured');
+      console.warn('YouTube: VITE_GOOGLE_YOUTUBE_CLIENT_ID not configured');
     }
   }
 
