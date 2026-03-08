@@ -169,14 +169,13 @@ export function createParticleConfig() {
       }),
     ],
 
-    // Wallet plugin: visible:true ensures the wallet iframe/DOM is created
-    // (required for openWallet() to work). The floating entry button is hidden
-    // via CSS (.particle-pwe-btn { display: none }) in index.css.
-    // openWallet() calls are wrapped in try-catch in case the WASM module fails to load.
+    // Wallet plugin: visible:false prevents the floating entry button and avoids
+    // WASM __wbindgen_malloc crashes (see commit 7aad842).
+    // openWallet() calls are wrapped in try-catch by UI components.
     plugins: [
       wallet({
         entryPosition: EntryPosition.BR,
-        visible: true,
+        visible: false,
       }),
     ],
 
