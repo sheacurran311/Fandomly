@@ -100,51 +100,6 @@
     </script>
     
     <div id="root"></div>
-    <!-- Buffer polyfill MUST load before any module code. Particle SDK's
-         crypto chain (ripemd160 → hash-base → readable-stream) calls
-         Buffer.slice() at import time. Vite hoists ES imports above runtime
-         code in main.tsx, so setting globalThis.Buffer there is too late.
-         This classic script runs synchronously before module evaluation. -->
-    <script>
-      (function() {
-        if (typeof globalThis.Buffer === 'undefined') {
-          try {
-            var bufferModule = require('buffer');
-            globalThis.Buffer = bufferModule.Buffer;
-          } catch(e) {
-            // In Vite dev, require isn't available — the nodePolyfills plugin
-            // injects Buffer via import, but we need a fallback shim for the
-            // brief window before Vite's polyfill runs.
-            // Define a minimal Buffer.from/slice/alloc that covers hash-base usage.
-            var B = function(arg, enc) {
-              if (typeof arg === 'number') return new Uint8Array(arg);
-              if (typeof arg === 'string') {
-                var e = new TextEncoder();
-                return e.encode(arg);
-              }
-              if (arg instanceof Uint8Array) return arg;
-              return new Uint8Array(arg || 0);
-            };
-            B.from = function(a, e) { return new B(a, e); };
-            B.alloc = function(n) { return new Uint8Array(n); };
-            B.allocUnsafe = B.alloc;
-            B.isBuffer = function(b) { return b instanceof Uint8Array; };
-            B.concat = function(list, len) {
-              var total = len || list.reduce(function(s, b) { return s + b.length; }, 0);
-              var result = new Uint8Array(total);
-              var offset = 0;
-              for (var i = 0; i < list.length; i++) {
-                result.set(list[i], offset);
-                offset += list[i].length;
-              }
-              return result;
-            };
-            B.prototype = Object.create(Uint8Array.prototype);
-            globalThis.Buffer = B;
-          }
-        }
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>

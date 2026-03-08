@@ -1,11 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Ensure Buffer is globally available before any crypto modules load.
-// Particle SDK's ripemd160/readable-stream chain requires Buffer.slice()
-// which may not be available if the polyfill loads after the module.
-import { Buffer } from 'buffer';
-if (typeof globalThis.Buffer === 'undefined') {
-  globalThis.Buffer = Buffer;
-}
+// Polyfills must be imported first — sets globalThis.Buffer and process
+// before any Particle SDK crypto modules (ripemd160, hash-base) execute.
+import './polyfills';
 
 import { createRoot } from 'react-dom/client';
 import App from './App';
