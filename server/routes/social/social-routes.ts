@@ -1409,8 +1409,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // YouTube user/channel info
-  app.get('/api/social/youtube/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // YouTube user/channel info (no auth required — runs in popup window that doesn't share session)
+  app.get('/api/social/youtube/me', async (req: Request, res: Response) => {
     try {
       // Prefer X-Social-Token header (avoids JWT middleware noise), fall back to Authorization
       const socialTokenHeader = req.headers['x-social-token'] as string | undefined;

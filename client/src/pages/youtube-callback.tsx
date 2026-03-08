@@ -6,9 +6,9 @@
  * Saves the connection to the database
  */
 
-import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
-import { useToast } from "@/hooks/use-toast";
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
+import { useToast } from '@/hooks/use-toast';
 
 // Global flag to prevent duplicate execution across multiple renders/remounts
 let youtubeCallbackProcessed = false;
@@ -29,12 +29,16 @@ export default function YouTubeCallback() {
     const run = async () => {
       // Parse URL parameters
       const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const state = params.get("state");
-      const error = params.get("error");
+      const code = params.get('code');
+      const state = params.get('state');
+      const error = params.get('error');
 
       // Helper to send result to opener with localStorage COOP fallback
-      const sendResultToOpener = (result: { success: boolean; error?: string; channelName?: string }) => {
+      const sendResultToOpener = (result: {
+        success: boolean;
+        error?: string;
+        channelName?: string;
+      }) => {
         if (state) {
           try {
             localStorage.setItem(`youtube_oauth_result_${state}`, JSON.stringify(result));
@@ -43,7 +47,11 @@ export default function YouTubeCallback() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: "youtube-oauth-result", result }, window.location.origin);
+          window.opener.postMessage(
+            { type: 'youtube-oauth-result', result },
+            window.location.origin
+          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window.opener as any).youtubeCallbackData = result;
           window.close();
           return true;
@@ -56,7 +64,7 @@ export default function YouTubeCallback() {
       };
 
       try {
-        console.log("[YouTube Callback] Processing OAuth callback", {
+        console.log('[YouTube Callback] Processing OAuth callback', {
           hasCode: !!code,
           hasState: !!state,
           hasError: !!error,
@@ -64,48 +72,48 @@ export default function YouTubeCallback() {
 
         // Handle OAuth error
         if (error) {
-          console.error("[YouTube Callback] OAuth error:", error);
-          const errorMsg = error || "YouTube authorization failed";
+          console.error('[YouTube Callback] OAuth error:', error);
+          const errorMsg = error || 'YouTube authorization failed';
           if (sendResultToOpener({ success: false, error: errorMsg })) return;
           toast({
-            title: "YouTube Connection Failed",
+            title: 'YouTube Connection Failed',
             description: errorMsg,
-            variant: "destructive",
+            variant: 'destructive',
           });
-          setLocation("/creator-dashboard/social");
+          setLocation('/creator-dashboard/social');
           return;
         }
 
         // Validate required parameters
         if (!code || !state) {
-          throw new Error("Missing code or state parameter");
+          throw new Error('Missing code or state parameter');
         }
 
         // Validate CSRF state
-        const savedState = localStorage.getItem("youtube_oauth_state");
+        const savedState = localStorage.getItem('youtube_oauth_state');
         if (!savedState || savedState !== state) {
-          throw new Error("Invalid state parameter - possible CSRF attack");
+          throw new Error('Invalid state parameter - possible CSRF attack');
         }
 
         // Clear the state from localStorage
-        localStorage.removeItem("youtube_oauth_state");
+        localStorage.removeItem('youtube_oauth_state');
 
-        console.log("[YouTube Callback] Exchanging code for token...");
+        console.log('[YouTube Callback] Exchanging code for token...');
 
         // Exchange code for access token
         const origin = window.location.origin;
         const redirectUri = `${origin}/youtube-callback`;
 
-        const tokenResponse = await fetch("/api/social/youtube/token", {
-          method: "POST",
+        const tokenResponse = await fetch('/api/social/youtube/token', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             code,
             redirect_uri: redirectUri,
           }),
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!tokenResponse.ok) {
@@ -117,18 +125,19 @@ export default function YouTubeCallback() {
         const accessToken = tokenData.access_token;
 
         if (!accessToken) {
-          throw new Error("No access token received");
+          throw new Error('No access token received');
         }
 
-        console.log("[YouTube Callback] Token obtained, fetching channel info...");
+        console.log('[YouTube Callback] Token obtained, fetching channel info...');
 
-        // Get channel info
-        const channelResponse = await fetch("/api/social/youtube/me", {
-          method: "GET",
+        // Get channel info — use X-Social-Token header so the YouTube access token
+        // doesn't conflict with the authenticateUser middleware's JWT parsing
+        const channelResponse = await fetch('/api/social/youtube/me', {
+          method: 'GET',
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            'X-Social-Token': `Bearer ${accessToken}`,
           },
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!channelResponse.ok) {
@@ -140,25 +149,27 @@ export default function YouTubeCallback() {
         const channel = channelData.items?.[0];
 
         if (!channel) {
-          throw new Error("No channel data received");
+          throw new Error('No channel data received');
         }
 
-        console.log("[YouTube Callback] Channel info fetched:", channel.snippet.title);
+        console.log('[YouTube Callback] Channel info fetched:', channel.snippet.title);
 
         // Save the connection to the database
-        const saveResponse = await fetch("/api/social-connections", {
-          method: "POST",
+        const saveResponse = await fetch('/api/social-connections', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            platform: "youtube",
+            platform: 'youtube',
             platformUserId: channel.id,
             platformUsername: channel.snippet.customUrl || channel.id,
             platformDisplayName: channel.snippet.title,
             accessToken: accessToken,
             refreshToken: tokenData.refresh_token || null,
-            tokenExpiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
+            tokenExpiresAt: tokenData.expires_in
+              ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+              : null,
             profileData: {
               id: channel.id,
               title: channel.snippet.title,
@@ -172,7 +183,7 @@ export default function YouTubeCallback() {
               description: channel.snippet.description,
             },
           }),
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!saveResponse.ok) {
@@ -180,29 +191,29 @@ export default function YouTubeCallback() {
           throw new Error(`Failed to save connection: ${errorText}`);
         }
 
-        console.log("[YouTube Callback] Connection saved successfully");
+        console.log('[YouTube Callback] Connection saved successfully');
 
         const channelName = channel.snippet.title;
         if (sendResultToOpener({ success: true, channelName })) return;
 
         // Otherwise show toast and redirect
         toast({
-          title: "YouTube Connected!",
+          title: 'YouTube Connected!',
           description: `Successfully connected ${channelName}`,
         });
-        setLocation("/creator-dashboard/social");
+        setLocation('/creator-dashboard/social');
       } catch (error) {
-        console.error("[YouTube Callback] Error:", error);
-        const errorMsg = error instanceof Error ? error.message : "Failed to connect YouTube";
+        console.error('[YouTube Callback] Error:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Failed to connect YouTube';
         if (sendResultToOpener({ success: false, error: errorMsg })) return;
 
         // Otherwise show toast and redirect
         toast({
-          title: "YouTube Connection Failed",
+          title: 'YouTube Connection Failed',
           description: errorMsg,
-          variant: "destructive",
+          variant: 'destructive',
         });
-        setLocation("/creator-dashboard/social");
+        setLocation('/creator-dashboard/social');
       }
     };
 
