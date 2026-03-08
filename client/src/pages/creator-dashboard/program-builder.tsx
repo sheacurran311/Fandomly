@@ -417,10 +417,23 @@ function ProgramCustomizer({
     },
   });
 
+  // Only count actual social platforms, not auth providers like 'google'
+  const SOCIAL_PLATFORMS = new Set([
+    'twitter',
+    'instagram',
+    'discord',
+    'facebook',
+    'tiktok',
+    'youtube',
+    'spotify',
+    'apple_music',
+    'twitch',
+    'kick',
+  ]);
   const connectedPlatforms = new Set<string>(
     (socialConnectionsData as any)?.connections
       ?.map((c: { platform?: string }) => c.platform)
-      .filter((p: unknown): p is string => typeof p === 'string') || []
+      .filter((p: unknown): p is string => typeof p === 'string' && SOCIAL_PLATFORMS.has(p)) || []
   );
 
   // Social platform connection handlers
