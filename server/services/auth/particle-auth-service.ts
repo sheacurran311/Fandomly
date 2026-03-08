@@ -127,10 +127,10 @@ export async function handleParticleCallback(
   //    key rotation with persisted sessions, or cross-chain wallet formats.
   let isVerified = await verifyWalletIsProjectUser(walletAddress);
   if (!isVerified) {
-    console.warn(
-      '[Particle Auth] Wallet not registered as project user — retrying once.',
-      { walletAddress, particleUuid }
-    );
+    console.warn('[Particle Auth] Wallet not registered as project user — retrying once.', {
+      walletAddress,
+      particleUuid,
+    });
     await new Promise((resolve) => setTimeout(resolve, 2000));
     isVerified = await verifyWalletIsProjectUser(walletAddress);
     if (!isVerified) {

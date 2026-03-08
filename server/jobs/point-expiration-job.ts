@@ -76,7 +76,10 @@ class PointExpirationJob {
         if (notifError?.code === '42P01') {
           // point_expiration_notifications table doesn't exist yet — skip silently
         } else {
-          console.warn('[PointExpirationJob] Warning notification step failed:', notifError?.message);
+          console.warn(
+            '[PointExpirationJob] Warning notification step failed:',
+            notifError?.message
+          );
         }
       }
 

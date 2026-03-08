@@ -61,6 +61,7 @@ The app uses `@neondatabase/serverless` which connects to PostgreSQL via WebSock
 **CRITICAL**: Each social network has ONE authoritative file that defines its OAuth configuration (scopes, redirect URIs, popup flow). See `.cursor/rules/social-auth-single-source.mdc` for the full rule and file mapping. **Never** duplicate OAuth logic, popup handling, or URL construction outside the designated source file. All consumer files (auth-modal.tsx, auth-context.tsx, callback pages) import from the source — fix bugs in the source, not the consumer.
 
 Quick reference:
+
 - **Twitter/X** → `client/src/lib/twitter.ts` (`TwitterSDKManager`)
 - **Facebook/Instagram** → `client/src/lib/facebook.ts` (`FacebookSDKManager`)
 - **TikTok, YouTube, Spotify, Discord, Twitch** → `client/src/lib/social-integrations.ts`

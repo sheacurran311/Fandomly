@@ -1,11 +1,20 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * YouTube OAuth Callback Page
  * ⛔ YouTube auth source of truth: client/src/lib/social-integrations.ts (YouTubeAPI)
  * See rule: .cursor/rules/social-auth-single-source.mdc
  *
- * Handles the OAuth callback from YouTube/Google
- * Exchanges authorization code for access token
- * Saves the connection to the database
+ * Handles the OAuth callback from YouTube/Google.
+ * Supports TWO modes based on the state parameter:
+ *
+ * 1. AUTH mode (state contains '_auth_'): Used by the primary auth modal
+ *    for registration/login. Exchanges code for token, fetches channel info
+ *    + Google profile (email), sends result to opener WITHOUT saving to
+ *    social connections. The auth modal handles loginWithCallback.
+ *
+ * 2. CONNECTION mode (default): Used by dashboard social connection flow.
+ *    Exchanges code for token, fetches channel info, saves to social
+ *    connections, sends result to opener.
  */
 
 import { useEffect, useRef } from 'react';
@@ -35,12 +44,11 @@ export default function YouTubeCallback() {
       const state = params.get('state');
       const error = params.get('error');
 
+      // Determine if this is an auth-modal flow or a social connection flow
+      const isAuthFlow = state?.includes('_auth_');
+
       // Helper to send result to opener with localStorage COOP fallback
-      const sendResultToOpener = (result: {
-        success: boolean;
-        error?: string;
-        channelName?: string;
-      }) => {
+      const sendResultToOpener = (result: any) => {
         if (state) {
           try {
             localStorage.setItem(`youtube_oauth_result_${state}`, JSON.stringify(result));
@@ -53,7 +61,6 @@ export default function YouTubeCallback() {
             { type: 'youtube-oauth-result', result },
             window.location.origin
           );
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window.opener as any).youtubeCallbackData = result;
           window.close();
           return true;
@@ -70,6 +77,7 @@ export default function YouTubeCallback() {
           hasCode: !!code,
           hasState: !!state,
           hasError: !!error,
+          isAuthFlow,
         });
 
         // Handle OAuth error
@@ -82,7 +90,7 @@ export default function YouTubeCallback() {
             description: errorMsg,
             variant: 'destructive',
           });
-          setLocation('/creator-dashboard/social');
+          setLocation('/');
           return;
         }
 
@@ -132,8 +140,7 @@ export default function YouTubeCallback() {
 
         console.log('[YouTube Callback] Token obtained, fetching channel info...');
 
-        // Get channel info — use X-Social-Token header so the YouTube access token
-        // doesn't conflict with the authenticateUser middleware's JWT parsing
+        // Get channel info
         const channelResponse = await fetch('/api/social/youtube/me', {
           method: 'GET',
           headers: {
@@ -156,7 +163,47 @@ export default function YouTubeCallback() {
 
         console.log('[YouTube Callback] Channel info fetched:', channel.snippet.title);
 
-        // Save the connection to the database
+        // ── AUTH FLOW: Send data back to opener for loginWithCallback ──
+        if (isAuthFlow) {
+          // Also fetch Google userinfo for email (YouTube API doesn't return email)
+          let email: string | undefined;
+          try {
+            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (userInfoResponse.ok) {
+              const userInfo = await userInfoResponse.json();
+              email = userInfo.email;
+            }
+          } catch (e) {
+            console.warn('[YouTube Callback] Could not fetch Google userinfo for email:', e);
+          }
+
+          const authResult = {
+            success: true,
+            accessToken,
+            userId: channel.id,
+            platformUserId: channel.id,
+            username: channel.snippet.customUrl || channel.id,
+            displayName: channel.snippet.title,
+            email,
+            profileData: {
+              id: channel.id,
+              title: channel.snippet.title,
+              profileImageUrl: channel.snippet.thumbnails?.default?.url,
+              subscriberCount: parseInt(channel.statistics?.subscriberCount || '0'),
+              followers: parseInt(channel.statistics?.subscriberCount || '0'),
+            },
+          };
+
+          if (sendResultToOpener(authResult)) return;
+
+          // Fallback: redirect to login page
+          setLocation('/login');
+          return;
+        }
+
+        // ── CONNECTION FLOW: Save to social connections ──
         const saveResponse = await fetch('/api/social-connections', {
           method: 'POST',
           headers: {
@@ -215,7 +262,7 @@ export default function YouTubeCallback() {
           description: errorMsg,
           variant: 'destructive',
         });
-        setLocation('/creator-dashboard/social');
+        setLocation(isAuthFlow ? '/login' : '/creator-dashboard/social');
       }
     };
 

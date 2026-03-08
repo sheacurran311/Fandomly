@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Discord OAuth Callback Page
  * ⛔ Discord auth source of truth: client/src/lib/social-integrations.ts (DiscordAPI)
@@ -8,9 +9,9 @@
  * Saves the connection to the database
  */
 
-import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
-import { useToast } from "@/hooks/use-toast";
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
+import { useToast } from '@/hooks/use-toast';
 
 // Global flag to prevent duplicate execution across multiple renders/remounts
 let discordCallbackProcessed = false;
@@ -31,13 +32,16 @@ export default function DiscordCallback() {
     const run = async () => {
       // Parse URL parameters
       const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const state = params.get("state");
-      const error = params.get("error");
-      const errorDescription = params.get("error_description");
+      const code = params.get('code');
+      const state = params.get('state');
+      const error = params.get('error');
+      const errorDescription = params.get('error_description');
+
+      // Determine if this is an auth-modal flow or a social connection flow
+      const isAuthFlow = state?.includes('_auth_');
 
       // Helper to send result to opener with localStorage COOP fallback
-      const sendResultToOpener = (result: { success: boolean; error?: string; displayName?: string }) => {
+      const sendResultToOpener = (result: Record<string, unknown>) => {
         if (state) {
           try {
             localStorage.setItem(`discord_oauth_result_${state}`, JSON.stringify(result));
@@ -46,7 +50,10 @@ export default function DiscordCallback() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: "discord-oauth-result", result }, window.location.origin);
+          window.opener.postMessage(
+            { type: 'discord-oauth-result', result },
+            window.location.origin
+          );
           (window.opener as any).discordCallbackData = result;
           window.close();
           return true;
@@ -59,7 +66,7 @@ export default function DiscordCallback() {
       };
 
       try {
-        console.log("[Discord Callback] Processing OAuth callback", {
+        console.log('[Discord Callback] Processing OAuth callback', {
           hasCode: !!code,
           hasState: !!state,
           hasError: !!error,
@@ -67,48 +74,48 @@ export default function DiscordCallback() {
 
         // Handle OAuth error
         if (error) {
-          console.error("[Discord Callback] OAuth error:", error, errorDescription);
-          const errorMsg = errorDescription || error || "Discord authorization failed";
+          console.error('[Discord Callback] OAuth error:', error, errorDescription);
+          const errorMsg = errorDescription || error || 'Discord authorization failed';
           if (sendResultToOpener({ success: false, error: errorMsg })) return;
           toast({
-            title: "Discord Connection Failed",
+            title: 'Discord Connection Failed',
             description: errorMsg,
-            variant: "destructive",
+            variant: 'destructive',
           });
-          setLocation("/creator-dashboard/social");
+          setLocation('/creator-dashboard/social');
           return;
         }
 
         // Validate required parameters
         if (!code || !state) {
-          throw new Error("Missing code or state parameter");
+          throw new Error('Missing code or state parameter');
         }
 
         // Validate CSRF state
-        const savedState = localStorage.getItem("discord_oauth_state");
+        const savedState = localStorage.getItem('discord_oauth_state');
         if (!savedState || savedState !== state) {
-          throw new Error("Invalid state parameter - possible CSRF attack");
+          throw new Error('Invalid state parameter - possible CSRF attack');
         }
 
         // Clear the state from localStorage
-        localStorage.removeItem("discord_oauth_state");
+        localStorage.removeItem('discord_oauth_state');
 
-        console.log("[Discord Callback] Exchanging code for token...");
+        console.log('[Discord Callback] Exchanging code for token...');
 
         // Exchange code for access token
         const origin = window.location.origin;
         const redirectUri = `${origin}/discord-callback`;
 
-        const tokenResponse = await fetch("/api/social/discord/token", {
-          method: "POST",
+        const tokenResponse = await fetch('/api/social/discord/token', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             code,
             redirect_uri: redirectUri,
           }),
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!tokenResponse.ok) {
@@ -119,15 +126,15 @@ export default function DiscordCallback() {
         const tokenData = await tokenResponse.json();
         const accessToken = tokenData.access_token;
 
-        console.log("[Discord Callback] Token obtained, fetching user profile...");
+        console.log('[Discord Callback] Token obtained, fetching user profile...');
 
         // Get user profile
-        const userResponse = await fetch("/api/social/discord/me", {
-          method: "GET",
+        const userResponse = await fetch('/api/social/discord/me', {
+          method: 'GET',
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!userResponse.ok) {
@@ -136,16 +143,41 @@ export default function DiscordCallback() {
         }
 
         const userData = await userResponse.json();
-        console.log("[Discord Callback] User profile fetched:", userData.username);
+        console.log('[Discord Callback] User profile fetched:', userData.username);
 
-        // Save the connection to the database
-        const saveResponse = await fetch("/api/social-connections", {
-          method: "POST",
+        // ── AUTH FLOW: Send data back to opener for loginWithCallback ──
+        if (isAuthFlow) {
+          const authResult = {
+            success: true,
+            accessToken,
+            userId: userData.id,
+            platformUserId: userData.id,
+            username: userData.username,
+            displayName: userData.global_name || userData.username,
+            email: userData.email,
+            profileData: {
+              id: userData.id,
+              username: userData.username,
+              global_name: userData.global_name,
+              avatar: userData.avatar
+                ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+                : undefined,
+              verified: userData.verified || false,
+            },
+          };
+          if (sendResultToOpener(authResult)) return;
+          setLocation('/login');
+          return;
+        }
+
+        // ── CONNECTION FLOW: Save to social connections ──
+        const saveResponse = await fetch('/api/social-connections', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            platform: "discord",
+            platform: 'discord',
             platformUserId: userData.id,
             username: userData.username,
             displayName: userData.global_name || userData.username,
@@ -154,11 +186,11 @@ export default function DiscordCallback() {
             profileUrl: `https://discord.com/users/${userData.id}`,
             profileImage: userData.avatar
               ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-              : "",
+              : '',
             verified: userData.verified || false,
             followers: 0, // Discord doesn't have a follower count
           }),
-          credentials: "include",
+          credentials: 'include',
         });
 
         if (!saveResponse.ok) {
@@ -166,29 +198,29 @@ export default function DiscordCallback() {
           throw new Error(`Failed to save connection: ${errorText}`);
         }
 
-        console.log("[Discord Callback] Connection saved successfully");
+        console.log('[Discord Callback] Connection saved successfully');
 
         const displayName = userData.global_name || userData.username;
         if (sendResultToOpener({ success: true, displayName })) return;
 
         // Otherwise show toast and redirect
         toast({
-          title: "Discord Connected!",
+          title: 'Discord Connected!',
           description: `Successfully connected ${displayName}`,
         });
-        setLocation("/creator-dashboard/social");
+        setLocation('/creator-dashboard/social');
       } catch (error) {
-        console.error("[Discord Callback] Error:", error);
-        const errorMsg = error instanceof Error ? error.message : "Failed to connect Discord";
+        console.error('[Discord Callback] Error:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Failed to connect Discord';
         if (sendResultToOpener({ success: false, error: errorMsg })) return;
 
         // Otherwise show toast and redirect
         toast({
-          title: "Discord Connection Failed",
+          title: 'Discord Connection Failed',
           description: errorMsg,
-          variant: "destructive",
+          variant: 'destructive',
         });
-        setLocation("/creator-dashboard/social");
+        setLocation('/creator-dashboard/social');
       }
     };
 

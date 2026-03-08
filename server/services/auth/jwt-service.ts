@@ -3,9 +3,9 @@ import type { JwtPayload, SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 
 export interface JWTUserPayload extends JwtPayload {
-  sub: string;           // User ID
+  sub: string; // User ID
   email: string | null;
-  provider?: string;     // Auth provider used (google, twitter, etc.)
+  provider?: string; // Auth provider used (google, twitter, etc.)
   iat?: number;
   exp?: number;
 }
@@ -30,7 +30,10 @@ const KEY_ID = 'fandomly-auth-key-1';
 const JWT_ISSUER = process.env.JWT_ISSUER || 'https://fandomly.com';
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'fandomly';
 const JWT_EXPIRY_SECONDS = parseInt(process.env.JWT_EXPIRY_SECONDS || '86400', 10); // 24 hours default
-const REFRESH_TOKEN_EXPIRY_SECONDS = parseInt(process.env.REFRESH_TOKEN_EXPIRY_SECONDS || '604800', 10); // 7 days default
+const REFRESH_TOKEN_EXPIRY_SECONDS = parseInt(
+  process.env.REFRESH_TOKEN_EXPIRY_SECONDS || '604800',
+  10
+); // 7 days default
 
 // Get keys from environment or generate for development
 let privateKey: string;
@@ -49,16 +52,16 @@ function initializeKeys() {
       modulusLength: 2048,
       publicKeyEncoding: {
         type: 'spki',
-        format: 'pem'
+        format: 'pem',
       },
       privateKeyEncoding: {
         type: 'pkcs8',
-        format: 'pem'
-      }
+        format: 'pem',
+      },
     });
     privateKey = privKey;
     publicKey = pubKey;
-    
+
     // Log the keys so they can be saved for development
     console.log('[JWT Service] Development keys generated. Set these in .env for persistence:');
     console.log('AUTH_PRIVATE_KEY=' + JSON.stringify(privKey));
@@ -72,7 +75,11 @@ initializeKeys();
 /**
  * Sign an access token for a user
  */
-export function signAccessToken(user: { id: string; email: string | null; provider?: string }): string {
+export function signAccessToken(user: {
+  id: string;
+  email: string | null;
+  provider?: string;
+}): string {
   const payload: JWTUserPayload = {
     sub: user.id,
     email: user.email,
@@ -119,7 +126,7 @@ export function verifyAccessToken(token: string): JWTUserPayload {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     }) as JWTUserPayload;
-    
+
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -140,11 +147,11 @@ export function verifyRefreshToken(token: string): { sub: string; type: string }
       algorithms: ['RS256'],
       issuer: JWT_ISSUER,
     }) as { sub: string; type: string };
-    
+
     if (decoded.type !== 'refresh') {
       throw new Error('Invalid token type');
     }
-    
+
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -170,7 +177,7 @@ export function getJWKS(): JWKS {
   // Parse the PEM public key to extract modulus and exponent
   const keyObject = crypto.createPublicKey(publicKey);
   const jwk = keyObject.export({ format: 'jwk' });
-  
+
   return {
     keys: [
       {
@@ -180,8 +187,8 @@ export function getJWKS(): JWKS {
         alg: 'RS256',
         use: 'sig',
         kid: KEY_ID,
-      }
-    ]
+      },
+    ],
   };
 }
 
@@ -199,10 +206,10 @@ export function isTokenExpiringSoon(token: string): boolean {
   try {
     const decoded = jwt.decode(token) as JWTUserPayload;
     if (!decoded || !decoded.exp) return true;
-    
+
     const expiresAt = decoded.exp * 1000; // Convert to milliseconds
     const fiveMinutes = 5 * 60 * 1000;
-    
+
     return Date.now() > expiresAt - fiveMinutes;
   } catch {
     return true;

@@ -162,15 +162,15 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           case 'facebook':
             return FacebookSDKManager.secureLogin('fan');
           case 'tiktok':
-            return tiktokApi.secureLogin();
+            return tiktokApi.secureLogin('auth');
           case 'youtube':
-            return youtubeApi.secureLogin();
+            return youtubeApi.secureLogin('auth');
           case 'spotify':
-            return spotifyApi.secureLogin();
+            return spotifyApi.secureLogin('auth');
           case 'discord':
-            return discordApi.secureLogin();
+            return discordApi.secureLogin('auth');
           case 'twitch':
-            return twitchApi.secureLogin();
+            return twitchApi.secureLogin('auth');
           default:
             throw new Error(`Provider ${providerId} not configured`);
         }
@@ -269,7 +269,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         pendingLinkData.callbackData
       );
       if (!result.success) throw new Error(result.message || 'Failed to link accounts');
-      toast({ title: 'Account Linked', description: 'Your accounts have been linked successfully.' });
+      toast({
+        title: 'Account Linked',
+        description: 'Your accounts have been linked successfully.',
+      });
       setPendingLinkData(null);
       onClose();
       const redirectUrl = getPostAuthRedirect(result.user, false);
@@ -318,8 +321,18 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <div className="relative px-8 py-10">
             <div className="text-center mb-6">
               <div className="mx-auto w-14 h-14 bg-amber-500/15 rounded-2xl flex items-center justify-center mb-4 border border-amber-500/20">
-                <svg className="w-7 h-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                <svg
+                  className="w-7 h-7 text-amber-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                  />
                 </svg>
               </div>
               <h2 className="text-xl font-bold text-white mb-2">Account Found</h2>
@@ -329,7 +342,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   {linkRequired.existingProviders.join(', ')}
                 </span>
                 . Link your{' '}
-                <span className="text-white font-medium capitalize">{pendingLinkData.provider}</span>{' '}
+                <span className="text-white font-medium capitalize">
+                  {pendingLinkData.provider}
+                </span>{' '}
                 account?
               </p>
             </div>
@@ -374,11 +389,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   disabled={busy}
                   className={`${p.color} h-12 rounded-2xl flex items-center justify-center gap-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]`}
                 >
-                  {loadingProvider === p.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    p.icon
-                  )}
+                  {loadingProvider === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : p.icon}
                   <span>{p.name}</span>
                 </button>
               ))}
@@ -434,11 +445,23 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <div className="mt-6 pt-5 border-t border-white/[0.06]">
               <p className="text-[11px] text-gray-600 text-center leading-relaxed">
                 By continuing, you agree to our{' '}
-                <button onClick={() => { onClose(); setLocation('/terms-of-service'); }} className="text-gray-500 hover:text-white underline underline-offset-2 transition-colors">
+                <button
+                  onClick={() => {
+                    onClose();
+                    setLocation('/terms-of-service');
+                  }}
+                  className="text-gray-500 hover:text-white underline underline-offset-2 transition-colors"
+                >
                   Terms of Service
                 </button>{' '}
                 and{' '}
-                <button onClick={() => { onClose(); setLocation('/privacy-policy'); }} className="text-gray-500 hover:text-white underline underline-offset-2 transition-colors">
+                <button
+                  onClick={() => {
+                    onClose();
+                    setLocation('/privacy-policy');
+                  }}
+                  className="text-gray-500 hover:text-white underline underline-offset-2 transition-colors"
+                >
                   Privacy Policy
                 </button>
               </p>

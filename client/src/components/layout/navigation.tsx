@@ -121,9 +121,7 @@ export default function Navigation() {
 
                   {/* Particle Wallet Widget — shows chain, address, balance for authenticated users */}
                   {particleEnabled && (
-                    <div
-                      className="[&>div]:rounded-xl [&>div]:text-xs [&>div]:h-9 [&>div]:min-w-0"
-                    >
+                    <div className="[&>div]:rounded-xl [&>div]:text-xs [&>div]:h-9 [&>div]:min-w-0">
                       <Suspense fallback={null}>
                         <ParticleConnectButton label="Wallet" />
                       </Suspense>
