@@ -114,7 +114,7 @@ export default defineConfig({
     __LANDING_ONLY__: JSON.stringify(process.env.LANDING_ONLY === 'true'),
   },
   optimizeDeps: {
-    include: ['buffer'],
+    include: ['buffer', 'process', 'stream-browserify', 'readable-stream', 'crypto-browserify'],
     esbuildOptions: {
       plugins: [
         {
