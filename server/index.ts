@@ -1,4 +1,5 @@
 import express, { type Request } from 'express';
+import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { doubleCsrf } from 'csrf-csrf';
@@ -17,6 +18,16 @@ const app = express();
 // Trust the first proxy (Replit / load balancer) so express-rate-limit
 // reads the real client IP from X-Forwarded-For instead of erroring.
 app.set('trust proxy', 1);
+
+// CORS — allow same-origin and Replit dev preview origins
+app.use(
+  cors({
+    origin: true, // Reflect the request origin (same-origin + Replit subdomains)
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Social-Token'],
+  })
+);
 
 // Security headers via Helmet
 app.use(
