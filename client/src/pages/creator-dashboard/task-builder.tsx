@@ -12,6 +12,7 @@ import InstagramTaskBuilder from '@/components/tasks/InstagramTaskBuilder';
 import YouTubeTaskBuilder from '@/components/tasks/YouTubeTaskBuilder';
 import TikTokTaskBuilder from '@/components/tasks/TikTokTaskBuilder';
 import SpotifyTaskBuilder from '@/components/tasks/SpotifyTaskBuilder';
+import AppleMusicTaskBuilder from '@/components/tasks/AppleMusicTaskBuilder';
 import DiscordTaskBuilder from '@/components/tasks/DiscordTaskBuilder';
 import TwitchTaskBuilder from '@/components/tasks/TwitchTaskBuilder';
 import KickTaskBuilder from '@/components/tasks/KickTaskBuilder';
@@ -519,6 +520,25 @@ export default function TaskBuilder() {
       return (
         <DashboardLayout userType="creator">
           <SpotifyTaskBuilder
+            onSave={handleSave}
+            onPublish={handlePublish}
+            onBack={handleBack}
+            initialData={existingTask}
+            isEditMode={isEditMode}
+            taskType={selectedTemplate}
+            programSelector={programSelectorCard}
+          />
+        </DashboardLayout>
+      );
+
+    case 'apple_music_favorite_artist':
+    case 'apple_music_add_track':
+    case 'apple_music_add_album':
+    case 'apple_music_add_playlist':
+    case 'apple_music_listen':
+      return (
+        <DashboardLayout userType="creator">
+          <AppleMusicTaskBuilder
             onSave={handleSave}
             onPublish={handlePublish}
             onBack={handleBack}

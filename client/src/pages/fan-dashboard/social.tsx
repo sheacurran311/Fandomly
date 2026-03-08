@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Award,
   Video,
+  Music,
   Edit as EditIcon,
 } from 'lucide-react';
 import { FaSpotify, FaPatreon } from 'react-icons/fa';
@@ -35,6 +36,7 @@ import {
   useFacebookConnection,
   useKickConnection,
   usePatreonConnection,
+  useAppleMusicConnection,
 } from '@/hooks/use-social-connection';
 import { useInstagramHandle } from '@/hooks/use-instagram-handle';
 import { useState } from 'react';
@@ -116,6 +118,13 @@ export default function FanSocial() {
   const patreonConnected = patreon.isConnected;
   const patreonConnecting = patreon.isConnecting;
   const patreonDisplayName = patreon.userInfo?.displayName || patreon.userInfo?.name || null;
+
+  // Apple Music connection via standardized hook
+  const appleMusic = useAppleMusicConnection();
+  const appleMusicConnected = appleMusic.isConnected;
+  const appleMusicConnecting = appleMusic.isConnecting;
+  const appleMusicDisplayName =
+    appleMusic.userInfo?.displayName || appleMusic.userInfo?.name || null;
 
   if (isLoading) {
     return (
@@ -200,6 +209,17 @@ export default function FanSocial() {
       bgColor: 'bg-green-500/20',
       buttonColor: 'border-green-500/30 text-green-500 hover:bg-green-500/10',
       description: 'Connect to participate in Spotify campaigns',
+    },
+    {
+      platform: 'Apple Music',
+      icon: Music,
+      handle: appleMusicConnected && appleMusicDisplayName ? appleMusicDisplayName : 'Your Profile',
+      followers: 0,
+      connected: appleMusicConnected,
+      color: 'text-pink-400',
+      bgColor: 'bg-pink-400/20',
+      buttonColor: 'border-pink-400/30 text-pink-400 hover:bg-pink-400/10',
+      description: 'Connect to participate in Apple Music campaigns',
     },
     {
       platform: 'Discord',
@@ -476,6 +496,7 @@ export default function FanSocial() {
                               else if (account.platform === 'Twitch') twitch.disconnect();
                               else if (account.platform === 'Kick') kick.disconnect();
                               else if (account.platform === 'Patreon') patreon.disconnect();
+                              else if (account.platform === 'Apple Music') appleMusic.disconnect();
                             }}
                             data-testid={`button-disconnect-${account.platform.toLowerCase()}-fan`}
                           >
@@ -500,6 +521,7 @@ export default function FanSocial() {
                               else if (account.platform === 'Kick') kick.connect();
                               else if (account.platform === 'Patreon') patreon.connect();
                               else if (account.platform === 'Twitch') twitch.connect();
+                              else if (account.platform === 'Apple Music') appleMusic.connect();
                             }}
                             disabled={
                               (account.platform === 'Facebook' && facebookConnecting) ||
@@ -510,7 +532,8 @@ export default function FanSocial() {
                               (account.platform === 'Discord' && discordConnecting) ||
                               (account.platform === 'Twitch' && twitchConnecting) ||
                               (account.platform === 'Kick' && kickConnecting) ||
-                              (account.platform === 'Patreon' && patreonConnecting)
+                              (account.platform === 'Patreon' && patreonConnecting) ||
+                              (account.platform === 'Apple Music' && appleMusicConnecting)
                             }
                             data-testid={`button-connect-${account.platform.toLowerCase()}-fan`}
                           >
@@ -522,7 +545,8 @@ export default function FanSocial() {
                             (account.platform === 'Discord' && discordConnecting) ||
                             (account.platform === 'Twitch' && twitchConnecting) ||
                             (account.platform === 'Kick' && kickConnecting) ||
-                            (account.platform === 'Patreon' && patreonConnecting)
+                            (account.platform === 'Patreon' && patreonConnecting) ||
+                            (account.platform === 'Apple Music' && appleMusicConnecting)
                               ? 'Connecting...'
                               : 'Connect'}
                           </Button>
@@ -581,6 +605,11 @@ export default function FanSocial() {
                   {!patreonConnected && (
                     <Badge className="bg-[#FF424D]/20 text-[#FF424D]">
                       Patreon tasks available
+                    </Badge>
+                  )}
+                  {!appleMusicConnected && (
+                    <Badge className="bg-pink-400/20 text-pink-300">
+                      Apple Music tasks available
                     </Badge>
                   )}
                 </div>
@@ -696,6 +725,18 @@ export default function FanSocial() {
                         }
                       >
                         {spotifyConnected ? 'Connected' : 'Not Connected'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-300">Apple Music</span>
+                      <Badge
+                        className={
+                          appleMusicConnected
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-gray-500/20 text-gray-400'
+                        }
+                      >
+                        {appleMusicConnected ? 'Connected' : 'Not Connected'}
                       </Badge>
                     </div>
                     <div className="flex justify-between items-center">

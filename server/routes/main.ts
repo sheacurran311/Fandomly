@@ -75,6 +75,7 @@ import {
   youtubeTaskSchema,
   tiktokTaskSchema,
   spotifyTaskSchema,
+  appleMusicTaskSchema,
 } from '@shared/taskTemplates';
 import {
   authenticateUser,
@@ -1998,6 +1999,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
           case 'spotify':
             configValidation = spotifyTaskSchema.parse(templateData.defaultConfig);
+            break;
+          case 'apple_music':
+            configValidation = appleMusicTaskSchema.parse(templateData.defaultConfig);
             break;
           default:
             return res

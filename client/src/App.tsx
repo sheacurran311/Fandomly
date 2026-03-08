@@ -79,6 +79,7 @@ import DiscordCallback from '@/pages/discord-callback';
 import TwitchCallback from '@/pages/twitch-callback';
 import KickCallback from '@/pages/kick-callback';
 import PatreonCallback from '@/pages/patreon-callback';
+import AppleMusicCallback from '@/pages/apple-music-callback';
 import Login from '@/pages/login';
 import GoogleCallback from '@/pages/auth/google-callback';
 import CreatorPublic from '@/pages/creator-public';
@@ -198,6 +199,7 @@ function Router() {
       <Route path="/twitch-callback" component={TwitchCallback} />
       <Route path="/kick-callback" component={KickCallback} />
       <Route path="/patreon-callback" component={PatreonCallback} />
+      <Route path="/apple-music-callback" component={AppleMusicCallback} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/data-deletion" component={DataDeletion} />
       <Route path="/privacy/data-deletion" component={DataDeletionInfo} />

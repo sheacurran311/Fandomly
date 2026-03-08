@@ -18,7 +18,8 @@ export type SocialPlatform =
   | 'discord'
   | 'facebook'
   | 'kick'
-  | 'patreon';
+  | 'patreon'
+  | 'apple_music';
 
 export interface SocialUserInfo {
   id?: string;
@@ -99,6 +100,10 @@ const PLATFORM_CONFIGS: Record<SocialPlatform, PlatformConfig> = {
   patreon: {
     name: 'Patreon',
     emoji: '🎨',
+  },
+  apple_music: {
+    name: 'Apple Music',
+    emoji: '🎵',
   },
 };
 
@@ -296,6 +301,12 @@ export function createSocialConnectionHook(platform: SocialPlatform) {
           case 'patreon':
             result = await socialManager[platform].secureLogin();
             break;
+          case 'apple_music': {
+            const { AppleMusicAPI } = await import('@/lib/social-integrations');
+            const appleMusicApi = new AppleMusicAPI();
+            result = await appleMusicApi.secureLogin();
+            break;
+          }
           default:
             result = { success: false, error: `Unsupported platform: ${platform}` };
         }
@@ -399,6 +410,7 @@ export const useFacebookConnection = createSocialConnectionHook('facebook');
 export const useInstagramConnection = createSocialConnectionHook('instagram');
 export const useKickConnection = createSocialConnectionHook('kick');
 export const usePatreonConnection = createSocialConnectionHook('patreon');
+export const useAppleMusicConnection = createSocialConnectionHook('apple_music');
 
 // Generic hook for dynamic platform selection
 export function useSocialConnection(platform: SocialPlatform): UseSocialConnectionReturn {

@@ -218,6 +218,44 @@ export const spotifyTaskSchema = z.discriminatedUnion('taskType', [
   }),
 ]);
 
+export const appleMusicTaskSchema = z.discriminatedUnion('taskType', [
+  z.object({
+    taskType: z.literal('apple_music_favorite_artist'),
+    artistId: z.string().min(1, 'Apple Music artist ID is required'),
+    artistName: z.string().optional(),
+    points: z.number().min(1).default(50),
+    verificationMethod: z.enum(['manual', 'automatic']).default('automatic'),
+  }),
+  z.object({
+    taskType: z.literal('apple_music_add_track'),
+    trackId: z.string().min(1, 'Apple Music track ID is required'),
+    trackName: z.string().optional(),
+    points: z.number().min(1).default(30),
+    verificationMethod: z.enum(['manual', 'automatic']).default('automatic'),
+  }),
+  z.object({
+    taskType: z.literal('apple_music_add_album'),
+    albumId: z.string().min(1, 'Apple Music album ID is required'),
+    albumName: z.string().optional(),
+    points: z.number().min(1).default(40),
+    verificationMethod: z.enum(['manual', 'automatic']).default('automatic'),
+  }),
+  z.object({
+    taskType: z.literal('apple_music_add_playlist'),
+    playlistId: z.string().min(1, 'Apple Music playlist ID is required'),
+    playlistName: z.string().optional(),
+    points: z.number().min(1).default(40),
+    verificationMethod: z.enum(['manual', 'automatic']).default('automatic'),
+  }),
+  z.object({
+    taskType: z.literal('apple_music_listen'),
+    trackId: z.string().min(1, 'Apple Music track ID is required'),
+    trackName: z.string().optional(),
+    points: z.number().min(1).default(20),
+    verificationMethod: z.enum(['manual', 'automatic']).default('manual'),
+  }),
+]);
+
 export const discordTaskSchema = z.discriminatedUnion('taskType', [
   z.object({
     taskType: z.literal('discord_join'),
@@ -453,6 +491,98 @@ export const CORE_TASK_TEMPLATES = [
       verificationMethod: 'api' as const,
     },
     defaultPoints: 30,
+    isGlobal: true,
+    isActive: true,
+  },
+
+  // Apple Music Templates (T1 - Full API access)
+  {
+    id: 'apple-music-favorite-artist',
+    name: 'Add Artist on Apple Music',
+    description: 'Fans add your artist profile to their Apple Music library',
+    platform: 'apple_music' as const,
+    taskType: 'apple_music_favorite_artist' as const,
+    category: 'trust_anchor',
+    verificationTier: 'T1' as const,
+    verificationMethod: 'api' as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 50,
+      verificationMethod: 'api' as const,
+    },
+    defaultPoints: 50,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: 'apple-music-add-track',
+    name: 'Add Track on Apple Music',
+    description: 'Fans add a track to their Apple Music library',
+    platform: 'apple_music' as const,
+    taskType: 'apple_music_add_track' as const,
+    category: 'trust_anchor',
+    verificationTier: 'T1' as const,
+    verificationMethod: 'api' as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 30,
+      verificationMethod: 'api' as const,
+    },
+    defaultPoints: 30,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: 'apple-music-add-album',
+    name: 'Add Album on Apple Music',
+    description: 'Fans add an album to their Apple Music library',
+    platform: 'apple_music' as const,
+    taskType: 'apple_music_add_album' as const,
+    category: 'trust_anchor',
+    verificationTier: 'T1' as const,
+    verificationMethod: 'api' as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: 'api' as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: 'apple-music-add-playlist',
+    name: 'Add Playlist on Apple Music',
+    description: 'Fans add a playlist to their Apple Music library',
+    platform: 'apple_music' as const,
+    taskType: 'apple_music_add_playlist' as const,
+    category: 'trust_anchor',
+    verificationTier: 'T1' as const,
+    verificationMethod: 'api' as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 40,
+      verificationMethod: 'api' as const,
+    },
+    defaultPoints: 40,
+    isGlobal: true,
+    isActive: true,
+  },
+  {
+    id: 'apple-music-listen',
+    name: 'Listen on Apple Music',
+    description: 'Fans listen to a track on Apple Music',
+    platform: 'apple_music' as const,
+    taskType: 'apple_music_listen' as const,
+    category: 'social',
+    verificationTier: 'T2' as const,
+    verificationMethod: 'manual' as const,
+    isStarterPack: false,
+    defaultConfig: {
+      points: 20,
+      verificationMethod: 'manual' as const,
+    },
+    defaultPoints: 20,
     isGlobal: true,
     isActive: true,
   },
@@ -1214,6 +1344,13 @@ export const PLATFORM_TASK_TYPES = {
     { value: 'spotify_save_track', label: 'Save Track', icon: 'Music' },
     { value: 'spotify_album', label: 'Save Album', icon: 'Disc' },
   ],
+  apple_music: [
+    { value: 'apple_music_favorite_artist', label: 'Add Artist to Library', icon: 'UserPlus' },
+    { value: 'apple_music_add_track', label: 'Add Track to Library', icon: 'Music' },
+    { value: 'apple_music_add_album', label: 'Add Album to Library', icon: 'Disc' },
+    { value: 'apple_music_add_playlist', label: 'Add Playlist to Library', icon: 'ListMusic' },
+    { value: 'apple_music_listen', label: 'Listen to Track', icon: 'Headphones' },
+  ],
   kick: [
     { value: 'kick_follow', label: 'Follow Channel', icon: 'UserPlus' },
     { value: 'kick_subscribe', label: 'Subscribe', icon: 'Star' },
@@ -1402,6 +1539,13 @@ export const TASK_TYPE_VERIFICATION: Record<
   spotify_playlist: { tier: 'T1', method: 'api' },
   spotify_album: { tier: 'T1', method: 'api' },
   spotify_save_track: { tier: 'T1', method: 'api' },
+
+  // Apple Music (full API access)
+  apple_music_favorite_artist: { tier: 'T1', method: 'api' },
+  apple_music_add_track: { tier: 'T1', method: 'api' },
+  apple_music_add_album: { tier: 'T1', method: 'api' },
+  apple_music_add_playlist: { tier: 'T1', method: 'api' },
+  apple_music_listen: { tier: 'T2', method: 'manual' },
 
   // YouTube (only subscribe is T1 - likes/shares are T3)
   youtube_subscribe: { tier: 'T1', method: 'api' },

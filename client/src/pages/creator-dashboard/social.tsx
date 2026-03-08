@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Unlink,
   Video,
+  Music,
 } from 'lucide-react';
 import { FaSpotify, FaDiscord, FaTwitch, FaPatreon } from 'react-icons/fa';
 import { SiKick } from 'react-icons/si';
@@ -40,6 +41,7 @@ import {
   useFacebookConnection,
   useKickConnection,
   usePatreonConnection,
+  useAppleMusicConnection,
 } from '@/hooks/use-social-connection';
 
 function SyncHistorySection() {
@@ -213,6 +215,17 @@ export default function CreatorSocial() {
 
   const patreonDisplayName = patreonUserInfo?.displayName || patreonUserInfo?.name || null;
 
+  // Apple Music connection via standardized hook
+  const {
+    isConnected: appleMusicConnected,
+    isConnecting: appleMusicConnecting,
+    userInfo: appleMusicUserInfo,
+    connect: connectAppleMusic,
+    disconnect: disconnectAppleMusic,
+  } = useAppleMusicConnection();
+
+  const appleMusicDisplayName = appleMusicUserInfo?.displayName || appleMusicUserInfo?.name || null;
+
   // Social activity filter state (must be before early returns for rules-of-hooks)
   const [_activityFilters, _setActivityFilters] = useState({
     instagram: true,
@@ -225,6 +238,7 @@ export default function CreatorSocial() {
     twitch: true,
     kick: true,
     patreon: true,
+    apple_music: true,
   });
 
   const _toggleFilter = (platform: keyof typeof _activityFilters) => {
@@ -325,6 +339,7 @@ export default function CreatorSocial() {
     if (twitchConnected) count++;
     if (kickConnected) count++;
     if (patreonConnected) count++;
+    if (appleMusicConnected) count++;
     return count;
   };
 
@@ -424,6 +439,17 @@ export default function CreatorSocial() {
       connected: spotifyConnected,
       color: 'text-green-400',
       bgColor: 'bg-green-400/20',
+    },
+    {
+      platform: 'Apple Music',
+      icon: Music,
+      handle:
+        appleMusicConnected && appleMusicDisplayName ? appleMusicDisplayName : 'Not connected',
+      followers: '—', // Apple Music doesn't expose follower counts
+      engagement: appleMusicConnected ? 'Active' : '—',
+      connected: appleMusicConnected,
+      color: 'text-pink-400',
+      bgColor: 'bg-pink-400/20',
     },
     // Facebook managed by state above
     {
@@ -895,6 +921,30 @@ export default function CreatorSocial() {
                               data-testid="button-connect-patreon-social"
                             >
                               {patreonConnecting ? 'Connecting...' : 'Connect'}
+                            </Button>
+                          )
+                        ) : account.platform === 'Apple Music' ? (
+                          account.connected ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-white/20 text-white hover:bg-white/10"
+                                onClick={disconnectAppleMusic}
+                                data-testid="button-disconnect-apple-music-social"
+                              >
+                                <Unlink className="h-4 w-4 mr-1" />
+                                Disconnect
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              className="bg-pink-500 hover:bg-pink-500/80 text-white"
+                              onClick={connectAppleMusic}
+                              disabled={appleMusicConnecting}
+                              data-testid="button-connect-apple-music-social"
+                            >
+                              {appleMusicConnecting ? 'Connecting...' : 'Connect'}
                             </Button>
                           )
                         ) : // Other platform buttons (static for now)

@@ -1,6 +1,6 @@
 /**
  * Platform Sync Services Index
- * 
+ *
  * Registry of all platform sync services. Used by the sync scheduler
  * to dispatch sync operations to the correct platform handler.
  */
@@ -16,8 +16,16 @@ import { spotifySync } from './spotify-sync';
 import { discordSync } from './discord-sync';
 import { kickSync } from './kick-sync';
 import { patreonSync } from './patreon-sync';
+import { appleMusicSync } from './apple-music-sync';
 
-export type { PlatformSyncService, AccountMetricsResult, ContentListResult, ContentMetricsResult, ContentItem, ContentMetricsData } from './types';
+export type {
+  PlatformSyncService,
+  AccountMetricsResult,
+  ContentListResult,
+  ContentMetricsResult,
+  ContentItem,
+  ContentMetricsData,
+} from './types';
 
 /**
  * Map of platform name -> sync service instance
@@ -33,6 +41,7 @@ export const platformSyncServices: Record<string, PlatformSyncService> = {
   discord: discordSync,
   kick: kickSync,
   patreon: patreonSync,
+  apple_music: appleMusicSync,
 };
 
 /**

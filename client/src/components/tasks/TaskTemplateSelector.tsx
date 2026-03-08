@@ -57,6 +57,7 @@ import {
   SiDiscord,
   SiTwitch,
   SiKick,
+  SiApplemusic,
 } from 'react-icons/si';
 import { FaPatreon } from 'react-icons/fa';
 import { TIER_GUIDANCE } from '@shared/taskTemplates';
@@ -81,6 +82,7 @@ type TemplatePlatform =
   | 'twitch'
   | 'kick'
   | 'patreon'
+  | 'apple_music'
   | 'general';
 type ViewMode = 'grid' | 'by-platform' | 'by-verification';
 
@@ -119,6 +121,11 @@ export type TaskTemplateType =
   | 'kick_subscribe'
   | 'patreon_support'
   | 'patreon_tier_check'
+  | 'apple_music_favorite_artist'
+  | 'apple_music_add_track'
+  | 'apple_music_add_album'
+  | 'apple_music_add_playlist'
+  | 'apple_music_listen'
   | 'stream_code_verify'
   | 'social_follow'
   | 'social_like'
@@ -283,12 +290,19 @@ const PLATFORM_CONFIG: Record<
     borderColor: 'border-[#FF424D]/20',
     sortOrder: 10,
   },
+  apple_music: {
+    name: 'Apple Music',
+    icon: SiApplemusic,
+    textColor: 'text-pink-400',
+    borderColor: 'border-pink-400/20',
+    sortOrder: 11,
+  },
   general: {
     name: 'General / Multi-Platform',
     icon: Globe,
     textColor: 'text-gray-300',
     borderColor: 'border-white/10',
-    sortOrder: 11,
+    sortOrder: 12,
   },
 };
 
@@ -876,6 +890,95 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     recommendedPoints: 50,
   },
 
+  // Apple Music Templates
+  {
+    id: 'apple_music_favorite_artist',
+    name: 'Add Artist to Library',
+    description:
+      'Reward fans for adding your artist profile to their Apple Music library - API verified',
+    icon: SiApplemusic,
+    category: 'social',
+    platform: 'apple_music',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 86,
+    estimatedSetupTime: '2 minutes',
+    benefits: ['Instant API verification', 'Grow Apple Music following', 'Build music fanbase'],
+    useCases: ['Music promotion', 'Artist growth', 'Release campaigns'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 50,
+  },
+  {
+    id: 'apple_music_add_track',
+    name: 'Add Track to Library',
+    description:
+      'Reward fans for adding a specific track to their Apple Music library - API verified',
+    icon: SiApplemusic,
+    category: 'social',
+    platform: 'apple_music',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 84,
+    estimatedSetupTime: '2 minutes',
+    benefits: ['Instant API verification', 'Boost streams', 'Song discovery'],
+    useCases: ['Single releases', 'Track promotion', 'Music campaigns'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 30,
+  },
+  {
+    id: 'apple_music_add_album',
+    name: 'Add Album to Library',
+    description: 'Reward fans for adding a full album to their Apple Music library - API verified',
+    icon: SiApplemusic,
+    category: 'social',
+    platform: 'apple_music',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 83,
+    estimatedSetupTime: '2 minutes',
+    benefits: ['Instant API verification', 'Album promotion', 'Full catalog engagement'],
+    useCases: ['Album releases', 'Catalog growth', 'Fan engagement'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 40,
+  },
+  {
+    id: 'apple_music_add_playlist',
+    name: 'Add Playlist to Library',
+    description: 'Reward fans for adding a playlist to their Apple Music library - API verified',
+    icon: ListMusic,
+    category: 'social',
+    platform: 'apple_music',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 82,
+    estimatedSetupTime: '2 minutes',
+    benefits: ['Instant API verification', 'Playlist growth', 'Curated engagement'],
+    useCases: ['Promote playlists', 'Music discovery', 'Curated collections'],
+    verificationTier: 'T1',
+    verificationMethod: 'api',
+    recommendedPoints: 40,
+  },
+  {
+    id: 'apple_music_listen',
+    name: 'Listen to Track',
+    description: 'Reward fans for listening to a specific track on Apple Music - manual review',
+    icon: SiApplemusic,
+    category: 'social',
+    platform: 'apple_music',
+    difficulty: 'easy',
+    status: 'ready',
+    popularityScore: 80,
+    estimatedSetupTime: '2 minutes',
+    benefits: ['Stream count growth', 'Fan discovery', 'Engagement rewards'],
+    useCases: ['Boost streams', 'New release push', 'Music engagement'],
+    verificationTier: 'T2',
+    verificationMethod: 'manual',
+    recommendedPoints: 20,
+  },
+
   // Discord Templates
   {
     id: 'discord_join',
@@ -1228,6 +1331,12 @@ export default function TaskTemplateSelector({
       // Spotify
       spotify_follow: 'bg-green-500',
       spotify_playlist: 'bg-green-500',
+      // Apple Music
+      apple_music_favorite_artist: 'bg-pink-500',
+      apple_music_add_track: 'bg-pink-500',
+      apple_music_add_album: 'bg-pink-500',
+      apple_music_add_playlist: 'bg-pink-500',
+      apple_music_listen: 'bg-pink-500',
     };
     return bgColors[templateId] || '';
   };
