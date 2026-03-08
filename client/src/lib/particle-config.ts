@@ -169,12 +169,13 @@ export function createParticleConfig() {
       }),
     ],
 
-    // Wallet plugin must be visible:true so the DOM element exists for openWallet().
-    // The floating entry button is hidden via CSS in index.css.
+    // Wallet plugin: visible:false hides the floating entry button completely.
+    // openWallet() calls are wrapped in try-catch by the app's UI components
+    // because the embedded wallet WASM module may fail to load in some environments.
     plugins: [
       wallet({
         entryPosition: EntryPosition.BR,
-        visible: true,
+        visible: false,
       }),
     ],
 
