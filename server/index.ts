@@ -15,8 +15,7 @@ import { standardApiLimiter } from './middleware/rate-limit';
 
 const app = express();
 
-// Trust the first proxy (Replit / load balancer) so express-rate-limit
-// reads the real client IP from X-Forwarded-For instead of erroring.
+// Trust proxy for rate limiting behind reverse proxies (Replit, load balancer, etc.)
 app.set('trust proxy', 1);
 
 // CORS — allow same-origin and Replit dev preview origins

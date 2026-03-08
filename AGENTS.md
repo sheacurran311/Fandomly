@@ -56,6 +56,17 @@ The app uses `@neondatabase/serverless` which connects to PostgreSQL via WebSock
 - **NFT/Marketplace → own L1 blockchain**: Crossmint integration was removed, but the NFT DB tables (`nft_collections`, `nft_templates`, `nft_mints`, `nft_deliveries`) and reward type `"nft"` are being kept — they'll be repurposed for the Fandomly L1 blockchain with three smart contracts: Staking, Token Factory (creators), and ReputationRegistry. See `feat/landing-page-redesign` PR for contract details.
 - **Auth migration**: Dynamic Labs wallet auth is being replaced with Particle Network. The JWT auth system (`jwt-service.ts`, `rbac.ts`) stays unchanged — only the wallet connection provider changes.
 
+### Social Network Auth — Single Source of Truth
+
+**CRITICAL**: Each social network has ONE authoritative file that defines its OAuth configuration (scopes, redirect URIs, popup flow). See `.cursor/rules/social-auth-single-source.mdc` for the full rule and file mapping. **Never** duplicate OAuth logic, popup handling, or URL construction outside the designated source file. All consumer files (auth-modal.tsx, auth-context.tsx, callback pages) import from the source — fix bugs in the source, not the consumer.
+
+Quick reference:
+
+- **Twitter/X** → `client/src/lib/twitter.ts` (`TwitterSDKManager`)
+- **Facebook/Instagram** → `client/src/lib/facebook.ts` (`FacebookSDKManager`)
+- **TikTok, YouTube, Spotify, Discord, Twitch** → `client/src/lib/social-integrations.ts`
+- **Google** → `server/services/auth/google-auth.ts` + `server/routes/auth/google-routes.ts`
+
 ### Gotchas
 
 - The Neon serverless driver connects via WebSocket, not TCP. Without `dev-ws-proxy.mjs` + `dev-preload.mjs`, database queries will fail with `ECONNREFUSED` on `wss://localhost/v2`.

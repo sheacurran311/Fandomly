@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * ⛔ SINGLE SOURCE OF TRUTH — Google OAuth (server-side)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This file + google-routes.ts are the ONLY places where Google OAuth config
+ * (client ID/secret, token exchange, redirect URI construction) should be
+ * defined. The flow is entirely server-driven — the client just navigates
+ * to GET /api/auth/google.
+ */
 import { db } from '../../db';
 import { users, socialConnections } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
@@ -478,7 +487,9 @@ function generateUsername(base: string): string {
 }
 
 /**
- * Get OAuth URL for Google sign-in
+ * Build the Google OAuth consent URL.
+ * The redirectUri MUST match an Authorized Redirect URI in the Google Cloud Console
+ * AND the value used later in the token exchange (exchangeGoogleCode).
  */
 export function getGoogleAuthUrl(redirectUri: string, state?: string): string {
   if (!GOOGLE_CLIENT_ID) {

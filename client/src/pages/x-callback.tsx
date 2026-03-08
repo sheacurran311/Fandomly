@@ -1,9 +1,13 @@
-import { useEffect, useRef } from "react";
-import { TwitterSDKManager, TwitterLoginResult } from "@/lib/twitter";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable no-empty */
+// ⛔ Twitter auth source of truth: client/src/lib/twitter.ts — see .cursor/rules/social-auth-single-source.mdc
+import { useEffect, useRef } from 'react';
+import { TwitterSDKManager, TwitterLoginResult } from '@/lib/twitter';
 
 export default function XCallback() {
   const ranRef = useRef(false);
-  
+
   useEffect(() => {
     if (ranRef.current) return;
     ranRef.current = true;
@@ -13,7 +17,7 @@ export default function XCallback() {
       console.log('[X-Callback] Starting Twitter OAuth callback processing...');
       console.log('[X-Callback] URL search params:', window.location.search);
       console.log('[X-Callback] Has opener window:', !!(window as any).opener);
-      
+
       const search = new URLSearchParams(window.location.search);
       const state = search.get('state') || undefined;
 
@@ -34,11 +38,11 @@ export default function XCallback() {
               result = parsed;
             }
           }
-          
+
           // If still no success, wait and try again (for race conditions)
           if (!result?.success) {
             console.log('[X-Callback] No cached result yet, waiting 600ms...');
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise((r) => setTimeout(r, 600));
             cached = sessionStorage.getItem(`tw_cb_result_${state}`);
             if (cached) {
               const parsed = JSON.parse(cached);
@@ -56,8 +60,8 @@ export default function XCallback() {
       // Strip ?code&state after we've processed them to avoid re-trigger
       try {
         const url = new URL(window.location.href);
-        url.search = "";
-        window.history.replaceState({}, "", url.toString());
+        url.search = '';
+        window.history.replaceState({}, '', url.toString());
       } catch {}
 
       // Always store in localStorage for COOP fallback (Cross-Origin-Opener-Policy can null window.opener)
@@ -73,7 +77,10 @@ export default function XCallback() {
       if ((window as any).opener) {
         try {
           console.log('[X-Callback] Posting result to opener:', result);
-          (window as any).opener.postMessage({ type: "twitter-oauth-result", result }, window.location.origin);
+          (window as any).opener.postMessage(
+            { type: 'twitter-oauth-result', result },
+            window.location.origin
+          );
           (window as any).opener.twitterCallbackData = result; // fallback
           console.log('[X-Callback] Posted to opener, closing popup...');
         } catch (error) {
@@ -84,8 +91,13 @@ export default function XCallback() {
       }
 
       // If no opener but state looks like popup flow (COOP blocked opener), close anyway
-      if (state && (state.startsWith('twitter_') || state.includes('_creator_') || state.includes('_fan_'))) {
-        console.log('[X-Callback] No opener (likely COOP), closing popup - parent will read localStorage');
+      if (
+        state &&
+        (state.startsWith('twitter_') || state.includes('_creator_') || state.includes('_fan_'))
+      ) {
+        console.log(
+          '[X-Callback] No opener (likely COOP), closing popup - parent will read localStorage'
+        );
         window.close();
         return;
       }
@@ -93,20 +105,22 @@ export default function XCallback() {
       if (!mounted) return;
       // Not a popup: minimal UX – navigate user back to dashboards based on state
       try {
-        const stateStr = result.state || "";
-        if (stateStr.includes("_creator_")) {
-          window.location.replace("/creator-dashboard/social");
-        } else if (stateStr.includes("_fan_")) {
-          window.location.replace("/fan-dashboard/social");
+        const stateStr = result.state || '';
+        if (stateStr.includes('_creator_')) {
+          window.location.replace('/creator-dashboard/social');
+        } else if (stateStr.includes('_fan_')) {
+          window.location.replace('/fan-dashboard/social');
         } else {
-          window.location.replace("/");
+          window.location.replace('/');
         }
       } catch {
-        window.location.replace("/");
+        window.location.replace('/');
       }
     };
     run();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (

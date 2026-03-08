@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * TikTok OAuth Callback Page
+ * ⛔ TikTok auth source of truth: client/src/lib/social-integrations.ts (TikTokAPI)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
  *
  * Handles the OAuth callback from TikTok
  * Exchanges authorization code for access token

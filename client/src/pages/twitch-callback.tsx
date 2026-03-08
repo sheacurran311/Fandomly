@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Twitch OAuth Callback Page
+ * ⛔ Twitch auth source of truth: client/src/lib/social-integrations.ts (TwitchAPI)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
  *
  * Handles the OAuth callback from Twitch
  * Exchanges authorization code for access token

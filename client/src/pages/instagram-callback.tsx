@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
+// ⛔ Instagram auth source of truth: client/src/lib/facebook.ts (FacebookSDKManager)
+// See rule: .cursor/rules/social-auth-single-source.mdc
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,19 +11,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { useInstagramConnection } from '@/contexts/instagram-connection-context';
 import InstagramSDKManager from '@/lib/instagram';
 import { toast } from '@/hooks/use-toast';
-import { 
-  Instagram, 
-  Loader2, 
-  CheckCircle, 
-  XCircle,
-  ArrowLeft 
-} from 'lucide-react';
+import { Instagram, Loader2, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 
 export default function InstagramCallback() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { connectInstagram } = useInstagramConnection();
-  
+
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [error, setError] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<any>(null);
@@ -31,7 +30,11 @@ export default function InstagramCallback() {
       const errorParam = urlParams.get('error');
 
       // Helper to send result to opener with localStorage COOP fallback
-      const sendResultToOpener = (result: { success: boolean; error?: string; [key: string]: any }) => {
+      const sendResultToOpener = (result: {
+        success: boolean;
+        error?: string;
+        [key: string]: any;
+      }) => {
         if (state) {
           try {
             localStorage.setItem(`instagram_oauth_result_${state}`, JSON.stringify(result));
@@ -40,7 +43,10 @@ export default function InstagramCallback() {
           }
         }
         if (window.opener) {
-          window.opener.postMessage({ type: 'instagram-oauth-result', result }, window.location.origin);
+          window.opener.postMessage(
+            { type: 'instagram-oauth-result', result },
+            window.location.origin
+          );
           (window.opener as any).instagramCallbackData = result;
           window.close();
           return true;
@@ -56,16 +62,16 @@ export default function InstagramCallback() {
         // Handle authorization errors
         if (errorParam) {
           const errorDescription = urlParams.get('error_description');
-          
+
           setStatus('error');
           setError(`Authorization failed: ${errorDescription || errorParam}`);
-          
+
           if (sendResultToOpener({ success: false, error: errorDescription || errorParam })) return;
-          
+
           toast({
-            title: "Instagram Authorization Failed",
-            description: errorDescription || "The authorization was cancelled or failed.",
-            variant: "destructive"
+            title: 'Instagram Authorization Failed',
+            description: errorDescription || 'The authorization was cancelled or failed.',
+            variant: 'destructive',
           });
           return;
         }
@@ -74,8 +80,14 @@ export default function InstagramCallback() {
         if (!code || !state) {
           setStatus('error');
           setError('Missing authorization code or state parameter');
-          
-          if (sendResultToOpener({ success: false, error: 'Missing authorization code or state parameter' })) return;
+
+          if (
+            sendResultToOpener({
+              success: false,
+              error: 'Missing authorization code or state parameter',
+            })
+          )
+            return;
           return;
         }
 
@@ -93,7 +105,9 @@ export default function InstagramCallback() {
             console.log('[Instagram Callback] Using global callback handler');
             (window as any).handleInstagramConnectionResult(result);
           } else {
-            console.log('[Instagram Callback] Global callback handler not available, using direct connection');
+            console.log(
+              '[Instagram Callback] Global callback handler not available, using direct connection'
+            );
             try {
               await connectInstagram();
             } catch (err) {
@@ -116,46 +130,44 @@ export default function InstagramCallback() {
                 media_count: result.user.media_count,
                 account_type: result.user.account_type,
               },
-            }
+            },
           };
 
           if (sendResultToOpener(augmentedResult)) return;
-          
+
           toast({
-            title: "Instagram Connected!",
+            title: 'Instagram Connected!',
             description: `Successfully connected @${result.user.username}`,
-            duration: 4000
+            duration: 4000,
           });
 
           setTimeout(() => {
             setLocation('/creator-dashboard');
           }, 2000);
-
         } else {
           setStatus('error');
           setError(result.error || 'Failed to complete Instagram connection');
-          
+
           if (sendResultToOpener(result)) return;
-          
+
           toast({
-            title: "Instagram Connection Failed",
+            title: 'Instagram Connection Failed',
             description: result.error || 'An unexpected error occurred',
-            variant: "destructive"
+            variant: 'destructive',
           });
         }
-
       } catch (err) {
         console.error('[Instagram Callback] Error:', err);
         setStatus('error');
         const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
         setError(errorMsg);
-        
+
         if (sendResultToOpener({ success: false, error: errorMsg })) return;
-        
+
         toast({
-          title: "Instagram Connection Error",
-          description: "Failed to process Instagram authorization",
-          variant: "destructive"
+          title: 'Instagram Connection Error',
+          description: 'Failed to process Instagram authorization',
+          variant: 'destructive',
         });
       }
     };
@@ -183,9 +195,7 @@ export default function InstagramCallback() {
               <Loader2 className="h-5 w-5 animate-spin" />
               Connecting Instagram
             </CardTitle>
-            <CardDescription>
-              Processing your Instagram authorization...
-            </CardDescription>
+            <CardDescription>Processing your Instagram authorization...</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <div className="space-y-2 text-sm text-muted-foreground">
@@ -208,24 +218,20 @@ export default function InstagramCallback() {
               <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
             <CardTitle className="text-green-600">Instagram Connected!</CardTitle>
-            <CardDescription>
-              Your Instagram Business Account is now connected
-            </CardDescription>
+            <CardDescription>Your Instagram Business Account is now connected</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
               {userInfo.profile_picture_url && (
-                <img 
-                  src={userInfo.profile_picture_url} 
+                <img
+                  src={userInfo.profile_picture_url}
                   alt={userInfo.username}
                   className="h-12 w-12 rounded-full"
                 />
               )}
               <div>
                 <p className="font-semibold">@{userInfo.username}</p>
-                {userInfo.name && (
-                  <p className="text-sm text-muted-foreground">{userInfo.name}</p>
-                )}
+                {userInfo.name && <p className="text-sm text-muted-foreground">{userInfo.name}</p>}
                 <p className="text-xs text-green-600">Business Account</p>
               </div>
             </div>
@@ -248,9 +254,7 @@ export default function InstagramCallback() {
               <XCircle className="h-8 w-8 text-red-500" />
             </div>
             <CardTitle className="text-red-600">Connection Failed</CardTitle>
-            <CardDescription>
-              Failed to connect your Instagram account
-            </CardDescription>
+            <CardDescription>Failed to connect your Instagram account</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
@@ -269,18 +273,11 @@ export default function InstagramCallback() {
             </div>
 
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={handleGoBack}
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={handleGoBack} className="flex-1">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
               </Button>
-              <Button 
-                onClick={handleRetry}
-                className="flex-1"
-              >
+              <Button onClick={handleRetry} className="flex-1">
                 Try Again
               </Button>
             </div>

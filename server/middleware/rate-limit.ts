@@ -12,6 +12,7 @@ export const standardApiLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many requests, please try again later.' },
 });
 
@@ -24,6 +25,7 @@ export const analyticsLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many analytics requests. Please wait a moment and try again.' },
 });
 
@@ -36,6 +38,7 @@ export const syncActionLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many sync requests. Please wait a moment.' },
 });
 
@@ -48,17 +51,20 @@ export const insightsLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many insight requests. Please wait a moment.' },
 });
 
 /**
- * Auth rate limit: 10 requests per minute per IP
+ * Auth rate limit: 20 requests per minute per IP
  * Prevents brute-force login attempts and account enumeration.
+ * Higher limit than default to account for Particle auth retry flows.
  */
 export const authRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many authentication attempts. Please try again later.' },
 });

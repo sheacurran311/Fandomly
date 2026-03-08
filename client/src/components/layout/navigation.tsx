@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,11 +13,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Menu, X, User, Settings, LogOut, ChevronDown, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/contexts/particle-provider';
-import { useAuthModal } from '@/hooks/use-auth-modal';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
 import { transformImageUrl } from '@/lib/image-utils';
 import { BrandSwitcher } from '@/components/brand-switcher';
 import { useEmbeddedWallet } from '@particle-network/connectkit';
+
+const ParticleConnectButton = lazy(() =>
+  import('@particle-network/connectkit').then((mod) => ({
+    default: mod.ConnectButton,
+  }))
+);
 
 /**
  * Wallet dropdown menu item — only renders inside ConnectKitProvider
@@ -46,19 +51,14 @@ function WalletDropdownItem() {
 export default function Navigation() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Use new auth context
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const particleEnabled = isParticleAuthEnabled();
-  const { openAuthModal } = useAuthModal();
 
-  // Landing page has its own minimal footer with logo — no nav bar needed
   if (location === '/') return null;
 
   const handleLogout = async () => {
     try {
       await logout();
-      // Redirect to home
       window.location.href = '/';
     } catch (error) {
       console.error('Error logging out:', error);
@@ -78,7 +78,6 @@ export default function Navigation() {
 
             <div className="hidden md:flex items-center space-x-8">
               {!isAuthenticated ? (
-                // Non-authenticated users see marketing navigation
                 <>
                   <Link
                     href="/#features"
@@ -100,7 +99,6 @@ export default function Navigation() {
                   </Link>
                 </>
               ) : (
-                // Authenticated users see simplified navigation
                 <>
                   <Link
                     href="/find-creators"
@@ -116,10 +114,19 @@ export default function Navigation() {
                   </Link>
                 </>
               )}
+
               {isAuthenticated && user ? (
-                <div className="flex items-center space-x-4">
-                  {/* Brand Switcher for Agency Users */}
+                <div className="flex items-center space-x-3">
                   {user.profileData?.brandType === 'agency' && <BrandSwitcher />}
+
+                  {/* Particle Wallet Widget — shows chain, address, balance for authenticated users */}
+                  {particleEnabled && (
+                    <div className="[&>div]:rounded-xl [&>div]:text-xs [&>div]:h-9 [&>div]:min-w-0">
+                      <Suspense fallback={null}>
+                        <ParticleConnectButton label="Wallet" />
+                      </Suspense>
+                    </div>
+                  )}
 
                   {/* Dashboard button */}
                   {!isLoading && user ? (
@@ -219,12 +226,12 @@ export default function Navigation() {
                   </DropdownMenu>
                 </div>
               ) : (
-                <Button
-                  onClick={() => openAuthModal()}
-                  className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105"
-                >
-                  Sign In
-                </Button>
+                /* Not authenticated — show Sign In button linking to /login */
+                <Link href="/login">
+                  <Button className="bg-brand-primary hover:bg-brand-primary/80 text-white font-medium px-6 py-2 rounded-xl transition-all duration-200 hover:scale-105">
+                    Sign In
+                  </Button>
+                </Link>
               )}
             </div>
 
@@ -243,7 +250,6 @@ export default function Navigation() {
             <div className="md:hidden py-4 border-t border-brand-primary/20">
               <div className="flex flex-col space-y-4">
                 {!isAuthenticated ? (
-                  // Non-authenticated mobile navigation
                   <>
                     <Link
                       href="/#features"
@@ -265,7 +271,6 @@ export default function Navigation() {
                     </Link>
                   </>
                 ) : (
-                  // Authenticated mobile navigation
                   <>
                     <Link
                       href="/find-creators"
@@ -282,15 +287,14 @@ export default function Navigation() {
                   </>
                 )}
                 {!isAuthenticated && (
-                  <Button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      openAuthModal();
-                    }}
-                    className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
-                  >
-                    Sign In
-                  </Button>
+                  <Link href="/login">
+                    <Button
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
+                    >
+                      Sign In
+                    </Button>
+                  </Link>
                 )}
               </div>
             </div>

@@ -1,5 +1,7 @@
 /**
  * Kick OAuth Callback Page
+ * ⛔ Kick auth source of truth: client/src/lib/kick.ts (KickAPI)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
  *
  * Handles the OAuth redirect from Kick in a popup window.
  * Exchanges auth code for token (with PKCE), saves connection, and notifies opener.

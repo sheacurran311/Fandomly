@@ -1,21 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// ⛔ Google auth source of truth: server/services/auth/google-auth.ts + server/routes/auth/google-routes.ts
+// See rule: .cursor/rules/social-auth-single-source.mdc
 import { useEffect, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 
 /**
  * Google OAuth callback page
- *
- * @deprecated This page handles the legacy Google OAuth redirect flow that was used
- * before Particle Network ConnectKit was integrated. When Particle is configured,
- * Google sign-in is handled natively by Particle ConnectKit's Google social auth
- * connector and this page is not reached.
- *
- * This page is kept as a fallback for:
- *   1. Environments where VITE_PARTICLE_PROJECT_ID is not set
- *   2. Backward compatibility for any session that was initiated via the old Google flow
- *
- * Do NOT remove until all Google OAuth users are fully migrated to Particle auth.
  *
  * After auth, routes users based on their stored type:
  * - New users / pending type → /user-type-selection (ALWAYS)
@@ -31,9 +22,13 @@ export default function GoogleCallback() {
   const [showLinkConfirmation, setShowLinkConfirmation] = useState(false);
 
   useEffect(() => {
+    // Guard against double-invocation (React 18 Strict Mode runs effects twice
+    // in development). Google auth codes are single-use, so the second call
+    // would always fail with `invalid_grant`.
+    let cancelled = false;
+
     async function handleCallback() {
       try {
-        // Parse URL parameters
         const params = new URLSearchParams(search);
         const code = params.get('code');
         const errorParam = params.get('error');
@@ -46,16 +41,18 @@ export default function GoogleCallback() {
           throw new Error('No authorization code received from Google');
         }
 
+        if (cancelled) return;
+
         console.log('[Google Callback] Processing callback with code');
 
-        // Exchange code for tokens — no userType passed, backend creates with 'pending'
         const result = await loginWithCallback('google', {
           code,
           redirect_uri: `${window.location.origin}/auth/google/callback`,
         });
 
+        if (cancelled) return;
+
         if (result.linkRequired) {
-          // Show link confirmation UI
           setShowLinkConfirmation(true);
           setIsProcessing(false);
           return;
@@ -64,7 +61,6 @@ export default function GoogleCallback() {
         if (result.success) {
           const user = result.user;
 
-          // New user OR user without a type → MUST go to type selection
           if (result.isNewUser || !user?.userType || user.userType === 'pending') {
             setLocation('/user-type-selection');
           } else if (user?.userType === 'creator') {
@@ -80,13 +76,13 @@ export default function GoogleCallback() {
               setLocation('/fan-onboarding/profile');
             }
           } else {
-            // Any other case → type selection
             setLocation('/user-type-selection');
           }
         } else {
           throw new Error(result.message || 'Authentication failed');
         }
       } catch (err: any) {
+        if (cancelled) return;
         console.error('[Google Callback] Error:', err);
         setError(err.message || 'An error occurred during authentication');
         setIsProcessing(false);
@@ -94,6 +90,10 @@ export default function GoogleCallback() {
     }
 
     handleCallback();
+
+    return () => {
+      cancelled = true;
+    };
   }, [search, loginWithCallback, setLocation]);
 
   // Handle link confirmation

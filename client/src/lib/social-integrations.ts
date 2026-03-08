@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * ⛔ SINGLE SOURCE OF TRUTH — TikTok, YouTube, Spotify, Discord, Twitch OAuth
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This file is the ONLY place where OAuth config (scopes, redirect URIs, popup
+ * flows, COOP fallbacks) for TikTok, YouTube, Spotify, Discord, and Twitch
+ * should be defined. All UI layers must import and call secureLogin() from here.
+ * NEVER duplicate this logic elsewhere.
+ */
 // Social Media Integration APIs
 import FacebookSDK, { type FacebookPage } from './facebook';
 import { KickAPI } from './kick';
@@ -193,11 +202,12 @@ export class TikTokAPI {
     return authUrl;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string }> {
+  async secureLogin(mode?: 'auth' | 'connect'): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
       try {
-        // Generate CSRF state token
-        const state = `tiktok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        // Generate CSRF state token; embed _auth_ marker so callbacks distinguish login from connection
+        const authMarker = mode === 'auth' ? '_auth_' : '';
+        const state = `tiktok_${authMarker}${Date.now()}_${Math.random().toString(36).slice(2)}`;
         localStorage.setItem('tiktok_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
@@ -438,11 +448,14 @@ export class YouTubeAPI {
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string; channelName?: string }> {
+  async secureLogin(
+    mode?: 'auth' | 'connect'
+  ): Promise<{ success: boolean; error?: string; channelName?: string }> {
     return new Promise((resolve) => {
       try {
-        // Generate CSRF state token
-        const state = `youtube_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        // Generate CSRF state token; embed _auth_ marker so callbacks distinguish login from connection
+        const authMarker = mode === 'auth' ? '_auth_' : '';
+        const state = `youtube_${authMarker}${Date.now()}_${Math.random().toString(36).slice(2)}`;
         localStorage.setItem('youtube_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
@@ -616,11 +629,14 @@ export class SpotifyAPI {
     return `https://accounts.spotify.com/authorize?${params.toString()}`;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+  async secureLogin(
+    mode?: 'auth' | 'connect'
+  ): Promise<{ success: boolean; error?: string; displayName?: string }> {
     return new Promise((resolve) => {
       try {
-        // Generate CSRF state token
-        const state = `spotify_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        // Generate CSRF state token; embed _auth_ marker so callbacks distinguish login from connection
+        const authMarker = mode === 'auth' ? '_auth_' : '';
+        const state = `spotify_${authMarker}${Date.now()}_${Math.random().toString(36).slice(2)}`;
         localStorage.setItem('spotify_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
@@ -943,10 +959,13 @@ export class DiscordAPI {
     return `https://discord.com/oauth2/authorize?${params.toString()}`;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+  async secureLogin(
+    mode?: 'auth' | 'connect'
+  ): Promise<{ success: boolean; error?: string; displayName?: string }> {
     return new Promise((resolve) => {
       try {
-        const state = `discord_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const authMarker = mode === 'auth' ? '_auth_' : '';
+        const state = `discord_${authMarker}${Date.now()}_${Math.random().toString(36).slice(2)}`;
         localStorage.setItem('discord_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);
@@ -1119,10 +1138,13 @@ export class TwitchAPI {
     return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string; displayName?: string }> {
+  async secureLogin(
+    mode?: 'auth' | 'connect'
+  ): Promise<{ success: boolean; error?: string; displayName?: string }> {
     return new Promise((resolve) => {
       try {
-        const state = `twitch_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const authMarker = mode === 'auth' ? '_auth_' : '';
+        const state = `twitch_${authMarker}${Date.now()}_${Math.random().toString(36).slice(2)}`;
         localStorage.setItem('twitch_oauth_state', state);
 
         const authUrl = this.getAuthUrl(state);

@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Spotify OAuth Callback Page
+ * ⛔ Spotify auth source of truth: client/src/lib/social-integrations.ts (SpotifyAPI)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
  *
  * Handles the OAuth callback from Spotify
  * Exchanges authorization code for access token

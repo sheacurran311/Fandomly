@@ -1241,8 +1241,9 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitter user info
-  app.get('/api/social/twitter/user', authenticateUser, async (req: Request, res: Response) => {
+  // Twitter user info — uses platform OAuth token from Authorization header, not Fandomly JWT.
+  // Called during login flow before user is authenticated in Fandomly.
+  app.get('/api/social/twitter/user', async (req: Request, res: Response) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1558,8 +1559,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Discord user info
-  app.get('/api/social/discord/me', authenticateUser, async (req, res) => {
+  // Discord user info — uses platform OAuth token, not Fandomly JWT.
+  app.get('/api/social/discord/me', async (req, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -1594,8 +1595,8 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Twitch user info
-  app.get('/api/social/twitch/me', authenticateUser, async (req, res) => {
+  // Twitch user info — uses platform OAuth token, not Fandomly JWT.
+  app.get('/api/social/twitch/me', async (req, res) => {
     try {
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {

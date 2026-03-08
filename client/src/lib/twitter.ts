@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-empty */
+/**
+ * ⛔ SINGLE SOURCE OF TRUTH — Twitter/X OAuth
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * TwitterSDKManager is the ONLY place where Twitter OAuth config (client ID,
+ * scopes, PKCE, redirect URI, popup flow) should be defined. All UI layers
+ * must import and call TwitterSDKManager.secureLogin(). NEVER duplicate
+ * this logic elsewhere.
+ */
 import { fetchApi } from '@/lib/queryClient';
 
 type UserType = 'creator' | 'fan' | string; // 'string' allows 'auth' and other neutral values

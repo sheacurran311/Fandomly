@@ -1,4 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * ⛔ SINGLE SOURCE OF TRUTH — Google OAuth (routes)
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This file + google-auth.ts are the ONLY places where Google OAuth routing and
+ * redirect URI construction should be defined.
+ */
 import type { Express, Request, Response } from 'express';
 import {
   exchangeGoogleCode,
@@ -7,20 +14,6 @@ import {
   getGoogleAuthUrl,
 } from '../../services/auth/google-auth';
 
-/**
- * Register Google OAuth routes
- *
- * @deprecated These routes are legacy fallbacks from before Particle Network was integrated.
- * When VITE_PARTICLE_PROJECT_ID is set, Particle ConnectKit handles all authentication
- * (including Google via its native Google social auth connector). These routes remain
- * for two reasons:
- *   1. Fallback when Particle env vars are not configured
- *   2. Backward compatibility for users who originally authenticated via Google OAuth
- *      and may have existing sessions that go through this code path
- *
- * Do NOT remove these routes unless all users have been migrated to Particle auth
- * and there is no longer a need for a non-Particle fallback path.
- */
 // Validate redirect_uri to prevent open redirect attacks.
 // Only allows same-origin URIs or configured allowed origins.
 function isAllowedRedirectUri(uri: string, host: string): boolean {
@@ -34,6 +27,29 @@ function isAllowedRedirectUri(uri: string, host: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Tracks recently used Google auth codes to reject duplicate exchange attempts
+// (e.g. React 18 Strict Mode double-firing effects). TTL: 2 minutes.
+const recentlyUsedCodes = new Map<string, number>();
+const CODE_TTL_MS = 2 * 60 * 1000;
+
+function markCodeUsed(code: string) {
+  recentlyUsedCodes.set(code, Date.now());
+  // Prune expired entries
+  for (const [key, ts] of recentlyUsedCodes) {
+    if (Date.now() - ts > CODE_TTL_MS) recentlyUsedCodes.delete(key);
+  }
+}
+
+function isCodeAlreadyUsed(code: string): boolean {
+  const ts = recentlyUsedCodes.get(code);
+  if (!ts) return false;
+  if (Date.now() - ts > CODE_TTL_MS) {
+    recentlyUsedCodes.delete(code);
+    return false;
+  }
+  return true;
 }
 
 export function registerGoogleAuthRoutes(app: Express) {
@@ -99,8 +115,6 @@ export function registerGoogleAuthRoutes(app: Express) {
   app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
     try {
       const { code, redirect_uri } = req.body;
-      // NOTE: user_type is intentionally NOT accepted here.
-      // All new users are created with 'pending' type and must choose after auth.
 
       if (!code) {
         return res.status(400).json({ error: 'Authorization code is required' });
@@ -110,18 +124,23 @@ export function registerGoogleAuthRoutes(app: Express) {
         return res.status(400).json({ error: 'redirect_uri is required' });
       }
 
+      if (isCodeAlreadyUsed(code)) {
+        console.warn('[Google Auth] Duplicate code exchange attempt — ignoring');
+        return res.status(409).json({
+          error: 'Authorization code already used',
+          message: 'This login request was already processed. Please try again.',
+        });
+      }
+      markCodeUsed(code);
+
       console.log('[Google Auth] Processing callback', {
         codeLength: code.length,
         redirectUri: redirect_uri,
       });
 
-      // Exchange code for tokens
       const googleTokens = await exchangeGoogleCode(code, redirect_uri);
-
-      // Authenticate or create user — new users always get 'pending' type
       const authResult = await authenticateWithGoogle(googleTokens);
 
-      // If link is required, return the link info
       if (authResult.linkRequired) {
         return res.status(200).json({
           success: false,
@@ -132,12 +151,11 @@ export function registerGoogleAuthRoutes(app: Express) {
         });
       }
 
-      // Set refresh token in HTTP-only cookie for security
       res.cookie('refresh_token', authResult.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       res.json({
@@ -171,13 +189,9 @@ export function registerGoogleAuthRoutes(app: Express) {
         return res.status(400).json({ error: 'code and redirect_uri are required' });
       }
 
-      // Exchange code for tokens
       const googleTokens = await exchangeGoogleCode(code, redirect_uri);
-
-      // Confirm the link
       const authResult = await confirmAccountLink(pending_link_id, googleTokens);
 
-      // Set refresh token in HTTP-only cookie
       res.cookie('refresh_token', authResult.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

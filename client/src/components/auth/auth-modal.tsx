@@ -1,10 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-empty */
+/**
+ * ⛔ SOCIAL AUTH — CONSUMER ONLY, NOT A SOURCE OF TRUTH
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * This file IMPORTS social auth from source-of-truth modules. It must NEVER
+ * define its own OAuth URLs, scopes, popup logic, or postMessage handling.
+ * To fix a social auth bug, fix it in the source file (twitter.ts,
+ * facebook.ts, or social-integrations.ts), NOT here.
+ */
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   FaGoogle,
@@ -18,6 +25,13 @@ import {
 } from 'react-icons/fa';
 import { TwitterSDKManager } from '@/lib/twitter';
 import { FacebookSDKManager } from '@/lib/facebook';
+import {
+  TikTokAPI,
+  YouTubeAPI,
+  SpotifyAPI,
+  DiscordAPI,
+  TwitchAPI,
+} from '@/lib/social-integrations';
 import { useToast } from '@/hooks/use-toast';
 import { getPostAuthRedirect } from '@/lib/auth-redirect';
 
@@ -25,192 +39,73 @@ interface AuthProvider {
   id: string;
   name: string;
   icon: React.ReactNode;
-  bgColor: string;
-  hoverColor: string;
-  textColor: string;
+  color: string;
 }
 
-// Primary providers shown by default (Google + top 3 social)
-// Note: Instagram is NOT included here - it only supports business/creator accounts
-// and is only available for creators to connect their accounts on the creator dashboard
 const primaryProviders: AuthProvider[] = [
   {
     id: 'google',
-    name: 'Continue with Google',
+    name: 'Google',
     icon: <FaGoogle className="w-5 h-5" />,
-    bgColor: 'bg-white',
-    hoverColor: 'hover:bg-gray-100',
-    textColor: 'text-gray-800',
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
   {
     id: 'twitter',
-    name: 'Continue with X',
+    name: 'X (Twitter)',
     icon: <FaTwitter className="w-5 h-5" />,
-    bgColor: 'bg-black',
-    hoverColor: 'hover:bg-gray-900',
-    textColor: 'text-white',
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
   {
     id: 'facebook',
-    name: 'Continue with Facebook',
-    icon: <FaFacebook className="w-5 h-5" />,
-    bgColor: 'bg-[#1877F2]',
-    hoverColor: 'hover:bg-[#166FE5]',
-    textColor: 'text-white',
+    name: 'Facebook',
+    icon: <FaFacebook className="w-5 h-5 text-[#1877F2]" />,
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
   {
     id: 'tiktok',
-    name: 'Continue with TikTok',
+    name: 'TikTok',
     icon: <FaTiktok className="w-5 h-5" />,
-    bgColor: 'bg-black',
-    hoverColor: 'hover:bg-gray-900',
-    textColor: 'text-white',
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
 ];
 
-// Additional providers shown when expanded
-const additionalProviders: AuthProvider[] = [
-  {
-    id: 'twitch',
-    name: 'Continue with Twitch',
-    icon: <FaTwitch className="w-5 h-5" />,
-    bgColor: 'bg-[#9146FF]',
-    hoverColor: 'hover:bg-[#7C3AED]',
-    textColor: 'text-white',
-  },
+const moreProviders: AuthProvider[] = [
   {
     id: 'discord',
-    name: 'Continue with Discord',
-    icon: <FaDiscord className="w-5 h-5" />,
-    bgColor: 'bg-[#5865F2]',
-    hoverColor: 'hover:bg-[#4752C4]',
-    textColor: 'text-white',
+    name: 'Discord',
+    icon: <FaDiscord className="w-5 h-5 text-[#5865F2]" />,
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
+  },
+  {
+    id: 'twitch',
+    name: 'Twitch',
+    icon: <FaTwitch className="w-5 h-5 text-[#9146FF]" />,
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
   {
     id: 'youtube',
-    name: 'Continue with YouTube',
-    icon: <FaYoutube className="w-5 h-5" />,
-    bgColor: 'bg-[#FF0000]',
-    hoverColor: 'hover:bg-[#CC0000]',
-    textColor: 'text-white',
+    name: 'YouTube',
+    icon: <FaYoutube className="w-5 h-5 text-[#FF0000]" />,
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
   {
     id: 'spotify',
-    name: 'Continue with Spotify',
-    icon: <FaSpotify className="w-5 h-5" />,
-    bgColor: 'bg-[#1DB954]',
-    hoverColor: 'hover:bg-[#1AA34A]',
-    textColor: 'text-white',
+    name: 'Spotify',
+    icon: <FaSpotify className="w-5 h-5 text-[#1DB954]" />,
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
   },
 ];
+
+// Reuse the single configured instances from social-integrations.ts
+const tiktokApi = new TikTokAPI();
+const youtubeApi = new YouTubeAPI();
+const spotifyApi = new SpotifyAPI();
+const discordApi = new DiscordAPI();
+const twitchApi = new TwitchAPI();
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-// OAuth popup helper for TikTok, YouTube, Spotify, Discord, Twitch
-async function openOAuthPopup(
-  providerId: string,
-  stateTag: string = 'auth' // neutral tag — no fan/creator assumption
-): Promise<{
-  success: boolean;
-  accessToken?: string;
-  userId?: string;
-  username?: string;
-  displayName?: string;
-  email?: string;
-  profileData?: any;
-  error?: string;
-}> {
-  const redirectUrls: Record<string, string> = {
-    tiktok: '/tiktok-callback',
-    youtube: '/youtube-callback',
-    spotify: '/spotify-callback',
-    discord: '/discord-callback',
-    twitch: '/twitch-callback',
-  };
-
-  const state = `${providerId}_${stateTag}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  localStorage.setItem(`${providerId}_oauth_state`, state);
-
-  const origin = window.location.origin;
-  const redirectUri = `${origin}${redirectUrls[providerId]}`;
-
-  let authUrl: string;
-
-  switch (providerId) {
-    case 'tiktok':
-      const tiktokClientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY || '';
-      authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${tiktokClientKey}&scope=user.info.basic&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
-      break;
-    case 'youtube':
-      const youtubeClientId = import.meta.env.VITE_GOOGLE_YOUTUBE_CLIENT_ID || '';
-      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${youtubeClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=https://www.googleapis.com/auth/youtube.readonly%20openid%20email%20profile&response_type=code&state=${state}&access_type=offline&prompt=consent`;
-      break;
-    case 'spotify':
-      const spotifyClientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
-      authUrl = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user-read-private%20user-read-email&response_type=code&state=${state}`;
-      break;
-    case 'discord':
-      const discordClientId = import.meta.env.VITE_DISCORD_CLIENT_ID || '';
-      authUrl = `https://discord.com/oauth2/authorize?client_id=${discordClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=identify%20email&response_type=code&state=${state}`;
-      break;
-    case 'twitch':
-      const twitchClientId = import.meta.env.VITE_TWITCH_CLIENT_ID || '';
-      authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${twitchClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:read:email&response_type=code&state=${state}`;
-      break;
-    default:
-      return { success: false, error: `Unknown provider: ${providerId}` };
-  }
-
-  return new Promise((resolve) => {
-    const popup = window.open(
-      authUrl,
-      `${providerId}-oauth`,
-      'width=600,height=700,scrollbars=yes,resizable=yes'
-    );
-
-    if (!popup) {
-      resolve({ success: false, error: 'Popup blocked. Please allow popups and try again.' });
-      return;
-    }
-
-    let settled = false;
-
-    const cleanup = () => {
-      window.removeEventListener('message', onMessage);
-      try {
-        popup?.close();
-      } catch {}
-    };
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== `${providerId}-oauth-result`) return;
-      if (settled) return;
-
-      settled = true;
-      cleanup();
-      resolve(event.data.result);
-    };
-
-    window.addEventListener('message', onMessage);
-
-    // Poll to check if popup was closed
-    const poll = setInterval(() => {
-      try {
-        if (!popup || popup.closed) {
-          clearInterval(poll);
-          if (!settled) {
-            settled = true;
-            cleanup();
-            resolve({ success: false, error: `${providerId} authorization was cancelled` });
-          }
-        }
-      } catch {}
-    }, 500);
-  });
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
@@ -226,8 +121,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   } = useAuth();
   const { toast } = useToast();
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
-  const [showMoreProviders, setShowMoreProviders] = useState(false);
-  // Account linking state — stores the provider + callback data needed to confirm the link
+  const [showMore, setShowMore] = useState(false);
   const [pendingLinkData, setPendingLinkData] = useState<{
     provider: string;
     callbackData: any;
@@ -236,12 +130,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   if (!isOpen) return null;
 
+  const busy = isLoading || loadingProvider !== null;
+
   const handleGoogleLogin = async () => {
     setLoadingProvider('google');
     try {
       await login('google');
     } catch (err: any) {
-      console.error('Google login error:', err);
       toast({
         title: 'Login Failed',
         description: err.message || 'Failed to connect with Google',
@@ -252,105 +147,108 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   const handleSocialLogin = async (providerId: string) => {
+    if (providerId === 'google') return handleGoogleLogin();
     setLoadingProvider(providerId);
 
     try {
-      let result: any;
+      // Each provider uses its single configured API class from social-integrations.ts.
+      // secureLogin() handles popup, postMessage, COOP fallback, and timeouts.
+      // The callback pages exchange the code, fetch user data, save the connection,
+      // and post the full result back to the opener.
+      const popupResult: any = await (async () => {
+        switch (providerId) {
+          case 'twitter':
+            return TwitterSDKManager.secureLogin('auth');
+          case 'facebook':
+            return FacebookSDKManager.secureLogin('fan');
+          case 'tiktok':
+            return tiktokApi.secureLogin('auth');
+          case 'youtube':
+            return youtubeApi.secureLogin('auth');
+          case 'spotify':
+            return spotifyApi.secureLogin('auth');
+          case 'discord':
+            return discordApi.secureLogin('auth');
+          case 'twitch':
+            return twitchApi.secureLogin('auth');
+          default:
+            throw new Error(`Provider ${providerId} not configured`);
+        }
+      })();
 
-      // Use platform-specific login methods
-      switch (providerId) {
-        case 'twitter':
-          result = await TwitterSDKManager.secureLogin('auth');
-          // Normalize Twitter result to match expected format
-          if (result.success && result.user) {
-            result = {
-              success: true,
-              accessToken: result.accessToken,
-              userId: result.user.id,
-              username: result.user.username,
-              displayName: result.user.name || result.user.username,
-              profileData: {
-                profileImageUrl: result.user.profileImageUrl,
-                followersCount: result.user.followersCount,
-                followingCount: result.user.followingCount,
-              },
-            };
-          }
-          break;
-        case 'facebook':
-          // Always use 'fan' app for initial authentication (basic public_profile + email)
-          // The 'creator' app with page permissions is only used later when connecting Pages
-          result = await FacebookSDKManager.secureLogin('fan');
-          // Normalize Facebook result to match expected format
-          if (result.success && result.user) {
-            result = {
-              success: true,
-              accessToken: result.accessToken,
-              userId: result.user.id,
-              username: result.user.name,
-              displayName: result.user.name,
-              email: result.user.email,
-              profileData: {
-                picture: result.user.picture,
-              },
-            };
-          }
-          break;
-        case 'tiktok':
-        case 'youtube':
-        case 'spotify':
-        case 'discord':
-        case 'twitch':
-          // These platforms use OAuth popup flow
-          result = await openOAuthPopup(providerId, 'auth');
-          break;
-        default:
-          throw new Error(`Provider ${providerId} not configured`);
+      if (!popupResult.success) {
+        throw new Error(popupResult.error || `Failed to connect with ${providerId}`);
       }
 
-      if (result.success) {
-        // Exchange the social token for our app token
-        const authResult = await loginWithCallback(providerId, {
-          access_token: result.accessToken,
-          platform_user_id: result.userId || result.platformUserId,
-          email: result.email,
-          username: result.username,
-          display_name: result.displayName,
-          profile_data: result.profileData || {
-            followers: result.followers,
-            verified: result.verified,
+      // Normalize the result shape — each provider's secureLogin/callback returns
+      // slightly different field names. Map to the flat shape loginWithCallback expects.
+      let accessToken: string | undefined;
+      let platformUserId: string | undefined;
+      let username: string | undefined;
+      let displayName: string | undefined;
+      let email: string | undefined;
+      let profileData: any = {};
+
+      if (providerId === 'twitter') {
+        accessToken = popupResult.accessToken;
+        platformUserId = popupResult.user?.id;
+        username = popupResult.user?.username;
+        displayName = popupResult.user?.name || popupResult.user?.username;
+        profileData = {
+          profileImageUrl: popupResult.user?.profileImageUrl,
+          followersCount: popupResult.user?.followersCount,
+          followingCount: popupResult.user?.followingCount,
+        };
+      } else if (providerId === 'facebook') {
+        accessToken = popupResult.accessToken;
+        platformUserId = popupResult.user?.id;
+        username = popupResult.user?.name;
+        displayName = popupResult.user?.name;
+        email = popupResult.user?.email;
+        profileData = { picture: popupResult.user?.picture };
+      } else {
+        // TikTok, YouTube, Spotify, Discord, Twitch —
+        // Their callback pages post back: { success, accessToken, userId, username, displayName, email, profileData }
+        accessToken = popupResult.accessToken;
+        platformUserId = popupResult.userId || popupResult.platformUserId;
+        username = popupResult.username;
+        displayName = popupResult.displayName || popupResult.channelName;
+        email = popupResult.email;
+        profileData = popupResult.profileData || {};
+      }
+
+      if (!accessToken || !platformUserId) {
+        throw new Error(`${providerId} auth completed but returned incomplete data`);
+      }
+
+      const authResult = await loginWithCallback(providerId, {
+        access_token: accessToken,
+        platform_user_id: platformUserId,
+        email,
+        username,
+        display_name: displayName,
+        profile_data: profileData,
+      });
+
+      if (authResult.success) {
+        toast({ title: 'Welcome!', description: `Signed in with ${providerId}` });
+        onClose();
+        const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
+        setLocation(redirectUrl);
+      } else if (authResult.linkRequired) {
+        setPendingLinkData({
+          provider: providerId,
+          callbackData: {
+            access_token: accessToken,
+            platform_user_id: platformUserId,
+            email,
+            username,
+            display_name: displayName,
+            profile_data: profileData,
           },
         });
-
-        if (authResult.success) {
-          toast({
-            title: 'Welcome!',
-            description: `Successfully signed in with ${providerId}`,
-          });
-          onClose();
-
-          // Redirect based on user status using shared utility
-          const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
-          setLocation(redirectUrl);
-        } else if (authResult.linkRequired) {
-          // Show the in-modal account linking confirmation UI
-          setPendingLinkData({
-            provider: providerId,
-            callbackData: {
-              access_token: result.accessToken,
-              platform_user_id: result.userId || result.platformUserId,
-              email: result.email,
-              username: result.username,
-              display_name: result.displayName,
-              profile_data: result.profileData,
-            },
-          });
-        }
-      } else {
-        throw new Error(result.error || `Failed to connect with ${providerId}`);
       }
     } catch (err: any) {
-      console.error(`${providerId} login error:`, err);
       toast({
         title: 'Login Failed',
         description: err.message || `Failed to connect with ${providerId}`,
@@ -361,7 +259,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
-  // Handle confirming account link
   const handleConfirmLink = async () => {
     if (!pendingLinkData || !linkRequired) return;
     setIsLinking(true);
@@ -371,19 +268,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         pendingLinkData.provider,
         pendingLinkData.callbackData
       );
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to link accounts');
-      }
-
+      if (!result.success) throw new Error(result.message || 'Failed to link accounts');
       toast({
         title: 'Account Linked',
         description: 'Your accounts have been linked successfully.',
       });
       setPendingLinkData(null);
       onClose();
-
-      // Redirect to the existing user's appropriate page (not onboarding — they already have an account)
       const redirectUrl = getPostAuthRedirect(result.user, false);
       setLocation(redirectUrl);
     } catch (err: any) {
@@ -402,34 +293,36 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     clearLinkRequired();
   };
 
-  // Determine which view to show
   const showLinkConfirmation = pendingLinkData && linkRequired;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop with blur */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         onClick={showLinkConfirmation ? undefined : onClose}
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-[#1A1A2E] rounded-2xl shadow-2xl border border-gray-800 overflow-hidden">
-        {/* Close button */}
+      <div className="relative w-full max-w-[420px] bg-gradient-to-b from-[#1e1e3a] to-[#13132b] rounded-3xl shadow-[0_0_80px_rgba(139,92,246,0.15)] border border-white/[0.08] overflow-hidden">
+        {/* Decorative glow */}
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-primary/20 rounded-full blur-[100px] pointer-events-none" />
+
+        {/* Close */}
         <button
           onClick={showLinkConfirmation ? handleCancelLink : onClose}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-gray-800"
+          className="absolute top-5 right-5 p-1.5 text-gray-500 hover:text-white transition-colors rounded-full hover:bg-white/10 z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
         {showLinkConfirmation ? (
-          /* ── Account Linking Confirmation View ── */
-          <>
-            <div className="px-8 pt-8 pb-4 text-center">
-              <div className="mx-auto w-14 h-14 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4">
+          /* ── Account Linking ── */
+          <div className="relative px-8 py-10">
+            <div className="text-center mb-6">
+              <div className="mx-auto w-14 h-14 bg-amber-500/15 rounded-2xl flex items-center justify-center mb-4 border border-amber-500/20">
                 <svg
-                  className="w-7 h-7 text-yellow-400"
+                  className="w-7 h-7 text-amber-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -442,152 +335,122 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Account Found</h2>
-              <p className="text-gray-400 text-sm">
-                An account with this email already exists using{' '}
+              <h2 className="text-xl font-bold text-white mb-2">Account Found</h2>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                An account with this email exists via{' '}
                 <span className="text-white font-medium">
                   {linkRequired.existingProviders.join(', ')}
                 </span>
-                .
-              </p>
-              <p className="text-gray-400 text-sm mt-2">
-                Would you like to link your{' '}
+                . Link your{' '}
                 <span className="text-white font-medium capitalize">
                   {pendingLinkData.provider}
                 </span>{' '}
-                account to your existing account?
+                account?
               </p>
             </div>
 
-            <div className="px-8 pb-8 space-y-3">
+            <div className="space-y-3">
               <Button
                 onClick={handleConfirmLink}
                 disabled={isLinking}
-                className="w-full h-12 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl"
+                className="w-full h-12 bg-brand-primary hover:bg-brand-primary/80 text-white font-semibold rounded-2xl transition-all"
               >
-                {isLinking ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                {isLinking ? 'Linking...' : 'Yes, Link My Accounts'}
+                {isLinking && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                {isLinking ? 'Linking...' : 'Link Accounts'}
               </Button>
               <Button
                 onClick={handleCancelLink}
                 disabled={isLinking}
-                variant="outline"
-                className="w-full h-12 border-gray-700 text-gray-300 hover:bg-gray-800 font-medium rounded-xl"
+                variant="ghost"
+                className="w-full h-12 text-gray-400 hover:text-white hover:bg-white/5 rounded-2xl"
               >
                 Cancel
               </Button>
-              <p className="text-xs text-gray-500 text-center pt-2">
-                Linking allows you to sign in with either account in the future.
-              </p>
             </div>
-          </>
+          </div>
         ) : (
-          /* ── Normal Sign-in View ── */
-          <>
+          /* ── Sign In ── */
+          <div className="relative px-8 py-10">
             {/* Header */}
-            <div className="px-8 pt-8 pb-4 text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome to Fandomly</h2>
-              <p className="text-gray-400 text-sm">
-                Sign in to connect with creators, grow your community, and earn rewards
+            <div className="text-center mb-8">
+              <img src="/fandomly2.png" alt="Fandomly" className="h-10 mx-auto mb-5 opacity-90" />
+              <h2 className="text-[22px] font-bold text-white tracking-tight">Welcome back</h2>
+              <p className="text-gray-400 text-sm mt-1.5">
+                Sign in to earn rewards and support creators
               </p>
             </div>
 
-            {/* Auth Buttons */}
-            <div className="px-8 pb-8 space-y-3">
-              {/* Google - Primary */}
-              <Button
-                onClick={handleGoogleLogin}
-                disabled={isLoading || loadingProvider !== null}
-                className={`w-full h-12 ${primaryProviders[0].bgColor} ${primaryProviders[0].hoverColor} ${primaryProviders[0].textColor} font-medium flex items-center justify-center gap-3 rounded-xl transition-all duration-200 border-0`}
-              >
-                {loadingProvider === 'google' ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  primaryProviders[0].icon
-                )}
-                <span>{primaryProviders[0].name}</span>
-              </Button>
-
-              {/* OR Divider */}
-              <div className="relative py-2">
-                <Separator className="bg-gray-700" />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1A1A2E] px-4 text-sm text-gray-500 font-medium">
-                  OR
-                </span>
-              </div>
-
-              {/* Primary Social Providers (X, Facebook, TikTok) */}
-              {primaryProviders.slice(1).map((provider) => (
-                <Button
-                  key={provider.id}
-                  onClick={() => handleSocialLogin(provider.id)}
-                  disabled={isLoading || loadingProvider !== null}
-                  className={`w-full h-12 ${provider.bgColor} ${provider.hoverColor} ${provider.textColor} font-medium flex items-center justify-center gap-3 rounded-xl transition-all duration-200 border-0`}
+            {/* Provider Grid — 2x2 for primary */}
+            <div className="grid grid-cols-2 gap-2.5 mb-3">
+              {primaryProviders.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => handleSocialLogin(p.id)}
+                  disabled={busy}
+                  className={`${p.color} h-12 rounded-2xl flex items-center justify-center gap-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]`}
                 >
-                  {loadingProvider === provider.id ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    provider.icon
-                  )}
-                  <span>{provider.name}</span>
-                </Button>
+                  {loadingProvider === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : p.icon}
+                  <span>{p.name}</span>
+                </button>
               ))}
+            </div>
 
-              {/* Show More Button */}
-              <button
-                onClick={() => setShowMoreProviders(!showMoreProviders)}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-400 hover:text-gray-300 transition-colors"
-              >
-                {showMoreProviders ? (
-                  <>
-                    <ChevronUp className="w-4 h-4" />
-                    <span>Show fewer options</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="w-4 h-4" />
-                    <span>More sign-in options</span>
-                  </>
-                )}
-              </button>
-
-              {/* Additional Providers (collapsible) */}
-              {showMoreProviders && (
-                <div className="space-y-3 pt-1">
-                  {additionalProviders.map((provider) => (
-                    <Button
-                      key={provider.id}
-                      onClick={() => handleSocialLogin(provider.id)}
-                      disabled={isLoading || loadingProvider !== null}
-                      className={`w-full h-12 ${provider.bgColor} ${provider.hoverColor} ${provider.textColor} font-medium flex items-center justify-center gap-3 rounded-xl transition-all duration-200 border-0`}
-                    >
-                      {loadingProvider === provider.id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        provider.icon
-                      )}
-                      <span>{provider.name}</span>
-                    </Button>
-                  ))}
-                </div>
+            {/* Expand more */}
+            <button
+              onClick={() => setShowMore(!showMore)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              {showMore ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Fewer options</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>More options</span>
+                </>
               )}
+            </button>
 
-              {/* Error Display */}
-              {error && (
-                <div className="p-3 bg-red-900/30 border border-red-700 rounded-xl mt-4">
-                  <p className="text-sm text-red-400 text-center">{error}</p>
-                </div>
-              )}
+            {/* More providers — same grid */}
+            {showMore && (
+              <div className="grid grid-cols-2 gap-2.5 mt-1 mb-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                {moreProviders.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleSocialLogin(p.id)}
+                    disabled={busy}
+                    className={`${p.color} h-12 rounded-2xl flex items-center justify-center gap-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]`}
+                  >
+                    {loadingProvider === p.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      p.icon
+                    )}
+                    <span>{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
-              {/* Terms */}
-              <p className="text-xs text-gray-500 text-center pt-4">
+            {/* Error */}
+            {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-2xl mt-4">
+                <p className="text-sm text-red-400 text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="mt-6 pt-5 border-t border-white/[0.06]">
+              <p className="text-[11px] text-gray-600 text-center leading-relaxed">
                 By continuing, you agree to our{' '}
                 <button
                   onClick={() => {
                     onClose();
                     setLocation('/terms-of-service');
                   }}
-                  className="text-primary hover:underline"
+                  className="text-gray-500 hover:text-white underline underline-offset-2 transition-colors"
                 >
                   Terms of Service
                 </button>{' '}
@@ -597,13 +460,16 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     onClose();
                     setLocation('/privacy-policy');
                   }}
-                  className="text-primary hover:underline"
+                  className="text-gray-500 hover:text-white underline underline-offset-2 transition-colors"
                 >
                   Privacy Policy
                 </button>
               </p>
+              <p className="text-[11px] text-gray-600 text-center mt-2">
+                A crypto wallet will be created automatically for you
+              </p>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

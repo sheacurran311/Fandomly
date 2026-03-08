@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Centralized Facebook SDK loader and utilities for Fandomly
-// Handles proper App ID separation between Fan and Creator contexts
+/**
+ * ⛔ SINGLE SOURCE OF TRUTH — Facebook / Instagram OAuth
+ * See rule: .cursor/rules/social-auth-single-source.mdc
+ *
+ * FacebookSDKManager is the ONLY place where Facebook/Instagram OAuth config
+ * (app IDs, scopes, SDK loading, login flow) should be defined. All UI layers
+ * must import and call FacebookSDKManager.secureLogin(). NEVER duplicate
+ * this logic elsewhere.
+ */
 
 declare global {
   interface Window {
