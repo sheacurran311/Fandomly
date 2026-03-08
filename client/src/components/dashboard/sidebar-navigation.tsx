@@ -22,25 +22,94 @@ import {
 import { useEmbeddedWallet } from '@particle-network/connectkit';
 
 /**
- * Wallet button for sidebar — only renders when Particle wallet is available.
+ * Profile section at the bottom of the sidebar.
+ * When Particle wallet is available, the entire section is clickable to open the wallet modal.
  */
-function SidebarWalletButton({ isCollapsed }: { isCollapsed: boolean }) {
+function SidebarProfileSection({
+  isCollapsed,
+  user,
+  avatarUrl,
+  userType,
+  particleEnabled,
+}: {
+  isCollapsed: boolean;
+  user: any;
+  avatarUrl: string | null;
+  userType: string;
+  particleEnabled: boolean;
+}) {
   const embeddedWallet = useEmbeddedWallet();
-  if (!embeddedWallet?.isCanOpen) return null;
-  return (
-    <button
-      onClick={() => embeddedWallet.openWallet()}
-      className={cn(
-        'w-full flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200',
-        'text-gray-300 hover:text-white hover:bg-brand-primary/20 border border-white/10',
-        isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2.5'
-      )}
-      title="Open Wallet"
-    >
-      <Wallet className={cn('flex-shrink-0 h-5 w-5 text-brand-secondary', !isCollapsed && '')} />
-      {!isCollapsed && <span>Wallet</span>}
-    </button>
+  const canOpenWallet = particleEnabled && embeddedWallet?.isCanOpen;
+
+  const profileContent = !isCollapsed ? (
+    <div className="flex items-center space-x-3">
+      <div className="relative">
+        <Avatar className="h-9 w-9 border border-white/10">
+          {avatarUrl ? <AvatarImage src={avatarUrl} alt={user?.username || 'Profile'} /> : null}
+          <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
+            {(user?.username || 'U').charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        {userType === 'creator' && (
+          <div
+            className={cn(
+              'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-dark-bg',
+              particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
+            )}
+            title={particleEnabled ? 'Connected to Fandomly Chain' : 'Fandomly Chain not connected'}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">
+          {user?.username || 'Your Account'}
+        </p>
+        <p className="text-xs truncate">
+          {userType === 'creator' && particleEnabled ? (
+            <span className="text-emerald-400">Chain connected</span>
+          ) : userType === 'creator' ? (
+            <span className="text-gray-500">Chain offline</span>
+          ) : (
+            <span className="text-gray-400 capitalize">{userType}</span>
+          )}
+        </p>
+      </div>
+      {canOpenWallet && <Wallet className="flex-shrink-0 h-4 w-4 text-brand-secondary" />}
+    </div>
+  ) : (
+    <div className="flex justify-center">
+      <div className="relative">
+        <Avatar className="h-8 w-8 border border-white/10">
+          {avatarUrl ? <AvatarImage src={avatarUrl} alt={user?.username || 'Profile'} /> : null}
+          <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
+            {(user?.username || 'U').charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        {userType === 'creator' && (
+          <div
+            className={cn(
+              'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-dark-bg',
+              particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
+            )}
+          />
+        )}
+      </div>
+    </div>
   );
+
+  if (canOpenWallet) {
+    return (
+      <button
+        onClick={() => embeddedWallet.openWallet()}
+        className="w-full p-3 border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer text-left"
+        title="Open Wallet"
+      >
+        {profileContent}
+      </button>
+    );
+  }
+
+  return <div className="p-3 border border-white/10 rounded-lg bg-white/5">{profileContent}</div>;
 }
 
 interface SidebarNavigationProps {
@@ -281,75 +350,14 @@ export default function SidebarNavigation({
           </div>
         )}
 
-        {/* Wallet Button */}
-        {particleEnabled && <SidebarWalletButton isCollapsed={isCollapsed} />}
-
-        {/* Profile Section */}
-        <div className="p-3 border border-white/10 rounded-lg bg-white/5">
-          {!isCollapsed ? (
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <Avatar className="h-9 w-9 border border-white/10">
-                  {avatarUrl ? (
-                    <AvatarImage src={avatarUrl} alt={user?.username || 'Profile'} />
-                  ) : null}
-                  <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
-                    {(user?.username || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {/* Particle Network / Fandomly Chain status dot */}
-                {userType === 'creator' && (
-                  <div
-                    className={cn(
-                      'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-dark-bg',
-                      particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
-                    )}
-                    title={
-                      particleEnabled
-                        ? 'Connected to Fandomly Chain'
-                        : 'Fandomly Chain not connected'
-                    }
-                  />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
-                  {user?.username || 'Your Account'}
-                </p>
-                <p className="text-xs truncate">
-                  {userType === 'creator' && particleEnabled ? (
-                    <span className="text-emerald-400">Chain connected</span>
-                  ) : userType === 'creator' ? (
-                    <span className="text-gray-500">Chain offline</span>
-                  ) : (
-                    <span className="text-gray-400 capitalize">{userType}</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <div className="relative">
-                <Avatar className="h-8 w-8 border border-white/10">
-                  {avatarUrl ? (
-                    <AvatarImage src={avatarUrl} alt={user?.username || 'Profile'} />
-                  ) : null}
-                  <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-secondary text-white text-xs font-bold">
-                    {(user?.username || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {userType === 'creator' && (
-                  <div
-                    className={cn(
-                      'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-dark-bg',
-                      particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
-                    )}
-                  />
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Profile Section — clickable to open Particle wallet when available */}
+        <SidebarProfileSection
+          isCollapsed={isCollapsed}
+          user={user}
+          avatarUrl={avatarUrl}
+          userType={userType}
+          particleEnabled={particleEnabled}
+        />
       </div>
     </div>
   );

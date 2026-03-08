@@ -41,17 +41,30 @@ export function getAppleMusicDeveloperToken(): string {
 
   // Apple private keys from .p8 files may have escaped newlines when stored
   // in env vars. Restore them so jsonwebtoken can parse the PEM.
-  const formattedKey = privateKey.replace(/\\n/g, '\n');
+  let formattedKey = privateKey.replace(/\\n/g, '\n');
 
-  const token = jwt.sign({}, formattedKey, {
-    algorithm: 'ES256',
-    expiresIn: TOKEN_LIFETIME_SECONDS,
-    issuer: teamId,
-    header: {
-      alg: 'ES256',
-      kid: keyId,
-    },
-  });
+  // Ensure the key has proper PEM headers
+  if (!formattedKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    formattedKey = `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
+  }
+
+  let token: string;
+  try {
+    token = jwt.sign({}, formattedKey, {
+      algorithm: 'ES256',
+      expiresIn: TOKEN_LIFETIME_SECONDS,
+      issuer: teamId,
+      header: {
+        alg: 'ES256',
+        kid: keyId,
+      },
+    });
+  } catch (err: any) {
+    console.error('[AppleMusic Auth] JWT signing failed:', err.message);
+    console.error('[AppleMusic Auth] Key ID:', keyId, 'Team ID:', teamId);
+    console.error('[AppleMusic Auth] Key starts with:', formattedKey.substring(0, 40) + '...');
+    throw new Error(`Apple Music JWT signing failed: ${err.message}`);
+  }
 
   cachedToken = token;
   cachedTokenExpiresAt = Date.now() + (TOKEN_LIFETIME_SECONDS - 3600) * 1000; // refresh 1h early

@@ -1892,7 +1892,7 @@ export function registerSocialRoutes(app: Express) {
       res.json({ token });
     } catch (error: any) {
       console.error('[Apple Music] Developer token error:', error);
-      res.status(500).json({ error: 'Failed to generate developer token' });
+      res.status(500).json({ error: error?.message || 'Failed to generate developer token' });
     }
   });
 

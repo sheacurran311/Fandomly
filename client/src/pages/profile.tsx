@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';
@@ -47,9 +47,8 @@ import { useTwitterConnection } from '@/hooks/use-twitter-connection';
 import CreatorReferralDashboard from '@/components/referrals/CreatorReferralDashboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function Profile() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, refreshUser } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Fetch creator's program for program details section
   const { data: programs = [], isLoading: programsLoading } = useQuery<
@@ -259,17 +258,12 @@ export default function Profile() {
                                             username: editedUsername,
                                           });
 
+                                          // Refresh the auth context user state so the new username persists
+                                          await refreshUser();
+
                                           toast({
                                             title: 'Success!',
                                             description: 'Username updated successfully',
-                                          });
-
-                                          // Invalidate all user-related queries to refresh data
-                                          await queryClient.invalidateQueries({
-                                            queryKey: ['/api/auth/me'],
-                                          });
-                                          await queryClient.refetchQueries({
-                                            queryKey: ['/api/auth/me'],
                                           });
 
                                           setIsEditingUsername(false);
