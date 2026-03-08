@@ -100,7 +100,13 @@ function SidebarProfileSection({
   if (canOpenWallet) {
     return (
       <button
-        onClick={() => embeddedWallet.openWallet()}
+        onClick={() => {
+          try {
+            embeddedWallet.openWallet();
+          } catch (err) {
+            console.warn('[Sidebar] Wallet not available:', err);
+          }
+        }}
         className="w-full p-3 border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer text-left"
         title="Open Wallet"
       >

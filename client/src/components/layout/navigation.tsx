@@ -33,7 +33,13 @@ function WalletDropdownItem() {
   if (!embeddedWallet?.isCanOpen) return null;
   return (
     <DropdownMenuItem
-      onClick={() => embeddedWallet.openWallet()}
+      onClick={() => {
+        try {
+          embeddedWallet.openWallet();
+        } catch (err) {
+          console.warn('[Navigation] Wallet not available:', err);
+        }
+      }}
       className="text-gray-300 hover:text-white hover:bg-brand-primary/60"
     >
       <Wallet className="mr-2 h-4 w-4" />

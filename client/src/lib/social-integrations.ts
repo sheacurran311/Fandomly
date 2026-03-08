@@ -842,12 +842,22 @@ export class AppleMusicAPI {
       }
 
       return { success: true, musicUserToken };
-    } catch (error) {
+    } catch (error: any) {
       console.error('[AppleMusic] Authorization error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Apple Music authorization failed',
-      };
+
+      // Provide actionable guidance for common MusicKit errors
+      const msg = error?.message || String(error);
+      let userMessage = 'Apple Music authorization failed';
+      if (msg.includes('Unauthorized') || msg.includes('AUTHORIZATION_ERROR')) {
+        userMessage =
+          'Apple Music rejected the developer token. ' +
+          'Please verify: (1) the MusicKit key is active in Apple Developer portal, ' +
+          '(2) APPLE_MUSIC_KEY_ID matches the key, ' +
+          '(3) APPLE_MUSIC_TEAM_ID matches your team. ' +
+          'New keys can take up to 30 minutes to propagate.';
+      }
+
+      return { success: false, error: userMessage };
     }
   }
 
