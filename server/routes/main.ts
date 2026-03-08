@@ -2001,8 +2001,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const programs = await storage.getLoyaltyProgramsByCreator(req.params.creatorId);
       res.json(programs);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch loyalty programs' });
+    } catch (error: any) {
+      console.error('[Loyalty Programs] Error fetching by creator:', error);
+      res.status(500).json({ error: error?.message || 'Failed to fetch loyalty programs' });
     }
   });
 

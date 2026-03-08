@@ -2,7 +2,7 @@
 import { createConfig } from '@particle-network/connectkit';
 import { authWalletConnectors } from '@particle-network/connectkit/auth';
 import { evmWalletConnectors } from '@particle-network/connectkit/evm';
-// wallet plugin import removed — wallet access provided through app's own UI
+import { wallet, EntryPosition } from '@particle-network/connectkit/wallet';
 import { defineChain } from '@particle-network/connectkit/chains';
 
 export const fandomlyChain = defineChain({
@@ -170,9 +170,14 @@ export function createParticleConfig() {
       }),
     ],
 
-    // Wallet plugin disabled — wallet access is provided through the app's own
-    // dropdown menu and sidebar profile section via useEmbeddedWallet().
-    plugins: [],
+    // Wallet plugin registered with visible:false so useEmbeddedWallet() works,
+    // but the floating widget is hidden. Wallet access is through the app's own UI.
+    plugins: [
+      wallet({
+        entryPosition: EntryPosition.BR,
+        visible: false,
+      }),
+    ],
 
     chains: [fandomlyChain],
   });
