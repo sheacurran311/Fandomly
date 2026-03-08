@@ -170,12 +170,12 @@ export function createParticleConfig() {
       }),
     ],
 
-    // Wallet plugin registered with visible:false so useEmbeddedWallet() works,
-    // but the floating widget is hidden. Wallet access is through the app's own UI.
+    // Wallet plugin must be visible:true so the DOM element exists for openWallet().
+    // The floating entry button is hidden via CSS in index.css.
     plugins: [
       wallet({
         entryPosition: EntryPosition.BR,
-        visible: false,
+        visible: true,
       }),
     ],
 

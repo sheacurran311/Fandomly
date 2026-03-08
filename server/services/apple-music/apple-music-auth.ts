@@ -12,6 +12,7 @@
  */
 
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 const APPLE_MUSIC_API_BASE = 'https://api.music.apple.com/v1';
 
@@ -20,6 +21,35 @@ const TOKEN_LIFETIME_SECONDS = 170 * 24 * 60 * 60;
 
 let cachedToken: string | null = null;
 let cachedTokenExpiresAt = 0;
+
+/**
+ * Normalize an Apple .p8 private key string from an environment variable
+ * into a proper PEM that Node's crypto (and jsonwebtoken) will accept.
+ *
+ * Handles all common env-var storage formats:
+ *   - Literal "\n" (escaped newlines from .env parsers / Replit Secrets)
+ *   - Actual newline characters
+ *   - Key pasted as a single Base64 blob (no PEM headers)
+ *   - Key with headers already present
+ */
+function normalizeApplePrivateKey(raw: string): string {
+  // 1. Replace literal escaped newlines with real newlines
+  let key = raw.replace(/\\n/g, '\n');
+
+  // 2. Strip any existing PEM headers/footers so we work with raw base64
+  key = key
+    .replace(/-----BEGIN (EC )?PRIVATE KEY-----/g, '')
+    .replace(/-----END (EC )?PRIVATE KEY-----/g, '')
+    .replace(/\s+/g, ''); // remove all whitespace
+
+  // 3. Re-wrap into 64-char lines with PKCS#8 PEM headers
+  const lines: string[] = [];
+  for (let i = 0; i < key.length; i += 64) {
+    lines.push(key.substring(i, i + 64));
+  }
+
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`;
+}
 
 /**
  * Generate (or return cached) Apple Music developer JWT.
@@ -39,13 +69,24 @@ export function getAppleMusicDeveloperToken(): string {
     );
   }
 
-  // Apple private keys from .p8 files may have escaped newlines when stored
-  // in env vars. Restore them so jsonwebtoken can parse the PEM.
-  let formattedKey = privateKey.replace(/\\n/g, '\n');
+  const formattedKey = normalizeApplePrivateKey(privateKey);
 
-  // Ensure the key has proper PEM headers
-  if (!formattedKey.includes('-----BEGIN PRIVATE KEY-----')) {
-    formattedKey = `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
+  // Sanity check: verify Node's crypto can parse it as an EC key
+  try {
+    const keyObj = crypto.createPrivateKey(formattedKey);
+    if (keyObj.asymmetricKeyType !== 'ec') {
+      throw new Error(`Expected EC key, got ${keyObj.asymmetricKeyType}`);
+    }
+  } catch (parseErr: any) {
+    console.error('[AppleMusic Auth] Private key parse failed:', parseErr.message);
+    console.error(
+      '[AppleMusic Auth] Formatted key preview:',
+      formattedKey.substring(0, 60) + '...'
+    );
+    throw new Error(
+      `Apple Music private key is invalid. Ensure APPLE_MUSIC_PRIVATE_KEY contains the full .p8 file content. ` +
+        `Parse error: ${parseErr.message}`
+    );
   }
 
   let token: string;
@@ -62,7 +103,6 @@ export function getAppleMusicDeveloperToken(): string {
   } catch (err: any) {
     console.error('[AppleMusic Auth] JWT signing failed:', err.message);
     console.error('[AppleMusic Auth] Key ID:', keyId, 'Team ID:', teamId);
-    console.error('[AppleMusic Auth] Key starts with:', formattedKey.substring(0, 40) + '...');
     throw new Error(`Apple Music JWT signing failed: ${err.message}`);
   }
 
