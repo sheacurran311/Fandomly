@@ -30,19 +30,20 @@ function patchParticleEvmProviderPlugin(): Plugin {
 }
 
 /**
- * Particle Network SDK pulls in @aws-sdk and @smithy (for Cognito auth)
- * which use Node.js-only imports (node:fs, node:path, etc.).
- * These code paths are never executed in the browser — the SDK uses them
- * only for optional server-side credential resolution.
+ * Stubs Node.js-only built-in imports (node:fs, node:path, etc.) that some
+ * @smithy packages reference. These code paths are never executed in the
+ * browser -- they're for Node.js-only credential resolution.
  *
- * This plugin stubs these packages at the module level so Rollup can
- * tree-shake them away without build errors.
+ * IMPORTANT: Do NOT stub @aws-sdk/* packages here. Particle SDK's auth-core
+ * dynamically imports @aws-sdk/client-kms, @aws-sdk/credential-providers,
+ * and @aws-sdk/client-cognito-identity at runtime for wallet key management.
+ * Stubbing them breaks wallet creation with "fromCognitoIdentity is not a function".
  */
 function serverOnlyStubPlugin(): Plugin {
-  const serverOnlyPrefixes = [
-    '@aws-sdk/',
+  // Only stub Node.js-specific smithy packages that use node:fs, node:os, etc.
+  // Do NOT stub @aws-sdk/* -- Particle needs them for Cognito/KMS at runtime.
+  const nodeOnlySmithyPrefixes = [
     '@smithy/shared-ini-file-loader',
-    '@smithy/credential-provider-',
     '@smithy/node-http-handler',
     '@smithy/node-config-provider',
   ];
@@ -50,11 +51,11 @@ function serverOnlyStubPlugin(): Plugin {
   return {
     name: 'server-only-stub',
     enforce: 'pre',
-    resolveId(source, importer) {
+    resolveId(source) {
       if (source.startsWith('node:')) {
         return { id: `\0node-stub:${source}`, moduleSideEffects: false };
       }
-      for (const prefix of serverOnlyPrefixes) {
+      for (const prefix of nodeOnlySmithyPrefixes) {
         if (source.startsWith(prefix) || source === prefix) {
           return { id: `\0server-stub:${source}`, moduleSideEffects: false };
         }
@@ -118,11 +119,12 @@ export default defineConfig({
         global: 'globalThis',
       },
       plugins: [
-        // Stub Node.js-only smithy/aws packages during dep pre-bundling.
+        // Stub only Node.js-specific smithy packages during dep pre-bundling.
+        // Do NOT stub @aws-sdk/* -- Particle SDK needs them for Cognito/KMS.
         {
-          name: 'stub-node-only-smithy-aws-in-deps',
+          name: 'stub-node-only-smithy-in-deps',
           setup(build: any) {
-            const nodeOnlyFilter = /^(@aws-sdk\/|@smithy\/(hash-node|shared-ini-file-loader|credential-provider-|node-http-handler|node-config-provider|util-body-length-node|util-user-agent-node))/;
+            const nodeOnlyFilter = /^@smithy\/(hash-node|shared-ini-file-loader|node-http-handler|node-config-provider|util-body-length-node|util-user-agent-node)/;
             build.onResolve({ filter: nodeOnlyFilter }, (args: any) => ({
               path: args.path,
               namespace: 'node-only-stub',
