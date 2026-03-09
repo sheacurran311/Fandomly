@@ -98,6 +98,7 @@ import AdminReviewQueue from '@/pages/admin-dashboard/review-queue';
 import AgencyDashboard from '@/pages/agency-dashboard';
 import ReputationPage from '@/pages/reputation';
 import CreatorTokenPage from '@/pages/creator-dashboard/token';
+import NftCollectionsPage from '@/pages/creator-dashboard/nft-collections';
 import CreatorPlatformTasksPage from '@/pages/creator-dashboard/platform-tasks';
 import StakingPage from '@/pages/staking';
 import { useLimitExceededHandler } from '@/hooks/use-limit-exceeded-handler';
@@ -155,6 +156,7 @@ function Router() {
       <Route path="/creator-dashboard/campaigns" component={CreatorCampaigns} />
       <Route path="/creator-dashboard/campaign-builder" component={CampaignBuilderNew} />
       <Route path="/creator-dashboard/token" component={CreatorTokenPage} />
+      <Route path="/creator-dashboard/nft-collections" component={NftCollectionsPage} />
       <Route path="/creator-dashboard/platform-tasks" component={CreatorPlatformTasksPage} />
       <Route path="/creator-dashboard/billing" component={BillingPage} />
       <Route path="/creator-dashboard/subscriptions" component={CreatorSubscriptions} />

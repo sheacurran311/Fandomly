@@ -445,7 +445,7 @@ export function useNFTStats() {
 // ============================================================================
 
 export function getChainDisplayName(chain: string): string {
-  if (chain === 'fandomly-chain') return 'Fandomly Chain';
+  if (chain === 'fandomly-chain' || chain === 'avalanche-fuji') return 'Avalanche Fuji';
   const chainMap: Record<string, string> = {
     polygon: 'Polygon',
     'polygon-amoy': 'Polygon Amoy (Testnet)',
@@ -458,7 +458,8 @@ export function getChainDisplayName(chain: string): string {
 }
 
 export function getChainColor(chain: string): string {
-  if (chain === 'fandomly-chain') return 'bg-gradient-to-r from-purple-500 to-pink-500';
+  if (chain === 'fandomly-chain' || chain === 'avalanche-fuji')
+    return 'bg-gradient-to-r from-purple-500 to-pink-500';
   if (chain.includes('polygon')) return 'bg-purple-500';
   if (chain.includes('base')) return 'bg-blue-500';
   if (chain.includes('ethereum')) return 'bg-gray-700';
@@ -489,12 +490,12 @@ export function ipfsToGateway(uri: string): string {
  * Get block explorer URL for a transaction
  */
 export function getExplorerTxUrl(txHash: string): string {
-  return `https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL/transaction/${txHash}`;
+  return `https://43113.testnet.snowtrace.io/tx/${txHash}`;
 }
 
 /**
  * Get block explorer URL for a contract
  */
 export function getExplorerContractUrl(address: string): string {
-  return `https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL/address/${address}`;
+  return `https://43113.testnet.snowtrace.io/address/${address}`;
 }

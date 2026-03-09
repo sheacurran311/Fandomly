@@ -521,7 +521,7 @@ export function registerBadgeRoutes(app: Express) {
             badgeTemplateId: badgeTypeId,
             recipientUserId: userId,
             recipientWalletAddress: user.avalancheL1Address,
-            recipientChain: 'fandomly-chain',
+            recipientChain: 'avalanche-fuji',
             mintReason: 'badge_achievement',
             txHash: mintResult.txHash,
             status: 'success',

@@ -130,7 +130,7 @@ function StakingOverview({
           <p className="text-sm font-mono text-white truncate">
             {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
           </p>
-          <p className="text-xs text-gray-500">Fandomly Chain</p>
+          <p className="text-xs text-gray-500">Avalanche Fuji</p>
         </CardContent>
       </Card>
     </div>
@@ -417,7 +417,7 @@ export default function StakingPage() {
               <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-white mb-2">Wallet Required</h3>
               <p className="text-sm text-gray-400">
-                Connect your wallet to start staking on Fandomly Chain.
+                Connect your wallet to start staking on Avalanche Fuji.
               </p>
             </CardContent>
           </Card>

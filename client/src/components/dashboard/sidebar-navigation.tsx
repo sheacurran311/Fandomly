@@ -18,6 +18,7 @@ import {
   Target,
   Megaphone,
   Wallet,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAccount, useModal } from '@particle-network/connectkit';
 
@@ -56,7 +57,7 @@ function SidebarProfileSection({
               'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-dark-bg',
               walletConnected ? 'bg-emerald-400' : 'bg-gray-500'
             )}
-            title={walletConnected ? 'Connected to Fandomly Chain' : 'Fandomly Chain not connected'}
+            title={walletConnected ? 'Connected to Avalanche Fuji' : 'Avalanche Fuji not connected'}
           />
         )}
       </div>
@@ -287,6 +288,39 @@ export default function SidebarNavigation({
             </div>
           );
         })}
+
+        {/* Admin Dashboard link — visible only to fandomly_admin users */}
+        {user?.role === 'fandomly_admin' && (
+          <div className="mt-2 pt-2 border-t border-white/10">
+            <Link href="/admin-dashboard/overview">
+              <div
+                className={cn(
+                  'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer',
+                  location.startsWith('/admin-dashboard')
+                    ? 'bg-brand-primary text-white shadow-lg'
+                    : 'text-gray-300 hover:text-white hover:bg-brand-primary/60',
+                  isCollapsed && 'justify-center'
+                )}
+              >
+                <ShieldCheck
+                  className={cn(
+                    'flex-shrink-0 h-5 w-5',
+                    location.startsWith('/admin-dashboard') ? 'text-white' : 'text-amber-400',
+                    !isCollapsed && 'mr-3'
+                  )}
+                />
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">Admin</span>
+                    <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-400 rounded-full">
+                      Admin
+                    </span>
+                  </>
+                )}
+              </div>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Bottom container: Create Button + Profile */}

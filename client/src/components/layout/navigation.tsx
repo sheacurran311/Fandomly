@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Menu, X, User, Settings, LogOut, ChevronDown, Wallet } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, ChevronDown, Wallet, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/lib/particle-config';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
@@ -210,6 +210,14 @@ export default function Navigation() {
                             </DropdownMenuItem>
                           </Link>
                           {particleEnabled && <WalletDropdownItem />}
+                          {user.role === 'fandomly_admin' && (
+                            <Link href="/admin-dashboard/overview">
+                              <DropdownMenuItem className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/20">
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Admin Dashboard
+                              </DropdownMenuItem>
+                            </Link>
+                          )}
                         </>
                       )}
                       <DropdownMenuSeparator className="bg-brand-primary/20" />

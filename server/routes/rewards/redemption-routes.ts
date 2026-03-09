@@ -457,7 +457,7 @@ export function registerRedemptionRoutes(app: Express) {
                     badgeTemplateId: badgeTemplateId,
                     recipientUserId: userId,
                     recipientWalletAddress: walletAddress,
-                    recipientChain: 'fandomly-chain',
+                    recipientChain: 'avalanche-fuji',
                     mintReason: 'reward_redemption',
                     contextData: {
                       rewardId: reward.id,
@@ -527,7 +527,7 @@ export function registerRedemptionRoutes(app: Express) {
                     templateId: templateId || null,
                     recipientUserId: userId,
                     recipientWalletAddress: walletAddress,
-                    recipientChain: 'fandomly-chain',
+                    recipientChain: 'avalanche-fuji',
                     mintReason: 'reward_redemption',
                     contextData: {
                       rewardId: reward.id,
@@ -568,7 +568,7 @@ export function registerRedemptionRoutes(app: Express) {
                 crossmintActionId: `redemption-failed-${Date.now()}-${userId}`,
                 recipientUserId: userId,
                 recipientWalletAddress: walletAddress || null,
-                recipientChain: 'fandomly-chain',
+                recipientChain: 'avalanche-fuji',
                 mintReason: 'reward_redemption',
                 contextData: {
                   rewardId: reward.id,

@@ -45,7 +45,7 @@ export function VerifiedBadgeNFT({
             Fandomly.
           </p>
           {hasBadgeNFT && (
-            <p className="text-gray-400 mt-0.5">Badge credential minted on Fandomly Chain</p>
+            <p className="text-gray-400 mt-0.5">Badge credential minted on Avalanche Fuji</p>
           )}
         </TooltipContent>
       </Tooltip>

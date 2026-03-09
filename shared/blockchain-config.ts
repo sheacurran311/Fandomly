@@ -8,7 +8,7 @@ export const FANDOMLY_CHAIN = {
   name: 'Avalanche Fuji',
   nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
   rpcUrl: 'https://api.avax-test.network/ext/bc/C/rpc',
-  blockExplorer: 'https://testnet.snowtrace.io',
+  blockExplorer: 'https://43113.testnet.snowtrace.io',
   testnet: true,
 } as const;
 

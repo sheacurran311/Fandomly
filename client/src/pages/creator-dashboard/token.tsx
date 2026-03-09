@@ -177,7 +177,7 @@ function TokenLaunchForm({
     onSuccess: () => {
       toast({
         title: 'Token created!',
-        description: `${name} (${symbol}) is live on Fandomly Chain.`,
+        description: `${name} (${symbol}) is live on Avalanche Fuji.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/blockchain/token'] });
       onSuccess();
@@ -527,7 +527,7 @@ function TokenDashboard({ token }: { token: TokenInfo }) {
               <BarChart3 className="w-5 h-5 text-blue-400" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">View on Explorer</p>
-                <p className="text-xs text-gray-500">See transactions on Fandomly Chain</p>
+                <p className="text-xs text-gray-500">See transactions on Avalanche Fuji</p>
               </div>
               <a
                 href={`${FANDOMLY_CHAIN.blockExplorer}`}
@@ -625,7 +625,7 @@ export default function TokenFactoryPage() {
               <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-white mb-2">Wallet Required</h3>
               <p className="text-sm text-gray-400">
-                Connect your wallet to create a token on Fandomly Chain.
+                Connect your wallet to create a token on Avalanche Fuji.
               </p>
             </CardContent>
           </Card>

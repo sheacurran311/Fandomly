@@ -767,7 +767,7 @@ function RewardCreationForm({
           >
             <h3 className="text-white font-medium">NFT Configuration</h3>
             <p className="text-sm text-gray-400">
-              Configure the NFT collection that will be minted as a reward on Fandomly Chain
+              Configure the NFT collection that will be minted as a reward on Avalanche Fuji
             </p>
             <FormField
               control={form.control as any}
@@ -849,7 +849,7 @@ function RewardCreationForm({
               </Label>
             </div>
             <p className="text-sm text-indigo-300">
-              NFTs will be minted on Fandomly Chain when fans redeem this reward.
+              NFTs will be minted on Avalanche Fuji when fans redeem this reward.
             </p>
           </div>
         )}
