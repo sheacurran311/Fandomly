@@ -8,7 +8,9 @@ export const FANDOMLY_CHAIN = {
   name: 'Fandomly Chain',
   nativeCurrency: { name: 'FAN', symbol: 'FAN', decimals: 18 },
   rpcUrl:
-    (typeof process !== 'undefined' ? process.env.VITE_FANDOMLY_RPC_URL : undefined) ??
+    ((typeof process !== 'undefined' ? process.env.VITE_FANDOMLY_RPC_URL : undefined) ?? '').split(
+      /\s/
+    )[0] ||
     'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
   blockExplorer:
     'https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93',

@@ -21,7 +21,7 @@ export const fandomlyChain = defineChain({
   rpcUrls: {
     default: {
       http: [
-        import.meta.env.VITE_FANDOMLY_RPC_URL ||
+        (import.meta.env.VITE_FANDOMLY_RPC_URL || '').split(/\s/)[0] ||
           'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
       ],
     },
