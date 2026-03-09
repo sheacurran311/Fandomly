@@ -1,8 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Polyfills must be imported first — sets globalThis.Buffer and process
-// before any Particle SDK crypto modules (ripemd160, hash-base) execute.
-import './polyfills';
-
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';

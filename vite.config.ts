@@ -4,10 +4,6 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 // @ts-ignore - installed in production, may be missing locally
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-// @ts-ignore
-import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill';
-// @ts-ignore
-import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfill';
 
 /**
  * Patches @particle-network/evm-connectors (and related) to use optional
@@ -116,20 +112,16 @@ export default defineConfig({
     // Force React into a single pre-bundled chunk so all dep chunks (Particle, styled-components)
     // share exactly one React copy. Without this, esbuild may resolve separate React copies
     // inside pre-bundled dep chunks, causing "Invalid hook call" at render time.
-    include: ['react', 'react-dom', 'buffer', 'process', 'stream-browserify', 'readable-stream', 'crypto-browserify'],
+    include: ['react', 'react-dom', 'buffer', 'process'],
     esbuildOptions: {
       define: {
         global: 'globalThis',
       },
       plugins: [
         // Stub Node.js-only smithy/aws packages during dep pre-bundling.
-        // Only stub packages that use node:fs, node:os, node crypto Node-only APIs.
-        // Do NOT stub @smithy/util-base64, @smithy/util-utf8, @smithy/protocol-http
-        // or other browser-compatible smithy utilities — they are needed by Particle.
         {
           name: 'stub-node-only-smithy-aws-in-deps',
           setup(build: any) {
-            // Matches only the node-only smithy packages (not all of @smithy/)
             const nodeOnlyFilter = /^(@aws-sdk\/|@smithy\/(hash-node|shared-ini-file-loader|credential-provider-|node-http-handler|node-config-provider|util-body-length-node|util-user-agent-node))/;
             build.onResolve({ filter: nodeOnlyFilter }, (args: any) => ({
               path: args.path,
@@ -141,17 +133,6 @@ export default defineConfig({
             }));
           },
         },
-        // Inject Buffer and process globals during esbuild dep pre-bundling.
-        // This ensures Particle SDK's crypto chain (ripemd160 → hash-base →
-        // readable-stream) has Buffer.slice() available at module init time.
-        // Do NOT inject Buffer/process here — it duplicates the buffer module's export
-        // and causes "Buffer has already been declared" in the deps chunk. The app
-        // sets globalThis.Buffer/process in client/src/polyfills.ts (imported first in main.tsx).
-        NodeGlobalsPolyfillPlugin({
-          process: true,
-          buffer: false,
-        }),
-        NodeModulesPolyfillPlugin(),
         // Patch Particle EVM connector provider.on() to use optional chaining
         {
           name: 'patch-particle-evm-provider',
