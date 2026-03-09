@@ -30,24 +30,18 @@ function patchParticleEvmProviderPlugin(): Plugin {
 }
 
 /**
- * Stubs Node.js-only built-in imports (node:fs, node:path, etc.) that some
- * @smithy packages reference. These code paths are never executed in the
- * browser -- they're for Node.js-only credential resolution.
+ * Stubs Node.js built-in protocol imports (node:fs, node:http, etc.) that
+ * @smithy and @aws-sdk packages reference. The smithy/AWS packages themselves
+ * are NOT stubbed — only their node: dependencies. This allows the AWS SDK
+ * chain (needed by Particle for Cognito/KMS wallet creation) to load and
+ * export its named symbols correctly, while the Node.js-only code paths
+ * (file I/O, HTTP via node:http, etc.) are replaced with no-ops.
  *
- * IMPORTANT: Do NOT stub @aws-sdk/* packages here. Particle SDK's auth-core
- * dynamically imports @aws-sdk/client-kms, @aws-sdk/credential-providers,
- * and @aws-sdk/client-cognito-identity at runtime for wallet key management.
- * Stubbing them breaks wallet creation with "fromCognitoIdentity is not a function".
+ * Uses CJS Proxy so that any named import (e.g. `import { readFileSync }
+ * from "node:fs"`) resolves to a no-op function instead of failing with
+ * "No matching export".
  */
 function serverOnlyStubPlugin(): Plugin {
-  // Only stub Node.js-specific smithy packages that use node:fs, node:os, etc.
-  // Do NOT stub @aws-sdk/* -- Particle needs them for Cognito/KMS at runtime.
-  const nodeOnlySmithyPrefixes = [
-    '@smithy/shared-ini-file-loader',
-    '@smithy/node-http-handler',
-    '@smithy/node-config-provider',
-  ];
-
   return {
     name: 'server-only-stub',
     enforce: 'pre',
@@ -55,16 +49,21 @@ function serverOnlyStubPlugin(): Plugin {
       if (source.startsWith('node:')) {
         return { id: `\0node-stub:${source}`, moduleSideEffects: false };
       }
-      for (const prefix of nodeOnlySmithyPrefixes) {
-        if (source.startsWith(prefix) || source === prefix) {
-          return { id: `\0server-stub:${source}`, moduleSideEffects: false };
-        }
-      }
       return null;
     },
     load(id) {
-      if (id.startsWith('\0node-stub:') || id.startsWith('\0server-stub:')) {
-        return 'export default {}; export var __esModule = true;';
+      if (id.startsWith('\0node-stub:')) {
+        // CJS Proxy: any named import resolves to a no-op function.
+        // esbuild/Rollup handle CJS→ESM interop by reading properties
+        // off module.exports at runtime, so the Proxy getter fires.
+        return [
+          'var handler = { get: function(_, p) {',
+          '  if (p === "__esModule") return true;',
+          '  if (typeof p !== "string") return undefined;',
+          '  return function() { return {}; };',
+          '} };',
+          'module.exports = new Proxy({}, handler);',
+        ].join('\n');
       }
       return null;
     },
@@ -119,18 +118,26 @@ export default defineConfig({
         global: 'globalThis',
       },
       plugins: [
-        // Stub only Node.js-specific smithy packages during dep pre-bundling.
-        // Do NOT stub @aws-sdk/* -- Particle SDK needs them for Cognito/KMS.
+        // Stub node: built-in imports (node:fs, node:http, etc.) during dep
+        // pre-bundling. The @smithy and @aws-sdk packages themselves are NOT
+        // stubbed so they can export their named symbols correctly.
+        // Uses CJS Proxy so any named import resolves to a no-op function.
         {
-          name: 'stub-node-only-smithy-in-deps',
+          name: 'stub-node-builtins-in-deps',
           setup(build: any) {
-            const nodeOnlyFilter = /^@smithy\/(hash-node|shared-ini-file-loader|node-http-handler|node-config-provider|util-body-length-node|util-user-agent-node)/;
-            build.onResolve({ filter: nodeOnlyFilter }, (args: any) => ({
+            build.onResolve({ filter: /^node:/ }, (args: any) => ({
               path: args.path,
-              namespace: 'node-only-stub',
+              namespace: 'node-builtin-stub',
             }));
-            build.onLoad({ filter: /.*/, namespace: 'node-only-stub' }, () => ({
-              contents: 'export default {};',
+            build.onLoad({ filter: /.*/, namespace: 'node-builtin-stub' }, () => ({
+              contents: [
+                'var handler = { get: function(_, p) {',
+                '  if (p === "__esModule") return true;',
+                '  if (typeof p !== "string") return undefined;',
+                '  return function() { return {}; };',
+                '} };',
+                'module.exports = new Proxy({}, handler);',
+              ].join('\n'),
               loader: 'js',
             }));
           },
