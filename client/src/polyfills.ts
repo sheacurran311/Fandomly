@@ -14,21 +14,18 @@ if (typeof globalThis.process === 'undefined') {
   (globalThis as typeof globalThis & { process: typeof process }).process = process;
 }
 
+const browserProcess = globalThis.process as typeof process & {
+  version?: string;
+  browser?: boolean;
+};
+
 // readable-stream and other legacy browserified deps expect these fields to exist.
-if (typeof globalThis.process.version !== 'string') {
-  (
-    globalThis as typeof globalThis & {
-      process: typeof process & { version: string };
-    }
-  ).process.version = 'v20.0.0';
+if (typeof browserProcess.version !== 'string') {
+  browserProcess.version = 'v20.0.0';
 }
 
-if (typeof globalThis.process.browser !== 'boolean') {
-  (
-    globalThis as typeof globalThis & {
-      process: typeof process & { browser: boolean };
-    }
-  ).process.browser = true;
+if (typeof browserProcess.browser !== 'boolean') {
+  browserProcess.browser = true;
 }
 
 export { Buffer, process };

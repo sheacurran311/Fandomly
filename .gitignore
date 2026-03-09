@@ -43,6 +43,8 @@ Thumbs.db
 # Archives and patches
 *.tar.gz
 *.patch
+!patches/
+!patches/*.patch
 
 # Database backups - never commit these
 *.sql

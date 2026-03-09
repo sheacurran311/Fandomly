@@ -55,7 +55,12 @@ app.use(
         imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         connectSrc: ["'self'", 'https:', 'wss:'],
-        frameSrc: ["'self'", 'https://www.facebook.com', 'https://accounts.google.com'],
+        frameSrc: [
+          "'self'",
+          'https://www.facebook.com',
+          'https://accounts.google.com',
+          'https://wallet.particle.network',
+        ],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
       },
