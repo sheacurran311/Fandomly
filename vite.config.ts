@@ -131,6 +131,7 @@ export default defineConfig({
     // causing "Invalid hook call" warnings.
     dedupe: ['react', 'react-dom'],
     alias: {
+      '@aws-sdk/util-user-agent-node': '@aws-sdk/util-user-agent-browser',
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
@@ -171,6 +172,10 @@ export default defineConfig({
         {
           name: 'stub-node-builtins-in-deps',
           setup(build: any) {
+            build.onResolve({ filter: /^@aws-sdk\/util-user-agent-node$/ }, () => ({
+              path: '@aws-sdk/util-user-agent-browser',
+              external: false,
+            }));
             build.onResolve({ filter: /^node:/ }, (args: any) => ({
               path: args.path,
               namespace: 'node-builtin-stub',
@@ -201,6 +206,28 @@ export default defineConfig({
                 .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
               return { contents: patched, loader: 'js' };
             });
+          },
+        },
+        {
+          name: 'patch-aws-runtime-config-browser',
+          setup(build: any) {
+            build.onLoad(
+              { filter: /@aws-sdk[\/\\].*runtimeConfig\.js$|@aws-sdk[\/\\]nested-clients[\/\\].*runtimeConfig\.js$/ },
+              async (args: any) => {
+                const { readFileSync } = await import('node:fs');
+                const src = readFileSync(args.path, 'utf8');
+                if (!src.includes('@aws-sdk/util-user-agent-node')) {
+                  return null;
+                }
+                return {
+                  contents: src.replace(
+                    /@aws-sdk\/util-user-agent-node/g,
+                    '@aws-sdk/util-user-agent-browser'
+                  ),
+                  loader: 'js',
+                };
+              }
+            );
           },
         },
         {
