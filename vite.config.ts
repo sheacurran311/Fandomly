@@ -103,10 +103,43 @@ function serverOnlyStubPlugin(): Plugin {
   };
 }
 
+function patchAwsBrowserRuntimePlugin(): Plugin {
+  return {
+    name: 'patch-aws-browser-runtime',
+    enforce: 'pre',
+    load(id) {
+      if (
+        id.endsWith('/node_modules/@aws-sdk/client-cognito-identity/dist-es/runtimeConfig.js') ||
+        id.endsWith(
+          '/node_modules/@aws-sdk/nested-clients/dist-es/submodules/cognito-identity/runtimeConfig.js'
+        )
+      ) {
+        return null;
+      }
+      return null;
+    },
+    async transform(code, id) {
+      if (
+        id.endsWith('/node_modules/@aws-sdk/client-cognito-identity/dist-es/runtimeConfig.js') ||
+        id.endsWith(
+          '/node_modules/@aws-sdk/nested-clients/dist-es/submodules/cognito-identity/runtimeConfig.js'
+        )
+      ) {
+        const browserPath = id.replace('runtimeConfig.js', 'runtimeConfig.browser.js');
+        const { readFile } = await import('node:fs/promises');
+        const browserCode = await readFile(browserPath, 'utf8');
+        return { code: browserCode, map: null };
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     patchParticleEvmProviderPlugin(),
     patchParticleThreshSigPlugin(),
+    patchAwsBrowserRuntimePlugin(),
     serverOnlyStubPlugin(),
     nodePolyfills({
       include: ['process', 'buffer', 'util', 'stream', 'events', 'crypto'],
@@ -131,7 +164,6 @@ export default defineConfig({
     // causing "Invalid hook call" warnings.
     dedupe: ['react', 'react-dom'],
     alias: {
-      '@aws-sdk/util-user-agent-node': '@aws-sdk/util-user-agent-browser',
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
@@ -172,10 +204,6 @@ export default defineConfig({
         {
           name: 'stub-node-builtins-in-deps',
           setup(build: any) {
-            build.onResolve({ filter: /^@aws-sdk\/util-user-agent-node$/ }, () => ({
-              path: '@aws-sdk/util-user-agent-browser',
-              external: false,
-            }));
             build.onResolve({ filter: /^node:/ }, (args: any) => ({
               path: args.path,
               namespace: 'node-builtin-stub',
@@ -209,21 +237,18 @@ export default defineConfig({
           },
         },
         {
-          name: 'patch-aws-runtime-config-browser',
+          name: 'patch-aws-cognito-runtime-config-browser',
           setup(build: any) {
             build.onLoad(
-              { filter: /@aws-sdk[\/\\].*runtimeConfig\.js$|@aws-sdk[\/\\]nested-clients[\/\\].*runtimeConfig\.js$/ },
+              {
+                filter:
+                  /@aws-sdk[\/\\]client-cognito-identity[\/\\]dist-es[\/\\]runtimeConfig\.js$|@aws-sdk[\/\\]nested-clients[\/\\]dist-es[\/\\]submodules[\/\\]cognito-identity[\/\\]runtimeConfig\.js$/,
+              },
               async (args: any) => {
                 const { readFileSync } = await import('node:fs');
-                const src = readFileSync(args.path, 'utf8');
-                if (!src.includes('@aws-sdk/util-user-agent-node')) {
-                  return null;
-                }
+                const browserPath = args.path.replace('runtimeConfig.js', 'runtimeConfig.browser.js');
                 return {
-                  contents: src.replace(
-                    /@aws-sdk\/util-user-agent-node/g,
-                    '@aws-sdk/util-user-agent-browser'
-                  ),
+                  contents: readFileSync(browserPath, 'utf8'),
                   loader: 'js',
                 };
               }
