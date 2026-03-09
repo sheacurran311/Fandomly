@@ -106,11 +106,43 @@ export function registerBlockchainRoutes(app: Express) {
 
         if (user.length === 0) return res.status(404).json({ error: 'User not found' });
 
-        const walletAddress = user[0].avalancheL1Address;
+        // Prefer client-provided wallet address (from Particle useAccount()) over DB field,
+        // since the DB field may be stale or not yet saved after a fresh login.
+        const clientWallet = req.body.walletAddress;
+        const dbWallet = user[0].avalancheL1Address;
+        const walletAddress = clientWallet || dbWallet;
+
         if (!walletAddress) {
           return res
             .status(400)
             .json({ error: 'No wallet address found. Connect your wallet first.' });
+        }
+
+        // Validate Ethereum address format
+        if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+          return res.status(400).json({ error: 'Invalid wallet address format.' });
+        }
+
+        // Update DB if wallet address is new or different
+        if (clientWallet && clientWallet !== dbWallet) {
+          try {
+            await db
+              .update(users)
+              .set({
+                avalancheL1Address: clientWallet,
+                blockchainEnabled: true,
+                updatedAt: new Date(),
+              })
+              .where(eq(users.id, userId));
+            console.log(
+              `[BlockchainRoutes] Updated wallet address for user ${userId}: ${clientWallet}`
+            );
+          } catch (dbErr) {
+            console.warn(
+              '[BlockchainRoutes] Failed to update wallet address (non-blocking):',
+              dbErr
+            );
+          }
         }
 
         // Check if creator already has a token
@@ -203,6 +235,13 @@ export function registerBlockchainRoutes(app: Express) {
     async (req: AuthenticatedRequest, res) => {
       try {
         const { creatorAddress } = req.params;
+
+        // Validate Ethereum address format before making contract calls
+        if (!creatorAddress || !/^0x[a-fA-F0-9]{40}$/.test(creatorAddress)) {
+          return res
+            .status(400)
+            .json({ error: 'Invalid wallet address format', hasToken: false, tokenAddress: null });
+        }
 
         const tokenAddress = await publicClient.readContract({
           address: CONTRACTS.CreatorTokenFactory as Address,

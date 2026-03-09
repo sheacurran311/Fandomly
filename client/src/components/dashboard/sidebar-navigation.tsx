@@ -19,7 +19,7 @@ import {
   Megaphone,
   Wallet,
 } from 'lucide-react';
-import { useAccount, useEmbeddedWallet } from '@particle-network/connectkit';
+import { useAccount, useModal } from '@particle-network/connectkit';
 
 /**
  * Profile section at the bottom of the sidebar.
@@ -38,8 +38,8 @@ function SidebarProfileSection({
   userType: string;
   walletConnected: boolean;
 }) {
-  const embeddedWallet = useEmbeddedWallet();
-  const canOpenWallet = walletConnected && embeddedWallet?.isCanOpen;
+  const { setOpen } = useModal();
+  const canOpenWallet = walletConnected;
 
   const profileContent = !isCollapsed ? (
     <div className="flex items-center space-x-3">
@@ -100,13 +100,7 @@ function SidebarProfileSection({
   if (canOpenWallet) {
     return (
       <button
-        onClick={() => {
-          try {
-            embeddedWallet.openWallet();
-          } catch (err) {
-            console.warn('[Sidebar] Wallet not available:', err);
-          }
-        }}
+        onClick={() => setOpen(true)}
         className="w-full p-3 border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer text-left"
         title="Open Wallet"
       >

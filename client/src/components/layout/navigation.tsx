@@ -16,7 +16,7 @@ import { isParticleAuthEnabled } from '@/lib/particle-config';
 import UserTypeSwitcher from '@/components/auth/user-type-switcher';
 import { transformImageUrl } from '@/lib/image-utils';
 import { BrandSwitcher } from '@/components/brand-switcher';
-import { useEmbeddedWallet, useAccount } from '@particle-network/connectkit';
+import { useModal, useAccount } from '@particle-network/connectkit';
 
 /**
  * Wallet dropdown menu item — only renders inside ConnectKitProvider
@@ -24,17 +24,11 @@ import { useEmbeddedWallet, useAccount } from '@particle-network/connectkit';
  */
 function WalletDropdownItem() {
   const { isConnected } = useAccount();
-  const embeddedWallet = useEmbeddedWallet();
-  if (!isConnected || !embeddedWallet?.isCanOpen) return null;
+  const { setOpen } = useModal();
+  if (!isConnected) return null;
   return (
     <DropdownMenuItem
-      onClick={() => {
-        try {
-          embeddedWallet.openWallet();
-        } catch (err) {
-          console.warn('[Navigation] Wallet not available:', err);
-        }
-      }}
+      onClick={() => setOpen(true)}
       className="text-gray-300 hover:text-white hover:bg-brand-primary/60"
     >
       <Wallet className="mr-2 h-4 w-4" />
@@ -49,21 +43,15 @@ function WalletDropdownItem() {
  */
 function NavWalletButton() {
   const { isConnected, address } = useAccount();
-  const embeddedWallet = useEmbeddedWallet();
+  const { setOpen } = useModal();
 
-  if (!isConnected || !embeddedWallet?.isCanOpen) return null;
+  if (!isConnected) return null;
 
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Wallet';
 
   return (
     <button
-      onClick={() => {
-        try {
-          embeddedWallet.openWallet();
-        } catch (err) {
-          console.warn('[Navigation] Wallet open failed:', err);
-        }
-      }}
+      onClick={() => setOpen(true)}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
       title={address || 'Open Wallet'}
     >

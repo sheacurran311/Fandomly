@@ -119,7 +119,13 @@ function ReputationGate({ score, threshold }: { score: number; threshold: number
   );
 }
 
-function TokenLaunchForm({ onSuccess }: { onSuccess: () => void }) {
+function TokenLaunchForm({
+  onSuccess,
+  walletAddress,
+}: {
+  onSuccess: () => void;
+  walletAddress: string;
+}) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -136,7 +142,11 @@ function TokenLaunchForm({ onSuccess }: { onSuccess: () => void }) {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/blockchain/create-token', { name, symbol });
+      const res = await apiRequest('POST', '/api/blockchain/create-token', {
+        name,
+        symbol,
+        walletAddress,
+      });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Token creation failed');
@@ -394,7 +404,7 @@ export default function TokenFactoryPage() {
             threshold={REPUTATION_THRESHOLDS.CREATOR_TOKEN}
           />
         ) : (
-          <TokenLaunchForm onSuccess={() => refetch()} />
+          <TokenLaunchForm onSuccess={() => refetch()} walletAddress={walletAddress!} />
         )}
       </div>
     </DashboardLayout>
