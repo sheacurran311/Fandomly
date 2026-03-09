@@ -13,17 +13,21 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
+// Global flag to prevent duplicate execution across multiple renders/remounts
+let twitchCallbackProcessed = false;
+
 export default function TwitchCallback() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const ranRef = useRef(false);
 
   useEffect(() => {
-    // Prevent duplicate execution within same mount (React StrictMode)
-    if (ranRef.current) {
+    // Prevent duplicate execution
+    if (ranRef.current || twitchCallbackProcessed) {
       return;
     }
     ranRef.current = true;
+    twitchCallbackProcessed = true;
 
     const run = async () => {
       // Parse URL parameters
@@ -139,6 +143,11 @@ export default function TwitchCallback() {
         }
 
         const userData = await userResponse.json();
+
+        if (!userData || !userData.id) {
+          throw new Error('No user data received from Twitch');
+        }
+
         console.log('[Twitch Callback] User profile fetched:', userData.login);
 
         // ── AUTH FLOW: Send data back to opener for loginWithCallback ──

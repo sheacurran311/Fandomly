@@ -1605,6 +1605,9 @@ export function registerSocialRoutes(app: Express) {
 
       console.log('[Twitch Me Route] Fetching user info');
       const userData = await getTwitchUser(accessToken);
+      if (!userData) {
+        return res.status(404).json({ error: 'No Twitch user found for this token' });
+      }
       res.json(userData);
     } catch (error) {
       console.error('Twitch me error:', error);

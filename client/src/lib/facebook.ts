@@ -459,11 +459,13 @@ class FacebookSDKManager {
             });
 
             if (response.status === 'connected' && response.authResponse) {
+              const isAuthFlow = userType !== 'fan' && userType !== 'creator';
               this.handleSuccessfulLogin(
                 response,
                 response.authResponse.accessToken,
                 config.requiredScopes,
-                resolve
+                resolve,
+                isAuthFlow
               );
             } else if (response.status === 'unknown') {
               // 'unknown' typically means popup was closed or blocked
@@ -508,7 +510,8 @@ class FacebookSDKManager {
     response: any,
     accessToken: string,
     requiredScopes: string[],
-    resolve: (result: FacebookLoginResult) => void
+    resolve: (result: FacebookLoginResult) => void,
+    isAuthFlow: boolean = false
   ): void {
     // Get user info and verify permissions
     window.FB.api(
@@ -525,7 +528,8 @@ class FacebookSDKManager {
               userResponse,
               accessToken,
               permResponse,
-              requiredScopes
+              requiredScopes,
+              isAuthFlow
             );
             resolve(result);
           });
@@ -548,7 +552,8 @@ class FacebookSDKManager {
     userResponse: any,
     accessToken: string,
     permResponse: any,
-    requiredScopes: string[]
+    requiredScopes: string[],
+    isAuthFlow: boolean = false
   ): Promise<FacebookLoginResult> {
     const grantedScopes: string[] = [];
     const deniedScopes: string[] = [];
@@ -570,55 +575,63 @@ class FacebookSDKManager {
       console.warn('[FB Manager] Missing required permissions:', missingScopes);
     }
 
-    // Save connection to database using cookie-based auth
-    try {
-      const { saveSocialConnection } = await import('./auth-redirect');
-      console.log('[FB Manager] Saving connection to database...');
-
-      // Try to get user's Facebook pages if they have page permissions
-      let pages: any[] = [];
+    // Save connection to database using cookie-based auth.
+    // Skip during auth flow — the user isn't authenticated yet, so the
+    // /api/social-connections endpoint would 401. The auth-modal's
+    // loginWithCallback handles creating the user + connection server-side.
+    if (isAuthFlow) {
+      console.log(
+        '[FB Manager] Auth flow — skipping connection save (handled by loginWithCallback)'
+      );
+    } else
       try {
-        await new Promise<void>((resolve) => {
-          window.FB.api(
-            '/me/accounts',
-            'GET',
-            { fields: 'id,name,access_token' },
-            (pagesResponse) => {
-              if (pagesResponse && !pagesResponse.error && pagesResponse.data) {
-                pages = pagesResponse.data;
-                console.log(`[FB Manager] Found ${pages.length} Facebook pages`);
+        const { saveSocialConnection } = await import('./auth-redirect');
+        console.log('[FB Manager] Saving connection to database...');
+
+        // Try to get user's Facebook pages if they have page permissions
+        let pages: any[] = [];
+        try {
+          await new Promise<void>((resolve) => {
+            window.FB.api(
+              '/me/accounts',
+              'GET',
+              { fields: 'id,name,access_token' },
+              (pagesResponse) => {
+                if (pagesResponse && !pagesResponse.error && pagesResponse.data) {
+                  pages = pagesResponse.data;
+                  console.log(`[FB Manager] Found ${pages.length} Facebook pages`);
+                }
+                resolve();
               }
-              resolve();
-            }
-          );
+            );
+          });
+        } catch {
+          console.log('[FB Manager] Could not fetch pages (user may not have page permissions)');
+        }
+
+        const saveResult = await saveSocialConnection({
+          platform: 'facebook',
+          platformUserId: userResponse.id,
+          platformUsername: userResponse.name,
+          platformDisplayName: userResponse.name,
+          accessToken,
+          profileData: {
+            id: userResponse.id,
+            name: userResponse.name,
+            email: userResponse.email,
+            picture: userResponse.picture,
+            pages: pages,
+          },
         });
-      } catch {
-        console.log('[FB Manager] Could not fetch pages (user may not have page permissions)');
-      }
 
-      const saveResult = await saveSocialConnection({
-        platform: 'facebook',
-        platformUserId: userResponse.id,
-        platformUsername: userResponse.name,
-        platformDisplayName: userResponse.name,
-        accessToken,
-        profileData: {
-          id: userResponse.id,
-          name: userResponse.name,
-          email: userResponse.email,
-          picture: userResponse.picture,
-          pages: pages,
-        },
-      });
-
-      if (saveResult.success) {
-        console.log('[FB Manager] Connection saved successfully');
-      } else {
-        console.warn('[FB Manager] Failed to save connection:', saveResult.error);
+        if (saveResult.success) {
+          console.log('[FB Manager] Connection saved successfully');
+        } else {
+          console.warn('[FB Manager] Failed to save connection:', saveResult.error);
+        }
+      } catch (error) {
+        console.error('[FB Manager] Error saving connection:', error);
       }
-    } catch (error) {
-      console.error('[FB Manager] Error saving connection:', error);
-    }
 
     return {
       success: true,

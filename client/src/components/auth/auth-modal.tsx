@@ -160,7 +160,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           case 'twitter':
             return TwitterSDKManager.secureLogin('auth');
           case 'facebook':
-            return FacebookSDKManager.secureLogin('fan');
+            return FacebookSDKManager.secureLogin('auth');
           case 'tiktok':
             return tiktokApi.secureLogin('auth');
           case 'youtube':
