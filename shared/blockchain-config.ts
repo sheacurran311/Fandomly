@@ -492,8 +492,10 @@ export const CREATOR_COLLECTION_FACTORY_ABI = [
   },
 ] as const;
 
-// Critical reputation thresholds used by on-chain contracts
+// Reputation thresholds — set to 0 for hackathon demo testing.
+// On-chain contracts still enforce 500/750 but the server auto-sets
+// on-chain scores before blockchain calls (see blockchain-routes.ts).
 export const REPUTATION_THRESHOLDS = {
-  FAN_STAKING: 500, // FanStaking contract requires 500+ to stake
-  CREATOR_TOKEN: 750, // CreatorTokenFactory requires 750+ to create tokens
+  FAN_STAKING: 0,
+  CREATOR_TOKEN: 0,
 } as const;

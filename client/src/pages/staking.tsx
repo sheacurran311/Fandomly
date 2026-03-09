@@ -160,8 +160,17 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
     stakedAt > 0 && fetchedAtSeconds > 0 ? (fetchedAtSeconds - stakedAt) / 86400 : 0;
   const isEarlyWithdrawal = daysSinceStake < MIN_STAKE_DURATION_DAYS && stakedAmount > 0;
 
-  const handleStake = () => {
+  const handleStake = async () => {
     if (!stakeAmount || Number(stakeAmount) <= 0) return;
+    // Ensure on-chain reputation meets the FanStaking contract threshold (500)
+    try {
+      await fetch('/api/blockchain/ensure-reputation', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Non-fatal — staking will still attempt and show its own error if reputation is too low
+    }
     stakeToken.mutate(
       { tokenAddress: token.tokenAddress, amount: stakeAmount },
       {
@@ -374,7 +383,9 @@ export default function StakingPage() {
   const { data: fanBalance } = useFanBalance(walletAddress || undefined);
 
   // fandomly_admin bypasses reputation gate for full platform access
-  const meetsThreshold = user?.role === 'fandomly_admin' || (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.FAN_STAKING;
+  const meetsThreshold =
+    user?.role === 'fandomly_admin' ||
+    (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.FAN_STAKING;
   const isLoading = repLoading || tokensLoading;
 
   return (

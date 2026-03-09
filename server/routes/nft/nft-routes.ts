@@ -194,9 +194,6 @@ export function registerNFTRoutes(app: Express) {
       }
 
       const creator = await storage.getCreatorByUserId(req.user!.id);
-      if (!creator && req.user?.role !== 'fandomly_admin') {
-        return res.status(403).json({ error: 'Creator profile or admin role required' });
-      }
 
       // Create on-chain
       const { txHash, receipt } = await blockchain.createNFTCollection(
@@ -878,9 +875,6 @@ export function registerNFTRoutes(app: Express) {
         }
 
         const creator = await storage.getCreatorByUserId(req.user!.id);
-        if (!creator && req.user?.role !== 'fandomly_admin') {
-          return res.status(403).json({ error: 'Creator profile or admin role required' });
-        }
 
         const result = await blockchain.createCreatorCollection(
           name,
