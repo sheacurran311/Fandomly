@@ -41,6 +41,10 @@ export function isParticleConfigured(): boolean {
   return Boolean(projectId && clientKey && appId);
 }
 
+export function isParticleAuthEnabled(): boolean {
+  return isParticleConfigured();
+}
+
 export function createParticleConfig() {
   if (!projectId || !clientKey || !appId) {
     throw new Error(

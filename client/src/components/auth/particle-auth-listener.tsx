@@ -16,7 +16,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { isParticleAuthEnabled } from '@/lib/particle-config';
 import { useAccount, useConnect, useConnectors, useDisconnect } from '@particle-network/connectkit';
 
 function ParticleAuthListenerInner() {

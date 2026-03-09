@@ -1,14 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode, useMemo } from 'react';
-import { isParticleConfigured, createParticleConfig } from '@/lib/particle-config';
+import { isParticleAuthEnabled, createParticleConfig } from '@/lib/particle-config';
 import { ConnectKitProvider } from '@particle-network/connectkit';
 
 interface ParticleProviderProps {
   children: ReactNode;
-}
-
-export function isParticleAuthEnabled(): boolean {
-  return isParticleConfigured();
 }
 
 export function ParticleProvider({ children }: ParticleProviderProps) {

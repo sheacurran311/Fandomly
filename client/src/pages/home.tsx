@@ -37,7 +37,7 @@ import {
 } from 'react-icons/si';
 import { Link } from 'wouter';
 import { SectionGeometry } from '@/components/landing/section-geometry';
-import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { isParticleAuthEnabled } from '@/lib/particle-config';
 
 // Lazy-load Particle ConnectButton only when needed (not in LANDING_ONLY mode)
 const ParticleConnectButton = lazy(() =>

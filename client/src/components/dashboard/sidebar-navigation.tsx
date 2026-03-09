@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
-import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { isParticleAuthEnabled } from '@/lib/particle-config';
 import { getNavigationItems } from '@/config/navigation';
 import {
   ChevronLeft,

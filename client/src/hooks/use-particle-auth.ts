@@ -19,7 +19,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { isParticleAuthEnabled } from '@/contexts/particle-provider';
+import { isParticleAuthEnabled } from '@/lib/particle-config';
 
 /**
  * Hook that bridges Particle Connect events to Fandomly auth.
