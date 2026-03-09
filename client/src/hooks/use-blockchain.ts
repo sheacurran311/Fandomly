@@ -346,3 +346,38 @@ export function useClaimRewards() {
     },
   });
 }
+
+export function useTransferToken() {
+  const walletClient = useWalletClient();
+  const { address } = useAccount();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      tokenAddress,
+      recipientAddress,
+      amount,
+    }: {
+      tokenAddress: string;
+      recipientAddress: string;
+      amount: string;
+    }) => {
+      if (!walletClient || !address) throw new Error('Wallet not connected');
+
+      const amountWei = parseUnits(amount, 18);
+      const tx = await walletClient.writeContract({
+        address: tokenAddress as Address,
+        abi: CREATOR_TOKEN_ABI,
+        functionName: 'transfer',
+        args: [recipientAddress as Address, amountWei],
+        chain: publicClient.chain,
+        account: address as Address,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
+      return receipt;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blockchain'] });
+    },
+  });
+}

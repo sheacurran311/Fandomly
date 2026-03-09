@@ -26,8 +26,14 @@ import {
   REPUTATION_REGISTRY_ABI,
 } from '@shared/blockchain-config';
 import { db } from '../../db';
-import { eq } from 'drizzle-orm';
-import { users, socialConnections, creators } from '@shared/schema';
+import { eq, and, isNotNull } from 'drizzle-orm';
+import {
+  users,
+  socialConnections,
+  creators,
+  tenantMemberships,
+  tokenDistributions,
+} from '@shared/schema';
 
 // ============================================================================
 // CHAIN + CLIENTS
@@ -535,6 +541,119 @@ export function registerBlockchainRoutes(app: Express) {
         console.error('[BlockchainRoutes] Ensure reputation error:', error);
         const classified = classifyBlockchainError(error);
         return res.status(classified.status).json({ error: classified.message });
+      }
+    }
+  );
+
+  // ==========================================================================
+  // COMMUNITY WALLETS — list fans with wallet addresses for token distribution
+  // ==========================================================================
+
+  app.get(
+    '/api/blockchain/community-wallets',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+        // Find creator's tenant
+        const [creator] = await db
+          .select({ tenantId: creators.tenantId })
+          .from(creators)
+          .where(eq(creators.userId, userId));
+
+        if (!creator?.tenantId) {
+          return res.status(403).json({ error: 'Not a creator' });
+        }
+
+        const members = await db
+          .select({
+            userId: users.id,
+            username: users.username,
+            displayName: users.displayName,
+            walletAddress: users.avalancheL1Address,
+          })
+          .from(tenantMemberships)
+          .innerJoin(users, eq(users.id, tenantMemberships.userId))
+          .where(
+            and(
+              eq(tenantMemberships.tenantId, creator.tenantId),
+              isNotNull(users.avalancheL1Address)
+            )
+          );
+
+        return res.json({ members });
+      } catch (error) {
+        console.error('[BlockchainRoutes] Community wallets error:', error);
+        return res.status(500).json({ error: 'Failed to fetch community wallets' });
+      }
+    }
+  );
+
+  // ==========================================================================
+  // TOKEN DISTRIBUTIONS — log and retrieve distribution history
+  // ==========================================================================
+
+  app.post(
+    '/api/blockchain/token-distributions',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+        const {
+          tokenAddress,
+          recipientAddress,
+          recipientUserId,
+          amount,
+          txHash,
+          distributionType,
+        } = req.body;
+
+        if (!tokenAddress || !recipientAddress || !amount || !txHash) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const [record] = await db
+          .insert(tokenDistributions)
+          .values({
+            creatorId: userId,
+            tokenAddress,
+            recipientAddress,
+            recipientUserId: recipientUserId || null,
+            amount: String(amount),
+            txHash,
+            distributionType: distributionType || 'single',
+          })
+          .returning();
+
+        return res.json({ success: true, distribution: record });
+      } catch (error) {
+        console.error('[BlockchainRoutes] Token distribution log error:', error);
+        return res.status(500).json({ error: 'Failed to log distribution' });
+      }
+    }
+  );
+
+  app.get(
+    '/api/blockchain/token-distributions',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+        const distributions = await db
+          .select()
+          .from(tokenDistributions)
+          .where(eq(tokenDistributions.creatorId, userId));
+
+        return res.json({ distributions });
+      } catch (error) {
+        console.error('[BlockchainRoutes] Token distributions fetch error:', error);
+        return res.status(500).json({ error: 'Failed to fetch distributions' });
       }
     }
   );

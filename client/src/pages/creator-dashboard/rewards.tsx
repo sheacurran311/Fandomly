@@ -51,6 +51,8 @@ import {
   Image as ImageIcon,
   Plus,
   Edit,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import type { Reward } from '@shared/schema';
 import { insertRewardSchema } from '@shared/schema';
@@ -466,6 +468,85 @@ function RewardCard({ reward, onUpdate }: { reward: Reward; onUpdate: () => void
   );
 }
 
+function NftImageUploadField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(value || null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPreview(URL.createObjectURL(file));
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch('/api/nft/upload/image', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const data = await res.json();
+      onChange(data.gatewayUrl);
+      setPreview(data.gatewayUrl);
+    } catch {
+      setPreview(null);
+      onChange('');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {preview && (
+        <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-white/10">
+          <img src={preview} alt="NFT preview" className="w-full h-full object-cover" />
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md cursor-pointer transition-colors">
+          {uploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading to IPFS...
+            </>
+          ) : (
+            <>
+              <Upload className="w-4 h-4" />
+              Upload Image
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+            disabled={uploading}
+          />
+        </label>
+      </div>
+      <Input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setPreview(e.target.value || null);
+        }}
+        placeholder="Or paste image URL..."
+        className="bg-white/10 border-white/20 text-white text-sm"
+      />
+    </div>
+  );
+}
+
 // Reward Creation Form Component with react-hook-form + zodResolver
 function RewardCreationForm({
   onSubmit,
@@ -727,13 +808,9 @@ function RewardCreationForm({
               name="rewardData.nftData.imageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Image URL</FormLabel>
+                  <FormLabel className="text-white">NFT Image</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="https://..."
-                      className="mt-2 bg-white/10 border-white/20 text-white"
-                    />
+                    <NftImageUploadField value={field.value || ''} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage className="text-red-400" />
                 </FormItem>

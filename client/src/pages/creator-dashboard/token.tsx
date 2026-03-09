@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Coins,
   Sparkles,
@@ -26,6 +27,8 @@ import {
   ExternalLink,
   Loader2,
   Shield,
+  Send,
+  History,
 } from 'lucide-react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
@@ -33,6 +36,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAccount } from '@particle-network/connectkit';
 import { REPUTATION_THRESHOLDS, FANDOMLY_CHAIN } from '@shared/blockchain-config';
+import { useTransferToken } from '@/hooks/use-blockchain';
 
 // ============================================================================
 // TYPES
@@ -52,6 +56,23 @@ interface TokenInfo {
 interface ReputationData {
   score: number;
   thresholds: { fanStaking: boolean; creatorToken: boolean };
+}
+
+interface CommunityMember {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  walletAddress: string;
+}
+
+interface Distribution {
+  id: string;
+  recipientAddress: string;
+  recipientUserId: string | null;
+  amount: string;
+  txHash: string;
+  distributionType: string;
+  createdAt: string;
 }
 
 // ============================================================================
@@ -239,89 +260,301 @@ function TokenLaunchForm({
   );
 }
 
-function TokenDashboard({ token }: { token: TokenInfo }) {
+function DistributeTokens({ token }: { token: TokenInfo }) {
+  const { toast } = useToast();
+  const [selectedWallet, setSelectedWallet] = useState('');
+  const [amount, setAmount] = useState('');
+  const transferMutation = useTransferToken();
+
+  const { data: membersData } = useQuery<{ members: CommunityMember[] }>({
+    queryKey: ['/api/blockchain/community-wallets'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/blockchain/community-wallets');
+      return res.json();
+    },
+  });
+
+  const { data: historyData, refetch: refetchHistory } = useQuery<{
+    distributions: Distribution[];
+  }>({
+    queryKey: ['/api/blockchain/token-distributions'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/blockchain/token-distributions');
+      return res.json();
+    },
+  });
+
+  const members = membersData?.members || [];
+  const distributions = historyData?.distributions || [];
+  const selectedMember = members.find((m) => m.walletAddress === selectedWallet);
+
+  const handleSend = async () => {
+    if (!token.tokenAddress || !selectedWallet || !amount) return;
+
+    try {
+      const receipt = await transferMutation.mutateAsync({
+        tokenAddress: token.tokenAddress,
+        recipientAddress: selectedWallet,
+        amount,
+      });
+
+      await apiRequest('POST', '/api/blockchain/token-distributions', {
+        tokenAddress: token.tokenAddress,
+        recipientAddress: selectedWallet,
+        recipientUserId: selectedMember?.userId,
+        amount,
+        txHash: receipt.transactionHash,
+        distributionType: 'single',
+      });
+
+      toast({
+        title: 'Tokens sent!',
+        description: `${amount} ${token.symbol} sent to ${selectedMember?.username || selectedWallet.slice(0, 8) + '...'}`,
+      });
+      setAmount('');
+      setSelectedWallet('');
+      refetchHistory();
+    } catch (error: any) {
+      toast({
+        title: 'Transfer failed',
+        description: error.message || 'Transaction was rejected or failed',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* Token Info */}
+      {/* Send Tokens */}
       <Card className="bg-white/5 border-white/10">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center">
-              <Coins className="w-7 h-7 text-purple-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">{token.name}</h2>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                  {token.symbol}
-                </Badge>
-                {token.tokenAddress && <CopyableAddress address={token.tokenAddress} />}
-              </div>
-            </div>
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2 text-base">
+            <Send className="w-4 h-4 text-purple-400" />
+            Send Tokens to Fan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-300 mb-1.5 block">Select Fan</label>
+            {members.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No fans with wallets found in your community yet.
+              </p>
+            ) : (
+              <select
+                value={selectedWallet}
+                onChange={(e) => setSelectedWallet(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">Choose a fan...</option>
+                {members.map((m) => (
+                  <option key={m.walletAddress} value={m.walletAddress}>
+                    {m.displayName || m.username} ({m.walletAddress.slice(0, 6)}...
+                    {m.walletAddress.slice(-4)})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-xs text-gray-500 mb-1">Total Supply</p>
-              <p className="text-lg font-semibold text-white">
-                {Number(token.totalSupply || 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-xs text-gray-500 mb-1">Your Balance</p>
-              <p className="text-lg font-semibold text-white">
-                {Number(token.creatorBalance || 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-xs text-gray-500 mb-1">Total Staked</p>
-              <p className="text-lg font-semibold text-emerald-400">
-                {Number(token.totalStaked || 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-xs text-gray-500 mb-1">Circulating</p>
-              <p className="text-lg font-semibold text-blue-400">
-                {Number(
-                  (Number(token.totalSupply || 0) - Number(token.creatorBalance || 0)).toFixed(0)
-                ).toLocaleString()}
-              </p>
-            </div>
+          <div>
+            <label className="text-sm text-gray-300 mb-1.5 block">Amount</label>
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 100"
+              className="bg-white/5 border-white/10 text-white"
+              min="0"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Your balance: {Number(token.creatorBalance || 0).toLocaleString()} {token.symbol}
+            </p>
           </div>
+
+          <Button
+            onClick={handleSend}
+            disabled={
+              !selectedWallet ||
+              !amount ||
+              Number(amount) <= 0 ||
+              Number(amount) > Number(token.creatorBalance || 0) ||
+              transferMutation.isPending
+            }
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            {transferMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-2" />
+                Send {amount ? `${amount} ${token.symbol || ''}` : 'Tokens'}
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-white/5 border-white/10 hover:border-white/20 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">View on Explorer</p>
-              <p className="text-xs text-gray-500">See transactions on Fandomly Chain</p>
+      {/* Distribution History */}
+      <Card className="bg-white/5 border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2 text-base">
+            <History className="w-4 h-4 text-blue-400" />
+            Distribution History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {distributions.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">
+              No distributions yet. Send tokens to fans to see history here.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {distributions.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between bg-white/5 rounded-lg p-3 text-sm"
+                >
+                  <div>
+                    <p className="text-white font-mono text-xs">
+                      {d.recipientAddress.slice(0, 8)}...{d.recipientAddress.slice(-6)}
+                    </p>
+                    <p className="text-gray-500 text-xs">
+                      {new Date(d.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-purple-400 font-semibold">
+                      {Number(d.amount).toLocaleString()} {token.symbol}
+                    </p>
+                    <a
+                      href={`${FANDOMLY_CHAIN.blockExplorer}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-gray-500 hover:text-white"
+                    >
+                      View tx
+                    </a>
+                  </div>
+                </div>
+              ))}
             </div>
-            <a
-              href={`${FANDOMLY_CHAIN.blockExplorer}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-400 hover:text-white"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </CardContent>
-        </Card>
-        <Card className="bg-white/5 border-white/10 hover:border-white/20 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Users className="w-5 h-5 text-green-400" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">Fan Staking</p>
-              <p className="text-xs text-gray-500">Fans can stake your token to earn FAN</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function TokenDashboard({ token }: { token: TokenInfo }) {
+  return (
+    <Tabs defaultValue="overview" className="space-y-4">
+      <TabsList className="bg-white/5 border border-white/10">
+        <TabsTrigger
+          value="overview"
+          className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-400"
+        >
+          <Coins className="w-4 h-4 mr-2" />
+          Overview
+        </TabsTrigger>
+        <TabsTrigger
+          value="distribute"
+          className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-400"
+        >
+          <Send className="w-4 h-4 mr-2" />
+          Distribute
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-4">
+        {/* Token Info */}
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center">
+                <Coins className="w-7 h-7 text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">{token.name}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                    {token.symbol}
+                  </Badge>
+                  {token.tokenAddress && <CopyableAddress address={token.tokenAddress} />}
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-xs text-gray-500 mb-1">Total Supply</p>
+                <p className="text-lg font-semibold text-white">
+                  {Number(token.totalSupply || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-xs text-gray-500 mb-1">Your Balance</p>
+                <p className="text-lg font-semibold text-white">
+                  {Number(token.creatorBalance || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-xs text-gray-500 mb-1">Total Staked</p>
+                <p className="text-lg font-semibold text-emerald-400">
+                  {Number(token.totalStaked || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-xs text-gray-500 mb-1">Circulating</p>
+                <p className="text-lg font-semibold text-blue-400">
+                  {Number(
+                    (Number(token.totalSupply || 0) - Number(token.creatorBalance || 0)).toFixed(0)
+                  ).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Links */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-white/5 border-white/10 hover:border-white/20 transition-colors">
+            <CardContent className="p-4 flex items-center gap-3">
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">View on Explorer</p>
+                <p className="text-xs text-gray-500">See transactions on Fandomly Chain</p>
+              </div>
+              <a
+                href={`${FANDOMLY_CHAIN.blockExplorer}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/5 border-white/10 hover:border-white/20 transition-colors">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Users className="w-5 h-5 text-green-400" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">Fan Staking</p>
+                <p className="text-xs text-gray-500">Fans can stake your token to earn FAN</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="distribute">
+        <DistributeTokens token={token} />
+      </TabsContent>
+    </Tabs>
   );
 }
 

@@ -4279,6 +4279,29 @@ export type InsertReputationScore = typeof reputationScores.$inferInsert;
 export type ReputationSyncLogEntry = typeof reputationSyncLog.$inferSelect;
 export type InsertReputationSyncLogEntry = typeof reputationSyncLog.$inferInsert;
 
+// ============================================================================
+// TOKEN DISTRIBUTIONS — tracks creator-to-fan token sends
+// ============================================================================
+
+export const tokenDistributions = pgTable('token_distributions', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  creatorId: varchar('creator_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  tokenAddress: text('token_address').notNull(),
+  recipientAddress: text('recipient_address').notNull(),
+  recipientUserId: varchar('recipient_user_id').references(() => users.id),
+  amount: text('amount').notNull(),
+  txHash: text('tx_hash').notNull(),
+  distributionType: text('distribution_type').notNull().default('single'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export type TokenDistribution = typeof tokenDistributions.$inferSelect;
+export type InsertTokenDistribution = typeof tokenDistributions.$inferInsert;
+
 // Additional inferred types for tables used by services
 export type SocialConnection = typeof socialConnections.$inferSelect;
 export type CreatorFacebookPage = typeof creatorFacebookPages.$inferSelect;
