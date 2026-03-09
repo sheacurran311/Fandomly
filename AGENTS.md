@@ -73,3 +73,7 @@ Quick reference:
 - Background jobs (GroupGoalPoller, PointExpirationJob, SyncScheduler) start automatically and log errors if the database schema is incomplete or columns are missing — this is non-blocking for development.
 - `drizzle-kit push` uses the standard `pg` driver (TCP), so it works directly with local PostgreSQL without the WebSocket proxy.
 - Husky pre-commit hook runs `npx lint-staged` (ESLint + Prettier on staged files).
+- `npm run dev` already starts `dev-ws-proxy.mjs` in the background (via `node dev-ws-proxy.mjs &` in the script), so you do not need to start it separately.
+- Two test suites (`tests/api/platform-e2e.test.ts`, `tests/api/task-templates-api.test.ts`) fetch `http://localhost:5000/api/csrf-token` and require a running dev server to pass. All other suites pass without a server.
+- `npm run build` has a pre-existing Vite/Rollup failure (`@aws-sdk/util-user-agent-node` tries to import `versions` from `node:process` which Rollup's node polyfills don't export). This does not affect development (`npm run dev` works fine).
+- PostgreSQL 16 is a system dependency that must be installed (`sudo apt-get install -y postgresql postgresql-client`) and started (`sudo pg_ctlcluster 16 main start`) before running the dev server or schema push.
