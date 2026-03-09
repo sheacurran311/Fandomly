@@ -117,7 +117,7 @@ export default function DataDeletion() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button 
                     variant="neon"
-                    onClick={() => window.open('mailto:support@fandomly.com?subject=Account Deletion Request', '_blank')}
+                    onClick={() => window.open('mailto:support@fandomly.ai?subject=Account Deletion Request', '_blank')}
                   >
                     Request Account Deletion
                   </Button>

@@ -206,7 +206,7 @@ export default function TenantSetup() {
                   Store URL *
                 </Label>
                 <div className="flex items-center">
-                  <span className="text-gray-400 text-sm mr-2">fandomly.com/</span>
+                  <span className="text-gray-400 text-sm mr-2">fandomly.ai/</span>
                   <Input
                     id="slug"
                     value={formData.slug}
@@ -578,7 +578,7 @@ export default function TenantSetup() {
                     <h3 className="text-white text-xl font-bold">
                       {formData.name || 'Your Store'}
                     </h3>
-                    <p className="text-gray-400">fandomly.com/{formData.slug || 'your-store'}</p>
+                    <p className="text-gray-400">fandomly.ai/{formData.slug || 'your-store'}</p>
                     {selectedTierData && (
                       <Badge className="mt-1" style={{ backgroundColor: formData.accentColor }}>
                         {selectedTierData.name} Plan

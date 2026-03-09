@@ -30,6 +30,39 @@ function patchParticleEvmProviderPlugin(): Plugin {
 }
 
 /**
+ * Particle's thresh-sig package lazily fetches its WASM file using
+ * `new URL("../wasm/thresh_sig_wasm_bg.wasm", import.meta.url)`.
+ * Once the package is pre-bundled into `.vite/deps`, that relative URL points
+ * at a non-existent location and our app catch-all returns `index.html`,
+ * causing silent WASM init failure and later `__wbindgen_malloc` crashes.
+ *
+ * Rewrite the fetch target to a stable app route that we serve explicitly in
+ * both dev and production. Also rethrow init errors so failures are visible.
+ */
+function patchParticleThreshSigPlugin(): Plugin {
+  return {
+    name: 'patch-particle-thresh-sig',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.includes('@particle-network/thresh-sig')) return null;
+      if (!code.includes('thresh_sig_wasm_bg.wasm')) return null;
+
+      const patched = code
+        .replace(
+          'new URL("../wasm/thresh_sig_wasm_bg.wasm", import.meta.url)',
+          '"/particle-wasm/thresh_sig_wasm_bg.wasm"'
+        )
+        .replace(
+          /} catch \(e\) {\s*}\s*context\.initializing = false;/,
+          '} catch (e) {\n      console.error("[Particle] Failed to initialize thresh-sig wasm", e);\n      throw e;\n    }\n    context.initializing = false;'
+        );
+
+      return { code: patched, map: null };
+    },
+  };
+}
+
+/**
  * Stubs Node.js built-in protocol imports (node:fs, node:http, etc.) that
  * @smithy and @aws-sdk packages reference. The smithy/AWS packages themselves
  * are NOT stubbed — only their node: dependencies. This allows the AWS SDK
@@ -73,6 +106,7 @@ function serverOnlyStubPlugin(): Plugin {
 export default defineConfig({
   plugins: [
     patchParticleEvmProviderPlugin(),
+    patchParticleThreshSigPlugin(),
     serverOnlyStubPlugin(),
     nodePolyfills({
       include: ['process', 'buffer', 'util', 'stream', 'events', 'crypto'],
@@ -155,6 +189,28 @@ export default defineConfig({
                 .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
               return { contents: patched, loader: 'js' };
             });
+          },
+        },
+        {
+          name: 'patch-particle-thresh-sig',
+          setup(build: any) {
+            build.onLoad(
+              { filter: /@particle-network[\/\\]thresh-sig[\/\\].*[\/\\]esm[\/\\]index\.js$/ },
+              async (args: any) => {
+                const { readFileSync } = await import('node:fs');
+                const src = readFileSync(args.path, 'utf8');
+                const patched = src
+                  .replace(
+                    'new URL("../wasm/thresh_sig_wasm_bg.wasm", import.meta.url)',
+                    '"/particle-wasm/thresh_sig_wasm_bg.wasm"'
+                  )
+                  .replace(
+                    /} catch \(e\) {\s*}\s*context\.initializing = false;/,
+                    '} catch (e) {\n      console.error("[Particle] Failed to initialize thresh-sig wasm", e);\n      throw e;\n    }\n    context.initializing = false;'
+                  );
+                return { contents: patched, loader: 'js' };
+              }
+            );
           },
         },
       ],

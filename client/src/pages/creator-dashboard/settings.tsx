@@ -466,7 +466,7 @@ export default function CreatorSettings() {
                         Store URL
                       </Label>
                       <div className="flex items-center">
-                        <span className="text-gray-400 text-sm mr-2">fandomly.com/</span>
+                        <span className="text-gray-400 text-sm mr-2">fandomly.ai/</span>
                         <Input
                           id="storeSlug"
                           value={settings.storeSlug}

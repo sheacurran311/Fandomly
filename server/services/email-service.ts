@@ -8,7 +8,8 @@
 import { Resend } from 'resend';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.EMAIL_FROM || 'Fandomly <notifications@fandomly.io>';
+const APP_URL = process.env.APP_URL || 'https://fandomly.ai';
+const FROM_EMAIL = process.env.EMAIL_FROM || 'Fandomly <notifications@fandomly.ai>';
 
 let resendClient: Resend | null = null;
 
@@ -96,7 +97,7 @@ export function shouldSendEmail(
   const prefKey = NOTIFICATION_TYPE_TO_PREFERENCE_KEY[notificationType];
   if (!prefKey) return false;
 
-  const channel = preferences[prefKey];
+  const channel = preferences[prefKey] as { email?: boolean } | undefined;
   return channel?.email === true;
 }
 
@@ -116,7 +117,7 @@ export function buildNotificationEmail(title: string, message: string, actionUrl
 <tr><td align="center">
   <table width="600" cellpadding="0" cellspacing="0" style="background:#1a0a30;border-radius:12px;border:1px solid rgba(225,6,152,0.2)">
     <tr><td style="padding:32px 32px 0">
-      <img src="https://fandomly.io/fandomly-logo.png" alt="Fandomly" width="120" style="display:block;margin-bottom:24px">
+      <img src="${APP_URL}/fandomly-logo.png" alt="Fandomly" width="120" style="display:block;margin-bottom:24px">
     </td></tr>
     <tr><td style="padding:0 32px">
       <h1 style="color:#fff;font-size:20px;margin:0 0 12px">${title}</h1>
@@ -124,7 +125,7 @@ export function buildNotificationEmail(title: string, message: string, actionUrl
     </td></tr>
     <tr><td style="padding:0 32px">${buttonHtml ? `<table><tbody>${buttonHtml}</tbody></table>` : ''}</td></tr>
     <tr><td style="padding:32px;border-top:1px solid rgba(255,255,255,0.05);margin-top:24px">
-      <p style="color:#6b5f82;font-size:12px;margin:0">You're receiving this because of your notification preferences on Fandomly. <a href="https://fandomly.io/settings" style="color:#e10698">Manage preferences</a></p>
+      <p style="color:#6b5f82;font-size:12px;margin:0">You're receiving this because of your notification preferences on Fandomly. <a href="${APP_URL}/settings" style="color:#e10698">Manage preferences</a></p>
     </td></tr>
   </table>
 </td></tr>

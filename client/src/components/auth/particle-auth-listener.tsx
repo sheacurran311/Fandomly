@@ -84,7 +84,7 @@ function ParticleAuthListenerInner() {
       accessToken.slice(0, 20) + '...'
     );
 
-    const attemptConnect = async (retriesLeft = 1): Promise<void> => {
+    const attemptConnect = async (retriesLeft = 2): Promise<void> => {
       try {
         const result = await connectAsync({
           connector: particleAuthConnector,
@@ -100,16 +100,28 @@ function ParticleAuthListenerInner() {
           /* noop */
         }
       } catch (err: any) {
+        const message = err?.message || '';
         // If SDK not ready, retry once after a short delay
         if (
           retriesLeft > 0 &&
-          (err?.message?.includes('not initialized') || err?.message?.includes('not ready'))
+          (
+            message.includes('not initialized') ||
+            message.includes('not ready') ||
+            message.includes('__wbindgen_malloc') ||
+            message.includes('WebAssembly')
+          )
         ) {
-          console.log('[Particle] SDK not ready, retrying in 500ms...');
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          console.log('[Particle] Wallet SDK not ready, retrying in 750ms...');
+          await new Promise((resolve) => setTimeout(resolve, 750));
           return attemptConnect(retriesLeft - 1);
         }
         // Non-blocking -- wallet creation failure doesn't affect the Fandomly session.
+        walletCreationAttempted.current = false;
+        try {
+          sessionStorage.removeItem(lockKey);
+        } catch {
+          /* noop */
+        }
         console.warn('[Particle] Wallet creation failed (non-blocking):', err?.message || err);
         console.warn('[Particle] Full error:', err);
       }

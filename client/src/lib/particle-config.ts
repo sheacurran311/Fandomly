@@ -76,7 +76,7 @@ export function createParticleConfig() {
       logo:
         typeof window !== 'undefined'
           ? `${window.location.origin}/fandomly-logo.png`
-          : 'https://fandomly.io/fandomly-logo.png',
+          : 'https://fandomly.ai/fandomly-logo.png',
 
       // Fandomly brand theme for the ConnectKit modal.
       // Brand colors: #e10698 (primary pink), #14feee (secondary cyan), #0a0118 (dark bg)
@@ -166,7 +166,7 @@ export function createParticleConfig() {
         metadata: {
           name: 'Fandomly',
           description: 'Elevate Your Brand. Reward Your Community.',
-          url: typeof window !== 'undefined' ? window.location.origin : 'https://fandomly.io',
+          url: typeof window !== 'undefined' ? window.location.origin : 'https://fandomly.ai',
           icon: typeof window !== 'undefined' ? `${window.location.origin}/favicon.ico` : '',
         },
         ...(walletConnectProjectId ? { walletConnectProjectId } : {}),

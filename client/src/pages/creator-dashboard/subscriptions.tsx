@@ -472,7 +472,7 @@ export default function CreatorSubscriptions() {
                             className="w-full border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
                             onClick={() =>
                               (window.location.href =
-                                'mailto:sales@fandomly.com?subject=Enterprise%20Plan%20Inquiry')
+                                'mailto:sales@fandomly.ai?subject=Enterprise%20Plan%20Inquiry')
                             }
                           >
                             <Mail className="h-4 w-4 mr-2" />

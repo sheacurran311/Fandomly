@@ -23,8 +23,9 @@ import { useEmbeddedWallet, useAccount } from '@particle-network/connectkit';
  * when Particle is enabled and the embedded wallet is available.
  */
 function WalletDropdownItem() {
+  const { isConnected } = useAccount();
   const embeddedWallet = useEmbeddedWallet();
-  if (!embeddedWallet?.isCanOpen) return null;
+  if (!isConnected || !embeddedWallet?.isCanOpen) return null;
   return (
     <DropdownMenuItem
       onClick={() => {

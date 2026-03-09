@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import './polyfills';
+
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';

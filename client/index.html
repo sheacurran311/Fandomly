@@ -100,21 +100,6 @@
     </script>
     
     <div id="root"></div>
-    <!-- Buffer/process polyfill: must run as classic script BEFORE ES modules load.
-         Particle SDK's crypto chain (ripemd160 -> hash-base -> readable-stream) calls
-         Buffer.slice() at module init time. vite-plugin-node-polyfills handles this
-         during dev, but this inline script is a failsafe for edge cases. -->
-    <script>
-      if (typeof globalThis.Buffer === 'undefined') {
-        try {
-          var b = require('buffer');
-          globalThis.Buffer = b.Buffer;
-        } catch(e) { /* vite-plugin-node-polyfills will handle it */ }
-      }
-      if (typeof globalThis.process === 'undefined') {
-        globalThis.process = { env: {}, versions: {} };
-      }
-    </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>

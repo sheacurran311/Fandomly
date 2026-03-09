@@ -19,7 +19,7 @@ import {
   Megaphone,
   Wallet,
 } from 'lucide-react';
-import { useEmbeddedWallet } from '@particle-network/connectkit';
+import { useAccount, useEmbeddedWallet } from '@particle-network/connectkit';
 
 /**
  * Profile section at the bottom of the sidebar.
@@ -30,16 +30,16 @@ function SidebarProfileSection({
   user,
   avatarUrl,
   userType,
-  particleEnabled,
+  walletConnected,
 }: {
   isCollapsed: boolean;
   user: any;
   avatarUrl: string | null;
   userType: string;
-  particleEnabled: boolean;
+  walletConnected: boolean;
 }) {
   const embeddedWallet = useEmbeddedWallet();
-  const canOpenWallet = particleEnabled && embeddedWallet?.isCanOpen;
+  const canOpenWallet = walletConnected && embeddedWallet?.isCanOpen;
 
   const profileContent = !isCollapsed ? (
     <div className="flex items-center space-x-3">
@@ -54,9 +54,9 @@ function SidebarProfileSection({
           <div
             className={cn(
               'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-brand-dark-bg',
-              particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
+              walletConnected ? 'bg-emerald-400' : 'bg-gray-500'
             )}
-            title={particleEnabled ? 'Connected to Fandomly Chain' : 'Fandomly Chain not connected'}
+            title={walletConnected ? 'Connected to Fandomly Chain' : 'Fandomly Chain not connected'}
           />
         )}
       </div>
@@ -65,7 +65,7 @@ function SidebarProfileSection({
           {user?.username || 'Your Account'}
         </p>
         <p className="text-xs truncate">
-          {userType === 'creator' && particleEnabled ? (
+          {userType === 'creator' && walletConnected ? (
             <span className="text-emerald-400">Chain connected</span>
           ) : userType === 'creator' ? (
             <span className="text-gray-500">Chain offline</span>
@@ -89,7 +89,7 @@ function SidebarProfileSection({
           <div
             className={cn(
               'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-dark-bg',
-              particleEnabled ? 'bg-emerald-400' : 'bg-gray-500'
+              walletConnected ? 'bg-emerald-400' : 'bg-gray-500'
             )}
           />
         )}
@@ -136,6 +136,8 @@ export default function SidebarNavigation({
 
   const { user, isAuthenticated } = useAuth();
   const particleEnabled = isParticleAuthEnabled();
+  const { isConnected } = useAccount();
+  const walletConnected = particleEnabled && isConnected;
 
   // Fetch creator's program for sidebar profile photo
   const { data: programs = [] } = useQuery<Array<{ pageConfig?: { logo?: string } }>>({
@@ -362,7 +364,7 @@ export default function SidebarNavigation({
           user={user}
           avatarUrl={avatarUrl}
           userType={userType}
-          particleEnabled={particleEnabled}
+          walletConnected={walletConnected}
         />
       </div>
     </div>

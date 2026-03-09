@@ -224,7 +224,7 @@ export class IPFSService {
       imageFilename: params.imageFilename,
       imageMimeType: params.imageMimeType,
       attributes,
-      externalUrl: 'https://fandomly.com',
+      externalUrl: 'https://fandomly.ai',
     });
   }
 

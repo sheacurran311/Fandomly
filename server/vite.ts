@@ -8,6 +8,16 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
+const particleWasmPath = path.resolve(
+  import.meta.dirname,
+  '..',
+  'node_modules',
+  '@particle-network',
+  'thresh-sig',
+  'wasm',
+  'thresh_sig_wasm_bg.wasm'
+);
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -19,7 +29,24 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+function registerParticleWasmRoute(app: Express) {
+  app.get('/particle-wasm/thresh_sig_wasm_bg.wasm', (_req, res) => {
+    if (!fs.existsSync(particleWasmPath)) {
+      res.status(404).end();
+      return;
+    }
+
+    res.set({
+      'Content-Type': 'application/wasm',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+    res.sendFile(particleWasmPath);
+  });
+}
+
 export async function setupVite(app: Express, server: Server) {
+  registerParticleWasmRoute(app);
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -68,6 +95,8 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
+  registerParticleWasmRoute(app);
+
   const distPath = path.resolve(import.meta.dirname, "public");
 
   if (!fs.existsSync(distPath)) {
