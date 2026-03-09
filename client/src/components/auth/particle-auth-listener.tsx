@@ -112,7 +112,24 @@ function ParticleAuthListenerInner() {
             thirdpartyCode: accessToken,
           },
         });
-        console.log('[Particle] Embedded wallet connected:', result.accounts?.[0]);
+        const walletAddr = result.accounts?.[0];
+        console.log('[Particle] Embedded wallet connected:', walletAddr);
+
+        // Persist wallet address to server so blockchain routes can use it
+        if (walletAddr) {
+          try {
+            await fetch('/api/auth/update-wallet', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ walletAddress: walletAddr }),
+            });
+            console.log('[Particle] Wallet address saved to server');
+          } catch (saveErr) {
+            console.warn('[Particle] Failed to save wallet address (non-blocking):', saveErr);
+          }
+        }
+
         try {
           sessionStorage.setItem(lockKey, 'created');
         } catch {
