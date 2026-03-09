@@ -440,8 +440,10 @@ export class TwitterSDKManager {
         if (state) sessionStorage.setItem(`tw_cb_result_${state}`, JSON.stringify(result));
       } catch {}
 
-      // Save connection via the authenticated endpoint (supports cookie auth)
-      if (user) {
+      // Save connection via the authenticated endpoint (supports cookie auth).
+      // Skip during auth flow — the auth-modal's loginWithCallback handles that.
+      const isAuthFlow = state.includes('_auth_');
+      if (user && !isAuthFlow) {
         try {
           console.log(`[Twitter] Saving connection via /api/social-connections...`);
           const savePayload = {
@@ -476,6 +478,8 @@ export class TwitterSDKManager {
         } catch (connectError) {
           console.error('[Twitter] Failed to save connection, but OAuth succeeded:', connectError);
         }
+      } else if (isAuthFlow) {
+        console.log(`[Twitter] Auth flow — skipping connection save (handled by loginWithCallback)`);
       } else {
         console.warn(`[Twitter] Cannot save connection: no user info available`);
       }

@@ -613,6 +613,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   // Refresh user data from server (useful after updating user type, profile, etc.)
+  // Returns a promise that resolves after state is updated and React has flushed.
   const refreshUser = useCallback(async () => {
     if (!accessTokenStorage) {
       console.log('[Auth] No access token, cannot refresh user');
@@ -646,6 +647,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Invalidate queries to refetch data with new user state
       queryClient.invalidateQueries();
+
+      // Wait for React to flush the state update before returning.
+      // Without this, callers that navigate immediately after refreshUser()
+      // may see stale state (e.g. onboarding reset after completion).
+      await new Promise((resolve) => setTimeout(resolve, 50));
     } catch (error) {
       console.error('[Auth] Refresh user error:', error);
     }
