@@ -3,7 +3,7 @@
  * useNFT — React Query hooks for Fandomly Chain L1 NFT operations.
  *
  * Replaces useCrossmint.ts for all on-chain NFT and badge interactions.
- * All minting happens on Fandomly Chain (ID: 31111) — no more Crossmint.
+ * All minting happens on Fandomly Chain (ID: 89197) — no more Crossmint.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -489,12 +489,12 @@ export function ipfsToGateway(uri: string): string {
  * Get block explorer URL for a transaction
  */
 export function getExplorerTxUrl(txHash: string): string {
-  return `https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93/transaction/${txHash}`;
+  return `https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL/transaction/${txHash}`;
 }
 
 /**
  * Get block explorer URL for a contract
  */
 export function getExplorerContractUrl(address: string): string {
-  return `https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93/address/${address}`;
+  return `https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL/address/${address}`;
 }

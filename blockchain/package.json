@@ -10,11 +10,12 @@
     "test": "npx hardhat test"
   },
   "devDependencies": {
-    "hardhat": "^3.1.10",
     "@types/node": "^22.8.5",
+    "hardhat": "^3.1.10",
     "typescript": "~5.8.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.6"
+    "@openzeppelin/contracts": "^4.9.6",
+    "viem": "^2.47.1"
   }
 }

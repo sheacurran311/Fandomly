@@ -23,7 +23,7 @@ const ARTIFACTS_DIR = resolve(__dirname, '../artifacts');
 
 // --- Fandomly Chain L1 Definition ---
 const fandomlyChain = defineChain({
-  id: 31111,
+  id: 89197,
   name: 'Fandomly Chain',
   nativeCurrency: {
     name: 'FAN',
@@ -32,13 +32,13 @@ const fandomlyChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc'],
+      http: ['https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc'],
     },
   },
   blockExplorers: {
     default: {
       name: 'Avalanche Explorer',
-      url: 'https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93',
+      url: 'https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL',
     },
   },
   testnet: true,
@@ -108,7 +108,7 @@ async function main() {
   console.log('========================================');
   console.log('  Fandomly Chain Contract Deployment');
   console.log('========================================');
-  console.log(`  Chain:    Fandomly Chain (ID: 31111)`);
+  console.log(`  Chain:    Fandomly Chain (ID: 89197)`);
   console.log(`  Deployer: ${account.address}`);
 
   // Check balance
@@ -153,14 +153,14 @@ async function main() {
   console.log(`  ReputationRegistry:   ${reputationAddress}`);
   console.log(`  CreatorTokenFactory:  ${factoryAddress}`);
   console.log(`  FanStaking:           ${stakingAddress}`);
-  console.log(`  Chain ID:             31111`);
+  console.log(`  Chain ID:             89197`);
   console.log(`  Deployer (owner):     ${account.address}`);
   console.log('========================================');
 
   // Save deployment addresses to file
   const deployment = {
     network: 'fandomly-chain-fuji',
-    chainId: 31111,
+    chainId: 89197,
     deployer: account.address,
     deployedAt: new Date().toISOString(),
     contracts: {
@@ -168,7 +168,7 @@ async function main() {
       CreatorTokenFactory: factoryAddress,
       FanStaking: stakingAddress,
     },
-    rpcUrl: 'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
+    rpcUrl: 'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc',
   };
 
   const deploymentPath = resolve(__dirname, '../deployment.json');

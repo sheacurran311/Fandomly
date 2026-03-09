@@ -26,12 +26,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ARTIFACTS_DIR = resolve(__dirname, '../artifacts');
 
 const fandomlyChain = defineChain({
-  id: 31111,
+  id: 89197,
   name: 'Fandomly Chain',
   nativeCurrency: { name: 'FAN', symbol: 'FAN', decimals: 18 },
   rpcUrls: {
     default: {
-      http: ['https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc'],
+      http: ['https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc'],
     },
   },
   testnet: true,
@@ -78,7 +78,7 @@ async function main() {
   console.log('  Fandomly Chain — Full Contract Deployment');
   console.log('  (Core v2 with security fixes + NFT suite)');
   console.log('==============================================');
-  console.log(`  Chain:    Fandomly Chain (ID: 31111)`);
+  console.log(`  Chain:    Fandomly Chain (ID: 89197)`);
   console.log(`  Deployer: ${account.address}`);
 
   const balance = await publicClient.getBalance({ address: account.address });
@@ -149,14 +149,14 @@ async function main() {
   console.log(`    FandomlyBadge:             ${badgeAddress}`);
   console.log(`    FandomlyNFT:               ${nftAddress}`);
   console.log(`    CreatorCollectionFactory:   ${collectionFactoryAddress}`);
-  console.log(`  Chain ID:                    31111`);
+  console.log(`  Chain ID:                    89197`);
   console.log(`  Deployer (owner):            ${account.address}`);
   console.log('==============================================');
 
   // Save deployment
   const deployment = {
     network: 'fandomly-chain-fuji',
-    chainId: 31111,
+    chainId: 89197,
     deployer: account.address,
     deployedAt: new Date().toISOString(),
     contracts: {
@@ -167,7 +167,7 @@ async function main() {
       FandomlyNFT: nftAddress,
       CreatorCollectionFactory: collectionFactoryAddress,
     },
-    rpcUrl: 'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
+    rpcUrl: 'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc',
   };
 
   const deploymentPath = resolve(__dirname, '../deployment.json');
@@ -181,14 +181,14 @@ async function main() {
  */
 
 export const FANDOMLY_CHAIN = {
-  id: 31111,
+  id: 89197,
   name: 'Fandomly Chain',
   nativeCurrency: { name: 'FAN', symbol: 'FAN', decimals: 18 },
   rpcUrl:
     (typeof process !== 'undefined' ? process.env.VITE_FANDOMLY_RPC_URL : undefined) ??
-    'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
+    'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc',
   blockExplorer:
-    'https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93',
+    'https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL',
   testnet: true,
 } as const;
 

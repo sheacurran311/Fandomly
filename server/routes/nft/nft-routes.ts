@@ -991,7 +991,7 @@ export function registerNFTRoutes(app: Express) {
           CreatorCollectionFactory: CONTRACTS.CreatorCollectionFactory,
         },
         chain: {
-          id: 31111,
+          id: 89197,
           name: 'Fandomly Chain',
         },
       });

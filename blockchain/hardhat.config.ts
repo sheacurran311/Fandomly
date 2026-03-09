@@ -19,8 +19,8 @@ export default defineConfig({
     fandomlyChain: {
       type: "http",
       chainType: "l1",
-      url: "https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc",
-      chainId: 31111,
+      url: "https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc",
+      chainId: 89197,
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
   },

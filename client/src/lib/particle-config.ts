@@ -11,7 +11,7 @@ const fandomlyLogoUrl =
     : 'https://fandomly.ai/fandomly-logo.png';
 
 export const fandomlyChain = defineChain({
-  id: 31111,
+  id: 89197,
   name: 'Fandomly Chain',
   nativeCurrency: {
     decimals: 18,
@@ -22,19 +22,19 @@ export const fandomlyChain = defineChain({
     default: {
       http: [
         (import.meta.env.VITE_FANDOMLY_RPC_URL || '').split(/\s/)[0] ||
-          'https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc',
+          'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc',
       ],
     },
   },
   blockExplorers: {
     default: {
       name: 'Avalanche Explorer',
-      url: 'https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93',
+      url: 'https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL',
     },
   },
   testnet: true,
   // Custom icon for Particle wallet modal — without this, the SDK fetches
-  // https://static.particle.network/chains/evm/icons/31111.png which 404s.
+  // https://static.particle.network/chains/evm/icons/89197.png which 404s.
   custom: {
     icon: fandomlyLogoUrl,
   },

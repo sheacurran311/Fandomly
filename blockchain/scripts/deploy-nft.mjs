@@ -28,7 +28,7 @@ const ARTIFACTS_DIR = resolve(__dirname, '../artifacts');
 
 // --- Fandomly Chain L1 Definition ---
 const fandomlyChain = defineChain({
-  id: 31111,
+  id: 89197,
   name: 'Fandomly Chain',
   nativeCurrency: {
     name: 'FAN',
@@ -37,13 +37,13 @@ const fandomlyChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://fandomly-avago-node-production.up.railway.app/ext/bc/Xw6RyupcvTsiJdnwc88U2rxt9RkacGbw2wHRJJD4H1sBu2z1H/rpc'],
+      http: ['https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc'],
     },
   },
   blockExplorers: {
     default: {
       name: 'Avalanche Explorer',
-      url: 'https://subnets-test.avax.network/subnets/2G2z7yGeWPKvwtJKbcs5bqEgwBATT5jkJNJHjt5RnhTBficJ93',
+      url: 'https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL',
     },
   },
   testnet: true,
@@ -129,7 +129,7 @@ async function main() {
   console.log('========================================');
   console.log('  Fandomly NFT Contract Deployment');
   console.log('========================================');
-  console.log(`  Chain:              Fandomly Chain (ID: 31111)`);
+  console.log(`  Chain:              Fandomly Chain (ID: 89197)`);
   console.log(`  Deployer:           ${account.address}`);
   console.log(`  ReputationRegistry: ${reputationAddress} (existing)`);
 
@@ -174,7 +174,7 @@ async function main() {
   console.log(`  FandomlyBadge:            ${badgeAddress}`);
   console.log(`  FandomlyNFT:              ${nftAddress}`);
   console.log(`  CreatorCollectionFactory:  ${collectionFactoryAddress}`);
-  console.log(`  Chain ID:                 31111`);
+  console.log(`  Chain ID:                 89197`);
   console.log(`  Deployer (owner):         ${account.address}`);
   console.log('========================================');
 
