@@ -38,7 +38,7 @@ function decodeJwtClaims(token: string) {
 }
 
 function ParticleAuthListenerInner() {
-  const { isAuthenticated, user, accessToken } = useAuth();
+  const { isAuthenticated, isLoading, user, accessToken } = useAuth();
   const { isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { connectAsync } = useConnect();
@@ -159,10 +159,11 @@ function ParticleAuthListenerInner() {
     attemptConnect();
   }, [isAuthenticated, accessToken, user, isConnected, connectors, connectAsync]);
 
-  // Reset the wallet creation flag when user logs out so it can fire again on next login.
-  // Also clear sessionStorage lock so the next login triggers fresh wallet creation.
+  // When user logs out (or page reloads after logout), reset wallet creation flag,
+  // clear sessionStorage locks, and disconnect the Particle wallet if still connected.
+  // We wait for isLoading to be false so we don't disconnect during initial auth check.
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isLoading) {
       walletCreationAttempted.current = false;
       try {
         for (const key of Object.keys(sessionStorage)) {
@@ -173,10 +174,23 @@ function ParticleAuthListenerInner() {
       } catch {
         /* noop */
       }
-    }
-  }, [isAuthenticated]);
 
-  // Fandomly logout -> disconnect Particle wallet session
+      // Disconnect Particle wallet if still connected after Fandomly logout.
+      // This handles both same-page logout and page-reload-after-logout cases,
+      // since the event-based approach can be killed by window.location.href navigation.
+      if (isConnected && !logoutInProgressRef.current) {
+        logoutInProgressRef.current = true;
+        console.log('[Particle] User not authenticated, disconnecting wallet');
+        try {
+          disconnect();
+        } finally {
+          logoutInProgressRef.current = false;
+        }
+      }
+    }
+  }, [isAuthenticated, isLoading, isConnected, disconnect]);
+
+  // Fandomly logout -> disconnect Particle wallet session (backup for same-page logout)
   useEffect(() => {
     const handleFandomlyLogout = () => {
       if (isConnected && !logoutInProgressRef.current) {
