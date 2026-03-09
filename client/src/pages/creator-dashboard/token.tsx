@@ -31,6 +31,7 @@ import DashboardLayout from '@/components/layout/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAccount } from '@particle-network/connectkit';
 import { REPUTATION_THRESHOLDS, FANDOMLY_CHAIN } from '@shared/blockchain-config';
 
 // ============================================================================
@@ -320,9 +321,10 @@ function TokenDashboard({ token }: { token: TokenInfo }) {
 
 export default function TokenFactoryPage() {
   const { user } = useAuth();
-  const walletAddress = (user as unknown as Record<string, unknown>)?.avalancheL1Address as
-    | string
-    | undefined;
+  const { address } = useAccount();
+  const walletAddress =
+    address ||
+    ((user as unknown as Record<string, unknown>)?.avalancheL1Address as string | undefined);
 
   const { data: reputation, isLoading: repLoading } = useQuery<ReputationData>({
     queryKey: ['/api/reputation/me'],
@@ -349,7 +351,9 @@ export default function TokenFactoryPage() {
   const isLoading = repLoading || tokenLoading;
   const hasToken = tokenInfo?.hasToken === true;
   // fandomly_admin bypasses reputation gate for full platform access
-  const meetsThreshold = user?.role === 'fandomly_admin' || (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.CREATOR_TOKEN;
+  const meetsThreshold =
+    user?.role === 'fandomly_admin' ||
+    (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.CREATOR_TOKEN;
 
   return (
     <DashboardLayout userType="creator">
