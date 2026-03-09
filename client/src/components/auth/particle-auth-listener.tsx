@@ -4,11 +4,14 @@
  *
  * Manages the Particle wallet lifecycle alongside Fandomly's social auth:
  *
- * 1. AFTER social auth + dupe check completes -> create embedded wallet via JWT
+ * 1. AFTER social auth + dupe check completes -> create or reconnect embedded wallet via JWT
  * 2. Fandomly logout -> disconnect Particle wallet
  *
+ * For returning users, ConnectKit does not auto-restore the embedded wallet session
+ * after a full page load. We always call connectAsync with the Fandomly JWT when
+ * authenticated and not connected; Particle restores the existing wallet for that user.
+ *
  * This listener is purely reactive -- it never initiates login flows.
- * It waits for Fandomly auth to succeed, then provisions the wallet.
  */
 
 import { useEffect, useRef } from 'react';
@@ -50,12 +53,14 @@ function ParticleAuthListenerInner() {
       return;
     }
 
-    // Persistent guard: survives React remounts / StrictMode double-invokes
+    // Prevent duplicate in-flight connect attempts across remounts (e.g. StrictMode).
+    // If a lock exists from a previous run but we're not connected (e.g. page refresh),
+    // clear it so we reconnect — ConnectKit does not auto-restore embedded wallet on load.
     const lockKey = `particle_wallet_${user.id || 'pending'}`;
     try {
       if (sessionStorage.getItem(lockKey) === 'created') {
-        console.log('[Particle] Skipping wallet creation — sessionStorage lock exists');
-        return;
+        sessionStorage.removeItem(lockKey);
+        console.log('[Particle] Cleared stale lock; reconnecting existing wallet');
       }
     } catch {
       /* noop */
@@ -75,7 +80,7 @@ function ParticleAuthListenerInner() {
 
     walletCreationAttempted.current = true;
     console.log(
-      '[Particle] Attempting JWT wallet creation with token (first 20 chars):',
+      '[Particle] Connecting embedded wallet with JWT (first 20 chars):',
       accessToken.slice(0, 20) + '...'
     );
 
@@ -88,7 +93,7 @@ function ParticleAuthListenerInner() {
             thirdpartyCode: accessToken,
           },
         });
-        console.log('[Particle] Embedded wallet created successfully:', result.accounts?.[0]);
+        console.log('[Particle] Embedded wallet connected:', result.accounts?.[0]);
         try {
           sessionStorage.setItem(lockKey, 'created');
         } catch {

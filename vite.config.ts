@@ -43,18 +43,7 @@ function patchParticleEvmProviderPlugin(): Plugin {
  * tree-shake them away without build errors.
  */
 function serverOnlyStubPlugin(): Plugin {
-  const serverOnlyPrefixes = [
-    '@aws-sdk/',
-    '@smithy/shared-ini-file-loader',
-    '@smithy/credential-provider-',
-    '@smithy/node-http-handler',
-    '@smithy/node-config-provider',
-    '@aws-sdk/util-user-agent-node',
-    '@aws-sdk/credential-provider-',
-    '@aws-sdk/client-cognito-identity',
-    '@aws-sdk/client-kms',
-    '@aws-sdk/nested-clients',
-  ];
+  const serverOnlyPrefixes = ['@aws-sdk/', '@smithy/'];
 
   return {
     name: 'server-only-stub',
@@ -124,6 +113,23 @@ export default defineConfig({
         global: 'globalThis',
       },
       plugins: [
+        // Stub @smithy and @aws-sdk during dep pre-bundling. They are pulled in by
+        // @particle-network/auth-core (Cognito) and use Node-only APIs (createHash,
+        // homedir, fstatSync, etc.) that node-modules-polyfill doesn't provide.
+        // Stubbing avoids esbuild trying to bundle them and failing.
+        {
+          name: 'stub-smithy-aws-in-deps',
+          setup(build: any) {
+            build.onResolve({ filter: /^@(smithy|aws-sdk)\// }, () => ({
+              path: '\0stub:server-only',
+              namespace: 'stub',
+            }));
+            build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
+              contents: 'export default {}; export const __esModule = true;',
+              loader: 'js',
+            }));
+          },
+        },
         // Inject Buffer and process globals during esbuild dep pre-bundling.
         // This ensures Particle SDK's crypto chain (ripemd160 → hash-base →
         // readable-stream) has Buffer.slice() available at module init time.
