@@ -105,7 +105,8 @@ export function registerBlockchainRoutes(app: Express) {
         const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
         if (user.length === 0) return res.status(404).json({ error: 'User not found' });
-        if (user[0].userType !== 'creator') {
+        // fandomly_admin can create tokens regardless of userType
+        if (user[0].userType !== 'creator' && req.user?.role !== 'fandomly_admin') {
           return res.status(403).json({ error: 'Only creators can create tokens' });
         }
 
@@ -123,7 +124,8 @@ export function registerBlockchainRoutes(app: Express) {
           .where(eq(reputationScores.userId, userId));
 
         const score = repRecord.length > 0 ? repRecord[0].offChainScore : 0;
-        if (score < REPUTATION_THRESHOLDS.CREATOR_TOKEN) {
+        // fandomly_admin bypasses reputation gate
+        if (score < REPUTATION_THRESHOLDS.CREATOR_TOKEN && req.user?.role !== 'fandomly_admin') {
           return res.status(403).json({
             error: `Insufficient reputation. Need ${REPUTATION_THRESHOLDS.CREATOR_TOKEN}+, have ${score}.`,
           });

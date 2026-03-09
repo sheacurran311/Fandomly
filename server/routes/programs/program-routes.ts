@@ -5,7 +5,7 @@ import { db } from '../../db';
 import { loyaltyPrograms, campaigns, tasks } from '@shared/schema';
 import { eq, and, desc, sql, or } from 'drizzle-orm';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
-import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
+import { enforceSubscriptionLimitForUser } from '../../services/subscription-limit-service';
 
 // Validation schemas
 const createProgramSchema = z.object({
@@ -237,7 +237,7 @@ export function registerProgramRoutes(app: Express) {
       // Enforce subscription limit for program creation
       if (creator.tenantId) {
         try {
-          await enforceSubscriptionLimit(creator.tenantId, 'programs');
+          await enforceSubscriptionLimitForUser(creator.tenantId, 'programs', req.user?.role);
         } catch (limitErr: any) {
           if (limitErr.code === 'LIMIT_EXCEEDED') {
             return res.status(403).json({

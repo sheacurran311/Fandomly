@@ -373,7 +373,8 @@ export default function StakingPage() {
   const { data: multiplier } = useUserMultiplier(walletAddress || undefined);
   const { data: fanBalance } = useFanBalance(walletAddress || undefined);
 
-  const meetsThreshold = (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.FAN_STAKING;
+  // fandomly_admin bypasses reputation gate for full platform access
+  const meetsThreshold = user?.role === 'fandomly_admin' || (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.FAN_STAKING;
   const isLoading = repLoading || tokensLoading;
 
   return (

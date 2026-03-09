@@ -348,7 +348,8 @@ export default function TokenFactoryPage() {
 
   const isLoading = repLoading || tokenLoading;
   const hasToken = tokenInfo?.hasToken === true;
-  const meetsThreshold = (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.CREATOR_TOKEN;
+  // fandomly_admin bypasses reputation gate for full platform access
+  const meetsThreshold = user?.role === 'fandomly_admin' || (reputation?.score ?? 0) >= REPUTATION_THRESHOLDS.CREATOR_TOKEN;
 
   return (
     <DashboardLayout userType="creator">

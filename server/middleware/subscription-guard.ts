@@ -27,6 +27,11 @@ export function requireActiveSubscription() {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
+      // Fandomly admins bypass all subscription checks
+      if (req.user?.role === 'fandomly_admin') {
+        return next();
+      }
+
       // Get user's tenant
       const user = await db
         .select({ currentTenantId: users.currentTenantId })

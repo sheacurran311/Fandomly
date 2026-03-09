@@ -11,7 +11,7 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
 import { onReputationSignalChanged } from '../../services/reputation/reputation-event-handler';
 import { getSocialMultiplierService } from '../../services/social/social-multiplier-service';
-import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
+import { enforceSubscriptionLimitForUser } from '../../services/subscription-limit-service';
 
 const router = Router();
 
@@ -167,7 +167,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       });
       if (user?.currentTenantId) {
         try {
-          await enforceSubscriptionLimit(user.currentTenantId, 'socialConnections');
+          await enforceSubscriptionLimitForUser(user.currentTenantId, 'socialConnections', req.user?.role);
         } catch (limitErr: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if ((limitErr as any).code === 'LIMIT_EXCEEDED') {

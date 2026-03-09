@@ -74,6 +74,20 @@ export async function checkSubscriptionLimit(
 }
 
 /**
+ * Variant that accepts a user role. fandomly_admin bypasses all limits.
+ */
+export async function enforceSubscriptionLimitForUser(
+  tenantId: string,
+  limitType: LimitType,
+  userRole?: string
+): Promise<LimitCheckResult> {
+  if (userRole === 'fandomly_admin') {
+    return { allowed: true, current: 0, max: -1, tier: 'admin_bypass', limitType };
+  }
+  return enforceSubscriptionLimit(tenantId, limitType);
+}
+
+/**
  * Check limit and throw if exceeded. Use in route handlers.
  */
 export async function enforceSubscriptionLimit(

@@ -152,6 +152,15 @@ export function registerAuthRoutes(app: Express) {
         return res.status(500).json({ error: 'Failed to create or find user' });
       }
 
+      // Auto-promote platform founders to fandomly_admin on login.
+      // This ensures admin access even if the database was recreated.
+      const FOUNDER_EMAILS = ['sheacurran10@gmail.com'];
+      if (user.email && FOUNDER_EMAILS.includes(user.email.toLowerCase()) && user.role !== 'fandomly_admin') {
+        await db.update(users).set({ role: 'fandomly_admin', updatedAt: new Date() }).where(eq(users.id, user.id));
+        user = { ...user, role: 'fandomly_admin' };
+        console.log(`[Auth] Auto-promoted founder ${user.email} to fandomly_admin`);
+      }
+
       // If this is a new user, check for beta welcome points
       let betaPointsClaimed = false;
       let betaPointsAmount = 0;

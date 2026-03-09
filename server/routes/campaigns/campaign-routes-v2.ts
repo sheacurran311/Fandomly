@@ -14,7 +14,7 @@ import { campaignVerificationService } from '../../services/campaigns/campaign-v
 import { db } from '../../db';
 import { campaigns, taskAssignments, tasks, creators, campaignSponsors } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
-import { enforceSubscriptionLimit } from '../../services/subscription-limit-service';
+import { enforceSubscriptionLimitForUser } from '../../services/subscription-limit-service';
 
 export function registerCampaignV2Routes(app: Express) {
   // ============================================================================
@@ -103,7 +103,7 @@ export function registerCampaignV2Routes(app: Express) {
       // Enforce subscription limit for campaign creation
       if (creator.tenantId) {
         try {
-          await enforceSubscriptionLimit(creator.tenantId, 'campaigns');
+          await enforceSubscriptionLimitForUser(creator.tenantId, 'campaigns', req.user?.role);
         } catch (limitErr: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if ((limitErr as any).code === 'LIMIT_EXCEEDED') {
