@@ -30,7 +30,7 @@ export function log(message: string, source = "express") {
 }
 
 function registerParticleWasmRoute(app: Express) {
-  app.get('/particle-wasm/thresh_sig_wasm_bg.wasm', (_req, res) => {
+  const serveParticleWasm = (_req: express.Request, res: express.Response) => {
     if (!fs.existsSync(particleWasmPath)) {
       res.status(404).end();
       return;
@@ -41,7 +41,13 @@ function registerParticleWasmRoute(app: Express) {
       'Cache-Control': 'public, max-age=31536000, immutable',
     });
     res.sendFile(particleWasmPath);
-  });
+  };
+
+  // Primary stable path used by our Vite patch.
+  app.get('/particle-wasm/thresh_sig_wasm_bg.wasm', serveParticleWasm);
+  // Legacy paths used by unpatched/optimized Particle thresh-sig bundles.
+  app.get('/node_modules/.vite/wasm/thresh_sig_wasm_bg.wasm', serveParticleWasm);
+  app.get('/node_modules/@particle-network/thresh-sig/wasm/thresh_sig_wasm_bg.wasm', serveParticleWasm);
 }
 
 export async function setupVite(app: Express, server: Server) {
