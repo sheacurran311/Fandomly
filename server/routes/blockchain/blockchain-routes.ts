@@ -82,6 +82,25 @@ function calculateMultiplier(platforms: string[]): number {
 }
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Detect RPC node unavailability and return a clear error message + status code. */
+function classifyBlockchainError(error: unknown): { status: number; message: string } {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes('bootstrapping') || msg.includes('503') || msg.includes('Service Unavailable')) {
+    return {
+      status: 503,
+      message: 'Fandomly Chain node is bootstrapping. Please try again in a few minutes.',
+    };
+  }
+  if (msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT') || msg.includes('fetch failed')) {
+    return { status: 503, message: 'Fandomly Chain node is unreachable. Please try again later.' };
+  }
+  return { status: 500, message: msg || 'Blockchain operation failed' };
+}
+
+// ============================================================================
 // ROUTES
 // ============================================================================
 
@@ -219,8 +238,8 @@ export function registerBlockchainRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('[BlockchainRoutes] Token creation error:', error);
-        const message = error instanceof Error ? error.message : 'Token creation failed';
-        return res.status(500).json({ error: message });
+        const classified = classifyBlockchainError(error);
+        return res.status(classified.status).json({ error: classified.message });
       }
     }
   );
@@ -303,7 +322,10 @@ export function registerBlockchainRoutes(app: Express) {
         });
       } catch (error) {
         console.error('[BlockchainRoutes] Token info error:', error);
-        return res.status(500).json({ error: 'Failed to fetch token info' });
+        const classified = classifyBlockchainError(error);
+        return res
+          .status(classified.status)
+          .json({ error: classified.message, hasToken: false, tokenAddress: null });
       }
     }
   );
@@ -375,7 +397,8 @@ export function registerBlockchainRoutes(app: Express) {
       return res.json({ tokens, totalCreated: Number(totalCreated) });
     } catch (error) {
       console.error('[BlockchainRoutes] List tokens error:', error);
-      return res.status(500).json({ error: 'Failed to list tokens' });
+      const classified = classifyBlockchainError(error);
+      return res.status(classified.status).json({ error: classified.message });
     }
   });
 
@@ -445,8 +468,8 @@ export function registerBlockchainRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('[BlockchainRoutes] Set multiplier error:', error);
-        const message = error instanceof Error ? error.message : 'Failed to set multiplier';
-        return res.status(500).json({ error: message });
+        const classified = classifyBlockchainError(error);
+        return res.status(classified.status).json({ error: classified.message });
       }
     }
   );
@@ -510,8 +533,8 @@ export function registerBlockchainRoutes(app: Express) {
         return res.json({ success: true, score: 1000, updated: true, txHash: hash });
       } catch (error: unknown) {
         console.error('[BlockchainRoutes] Ensure reputation error:', error);
-        const message = error instanceof Error ? error.message : 'Failed to set reputation';
-        return res.status(500).json({ error: message });
+        const classified = classifyBlockchainError(error);
+        return res.status(classified.status).json({ error: classified.message });
       }
     }
   );
