@@ -180,6 +180,7 @@ export function createParticleConfig() {
       wallet({
         entryPosition: EntryPosition.BR,
         visible: true,
+        preload: true,
       }),
     ],
 

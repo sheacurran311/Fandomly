@@ -139,6 +139,8 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': {},
+    'process.version': JSON.stringify('v20.0.0'),
+    'process.browser': JSON.stringify(true),
     'process.versions': {},
     __LANDING_ONLY__: JSON.stringify(process.env.LANDING_ONLY === 'true'),
   },
@@ -146,10 +148,20 @@ export default defineConfig({
     // Force React into a single pre-bundled chunk so all dep chunks (Particle, styled-components)
     // share exactly one React copy. Without this, esbuild may resolve separate React copies
     // inside pre-bundled dep chunks, causing "Invalid hook call" at render time.
-    include: ['react', 'react-dom', 'buffer', 'process'],
+    include: [
+      'react',
+      'react-dom',
+      'buffer',
+      'process',
+      'stream-browserify',
+      'readable-stream',
+      'crypto-browserify',
+    ],
     esbuildOptions: {
       define: {
         global: 'globalThis',
+        'process.version': '"v20.0.0"',
+        'process.browser': 'true',
       },
       plugins: [
         // Stub node: built-in imports (node:fs, node:http, etc.) during dep

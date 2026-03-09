@@ -19,6 +19,24 @@ import { useAuth } from '@/contexts/auth-context';
 import { isParticleAuthEnabled } from '@/lib/particle-config';
 import { useAccount, useConnect, useConnectors, useDisconnect } from '@particle-network/connectkit';
 
+function decodeJwtClaims(token: string) {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(window.atob(padded)) as {
+      iss?: string;
+      aud?: string | string[];
+      sub?: string;
+      exp?: number;
+      iat?: number;
+    };
+  } catch {
+    return null;
+  }
+}
+
 function ParticleAuthListenerInner() {
   const { isAuthenticated, user, accessToken } = useAuth();
   const { isConnected } = useAccount();
@@ -83,6 +101,7 @@ function ParticleAuthListenerInner() {
       '[Particle] Connecting embedded wallet with JWT (first 20 chars):',
       accessToken.slice(0, 20) + '...'
     );
+    console.log('[Particle] JWT claims for wallet connect:', decodeJwtClaims(accessToken));
 
     const attemptConnect = async (retriesLeft = 2): Promise<void> => {
       try {
@@ -101,27 +120,20 @@ function ParticleAuthListenerInner() {
         }
       } catch (err: any) {
         const message = err?.message || '';
+        const isRetriable =
+          message.includes('not initialized') ||
+          message.includes('not ready') ||
+          message.includes('__wbindgen_malloc') ||
+          message.includes('WebAssembly') ||
+          message.includes("reading 'slice'");
         // If SDK not ready, retry once after a short delay
-        if (
-          retriesLeft > 0 &&
-          (
-            message.includes('not initialized') ||
-            message.includes('not ready') ||
-            message.includes('__wbindgen_malloc') ||
-            message.includes('WebAssembly')
-          )
-        ) {
+        if (retriesLeft > 0 && isRetriable) {
           console.log('[Particle] Wallet SDK not ready, retrying in 750ms...');
           await new Promise((resolve) => setTimeout(resolve, 750));
           return attemptConnect(retriesLeft - 1);
         }
         // Non-blocking -- wallet creation failure doesn't affect the Fandomly session.
-        walletCreationAttempted.current = false;
-        try {
-          sessionStorage.removeItem(lockKey);
-        } catch {
-          /* noop */
-        }
+        // Keep the in-memory/session guards so React rerenders do not spam connectAsync.
         console.warn('[Particle] Wallet creation failed (non-blocking):', err?.message || err);
         console.warn('[Particle] Full error:', err);
       }
