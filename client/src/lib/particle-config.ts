@@ -5,6 +5,11 @@ import { evmWalletConnectors } from '@particle-network/connectkit/evm';
 import { wallet, EntryPosition } from '@particle-network/connectkit/wallet';
 import { defineChain } from '@particle-network/connectkit/chains';
 
+const fandomlyLogoUrl =
+  typeof window !== 'undefined'
+    ? `${window.location.origin}/fandomly-logo.png`
+    : 'https://fandomly.ai/fandomly-logo.png';
+
 export const fandomlyChain = defineChain({
   id: 31111,
   name: 'Fandomly Chain',
@@ -28,6 +33,11 @@ export const fandomlyChain = defineChain({
     },
   },
   testnet: true,
+  // Custom icon for Particle wallet modal — without this, the SDK fetches
+  // https://static.particle.network/chains/evm/icons/31111.png which 404s.
+  custom: {
+    icon: fandomlyLogoUrl,
+  },
 });
 
 const projectId = import.meta.env.VITE_PARTICLE_PROJECT_ID;

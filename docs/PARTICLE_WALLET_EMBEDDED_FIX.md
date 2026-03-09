@@ -132,6 +132,34 @@ Fix:
 - Commit the generated patch files:
   - `patches/@particle-network+thresh-sig+0.7.8.patch`
   - `patches/@particle-network+wallet-plugin+2.1.1.patch`
+  - `patches/@particle-network+wallet+2.1.1.patch`
+
+### 8. Chain icon missing for custom chain
+
+Symptom:
+- wallet modal shows fallback/broken icon for the Fandomly chain
+
+Cause:
+- Particle SDK fetches `https://static.particle.network/chains/evm/icons/31111.png` which 404s for custom chains.
+
+Fix:
+- Add `custom: { icon: fandomlyLogoUrl }` to the chain definition in `particle-config.ts`.
+- The SDK checks `chain.custom?.icon` before falling back to the CDN URL.
+
+### 9. Wallet iframe missing RPC/explorer/currency for custom chains
+
+Symptom:
+- wallet modal opens but cannot interact with the custom chain (no RPC, no explorer links, no native currency info)
+
+Cause:
+- `@particle-network/wallet-plugin` only forwarded `{ id, chainType }` to the wallet iframe.
+- `@particle-network/wallet` `walletUrl()` further stripped to `{ name, id, chainType }`.
+- No RPC URL, block explorer, or native currency reaches the iframe.
+
+Fix:
+- Patched wallet-plugin to forward `nativeCurrency`, `rpcUrl`, `blockExplorerUrl` alongside `id`, `name`, `chainType`.
+- Patched wallet package `walletUrl()` to preserve those extra fields in the base64-encoded `customStyle` URL parameter.
+- Whether the Particle wallet iframe actually consumes these extra fields depends on Particle's hosted code. If the modal still doesn't fully recognize chain 31111, contact Particle Network support to register it in their backend chain registry.
 
 ## Files Touched For The Fix
 
@@ -148,8 +176,10 @@ Fix:
 - `package.json`
 - `patches/@particle-network+thresh-sig+0.7.8.patch`
 - `patches/@particle-network+wallet-plugin+2.1.1.patch`
+- `patches/@particle-network+wallet+2.1.1.patch`
 - `node_modules/@particle-network/thresh-sig/esm/index.js`
 - `node_modules/@particle-network/wallet-plugin/dist/esm/index.mjs`
+- `node_modules/@particle-network/wallet/dist/esm/index.mjs`
 
 ## Non-Obvious Operational Notes
 
@@ -157,8 +187,10 @@ Fix:
   - `patch-package` output during install
   - `patches/@particle-network+thresh-sig+0.7.8.patch`
   - `patches/@particle-network+wallet-plugin+2.1.1.patch`
+  - `patches/@particle-network+wallet+2.1.1.patch`
   - `node_modules/@particle-network/thresh-sig/esm/index.js`
   - `node_modules/@particle-network/wallet-plugin/dist/esm/index.mjs`
+  - `node_modules/@particle-network/wallet/dist/esm/index.mjs`
   - the legacy WASM URLs above
   - CSP `frame-src`
   - JWT `iss` / `aud`

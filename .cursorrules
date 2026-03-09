@@ -1,0 +1,38 @@
+## CRITICAL: Particle Network Embedded Wallet — Protected Files
+
+The Particle Network wallet integration required extensive debugging across multiple
+sessions. The following files are PROTECTED and must NOT be rewritten, replaced, or
+significantly restructured without explicit human approval.
+
+### Protected files (DO NOT rewrite):
+- vite.config.ts
+- client/src/lib/particle-config.ts
+- client/src/components/auth/particle-auth-listener.tsx
+- client/src/contexts/particle-provider.tsx
+- client/src/polyfills.ts
+- client/src/main.tsx (import order is load-sensitive)
+- server/vite.ts
+- server/index.ts (CSP frame-src directive)
+- server/services/auth/jwt-service.ts (JWT iss/aud contract)
+- patches/@particle-network+thresh-sig+0.7.8.patch
+- patches/@particle-network+wallet-plugin+2.1.1.patch
+
+### What breaks if you modify these:
+- vite.config.ts plugins: `fromCognitoIdentity is not a function`, `__wbindgen_malloc`, `No matching export` build errors
+- JWT issuer/audience: `Invalid jwt: iss is not valid` from Particle
+- polyfills.ts removal: `Cannot read properties of undefined (reading 'slice')`
+- patch-package removal: wallet modal partially renders, WASM init fails silently
+- Error boundaries around ConnectKitProvider: wallet errors swallowed silently
+
+### Small changes are OK:
+- Adding new chains to the `chains` array
+- Adding new auth types to `authTypes`
+- Adjusting appearance/theme values
+- Adding new CSP sources alongside existing ones
+
+### Full context:
+See docs/PARTICLE_WALLET_EMBEDDED_FIX.md and AGENTS.md for the complete debugging history.
+
+## Social Auth Architecture
+See .cursor/rules/social-auth-single-source.mdc for the full social auth rules.
+Each social network has ONE authoritative file. Never duplicate OAuth logic.

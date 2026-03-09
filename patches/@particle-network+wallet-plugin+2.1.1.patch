@@ -1,20 +1,26 @@
 diff --git a/node_modules/@particle-network/wallet-plugin/dist/esm/index.mjs b/node_modules/@particle-network/wallet-plugin/dist/esm/index.mjs
-index 9ec9a31..5613cbf 100644
+index 9ec9a31..a1b2c3d 100644
 --- a/node_modules/@particle-network/wallet-plugin/dist/esm/index.mjs
 +++ b/node_modules/@particle-network/wallet-plugin/dist/esm/index.mjs
-@@ -120,6 +120,7 @@ var wallet = (parameters = {}) => {
+@@ -120,6 +120,10 @@ var wallet = (parameters = {}) => {
              ...(_f = this.getPlugin().walletOptions) == null ? void 0 : _f.customStyle,
              supportChains: validChains.map((chain) => ({
                id: chain.id,
 +              name: chain.name,
++              nativeCurrency: chain.nativeCurrency,
++              rpcUrl: chain.rpcUrls?.default?.http?.[0],
++              blockExplorerUrl: chain.blockExplorers?.default?.url,
                chainType: connector.chainType
              }))
            }
-@@ -136,6 +137,7 @@ var wallet = (parameters = {}) => {
+@@ -136,6 +140,10 @@ var wallet = (parameters = {}) => {
                ...(_h = (_g = this.getPlugin()) == null ? void 0 : _g.walletOptions) == null ? void 0 : _h.customStyle,
                supportChains: validChains.map((chain) => ({
                  id: chain.id,
 +                name: chain.name,
++                nativeCurrency: chain.nativeCurrency,
++                rpcUrl: chain.rpcUrls?.default?.http?.[0],
++                blockExplorerUrl: chain.blockExplorers?.default?.url,
                  chainType: connector.chainType
                }))
              }

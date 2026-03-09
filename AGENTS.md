@@ -1,5 +1,37 @@
 # Fandomly — Agent Instructions
 
+## CRITICAL: Protected Files — DO NOT MODIFY
+
+The following files contain hard-won Particle Network embedded wallet fixes that took
+hours of debugging across multiple agents. **DO NOT rewrite, replace, or significantly
+restructure these files** without explicit human approval. Small, additive changes are OK
+but wholesale rewrites or "cleanup" refactors are NOT.
+
+### Protected Particle Network files:
+- `vite.config.ts` — Contains WASM patching, AWS browser runtime redirection, node: builtin stubs, and EVM provider patches. Every plugin exists to solve a specific Particle SDK compatibility issue.
+- `client/src/lib/particle-config.ts` — Chain definition, ConnectKit config, wallet plugin setup. The `chains`, `walletConnectors`, and `plugins` arrays are calibrated precisely.
+- `client/src/components/auth/particle-auth-listener.tsx` — JWT-based wallet connect flow with retry logic, session guards, and reconnection handling.
+- `client/src/contexts/particle-provider.tsx` — Thin wrapper; do NOT add error boundaries that swallow ConnectKitProvider errors.
+- `client/src/polyfills.ts` — Buffer/process polyfills that must run before Particle SDK loads.
+- `client/src/main.tsx` — Polyfill import order and EIP-1193 patches are load-order sensitive.
+- `server/vite.ts` — WASM file serving routes for Particle thresh-sig.
+- `server/index.ts` — CSP `frame-src` includes `wallet.particle.network`.
+- `server/services/auth/jwt-service.ts` — JWT issuer/audience must match Particle Dashboard exactly (`iss=https://fandomly.com`, `aud=fandomly`).
+- `patches/@particle-network+thresh-sig+0.7.8.patch` — WASM URL fix + error visibility.
+- `patches/@particle-network+wallet-plugin+2.1.1.patch` — Chain name forwarding for custom chains.
+- `package.json` — `postinstall: "patch-package"` and `patch-package` devDependency are required.
+
+### What breaks if you ignore this:
+- Removing/changing vite plugins → `fromCognitoIdentity is not a function`, `__wbindgen_malloc`, or `No matching export` build errors
+- Changing JWT issuer/audience → `Invalid jwt: iss is not valid` from Particle
+- Removing polyfills.ts or changing import order → `Cannot read properties of undefined (reading 'slice')` at runtime
+- Removing patch-package → wallet modal partially renders, WASM init fails silently
+- Adding error boundaries around ConnectKitProvider → wallet errors silently swallowed, wallet appears broken with no diagnostics
+
+See `docs/PARTICLE_WALLET_EMBEDDED_FIX.md` for the full debugging history.
+
+---
+
 ## Cursor Cloud specific instructions
 
 ### Overview
