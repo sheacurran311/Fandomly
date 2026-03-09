@@ -4,6 +4,10 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 // @ts-ignore - installed in production, may be missing locally
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+// @ts-ignore
+import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill';
+// @ts-ignore
+import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfill';
 
 /**
  * Patches @particle-network/evm-connectors (and related) to use optional
@@ -116,32 +120,30 @@ export default defineConfig({
   optimizeDeps: {
     include: ['buffer', 'process', 'stream-browserify', 'readable-stream', 'crypto-browserify'],
     esbuildOptions: {
-      // Inject Buffer/process globals into every pre-bundled dependency.
-      // This ensures Particle SDK's crypto chain has Buffer available
-      // before any module-level code runs.
       define: {
         global: 'globalThis',
       },
       plugins: [
+        // Inject Buffer and process globals during esbuild dep pre-bundling.
+        // This ensures Particle SDK's crypto chain (ripemd160 → hash-base →
+        // readable-stream) has Buffer.slice() available at module init time.
+        NodeGlobalsPolyfillPlugin({
+          process: true,
+          buffer: true,
+        }),
+        NodeModulesPolyfillPlugin(),
+        // Patch Particle EVM connector provider.on() to use optional chaining
         {
-          name: 'inject-buffer-global',
+          name: 'patch-particle-evm-provider',
           setup(build: any) {
-            // Inject Buffer global at the start of every pre-bundled module
-            build.onLoad({ filter: /node_modules/ }, async (args: any) => {
+            build.onLoad({ filter: /evm-connectors/ }, async (args: any) => {
               const { readFileSync } = await import('node:fs');
-              let src = readFileSync(args.path, 'utf8');
-              // Only inject into files that reference Buffer
-              if (src.includes('Buffer') && !src.includes('import { Buffer }') && !src.includes("require('buffer')")) {
-                src = `import { Buffer as __Buffer } from 'buffer'; if(typeof globalThis.Buffer==='undefined'){globalThis.Buffer=__Buffer;}\n${src}`;
-              }
-              // Patch Particle EVM connector provider.on() calls
-              if (args.path.includes('evm-connector')) {
-                src = src
-                  .replace(/\bprovider\.on\(/g, 'provider?.on?.(')
-                  .replace(/\bprovider\.removeListener\(/g, 'provider?.removeListener?.(')
-                  .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
-              }
-              return { contents: src, loader: args.path.endsWith('.ts') ? 'ts' : 'js' };
+              const src = readFileSync(args.path, 'utf8');
+              const patched = src
+                .replace(/\bprovider\.on\(/g, 'provider?.on?.(')
+                .replace(/\bprovider\.removeListener\(/g, 'provider?.removeListener?.(')
+                .replace(/\bprovider\.off\(/g, 'provider?.off?.(');
+              return { contents: patched, loader: 'js' };
             });
           },
         },
