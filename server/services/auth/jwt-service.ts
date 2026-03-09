@@ -27,7 +27,11 @@ export interface JWKS {
 const KEY_ID = 'fandomly-auth-key-1';
 
 // JWT configuration
-const JWT_ISSUER = process.env.JWT_ISSUER || 'https://fandomly.ai';
+// IMPORTANT: This must exactly match the issuer configured in Particle's JWT
+// provider dashboard. App marketing/runtime URLs can move to fandomly.ai
+// independently, but wallet provisioning will fail until the Particle config
+// is updated to the new issuer.
+const JWT_ISSUER = process.env.JWT_ISSUER || 'https://fandomly.com';
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'fandomly';
 const JWT_EXPIRY_SECONDS = parseInt(process.env.JWT_EXPIRY_SECONDS || '86400', 10); // 24 hours default
 const REFRESH_TOKEN_EXPIRY_SECONDS = parseInt(
