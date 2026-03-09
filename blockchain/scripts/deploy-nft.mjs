@@ -26,24 +26,20 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ARTIFACTS_DIR = resolve(__dirname, '../artifacts');
 
-// --- Fandomly Chain L1 Definition ---
+// --- Avalanche Fuji C-Chain ---
 const fandomlyChain = defineChain({
-  id: 89197,
-  name: 'Fandomly Chain',
-  nativeCurrency: {
-    name: 'FAN',
-    symbol: 'FAN',
-    decimals: 18,
-  },
+  id: 43113,
+  name: 'Avalanche Fuji',
+  nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
   rpcUrls: {
     default: {
-      http: ['https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc'],
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
     },
   },
   blockExplorers: {
     default: {
-      name: 'Avalanche Explorer',
-      url: 'https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL',
+      name: 'Snowtrace',
+      url: 'https://testnet.snowtrace.io',
     },
   },
   testnet: true,
@@ -129,16 +125,16 @@ async function main() {
   console.log('========================================');
   console.log('  Fandomly NFT Contract Deployment');
   console.log('========================================');
-  console.log(`  Chain:              Fandomly Chain (ID: 89197)`);
+  console.log(`  Chain:              Avalanche Fuji (ID: 43113)`);
   console.log(`  Deployer:           ${account.address}`);
   console.log(`  ReputationRegistry: ${reputationAddress} (existing)`);
 
   // Check balance
   const balance = await publicClient.getBalance({ address: account.address });
-  console.log(`  Balance:            ${(Number(balance) / 1e18).toFixed(4)} FAN`);
+  console.log(`  Balance:            ${(Number(balance) / 1e18).toFixed(4)} AVAX`);
 
   if (balance === 0n) {
-    console.error('\n  ERROR: Deployer has no FAN. Fund the address first.');
+    console.error('\n  ERROR: Deployer has no AVAX. Fund the address first.');
     process.exit(1);
   }
 

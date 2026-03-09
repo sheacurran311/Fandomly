@@ -5,39 +5,26 @@ import { evmWalletConnectors } from '@particle-network/connectkit/evm';
 import { wallet, EntryPosition } from '@particle-network/connectkit/wallet';
 import { defineChain } from '@particle-network/connectkit/chains';
 
-const fandomlyLogoUrl =
-  typeof window !== 'undefined'
-    ? `${window.location.origin}/fandomly-logo.png`
-    : 'https://fandomly.ai/fandomly-logo.png';
-
 export const fandomlyChain = defineChain({
-  id: 89197,
-  name: 'Fandomly Chain',
+  id: 43113,
+  name: 'Avalanche Fuji',
   nativeCurrency: {
     decimals: 18,
-    name: 'FAN',
-    symbol: 'FAN',
+    name: 'AVAX',
+    symbol: 'AVAX',
   },
   rpcUrls: {
     default: {
-      http: [
-        (import.meta.env.VITE_FANDOMLY_RPC_URL || '').split(/\s/)[0] ||
-          'https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc',
-      ],
+      http: ['https://api.avax-test.network/ext/bc/C/rpc'],
     },
   },
   blockExplorers: {
     default: {
-      name: 'Avalanche Explorer',
-      url: 'https://subnets-test.avax.network/subnets/2vPvpLkRNwNVhyRLH4JuDSsdYnjFzc68MFVXGAPqTNZ148SfFL',
+      name: 'Snowtrace',
+      url: 'https://testnet.snowtrace.io',
     },
   },
   testnet: true,
-  // Custom icon for Particle wallet modal — without this, the SDK fetches
-  // https://static.particle.network/chains/evm/icons/89197.png which 404s.
-  custom: {
-    icon: fandomlyLogoUrl,
-  },
 });
 
 const projectId = import.meta.env.VITE_PARTICLE_PROJECT_ID;

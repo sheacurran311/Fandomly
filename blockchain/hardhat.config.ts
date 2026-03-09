@@ -16,11 +16,11 @@ export default defineConfig({
     },
   },
   networks: {
-    fandomlyChain: {
+    fuji: {
       type: "http",
       chainType: "l1",
-      url: "https://nodes-prod.18.182.4.86.sslip.io/ext/bc/2Ux71YgdfbcyTCoDYFEkE1Qy9nYpSQyd1it4f953ZTQAaJLB7t/rpc",
-      chainId: 89197,
+      url: "https://api.avax-test.network/ext/bc/C/rpc",
+      chainId: 43113,
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
   },

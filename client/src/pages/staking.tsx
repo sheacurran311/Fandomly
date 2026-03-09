@@ -115,7 +115,7 @@ function StakingOverview({
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-1">
             <Coins className="w-4 h-4 text-yellow-400" />
-            <span className="text-xs text-gray-500">FAN Balance</span>
+            <span className="text-xs text-gray-500">AVAX Balance</span>
           </div>
           <p className="text-xl font-bold text-white">{Number(fanBalance).toFixed(2)}</p>
           <p className="text-xs text-gray-500">Native token</p>
@@ -214,7 +214,7 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
         onSuccess: () => {
           toast({
             title: 'Rewards claimed!',
-            description: `${rewards.toFixed(4)} FAN sent to your wallet.`,
+            description: `${rewards.toFixed(4)} AVAX sent to your wallet.`,
           });
         },
         onError: (error: Error) => {
@@ -257,7 +257,7 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
           </div>
           <div className="bg-white/5 rounded-lg p-3">
             <p className="text-xs text-gray-500">Rewards</p>
-            <p className="text-sm font-semibold text-yellow-400">{rewards.toFixed(4)} FAN</p>
+            <p className="text-sm font-semibold text-yellow-400">{rewards.toFixed(4)} AVAX</p>
           </div>
         </div>
 
@@ -340,7 +340,7 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
             ) : (
               <Gift className="w-4 h-4 mr-2" />
             )}
-            Claim {rewards.toFixed(4)} FAN
+            Claim {rewards.toFixed(4)} AVAX
           </Button>
         )}
       </CardContent>
@@ -398,7 +398,7 @@ export default function StakingPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">Staking</h1>
-            <p className="text-sm text-gray-400">Stake creator tokens and earn FAN rewards</p>
+            <p className="text-sm text-gray-400">Stake creator tokens and earn AVAX rewards</p>
           </div>
         </div>
 

@@ -991,8 +991,8 @@ export function registerNFTRoutes(app: Express) {
           CreatorCollectionFactory: CONTRACTS.CreatorCollectionFactory,
         },
         chain: {
-          id: 89197,
-          name: 'Fandomly Chain',
+          id: 43113,
+          name: 'Avalanche Fuji',
         },
       });
     } catch (error: unknown) {
@@ -1026,5 +1026,5 @@ export function registerNFTRoutes(app: Express) {
     }
   });
 
-  console.log('NFT routes registered (Fandomly Chain L1)');
+  console.log('NFT routes registered (Avalanche Fuji)');
 }
