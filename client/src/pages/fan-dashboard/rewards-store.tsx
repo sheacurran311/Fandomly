@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
+import { useRewardRedemptions } from '@/hooks/use-points';
 import { apiRequest, readJsonResponse } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/layout/dashboard-layout';
@@ -35,8 +36,9 @@ import {
   Calendar,
   MapPin,
   CheckCircle,
+  History,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useAccount } from '@particle-network/connectkit';
 
 // Types
@@ -121,17 +123,51 @@ function getRewardTypeConfig(type: string | undefined) {
   return { icon: Gift, label: 'Reward', color: 'text-gray-400', bgColor: 'bg-gray-400/20' };
 }
 
+function getRedemptionStatusMeta(status: string, nftStatus?: string) {
+  if (nftStatus === 'completed') {
+    return { label: 'NFT Minted', className: 'bg-green-500/20 text-green-400 border-green-500/30' };
+  }
+  if (nftStatus === 'pending_wallet') {
+    return {
+      label: 'Wallet Needed',
+      className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    };
+  }
+  if (nftStatus === 'pending_manual') {
+    return {
+      label: 'Awaiting Mint',
+      className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    };
+  }
+  if (nftStatus === 'failed') {
+    return { label: 'Mint Failed', className: 'bg-red-500/20 text-red-400 border-red-500/30' };
+  }
+  if (status === 'fulfilled' || status === 'completed') {
+    return { label: 'Fulfilled', className: 'bg-green-500/20 text-green-400 border-green-500/30' };
+  }
+  if (status === 'pending') {
+    return { label: 'Pending', className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' };
+  }
+  return { label: status || 'Unknown', className: 'bg-white/5 text-gray-400 border-white/10' };
+}
+
 export default function FanRewardsStore() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [storeView, setStoreView] = useState<'browse' | 'redemptions'>('browse');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showShippingDialog, setShowShippingDialog] = useState(false);
+  const [lastRedeemed, setLastRedeemed] = useState<{
+    name: string;
+    points: number;
+    type: string;
+  } | null>(null);
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     fullName: '',
@@ -155,6 +191,7 @@ export default function FanRewardsStore() {
 
   const rewards = catalogData?.rewards || [];
   const userPoints = catalogData?.userPoints || 0;
+  const { data: redemptionHistory = [], isLoading: redemptionsLoading } = useRewardRedemptions();
   const { address: particleAddress } = useAccount();
   const fanWalletAddress =
     particleAddress ||
@@ -199,6 +236,9 @@ export default function FanRewardsStore() {
       return readJsonResponse(response);
     },
     onSuccess: (data: any) => {
+      const rewardName = selectedReward?.name || 'Reward';
+      const rewardPoints = selectedReward?.pointsCost || 0;
+      const rewardType = selectedReward?.rewardType || 'custom';
       const nftMessage = data?.redemption?.metadata?.nftMintMessage;
       const nftStatus = data?.redemption?.metadata?.nftMintStatus;
       toast({
@@ -209,6 +249,8 @@ export default function FanRewardsStore() {
             ? 'Your NFT was minted successfully.'
             : 'Your reward has been successfully redeemed.'),
       });
+      setLastRedeemed({ name: rewardName, points: rewardPoints, type: rewardType });
+      setTimeout(() => setLastRedeemed(null), 8000);
       setShowConfirmDialog(false);
       setShowShippingDialog(false);
       setShowDetailDialog(false);
@@ -223,6 +265,7 @@ export default function FanRewardsStore() {
         country: '',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/rewards/catalog'] });
+      queryClient.invalidateQueries({ queryKey: ['reward-redemptions'] });
     },
     onError: (error: Error) => {
       toast({
@@ -331,173 +374,387 @@ export default function FanRewardsStore() {
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <Store className="h-8 w-8 text-brand-primary" />
-              Rewards Store
+              {storeView === 'browse' ? 'Rewards Store' : 'My Redemptions'}
             </h1>
-            <p className="text-gray-400 mt-1">Redeem your points for exclusive rewards</p>
+            <p className="text-gray-400 mt-1">
+              {storeView === 'browse'
+                ? 'Redeem your points for exclusive rewards'
+                : 'Track the status of your redeemed rewards'}
+            </p>
           </div>
 
-          <Card className="bg-gradient-to-br from-brand-primary/20 to-brand-secondary/20 border-brand-primary/30 md:w-auto">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Coins className="h-8 w-8 text-brand-primary" />
-                <div>
-                  <p className="text-sm text-gray-400">Your Points</p>
-                  <p className="text-2xl font-bold text-white">{userPoints.toLocaleString()}</p>
+          <div className="flex items-center gap-3">
+            <Card className="bg-gradient-to-br from-brand-primary/20 to-brand-secondary/20 border-brand-primary/30 md:w-auto">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Coins className="h-8 w-8 text-brand-primary" />
+                  <div>
+                    <p className="text-sm text-gray-400">Your Points</p>
+                    <p className="text-2xl font-bold text-white">{userPoints.toLocaleString()}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Input
-              placeholder="Search rewards..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
-            />
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <Tabs value={selectedType} onValueChange={setSelectedType} className="w-full">
-          <TabsList className="bg-white/5 border-white/10">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="physical">Physical</TabsTrigger>
-            <TabsTrigger value="video">Video</TabsTrigger>
-            <TabsTrigger value="custom">Custom</TabsTrigger>
-            <TabsTrigger value="raffle">Raffle</TabsTrigger>
-            <TabsTrigger value="nft">NFT</TabsTrigger>
-          </TabsList>
+        {/* View Toggle */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={storeView === 'browse' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStoreView('browse')}
+            className={
+              storeView === 'browse'
+                ? 'bg-brand-primary hover:bg-brand-primary/80'
+                : 'border-white/10 text-gray-300 hover:bg-white/5'
+            }
+          >
+            <Store className="h-4 w-4 mr-2" />
+            Browse Rewards
+          </Button>
+          <Button
+            variant={storeView === 'redemptions' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStoreView('redemptions')}
+            className={
+              storeView === 'redemptions'
+                ? 'bg-brand-primary hover:bg-brand-primary/80'
+                : 'border-white/10 text-gray-300 hover:bg-white/5'
+            }
+          >
+            <History className="h-4 w-4 mr-2" />
+            My Redemptions
+            {redemptionHistory.length > 0 && (
+              <Badge className="ml-2 bg-white/10 text-white border-0 text-xs px-1.5">
+                {redemptionHistory.length}
+              </Badge>
+            )}
+          </Button>
+        </div>
 
-          <TabsContent value={selectedType} className="mt-6">
-            {filteredRewards.length === 0 ? (
+        {/* Success confirmation after redemption */}
+        {lastRedeemed && (
+          <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-6 h-6 text-green-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-green-400">Reward Redeemed Successfully</p>
+              <p className="text-xs text-green-400/70">
+                {lastRedeemed.name} &middot; {lastRedeemed.points.toLocaleString()} points spent
+                {lastRedeemed.type === 'nft' && ' &middot; NFT minting in progress'}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLastRedeemed(null);
+                setStoreView('redemptions');
+              }}
+              className="border-green-500/30 text-green-400 hover:bg-green-500/10 shrink-0"
+            >
+              View Redemptions
+            </Button>
+          </div>
+        )}
+
+        {/* My Redemptions View */}
+        {storeView === 'redemptions' && (
+          <div className="space-y-4">
+            {redemptionsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : redemptionHistory.length === 0 ? (
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-12 text-center">
                   <Gift className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No Rewards Found</h3>
-                  <p className="text-gray-400">
-                    {searchQuery
-                      ? 'Try adjusting your search or filters'
-                      : 'No rewards available at the moment. Check back soon!'}
+                  <h3 className="text-xl font-semibold text-white mb-2">No Redemptions Yet</h3>
+                  <p className="text-gray-400 mb-4">
+                    Browse the rewards store and redeem your points for exclusive rewards.
                   </p>
+                  <Button
+                    onClick={() => setStoreView('browse')}
+                    className="bg-brand-primary hover:bg-brand-primary/80"
+                  >
+                    <Store className="h-4 w-4 mr-2" />
+                    Browse Rewards
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRewards.map((reward) => {
-                  const config = getRewardTypeConfig(reward.rewardType);
-                  const Icon = config.icon;
-                  const canAfford = reward.canAfford ?? userPoints >= (reward.pointsCost ?? 0);
-                  const isOutOfStock = reward.stockRemaining != null && reward.stockRemaining <= 0;
-                  const needsPoints = (reward.pointsCost ?? 0) - userPoints;
+              <div className="space-y-3">
+                {/* Redemption stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-white">{redemptionHistory.length}</p>
+                      <p className="text-xs text-gray-400">Total Redeemed</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-green-400">
+                        {
+                          redemptionHistory.filter(
+                            (r: any) =>
+                              r.status === 'fulfilled' ||
+                              r.status === 'completed' ||
+                              r.metadata?.nftMintStatus === 'completed'
+                          ).length
+                        }
+                      </p>
+                      <p className="text-xs text-gray-400">Fulfilled</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-yellow-400">
+                        {
+                          redemptionHistory.filter(
+                            (r: any) =>
+                              r.status === 'pending' ||
+                              r.metadata?.nftMintStatus === 'pending_manual'
+                          ).length
+                        }
+                      </p>
+                      <p className="text-xs text-gray-400">Pending</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Redemption list */}
+                {redemptionHistory.map((redemption: any) => {
+                  const statusMeta = getRedemptionStatusMeta(
+                    redemption.status,
+                    redemption.metadata?.nftMintStatus
+                  );
+                  const rewardConfig = getRewardTypeConfig(
+                    redemption.reward?.rewardType || redemption.reward?.type
+                  );
+                  const RewardIcon = rewardConfig.icon;
 
                   return (
                     <Card
-                      key={reward.id}
-                      className="bg-white/5 border-white/10 hover:border-brand-primary/50 transition-all cursor-pointer group overflow-hidden"
-                      onClick={() => handleRewardClick(reward)}
+                      key={redemption.id}
+                      className="bg-white/5 border-white/10 hover:border-white/20 transition-colors"
                     >
-                      {/* Image */}
-                      <div className="relative h-48 bg-gradient-to-br from-brand-primary/10 to-brand-secondary/10 overflow-hidden">
-                        {reward.imageUrl ? (
-                          <img
-                            src={reward.imageUrl}
-                            alt={reward.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Icon className={`h-20 w-20 ${config.color}`} />
-                          </div>
-                        )}
-
-                        {/* Type Badge */}
-                        <div className="absolute top-3 left-3">
-                          <Badge className={`${config.bgColor} ${config.color} border-0`}>
-                            <Icon className="h-3 w-3 mr-1" />
-                            {config.label}
-                          </Badge>
-                        </div>
-
-                        {/* Stock Badge — only show when stock is tracked (non-null) */}
-                        {reward.stockRemaining != null && (
-                          <div className="absolute top-3 right-3">
-                            <Badge
-                              className={
-                                isOutOfStock
-                                  ? 'bg-red-500/20 text-red-400 border-0'
-                                  : reward.stockRemaining < 10
-                                    ? 'bg-yellow-500/20 text-yellow-400 border-0'
-                                    : 'bg-green-500/20 text-green-400 border-0'
-                              }
-                            >
-                              {isOutOfStock ? 'Out of Stock' : `${reward.stockRemaining} left`}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-
-                      <CardContent className="p-4 space-y-3">
-                        {/* Title */}
-                        <div>
-                          <h3 className="text-lg font-semibold text-white line-clamp-1">
-                            {reward.name}
-                          </h3>
-                          {reward.creatorName && (
-                            <p className="text-xs text-gray-500">by {reward.creatorName}</p>
-                          )}
-                        </div>
-
-                        {/* Description */}
-                        <p className="text-sm text-gray-400 line-clamp-2">{reward.description}</p>
-
-                        {/* Points Cost */}
-                        <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                          <div className="flex items-center gap-2">
-                            <Coins className="h-5 w-5 text-brand-primary" />
-                            <span
-                              className={`text-lg font-bold ${canAfford ? 'text-white' : 'text-red-400'}`}
-                            >
-                              {reward.pointsCost.toLocaleString()}
-                            </span>
-                          </div>
-
-                          <Button
-                            size="sm"
-                            disabled={!canAfford || isOutOfStock}
-                            className={
-                              canAfford && !isOutOfStock
-                                ? 'bg-brand-primary hover:bg-brand-primary/80'
-                                : 'bg-gray-600 hover:bg-gray-600 cursor-not-allowed'
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRewardClick(reward);
-                            }}
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          {/* Reward icon */}
+                          <div
+                            className={`w-12 h-12 rounded-xl ${rewardConfig.bgColor} flex items-center justify-center shrink-0`}
                           >
-                            {isOutOfStock ? 'Unavailable' : 'Redeem'}
-                          </Button>
-                        </div>
-
-                        {/* Need More Points */}
-                        {!canAfford && !isOutOfStock && (
-                          <div className="flex items-center gap-2 text-xs text-red-400">
-                            <AlertCircle className="h-3 w-3" />
-                            <span>Need {needsPoints.toLocaleString()} more points</span>
+                            {redemption.reward?.imageUrl ? (
+                              <img
+                                src={redemption.reward.imageUrl}
+                                alt=""
+                                className="w-12 h-12 rounded-xl object-cover"
+                              />
+                            ) : (
+                              <RewardIcon className={`w-6 h-6 ${rewardConfig.color}`} />
+                            )}
                           </div>
-                        )}
+
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="text-sm font-semibold text-white truncate">
+                                {redemption.reward?.name || 'Reward'}
+                              </h4>
+                              <Badge className={`${statusMeta.className} text-xs shrink-0`}>
+                                {statusMeta.label}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Coins className="w-3 h-3" />
+                                {(redemption.pointsSpent || 0).toLocaleString()} pts
+                              </span>
+                              {redemption.programName && (
+                                <span className="truncate">{redemption.programName}</span>
+                              )}
+                              <span>
+                                {formatDistanceToNow(new Date(redemption.redeemedAt), {
+                                  addSuffix: true,
+                                })}
+                              </span>
+                            </div>
+                            {redemption.metadata?.nftMintMessage && (
+                              <p className="text-xs text-yellow-300 mt-1">
+                                {redemption.metadata.nftMintMessage}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
                   );
                 })}
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
+
+        {/* Browse Store View */}
+        {storeView === 'browse' && (
+          <>
+            {/* Search and Filter */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  placeholder="Search rewards..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+                />
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <Tabs value={selectedType} onValueChange={setSelectedType} className="w-full">
+              <TabsList className="bg-white/5 border-white/10">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="physical">Physical</TabsTrigger>
+                <TabsTrigger value="video">Video</TabsTrigger>
+                <TabsTrigger value="custom">Custom</TabsTrigger>
+                <TabsTrigger value="raffle">Raffle</TabsTrigger>
+                <TabsTrigger value="nft">NFT</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value={selectedType} className="mt-6">
+                {filteredRewards.length === 0 ? (
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-12 text-center">
+                      <Gift className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-white mb-2">No Rewards Found</h3>
+                      <p className="text-gray-400">
+                        {searchQuery
+                          ? 'Try adjusting your search or filters'
+                          : 'No rewards available at the moment. Check back soon!'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredRewards.map((reward) => {
+                      const config = getRewardTypeConfig(reward.rewardType);
+                      const Icon = config.icon;
+                      const canAfford = reward.canAfford ?? userPoints >= (reward.pointsCost ?? 0);
+                      const isOutOfStock =
+                        reward.stockRemaining != null && reward.stockRemaining <= 0;
+                      const needsPoints = (reward.pointsCost ?? 0) - userPoints;
+
+                      return (
+                        <Card
+                          key={reward.id}
+                          className="bg-white/5 border-white/10 hover:border-brand-primary/50 transition-all cursor-pointer group overflow-hidden"
+                          onClick={() => handleRewardClick(reward)}
+                        >
+                          {/* Image */}
+                          <div className="relative h-48 bg-gradient-to-br from-brand-primary/10 to-brand-secondary/10 overflow-hidden">
+                            {reward.imageUrl ? (
+                              <img
+                                src={reward.imageUrl}
+                                alt={reward.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Icon className={`h-20 w-20 ${config.color}`} />
+                              </div>
+                            )}
+
+                            {/* Type Badge */}
+                            <div className="absolute top-3 left-3">
+                              <Badge className={`${config.bgColor} ${config.color} border-0`}>
+                                <Icon className="h-3 w-3 mr-1" />
+                                {config.label}
+                              </Badge>
+                            </div>
+
+                            {/* Stock Badge — only show when stock is tracked (non-null) */}
+                            {reward.stockRemaining != null && (
+                              <div className="absolute top-3 right-3">
+                                <Badge
+                                  className={
+                                    isOutOfStock
+                                      ? 'bg-red-500/20 text-red-400 border-0'
+                                      : reward.stockRemaining < 10
+                                        ? 'bg-yellow-500/20 text-yellow-400 border-0'
+                                        : 'bg-green-500/20 text-green-400 border-0'
+                                  }
+                                >
+                                  {isOutOfStock ? 'Out of Stock' : `${reward.stockRemaining} left`}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          <CardContent className="p-4 space-y-3">
+                            {/* Title */}
+                            <div>
+                              <h3 className="text-lg font-semibold text-white line-clamp-1">
+                                {reward.name}
+                              </h3>
+                              {reward.creatorName && (
+                                <p className="text-xs text-gray-500">by {reward.creatorName}</p>
+                              )}
+                            </div>
+
+                            {/* Description */}
+                            <p className="text-sm text-gray-400 line-clamp-2">
+                              {reward.description}
+                            </p>
+
+                            {/* Points Cost */}
+                            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                              <div className="flex items-center gap-2">
+                                <Coins className="h-5 w-5 text-brand-primary" />
+                                <span
+                                  className={`text-lg font-bold ${canAfford ? 'text-white' : 'text-red-400'}`}
+                                >
+                                  {reward.pointsCost.toLocaleString()}
+                                </span>
+                              </div>
+
+                              <Button
+                                size="sm"
+                                disabled={!canAfford || isOutOfStock}
+                                className={
+                                  canAfford && !isOutOfStock
+                                    ? 'bg-brand-primary hover:bg-brand-primary/80'
+                                    : 'bg-gray-600 hover:bg-gray-600 cursor-not-allowed'
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRewardClick(reward);
+                                }}
+                              >
+                                {isOutOfStock ? 'Unavailable' : 'Redeem'}
+                              </Button>
+                            </div>
+
+                            {/* Need More Points */}
+                            {!canAfford && !isOutOfStock && (
+                              <div className="flex items-center gap-2 text-xs text-red-400">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Need {needsPoints.toLocaleString()} more points</span>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
 
         {/* Reward Detail Dialog */}
         <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>

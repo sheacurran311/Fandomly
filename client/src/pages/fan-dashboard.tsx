@@ -358,12 +358,12 @@ export default function FanDashboard() {
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
+            {/* Redeemed Rewards */}
             <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-base flex items-center justify-between">
-                  <span>Recent Activity</span>
-                  <Link href="/fan-dashboard/points">
+                  <span>Redeemed Rewards</span>
+                  <Link href="/fan-dashboard/rewards-store">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -382,55 +382,73 @@ export default function FanDashboard() {
                 ) : redemptionHistory.length === 0 ? (
                   <div className="text-center py-6">
                     <Sparkles className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-                    <p className="text-sm text-gray-400 mb-1">No recent activity</p>
-                    <p className="text-xs text-gray-500">Complete tasks to earn rewards!</p>
+                    <p className="text-sm text-gray-400 mb-1">No redeemed rewards yet</p>
+                    <p className="text-xs text-gray-500">
+                      Visit the{' '}
+                      <Link
+                        href="/fan-dashboard/rewards-store"
+                        className="text-brand-primary hover:underline"
+                      >
+                        Rewards Store
+                      </Link>{' '}
+                      to redeem your points!
+                    </p>
                   </div>
                 ) : (
-                  redemptionHistory.slice(0, 4).map((redemption: any) => (
-                    (() => {
+                  <>
+                    {redemptionHistory.slice(0, 5).map((redemption: any) => {
                       const statusMeta = getRedemptionStatusMeta(redemption);
-                      return <div
-                      key={redemption.id}
-                      className="flex items-center space-x-3 p-2 rounded-lg bg-white/5"
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          statusMeta.className.includes('green')
-                            ? 'bg-green-400/20 text-green-400'
-                            : statusMeta.className.includes('yellow')
-                              ? 'bg-yellow-400/20 text-yellow-400'
-                              : statusMeta.className.includes('red')
-                                ? 'bg-red-400/20 text-red-400'
-                                : 'bg-gray-400/20 text-gray-400'
-                        }`}
-                      >
-                        <Gift className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {redemption.reward?.name || 'Reward'}
+                      return (
+                        <div
+                          key={redemption.id}
+                          className="flex items-center space-x-3 p-2 rounded-lg bg-white/5"
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              statusMeta.className.includes('green')
+                                ? 'bg-green-400/20 text-green-400'
+                                : statusMeta.className.includes('yellow')
+                                  ? 'bg-yellow-400/20 text-yellow-400'
+                                  : statusMeta.className.includes('red')
+                                    ? 'bg-red-400/20 text-red-400'
+                                    : 'bg-gray-400/20 text-gray-400'
+                            }`}
+                          >
+                            <Gift className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">
+                              {redemption.reward?.name || 'Reward'}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {redemption.pointsSpent?.toLocaleString() || 0} pts &middot;{' '}
+                              {formatDistanceToNow(new Date(redemption.redeemedAt), {
+                                addSuffix: true,
+                              })}
+                            </p>
+                            {redemption.metadata?.nftMintMessage && (
+                              <p className="text-xs text-yellow-300 mt-1">
+                                {redemption.metadata.nftMintMessage}
+                              </p>
+                            )}
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs shrink-0 ${statusMeta.className}`}
+                          >
+                            {statusMeta.label}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                    {redemptionHistory.length > 5 && (
+                      <Link href="/fan-dashboard/rewards-store">
+                        <p className="text-xs text-brand-primary text-center hover:underline cursor-pointer pt-1">
+                          +{redemptionHistory.length - 5} more redemptions
                         </p>
-                        <p className="text-xs text-gray-400">
-                          {formatDistanceToNow(new Date(redemption.redeemedAt), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                        {redemption.metadata?.nftMintMessage && (
-                          <p className="text-xs text-yellow-300 mt-1">{redemption.metadata.nftMintMessage}</p>
-                        )}
-                        {redemption.metadata?.nftMintError && (
-                          <p className="text-xs text-red-300 mt-1">{redemption.metadata.nftMintError}</p>
-                        )}
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs shrink-0 ${statusMeta.className}`}
-                      >
-                        {statusMeta.label}
-                      </Badge>
-                    </div>;
-                    })()
-                  ))
+                      </Link>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

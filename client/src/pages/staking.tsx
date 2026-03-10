@@ -26,6 +26,7 @@ import {
   Gift,
   Zap,
   ArrowRight,
+  CheckCircle,
 } from 'lucide-react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
@@ -141,6 +142,10 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
   const { toast } = useToast();
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
+  const [successAction, setSuccessAction] = useState<{
+    type: 'stake' | 'unstake' | 'claim';
+    amount: string;
+  } | null>(null);
 
   const { data: balance } = useTokenBalance(token.tokenAddress, walletAddress);
   const { data: stakeInfo, dataUpdatedAt } = useStakeInfo(walletAddress, token.tokenAddress);
@@ -162,6 +167,7 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
 
   const handleStake = async () => {
     if (!stakeAmount || Number(stakeAmount) <= 0) return;
+    const savedAmount = stakeAmount;
     // Ensure on-chain reputation meets the FanStaking contract threshold (500)
     try {
       await fetch('/api/blockchain/ensure-reputation', {
@@ -175,10 +181,8 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
       { tokenAddress: token.tokenAddress, amount: stakeAmount },
       {
         onSuccess: () => {
-          toast({
-            title: 'Staked!',
-            description: `${stakeAmount} ${token.symbol} staked successfully.`,
-          });
+          setSuccessAction({ type: 'stake', amount: savedAmount });
+          setTimeout(() => setSuccessAction(null), 6000);
           setStakeAmount('');
         },
         onError: (error: Error) => {
@@ -190,14 +194,13 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
 
   const handleUnstake = () => {
     if (!unstakeAmount || Number(unstakeAmount) <= 0) return;
+    const savedAmount = unstakeAmount;
     unstakeToken.mutate(
       { tokenAddress: token.tokenAddress, amount: unstakeAmount },
       {
         onSuccess: () => {
-          toast({
-            title: 'Unstaked!',
-            description: `${unstakeAmount} ${token.symbol} returned to wallet.`,
-          });
+          setSuccessAction({ type: 'unstake', amount: savedAmount });
+          setTimeout(() => setSuccessAction(null), 6000);
           setUnstakeAmount('');
         },
         onError: (error: Error) => {
@@ -208,14 +211,13 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
   };
 
   const handleClaim = () => {
+    const savedAmount = rewards.toFixed(4);
     claimRewards.mutate(
       { tokenAddress: token.tokenAddress },
       {
         onSuccess: () => {
-          toast({
-            title: 'Rewards claimed!',
-            description: `${rewards.toFixed(4)} AVAX sent to your wallet.`,
-          });
+          setSuccessAction({ type: 'claim', amount: savedAmount });
+          setTimeout(() => setSuccessAction(null), 6000);
         },
         onError: (error: Error) => {
           toast({ title: 'Claim failed', description: error.message, variant: 'destructive' });
@@ -223,6 +225,8 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
       }
     );
   };
+
+  const tokenSymbol = metadata?.symbol || token.symbol;
 
   return (
     <Card className="bg-white/5 border-white/10">
@@ -235,7 +239,7 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
             <div>
               <CardTitle className="text-white text-base">{metadata?.name || token.name}</CardTitle>
               <p className="text-xs text-gray-500">
-                {metadata?.symbol || token.symbol} &middot; by {token.creatorUsername}
+                {tokenSymbol} &middot; by {token.creatorUsername}
               </p>
             </div>
           </div>
@@ -245,6 +249,60 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Success confirmation banner */}
+        {successAction && (
+          <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-lg p-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-green-400">
+                {successAction.type === 'stake' && 'Staked Successfully'}
+                {successAction.type === 'unstake' && 'Unstaked Successfully'}
+                {successAction.type === 'claim' && 'Rewards Claimed'}
+              </p>
+              <p className="text-xs text-green-400/70">
+                {successAction.type === 'stake' &&
+                  `${successAction.amount} ${tokenSymbol} is now earning rewards`}
+                {successAction.type === 'unstake' &&
+                  `${successAction.amount} ${tokenSymbol} returned to your wallet`}
+                {successAction.type === 'claim' &&
+                  `${successAction.amount} AVAX sent to your wallet`}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Staking Position Summary — always visible when staked */}
+        {stakedAmount > 0 && !successAction && (
+          <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">
+                  Active Position
+                </span>
+              </div>
+              <span className="text-xs text-gray-500">
+                {daysSinceStake >= 1
+                  ? `${Math.floor(daysSinceStake)}d staked`
+                  : daysSinceStake > 0
+                    ? `${Math.floor(daysSinceStake * 24)}h staked`
+                    : 'Just staked'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-white">{stakedAmount.toFixed(2)}</span>
+              <span className="text-sm text-gray-400">{tokenSymbol}</span>
+              {rewards > 0 && (
+                <span className="ml-auto text-sm font-medium text-yellow-400">
+                  +{rewards.toFixed(4)} AVAX earned
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Balances */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white/5 rounded-lg p-3">
@@ -300,7 +358,7 @@ function StakeTokenCard({ token, walletAddress }: { token: CreatorToken; walletA
           </Button>
         </div>
 
-        {/* Unstake Input */}
+        {/* Unstake Input — always visible when staked */}
         {stakedAmount > 0 && (
           <div className="flex gap-2">
             <Input
