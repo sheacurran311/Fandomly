@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
@@ -162,9 +163,9 @@ export default function FanRewardsStore() {
 
   // Fetch reward detail — the endpoint returns { reward, userBalance, canRedeem, ... }
   // so we flatten it into the Reward shape the UI expects.
-  const { data: rewardDetail, isLoading: isLoadingDetail } = useQuery<Reward>({
+  const { data: rewardDetail, isLoading: isLoadingDetail } = useQuery<Reward | null>({
     queryKey: ['/api/rewards/catalog', selectedReward?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<Reward | null> => {
       if (!selectedReward?.id) return null;
       const response = await apiRequest('GET', `/api/rewards/catalog/${selectedReward.id}`);
       const data: any = await readJsonResponse(response);
@@ -175,11 +176,12 @@ export default function FanRewardsStore() {
         rewardType: r.rewardType ?? r.reward_type ?? 'custom',
         imageUrl: r.imageUrl ?? r.image_url,
         stockCount: r.stockCount ?? r.stock_quantity,
-        stockRemaining: r.stockQuantity != null ? r.stockQuantity : r.stockRemaining ?? r.stock_quantity,
+        stockRemaining:
+          r.stockQuantity != null ? r.stockQuantity : (r.stockRemaining ?? r.stock_quantity),
         isActive: r.isActive ?? r.is_active ?? true,
         programId: r.programId ?? r.program_id ?? selectedReward?.programId,
         rewardData: r.rewardData ?? r.reward_data,
-        canAfford: data.canRedeem ?? (data.userBalance >= (r.pointsCost ?? r.points_cost ?? 0)),
+        canAfford: data.canRedeem ?? data.userBalance >= (r.pointsCost ?? r.points_cost ?? 0),
         creatorName: r.creatorName ?? selectedReward?.creatorName,
       } as Reward;
     },
@@ -188,7 +190,11 @@ export default function FanRewardsStore() {
 
   // Redeem mutation
   const redeemMutation = useMutation({
-    mutationFn: async (data: { rewardId: string; programId: string; shippingAddress?: ShippingAddress }) => {
+    mutationFn: async (data: {
+      rewardId: string;
+      programId: string;
+      shippingAddress?: ShippingAddress;
+    }) => {
       const response = await apiRequest('POST', '/api/rewards/redeem', data);
       return readJsonResponse(response);
     },
@@ -386,8 +392,7 @@ export default function FanRewardsStore() {
                   const config = getRewardTypeConfig(reward.rewardType);
                   const Icon = config.icon;
                   const canAfford = reward.canAfford ?? userPoints >= (reward.pointsCost ?? 0);
-                  const isOutOfStock =
-                    reward.stockRemaining != null && reward.stockRemaining <= 0;
+                  const isOutOfStock = reward.stockRemaining != null && reward.stockRemaining <= 0;
                   const needsPoints = (reward.pointsCost ?? 0) - userPoints;
 
                   return (
@@ -502,245 +507,248 @@ export default function FanRewardsStore() {
                 <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
               </div>
             ) : rewardDetail ? (
-                (() => {
-                  const detailConfig = getRewardTypeConfig(rewardDetail.rewardType);
-                  return (
-                    <>
-                <DialogHeader>
-                  <DialogTitle className="text-white text-2xl flex items-center gap-3">
-                    {rewardDetail.imageUrl && (
-                      <img
-                        src={rewardDetail.imageUrl}
-                        alt={rewardDetail.name}
-                        className="w-16 h-16 rounded-lg object-cover"
-                      />
-                    )}
-                    <div className="flex-1">
-                      {rewardDetail.name}
-                      {rewardDetail.creatorName && (
-                        <p className="text-sm text-gray-400 font-normal">
-                          by {rewardDetail.creatorName}
-                        </p>
-                      )}
-                    </div>
-                  </DialogTitle>
-                  <DialogDescription className="text-gray-400 text-base">
-                    {rewardDetail.description}
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4">
-                  {/* Type and Cost */}
-                  <div className="flex items-center gap-4">
-                    <Badge
-                      className={`${detailConfig.bgColor} ${detailConfig.color} border-0`}
-                    >
-                      {detailConfig.label}
-                    </Badge>
-                    <div className="flex items-center gap-2">
-                      <Coins className="h-5 w-5 text-brand-primary" />
-                      <span className="text-xl font-bold text-white">
-                        {(rewardDetail.pointsCost ?? 0).toLocaleString()} points
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Stock Info — only show when stock is tracked (non-null) */}
-                  {rewardDetail.stockRemaining != null && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Package className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-300">
-                        {rewardDetail.stockRemaining > 0
-                          ? `${rewardDetail.stockRemaining} remaining`
-                          : 'Out of stock'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Physical Reward Details */}
-                  {rewardDetail.rewardType === 'physical' && rewardDetail.metadata && (
-                    <div className="space-y-3 p-4 bg-white/5 rounded-lg">
-                      <h4 className="font-semibold text-white flex items-center gap-2">
-                        <Package className="h-5 w-5 text-blue-400" />
-                        Shipping Information
-                      </h4>
-                      {rewardDetail.metadata.condition && (
-                        <div className="text-sm">
-                          <span className="text-gray-400">Condition: </span>
-                          <span className="text-white">{rewardDetail.metadata.condition}</span>
+              (() => {
+                const detailConfig = getRewardTypeConfig(rewardDetail.rewardType);
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle className="text-white text-2xl flex items-center gap-3">
+                        {rewardDetail.imageUrl && (
+                          <img
+                            src={rewardDetail.imageUrl}
+                            alt={rewardDetail.name}
+                            className="w-16 h-16 rounded-lg object-cover"
+                          />
+                        )}
+                        <div className="flex-1">
+                          {rewardDetail.name}
+                          {rewardDetail.creatorName && (
+                            <p className="text-sm text-gray-400 font-normal">
+                              by {rewardDetail.creatorName}
+                            </p>
+                          )}
                         </div>
-                      )}
-                      {rewardDetail.metadata.estimatedShipping && (
-                        <div className="text-sm flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-gray-400">Est. Shipping: </span>
-                          <span className="text-white">
-                            {rewardDetail.metadata.estimatedShipping}
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-400 text-base">
+                        {rewardDetail.description}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      {/* Type and Cost */}
+                      <div className="flex items-center gap-4">
+                        <Badge className={`${detailConfig.bgColor} ${detailConfig.color} border-0`}>
+                          {detailConfig.label}
+                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Coins className="h-5 w-5 text-brand-primary" />
+                          <span className="text-xl font-bold text-white">
+                            {(rewardDetail.pointsCost ?? 0).toLocaleString()} points
                           </span>
                         </div>
-                      )}
-                      {rewardDetail.metadata.shippingInfo && (
-                        <p className="text-sm text-gray-300">
-                          {rewardDetail.metadata.shippingInfo}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Video Reward Details */}
-                  {rewardDetail.rewardType === 'video' && rewardDetail.metadata && (
-                    <div className="space-y-3 p-4 bg-white/5 rounded-lg">
-                      <h4 className="font-semibold text-white flex items-center gap-2">
-                        <Video className="h-5 w-5 text-purple-400" />
-                        Video Details
-                      </h4>
-                      {rewardDetail.metadata.turnaroundTime && (
-                        <div className="text-sm flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-gray-400">Turnaround: </span>
-                          <span className="text-white">{rewardDetail.metadata.turnaroundTime}</span>
-                        </div>
-                      )}
-                      {rewardDetail.metadata.maxDuration && (
-                        <div className="text-sm">
-                          <span className="text-gray-400">Max Duration: </span>
-                          <span className="text-white">{rewardDetail.metadata.maxDuration}</span>
-                        </div>
-                      )}
-                      {rewardDetail.metadata.personalizationOptions && (
-                        <div className="text-sm">
-                          <span className="text-gray-400">Personalization: </span>
-                          <span className="text-white">
-                            {rewardDetail.metadata.personalizationOptions}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Raffle Reward Details */}
-                  {rewardDetail.rewardType === 'raffle' && rewardDetail.metadata && (
-                    <div className="space-y-3 p-4 bg-white/5 rounded-lg">
-                      <h4 className="font-semibold text-white flex items-center gap-2">
-                        <Ticket className="h-5 w-5 text-pink-400" />
-                        Raffle Details
-                      </h4>
-                      {rewardDetail.metadata.prizeDescription && (
-                        <div className="text-sm">
-                          <span className="text-gray-400">Prize: </span>
-                          <span className="text-white">
-                            {rewardDetail.metadata.prizeDescription}
-                          </span>
-                        </div>
-                      )}
-                      {rewardDetail.metadata.drawDate && (
-                        <div className="text-sm flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span className="text-gray-400">Draw Date: </span>
-                          <span className="text-white">
-                            {format(new Date(rewardDetail.metadata.drawDate), 'MMM dd, yyyy')}
-                          </span>
-                        </div>
-                      )}
-                      {rewardDetail.metadata.ticketsRemaining !== undefined && (
-                        <div className="text-sm">
-                          <span className="text-gray-400">Tickets Remaining: </span>
-                          <span className="text-white">
-                            {rewardDetail.metadata.ticketsRemaining} /{' '}
-                            {rewardDetail.metadata.totalTickets || 0}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {rewardDetail.rewardType === 'nft' && (
-                    <div className="space-y-3 p-4 bg-white/5 rounded-lg">
-                      <h4 className="font-semibold text-white flex items-center gap-2">
-                        <ImageIcon className="h-5 w-5 text-green-400" />
-                        NFT Delivery
-                      </h4>
-                      <div className="text-sm">
-                        <span className="text-gray-400">Collection: </span>
-                        <span className="text-white">
-                          {rewardDetail.rewardData?.nftData?.collectionName || 'Selected NFT collection'}
-                        </span>
                       </div>
-                      <div className="text-sm">
-                        <span className="text-gray-400">Delivery: </span>
-                        <span className="text-white">
-                          {rewardDetail.rewardData?.nftData?.autoMintOnRedeem === false
-                            ? 'Manual mint by creator after redemption'
-                            : 'Auto-mint to your connected wallet after redemption'}
-                        </span>
-                      </div>
-                      {!fanWalletAddress && (
-                        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
-                          No wallet is connected yet. You can still redeem this NFT reward, but minting
-                          will stay pending until your wallet is connected.
+
+                      {/* Stock Info — only show when stock is tracked (non-null) */}
+                      {rewardDetail.stockRemaining != null && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Package className="h-4 w-4 text-gray-400" />
+                          <span className="text-gray-300">
+                            {rewardDetail.stockRemaining > 0
+                              ? `${rewardDetail.stockRemaining} remaining`
+                              : 'Out of stock'}
+                          </span>
                         </div>
                       )}
-                      {fanWalletAddress && (
-                        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">
-                          This NFT will be minted to {fanWalletAddress.slice(0, 6)}...
-                          {fanWalletAddress.slice(-4)}.
+
+                      {/* Physical Reward Details */}
+                      {rewardDetail.rewardType === 'physical' && rewardDetail.metadata && (
+                        <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                          <h4 className="font-semibold text-white flex items-center gap-2">
+                            <Package className="h-5 w-5 text-blue-400" />
+                            Shipping Information
+                          </h4>
+                          {rewardDetail.metadata.condition && (
+                            <div className="text-sm">
+                              <span className="text-gray-400">Condition: </span>
+                              <span className="text-white">{rewardDetail.metadata.condition}</span>
+                            </div>
+                          )}
+                          {rewardDetail.metadata.estimatedShipping && (
+                            <div className="text-sm flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-400">Est. Shipping: </span>
+                              <span className="text-white">
+                                {rewardDetail.metadata.estimatedShipping}
+                              </span>
+                            </div>
+                          )}
+                          {rewardDetail.metadata.shippingInfo && (
+                            <p className="text-sm text-gray-300">
+                              {rewardDetail.metadata.shippingInfo}
+                            </p>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* Your Points */}
-                  <div className="p-4 bg-brand-primary/10 rounded-lg border border-brand-primary/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-300">Your Points:</span>
-                      <span className="text-xl font-bold text-white">
-                        {userPoints.toLocaleString()}
-                      </span>
-                    </div>
-                    {!rewardDetail.canAfford && pointsNeeded > 0 && (
-                      <div className="mt-2 flex items-center gap-2 text-sm text-red-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>You need {pointsNeeded.toLocaleString()} more points</span>
+                      {/* Video Reward Details */}
+                      {rewardDetail.rewardType === 'video' && rewardDetail.metadata && (
+                        <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                          <h4 className="font-semibold text-white flex items-center gap-2">
+                            <Video className="h-5 w-5 text-purple-400" />
+                            Video Details
+                          </h4>
+                          {rewardDetail.metadata.turnaroundTime && (
+                            <div className="text-sm flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-400">Turnaround: </span>
+                              <span className="text-white">
+                                {rewardDetail.metadata.turnaroundTime}
+                              </span>
+                            </div>
+                          )}
+                          {rewardDetail.metadata.maxDuration && (
+                            <div className="text-sm">
+                              <span className="text-gray-400">Max Duration: </span>
+                              <span className="text-white">
+                                {rewardDetail.metadata.maxDuration}
+                              </span>
+                            </div>
+                          )}
+                          {rewardDetail.metadata.personalizationOptions && (
+                            <div className="text-sm">
+                              <span className="text-gray-400">Personalization: </span>
+                              <span className="text-white">
+                                {rewardDetail.metadata.personalizationOptions}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Raffle Reward Details */}
+                      {rewardDetail.rewardType === 'raffle' && rewardDetail.metadata && (
+                        <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                          <h4 className="font-semibold text-white flex items-center gap-2">
+                            <Ticket className="h-5 w-5 text-pink-400" />
+                            Raffle Details
+                          </h4>
+                          {rewardDetail.metadata.prizeDescription && (
+                            <div className="text-sm">
+                              <span className="text-gray-400">Prize: </span>
+                              <span className="text-white">
+                                {rewardDetail.metadata.prizeDescription}
+                              </span>
+                            </div>
+                          )}
+                          {rewardDetail.metadata.drawDate && (
+                            <div className="text-sm flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-400">Draw Date: </span>
+                              <span className="text-white">
+                                {format(new Date(rewardDetail.metadata.drawDate), 'MMM dd, yyyy')}
+                              </span>
+                            </div>
+                          )}
+                          {rewardDetail.metadata.ticketsRemaining !== undefined && (
+                            <div className="text-sm">
+                              <span className="text-gray-400">Tickets Remaining: </span>
+                              <span className="text-white">
+                                {rewardDetail.metadata.ticketsRemaining} /{' '}
+                                {rewardDetail.metadata.totalTickets || 0}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {rewardDetail.rewardType === 'nft' && (
+                        <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                          <h4 className="font-semibold text-white flex items-center gap-2">
+                            <ImageIcon className="h-5 w-5 text-green-400" />
+                            NFT Delivery
+                          </h4>
+                          <div className="text-sm">
+                            <span className="text-gray-400">Collection: </span>
+                            <span className="text-white">
+                              {rewardDetail.rewardData?.nftData?.collectionName ||
+                                'Selected NFT collection'}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-gray-400">Delivery: </span>
+                            <span className="text-white">
+                              {rewardDetail.rewardData?.nftData?.autoMintOnRedeem === false
+                                ? 'Manual mint by creator after redemption'
+                                : 'Auto-mint to your connected wallet after redemption'}
+                            </span>
+                          </div>
+                          {!fanWalletAddress && (
+                            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+                              No wallet is connected yet. You can still redeem this NFT reward, but
+                              minting will stay pending until your wallet is connected.
+                            </div>
+                          )}
+                          {fanWalletAddress && (
+                            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">
+                              This NFT will be minted to {fanWalletAddress.slice(0, 6)}...
+                              {fanWalletAddress.slice(-4)}.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Your Points */}
+                      <div className="p-4 bg-brand-primary/10 rounded-lg border border-brand-primary/30">
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-300">Your Points:</span>
+                          <span className="text-xl font-bold text-white">
+                            {userPoints.toLocaleString()}
+                          </span>
+                        </div>
+                        {!rewardDetail.canAfford && pointsNeeded > 0 && (
+                          <div className="mt-2 flex items-center gap-2 text-sm text-red-400">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>You need {pointsNeeded.toLocaleString()} more points</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowDetailDialog(false)}
-                    className="border-white/20 text-gray-300 hover:bg-white/10"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleRedeemClick}
-                    disabled={
-                      !rewardDetail.canAfford ||
-                      !rewardDetail.programId ||
-                      (rewardDetail.stockRemaining != null &&
-                        rewardDetail.stockRemaining <= 0) ||
-                      redeemMutation.isPending
-                    }
-                    className="bg-brand-primary hover:bg-brand-primary/80"
-                  >
-                    {redeemMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Redeeming...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Redeem Reward
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-                    </>
-                  );
-                })()
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowDetailDialog(false)}
+                        className="border-white/20 text-gray-300 hover:bg-white/10"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleRedeemClick}
+                        disabled={
+                          !rewardDetail.canAfford ||
+                          !rewardDetail.programId ||
+                          (rewardDetail.stockRemaining != null &&
+                            rewardDetail.stockRemaining <= 0) ||
+                          redeemMutation.isPending
+                        }
+                        className="bg-brand-primary hover:bg-brand-primary/80"
+                      >
+                        {redeemMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Redeeming...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Redeem Reward
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </>
+                );
+              })()
             ) : null}
           </DialogContent>
         </Dialog>

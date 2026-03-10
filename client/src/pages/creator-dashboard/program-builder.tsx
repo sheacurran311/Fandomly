@@ -218,7 +218,9 @@ export default function ProgramBuilderNew() {
         ) : selectedProgram ? (
           <ProgramCustomizer
             program={selectedProgram}
-            onPublish={(slug) => publishProgramMutation.mutateAsync({ id: selectedProgram.id, slug })}
+            onPublish={async (slug) => {
+              await publishProgramMutation.mutateAsync({ id: selectedProgram.id, slug });
+            }}
             onUpdate={refetchProgram}
             campaigns={programCampaigns}
             tasks={programTasks}
@@ -1631,9 +1633,10 @@ function PublishDialog({
                   });
                 } catch (err: any) {
                   const missingFields = err?.details?.missingFields;
-                  const msg = Array.isArray(missingFields) && missingFields.length
-                    ? `Missing: ${missingFields.join(', ')}`
-                    : err?.message || 'Failed to publish. Please try again.';
+                  const msg =
+                    Array.isArray(missingFields) && missingFields.length
+                      ? `Missing: ${missingFields.join(', ')}`
+                      : err?.message || 'Failed to publish. Please try again.';
                   setPublishError(msg);
                   toast({
                     title: 'Publish Failed',
@@ -1648,11 +1651,7 @@ function PublishDialog({
               disabled={!canPublish || isPublishing}
             >
               <Rocket className="h-4 w-4 mr-2" />
-              {isPublishing
-                ? 'Publishing...'
-                : isAlreadyPublished
-                  ? 'Update URL'
-                  : 'Publish Now'}
+              {isPublishing ? 'Publishing...' : isAlreadyPublished ? 'Update URL' : 'Publish Now'}
             </Button>
           </div>
         </div>

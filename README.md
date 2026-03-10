@@ -1,6 +1,6 @@
 # Fandomly
 
-A Web3-native loyalty and engagement platform that empowers creators to build deeper relationships with their communities. Creators launch customizable loyalty programs with tasks, campaigns, rewards, and NFT-powered badges -- all backed by on-chain verification on the Fandomly Chain (Avalanche L1).
+A Web3-native loyalty and engagement platform that empowers creators to build deeper relationships with their communities. Creators launch customizable loyalty programs with tasks, campaigns, rewards, and NFT-powered badges -- all backed by on-chain verification on the Avalanche Fuji C-Chain.
 
 ## Tech Stack
 
@@ -14,15 +14,17 @@ A Web3-native loyalty and engagement platform that empowers creators to build de
 | Testing    | Vitest, Playwright, React Testing Library                 |
 | Payments   | Stripe                                                    |
 
-## Fandomly Chain (Avalanche L1)
+## Blockchain (Avalanche Fuji C-Chain)
 
-Fandomly runs its own Avalanche L1 blockchain with the native **FAN** token.
+All smart contracts are deployed on the **Avalanche Fuji C-Chain** testnet.
 
-| Property     | Value                  |
-| ------------ | ---------------------- |
-| Chain ID     | 31111                  |
-| Native Token | FAN (18 decimals)      |
-| Network      | Avalanche Fuji Testnet |
+| Property       | Value                                      |
+| -------------- | ------------------------------------------ |
+| Chain ID       | 43113                                      |
+| Native Token   | AVAX (18 decimals)                         |
+| Network        | Avalanche Fuji C-Chain (Testnet)           |
+| Block Explorer | https://43113.testnet.snowtrace.io         |
+| RPC            | https://api.avax-test.network/ext/bc/C/rpc |
 
 ### Smart Contracts
 
@@ -30,7 +32,7 @@ Six deployed smart contracts power the on-chain layer:
 
 - **ReputationRegistry** -- On-chain reputation oracle (0-1000 score). Gates access to staking (500+) and token creation (750+). Synced from off-chain reputation engine.
 - **CreatorTokenFactory + CreatorToken** -- Factory pattern for launching per-creator ERC-20 tokens (1M initial supply). Reputation-gated at 750+.
-- **FanStaking** -- Stake creator tokens, earn FAN rewards at 5% base APY. Social multipliers up to 5x based on connected platforms. 7-day minimum with 5% early withdrawal penalty.
+- **FanStaking** -- Stake creator tokens, earn AVAX rewards at 5% base APY. Social multipliers up to 5x based on connected platforms. 7-day minimum with 5% early withdrawal penalty.
 - **FandomlyBadge (ERC-1155)** -- Platform and creator badges. Supports both soulbound (non-transferable) and transferable variants. Used for achievements, verification, and community milestones.
 - **FandomlyNFT + CreatorCollectionFactory (ERC-721)** -- Platform NFT collections and per-creator collections with EIP-2981 royalty support.
 
@@ -91,7 +93,7 @@ Fandomly/
 - **Social Verification** -- Connect accounts and earn points for real engagement
 - **Check-In Streaks** -- Daily check-ins with tier progression (Bronze through Diamond)
 - **On-Chain Reputation** -- Portable 0-1000 score synced to blockchain
-- **Staking** -- Stake creator tokens for FAN rewards with social multipliers
+- **Staking** -- Stake creator tokens for AVAX rewards with social multipliers
 - **Reward Redemption** -- Spend points on creator rewards, NFTs, and raffle entries
 
 ### For Brands & Sponsors
@@ -199,7 +201,7 @@ Express API Server (port 5000)
     │
     ├── PostgreSQL ── Drizzle ORM, 40+ tables, Neon serverless driver
     │
-    └── Fandomly Chain (Avalanche L1)
+    └── Avalanche Fuji C-Chain (43113)
          ├── ReputationRegistry (oracle sync)
          ├── CreatorTokenFactory + CreatorToken (ERC-20)
          ├── FanStaking (staking + social multipliers)

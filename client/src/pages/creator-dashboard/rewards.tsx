@@ -67,15 +67,15 @@ const rewardCreationFormSchema = insertRewardSchema
     tenantId: true,
   })
   .extend({
-  name: z.string().min(1, 'Reward name is required').max(100, 'Name too long'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  pointsCost: z.number().min(1, 'Points cost must be at least 1'),
-  rewardType: z.enum(['raffle', 'physical', 'custom', 'video', 'nft'], {
-    required_error: 'Please select a reward type',
-  }),
-  maxRedemptions: z.number().min(1).optional().nullable(),
-  // Type-specific validation handled dynamically
-})
+    name: z.string().min(1, 'Reward name is required').max(100, 'Name too long'),
+    description: z.string().min(10, 'Description must be at least 10 characters'),
+    pointsCost: z.number().min(1, 'Points cost must be at least 1'),
+    rewardType: z.enum(['raffle', 'physical', 'custom', 'video', 'nft'], {
+      required_error: 'Please select a reward type',
+    }),
+    maxRedemptions: z.number().min(1).optional().nullable(),
+    // Type-specific validation handled dynamically
+  })
   .superRefine((data, ctx) => {
     if (data.rewardType === 'nft') {
       const nftData = (data.rewardData as any)?.nftData;
@@ -148,9 +148,9 @@ export default function RewardsManagement() {
   } = useQuery({
     queryKey: ['/api/rewards', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id) return [] as Reward[];
       const response = await apiRequest('GET', '/api/rewards');
-      return readJsonResponse(response);
+      return readJsonResponse<Reward[]>(response);
     },
     enabled: !!user?.id,
   });
@@ -693,11 +693,14 @@ function RewardCreationForm({
   }, [form, programs]);
 
   useEffect(() => {
-    const selectedCollection = collections.find((collection) => collection.id === watchedCollectionId);
+    const selectedCollection = collections.find(
+      (collection) => collection.id === watchedCollectionId
+    );
     if (!selectedCollection) return;
 
     const metadata = (selectedCollection.metadata as Record<string, unknown> | undefined) || {};
-    const currentNftData = (form.getValues('rewardData.nftData' as any) as Record<string, any>) || {};
+    const currentNftData =
+      (form.getValues('rewardData.nftData' as any) as Record<string, any>) || {};
 
     form.setValue('rewardData.nftData.collectionName' as any, selectedCollection.name, {
       shouldValidate: true,
@@ -937,8 +940,8 @@ function RewardCreationForm({
             />
             {watchedCollectionId && (
               <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 text-sm text-indigo-200">
-                {collections.find((collection) => collection.id === watchedCollectionId)?.description ||
-                  'This reward will mint into the selected collection.'}
+                {collections.find((collection) => collection.id === watchedCollectionId)
+                  ?.description || 'This reward will mint into the selected collection.'}
               </div>
             )}
             <FormField

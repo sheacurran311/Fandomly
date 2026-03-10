@@ -10,7 +10,6 @@ import RevenueWidget from '@/components/dashboard/revenue-widget';
 import LeaderboardWidget from '@/components/dashboard/leaderboard-widget';
 import NewFansWidget from '@/components/dashboard/new-fans-widget';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
-import { CreatorVerificationProgress } from '@/components/creator/CreatorVerificationProgress';
 import { useInstagramConnection } from '@/contexts/instagram-connection-context';
 import InstagramSDKManager from '@/lib/instagram';
 import { useEffect, useMemo } from 'react';
@@ -225,10 +224,11 @@ export default function CreatorDashboard() {
   const {
     creator: verificationCreator,
     verificationData,
-    platformActivity,
+    platformActivity: _platformActivity,
     isVerified,
     isLoading: verificationLoading,
   } = useCreatorVerification();
+  void _platformActivity; // used in full verification page, not compact dashboard
 
   // Only use Instagram connection for creators
   const instagramConnection = user?.userType === 'creator' ? useInstagramConnection() : null;
@@ -297,7 +297,7 @@ export default function CreatorDashboard() {
               { type: 'instagram-oauth-result', result: errorResult },
               window.location.origin
             );
-          } catch (e) {
+          } catch {
             console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
           }
           try {
@@ -385,11 +385,12 @@ export default function CreatorDashboard() {
                   { type: 'instagram-oauth-result', result: result },
                   window.location.origin
                 );
-              } catch (e) {
+              } catch {
                 console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
               }
               try {
-                (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData = result;
+                (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData =
+                  result;
               } catch {
                 // Cross-origin frame access blocked — localStorage fallback already set above
               }
@@ -419,11 +420,12 @@ export default function CreatorDashboard() {
                   { type: 'instagram-oauth-result', result: result },
                   window.location.origin
                 );
-              } catch (e) {
+              } catch {
                 console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
               }
               try {
-                (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData = result;
+                (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData =
+                  result;
               } catch {
                 // Cross-origin frame access blocked — localStorage fallback already set above
               }
@@ -470,7 +472,7 @@ export default function CreatorDashboard() {
                 { type: 'instagram-oauth-result', result: errorResult },
                 window.location.origin
               );
-            } catch (e) {
+            } catch {
               console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
             }
             try {
@@ -714,90 +716,169 @@ export default function CreatorDashboard() {
               </div>
             ))}
 
-          {/* Program Setup Checklist - shown for unpublished programs */}
-          {showSetupChecklist && finalChecklist && (
-            <Card className="bg-gradient-to-br from-brand-primary/10 to-brand-accent/5 backdrop-blur-lg border border-brand-primary/20">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-brand-primary/20 flex items-center justify-center">
-                      <Rocket className="h-5 w-5 text-brand-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-white text-lg">Complete Your Program</CardTitle>
-                      <p className="text-gray-400 text-sm mt-0.5">
-                        {completedCount === totalCount
-                          ? "You're ready to publish!"
-                          : `${completedCount} of ${totalCount} steps complete`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-brand-primary font-semibold text-sm">
-                      {setupProgress}%
-                    </span>
-                    {completedCount === totalCount && (
-                      <Button
-                        size="sm"
-                        className="bg-brand-primary hover:bg-brand-primary/80"
-                        onClick={() => setLocation('/creator-dashboard/program-builder')}
-                      >
-                        <Rocket className="h-4 w-4 mr-1" />
-                        Publish
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <Progress value={setupProgress} className="h-2 mt-3" />
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {finalChecklist.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setLocation(item.link)}
-                      className={`flex items-center gap-3 p-3 rounded-lg transition-colors text-left w-full ${
-                        item.completed
-                          ? 'bg-green-500/10 border border-green-500/20'
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-brand-primary/30'
-                      }`}
-                    >
-                      {item.completed ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-gray-500 flex-shrink-0" />
-                      )}
-                      <span
-                        className={`text-sm flex-1 ${
-                          item.completed ? 'text-green-300 line-through' : 'text-gray-300'
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                      {item.required && !item.completed && (
-                        <span className="text-[10px] text-brand-primary font-medium bg-brand-primary/10 px-1.5 py-0.5 rounded">
-                          Required
+          {/* Consolidated Setup & Verification Progress */}
+          {(showSetupChecklist ||
+            (!verificationLoading && verificationData && verificationCreator && !isVerified)) && (
+            <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+              <CardContent className="p-4">
+                {/* Two-column ring indicators */}
+                <div className="flex items-start gap-6">
+                  {/* Program Setup Ring */}
+                  {showSetupChecklist && finalChecklist && (
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="relative flex-shrink-0 w-14 h-14">
+                        <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                          <circle
+                            cx="28"
+                            cy="28"
+                            r="24"
+                            fill="none"
+                            stroke="currentColor"
+                            className="text-white/10"
+                            strokeWidth="4"
+                          />
+                          <circle
+                            cx="28"
+                            cy="28"
+                            r="24"
+                            fill="none"
+                            stroke="url(#programGrad)"
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            strokeDasharray={`${setupProgress * 1.508} 150.8`}
+                          />
+                          <defs>
+                            <linearGradient id="programGrad" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#e10698" />
+                              <stop offset="100%" stopColor="#14feee" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+                          {setupProgress}%
                         </span>
-                      )}
-                      {!item.completed && (
-                        <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Rocket className="h-4 w-4 text-brand-primary flex-shrink-0" />
+                          <span className="text-sm font-semibold text-white truncate">
+                            Program Setup
+                          </span>
+                          <span className="text-xs text-gray-500 flex-shrink-0">
+                            {completedCount}/{totalCount}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {finalChecklist.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => setLocation(item.link)}
+                              className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${
+                                item.completed
+                                  ? 'bg-green-500/15 text-green-400'
+                                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                              }`}
+                            >
+                              {item.completed ? (
+                                <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                              ) : (
+                                <Circle className="h-3 w-3 flex-shrink-0" />
+                              )}
+                              <span className="truncate">{item.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {completedCount === totalCount && (
+                          <Button
+                            size="sm"
+                            className="mt-2 h-7 text-xs bg-brand-primary hover:bg-brand-primary/80"
+                            onClick={() => setLocation('/creator-dashboard/program-builder')}
+                          >
+                            <Rocket className="h-3 w-3 mr-1" />
+                            Publish Now
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Divider between the two sections */}
+                  {showSetupChecklist &&
+                    finalChecklist &&
+                    !verificationLoading &&
+                    verificationData &&
+                    verificationCreator &&
+                    !isVerified && <div className="w-px self-stretch bg-white/10 flex-shrink-0" />}
+
+                  {/* Verification Ring */}
+                  {!verificationLoading &&
+                    verificationData &&
+                    verificationCreator &&
+                    !isVerified && (
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="relative flex-shrink-0 w-14 h-14">
+                          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                            <circle
+                              cx="28"
+                              cy="28"
+                              r="24"
+                              fill="none"
+                              stroke="currentColor"
+                              className="text-white/10"
+                              strokeWidth="4"
+                            />
+                            <circle
+                              cx="28"
+                              cy="28"
+                              r="24"
+                              fill="none"
+                              stroke="url(#verifyGrad)"
+                              strokeWidth="4"
+                              strokeLinecap="round"
+                              strokeDasharray={`${verificationData.completionPercentage * 1.508} 150.8`}
+                            />
+                            <defs>
+                              <linearGradient id="verifyGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#3b82f6" />
+                                <stop offset="100%" stopColor="#a855f7" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+                            {verificationData.completionPercentage}%
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            {verificationData.profileComplete ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+                            )}
+                            <span className="text-sm font-semibold text-white truncate">
+                              Profile Verification
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mb-1.5">
+                            {verificationData.missingFields &&
+                            verificationData.missingFields.length > 0
+                              ? `${verificationData.missingFields.length} field${verificationData.missingFields.length !== 1 ? 's' : ''} remaining`
+                              : 'All fields complete'}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                            onClick={() => (window.location.href = '/creator-dashboard/settings')}
+                          >
+                            Verify Now <ChevronRight className="h-3 w-3 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                 </div>
               </CardContent>
             </Card>
-          )}
-
-          {/* Verification Progress Card */}
-          {!verificationLoading && verificationData && verificationCreator && !isVerified && (
-            <CreatorVerificationProgress
-              creator={verificationCreator as Record<string, unknown>}
-              verificationData={verificationData}
-              platformActivity={platformActivity}
-              onStartWizard={() => (window.location.href = '/creator-dashboard/settings')}
-              compact
-            />
           )}
 
           {/* SECTION 1: Key Metrics Row */}

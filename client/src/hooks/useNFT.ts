@@ -110,7 +110,7 @@ export function useUploadImage() {
 
       if (!response.ok) {
         const error = await readJsonResponse<{ message?: string; error?: string }>(response).catch(
-          () => ({})
+          () => ({ message: undefined, error: undefined })
         );
         throw new Error(error.message || error.error || 'Failed to upload image');
       }
@@ -149,7 +149,7 @@ export function useUploadVideo() {
 
       if (!response.ok) {
         const error = await readJsonResponse<{ message?: string; error?: string }>(response).catch(
-          () => ({})
+          () => ({ message: undefined, error: undefined })
         );
         throw new Error(error.message || error.error || 'Failed to upload video');
       }

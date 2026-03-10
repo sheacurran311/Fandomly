@@ -1978,7 +1978,7 @@ export function registerSocialRoutes(app: Express) {
             const existingReward = await db.query.platformPointsTransactions.findFirst({
               where: and(
                 eq(platformPointsTransactions.userId, userId),
-                eq(platformPointsTransactions.type, 'social_connection_reward'),
+                eq(platformPointsTransactions.source, 'social_connection_reward'),
                 sql`${platformPointsTransactions.metadata}->>'platform' = 'apple_music'`
               ),
             });
