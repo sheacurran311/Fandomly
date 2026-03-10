@@ -626,7 +626,7 @@ export function initializeBlockchainNFTService(): BlockchainNFTService | null {
 
   const key = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as `0x${string}`;
   blockchainNFTService = new BlockchainNFTService(key);
-  console.log('Blockchain NFT Service initialized (Fandomly Chain L1)');
+  console.log(`Blockchain NFT Service initialized (${FANDOMLY_CHAIN.name}, chain ${FANDOMLY_CHAIN.id})`);
   return blockchainNFTService;
 }
 

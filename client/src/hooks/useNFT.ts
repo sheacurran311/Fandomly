@@ -1,13 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * useNFT — React Query hooks for Fandomly Chain L1 NFT operations.
+ * useNFT — React Query hooks for NFT operations on Avalanche Fuji (43113).
  *
  * Replaces useCrossmint.ts for all on-chain NFT and badge interactions.
- * All minting happens on Fandomly Chain (ID: 89197) — no more Crossmint.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getCsrfToken, getAuthHeaders } from '@/lib/queryClient';
 
 export interface NftCollection {
   id: string;
@@ -98,10 +97,15 @@ export function useUploadImage() {
       const formData = new FormData();
       formData.append('image', file);
 
+      const headers: Record<string, string> = { ...getAuthHeaders() };
+      const csrfToken = await getCsrfToken();
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
       const response = await fetch('/api/nft/upload/image', {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers,
       });
 
       if (!response.ok) {
@@ -130,10 +134,15 @@ export function useUploadVideo() {
       formData.append('video', video);
       formData.append('thumbnail', thumbnail);
 
+      const headers: Record<string, string> = { ...getAuthHeaders() };
+      const csrfToken = await getCsrfToken();
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
       const response = await fetch('/api/nft/upload/video', {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers,
       });
 
       if (!response.ok) {

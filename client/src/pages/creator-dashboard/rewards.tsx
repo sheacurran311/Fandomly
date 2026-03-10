@@ -36,7 +36,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getCsrfToken, getAuthHeaders } from '@/lib/queryClient';
 import {
   Gift,
   Ticket,
@@ -488,10 +488,16 @@ function NftImageUploadField({
     try {
       const formData = new FormData();
       formData.append('image', file);
+
+      const headers: Record<string, string> = { ...getAuthHeaders() };
+      const csrfToken = await getCsrfToken();
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
       const res = await fetch('/api/nft/upload/image', {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers,
       });
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json();

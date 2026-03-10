@@ -295,7 +295,7 @@ export function initializeSocialMultiplierService(): SocialMultiplierService | n
 
   const key = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as `0x${string}`;
   socialMultiplierService = new SocialMultiplierService(key);
-  console.log('[SocialMultiplier] Initialized (Fandomly Chain L1)');
+  console.log(`[SocialMultiplier] Initialized (${FANDOMLY_CHAIN.name}, chain ${FANDOMLY_CHAIN.id})`);
   return socialMultiplierService;
 }
 

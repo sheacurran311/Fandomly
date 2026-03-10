@@ -648,7 +648,7 @@ export function initializeReputationOracle(): ReputationOracleService | null {
 
   const key = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as `0x${string}`;
   reputationOracleService = new ReputationOracleService(key);
-  console.log('[ReputationOracle] Initialized (Fandomly Chain L1)');
+  console.log(`[ReputationOracle] Initialized (${FANDOMLY_CHAIN.name}, chain ${FANDOMLY_CHAIN.id})`);
   return reputationOracleService;
 }
 

@@ -11,7 +11,6 @@
  * per Avalanche Academy guidance (breaks tokenURI resolution on some indexers).
  */
 
-// @ts-expect-error - pinata-web3 types may not be installed
 import { PinataSDK } from 'pinata-web3';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -39,6 +38,24 @@ export interface UploadResult {
   ipfsUri: string; // ipfs://Qm...
   gatewayUrl: string; // https://gateway.pinata.cloud/ipfs/Qm...
   size?: number;
+}
+
+function getValidatedPinataJwt(rawJwt: string | undefined): string | null {
+  const jwt = rawJwt?.trim();
+  if (!jwt) {
+    console.warn('IPFS Service not configured. Set PINATA_JWT in env.');
+    return null;
+  }
+
+  // Pinata JWTs should be standard three-segment JWTs.
+  if (jwt.split('.').length !== 3) {
+    console.error(
+      'IPFS Service misconfigured: PINATA_JWT is not a valid JWT. Update the environment variable with a real Pinata JWT.'
+    );
+    return null;
+  }
+
+  return jwt;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -253,9 +270,8 @@ export class IPFSService {
 let ipfsService: IPFSService | null = null;
 
 export function initializeIPFSService(): IPFSService | null {
-  const jwt = process.env.PINATA_JWT;
+  const jwt = getValidatedPinataJwt(process.env.PINATA_JWT);
   if (!jwt) {
-    console.warn('IPFS Service not configured. Set PINATA_JWT in env.');
     return null;
   }
 
