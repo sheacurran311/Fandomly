@@ -308,9 +308,6 @@ export default defineConfig({
             if (id.includes('@radix-ui')) {
               return 'vendor-radix';
             }
-            if (id.includes('recharts') || id.includes('d3-')) {
-              return 'vendor-charts';
-            }
             if (id.includes('framer-motion')) {
               return 'vendor-framer';
             }
