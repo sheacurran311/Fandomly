@@ -292,17 +292,20 @@ export default function CreatorDashboard() {
 
         // If opened in popup, communicate result to parent
         if (window.opener) {
-          window.opener.postMessage(
-            {
-              type: 'instagram-oauth-result',
-              result: errorResult,
-            },
-            window.location.origin
-          );
-
-          // Store result in parent window for fallback
-          (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData =
-            errorResult;
+          try {
+            window.opener.postMessage(
+              { type: 'instagram-oauth-result', result: errorResult },
+              window.location.origin
+            );
+          } catch (e) {
+            console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
+          }
+          try {
+            (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData =
+              errorResult;
+          } catch {
+            // Cross-origin frame access blocked — localStorage fallback already set above
+          }
 
           window.close();
           return;
@@ -377,16 +380,19 @@ export default function CreatorDashboard() {
 
             // If opened in popup, communicate result to parent and close
             if (window.opener) {
-              window.opener.postMessage(
-                {
-                  type: 'instagram-oauth-result',
-                  result: result,
-                },
-                window.location.origin
-              );
-
-              // Store result in parent window for fallback
-              (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData = result;
+              try {
+                window.opener.postMessage(
+                  { type: 'instagram-oauth-result', result: result },
+                  window.location.origin
+                );
+              } catch (e) {
+                console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
+              }
+              try {
+                (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData = result;
+              } catch {
+                // Cross-origin frame access blocked — localStorage fallback already set above
+              }
 
               window.close();
               return;
@@ -408,16 +414,19 @@ export default function CreatorDashboard() {
 
             // If opened in popup, communicate result to parent
             if (window.opener) {
-              window.opener.postMessage(
-                {
-                  type: 'instagram-oauth-result',
-                  result: result,
-                },
-                window.location.origin
-              );
-
-              // Store result in parent window for fallback
-              (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData = result;
+              try {
+                window.opener.postMessage(
+                  { type: 'instagram-oauth-result', result: result },
+                  window.location.origin
+                );
+              } catch (e) {
+                console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
+              }
+              try {
+                (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData = result;
+              } catch {
+                // Cross-origin frame access blocked — localStorage fallback already set above
+              }
 
               window.close();
               return;
@@ -456,17 +465,20 @@ export default function CreatorDashboard() {
 
           // If opened in popup, communicate result to parent
           if (window.opener) {
-            window.opener.postMessage(
-              {
-                type: 'instagram-oauth-result',
-                result: errorResult,
-              },
-              window.location.origin
-            );
-
-            // Store result in parent window for fallback
-            (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData =
-              errorResult;
+            try {
+              window.opener.postMessage(
+                { type: 'instagram-oauth-result', result: errorResult },
+                window.location.origin
+              );
+            } catch (e) {
+              console.warn('[Creator Dashboard] postMessage blocked (cross-origin)');
+            }
+            try {
+              (window.opener as { instagramCallbackData?: unknown }).instagramCallbackData =
+                errorResult;
+            } catch {
+              // Cross-origin frame access blocked — localStorage fallback already set above
+            }
 
             window.close();
             return;

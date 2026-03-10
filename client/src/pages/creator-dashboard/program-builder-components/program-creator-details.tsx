@@ -103,7 +103,7 @@ export function ProgramCreatorDetails({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-white">Sport</Label>
-              <Input
+              <select
                 value={String((creatorDetails?.athlete as AthleteDetails)?.sport ?? '')}
                 onChange={(e) =>
                   onCreatorDetailsChange({
@@ -114,9 +114,36 @@ export function ProgramCreatorDetails({
                     },
                   })
                 }
-                placeholder="e.g., Basketball, Football"
-                className="bg-white/10 border-white/20 text-white"
-              />
+                className="w-full h-10 rounded-md bg-[#1a1a2e] border border-white/20 text-white px-3 [&>option]:bg-[#1a1a2e] [&>option]:text-white"
+              >
+                <option value="">Select sport</option>
+                <option value="Basketball">Basketball</option>
+                <option value="Football">Football</option>
+                <option value="Soccer">Soccer</option>
+                <option value="Baseball">Baseball</option>
+                <option value="Softball">Softball</option>
+                <option value="Track & Field">Track &amp; Field</option>
+                <option value="Swimming">Swimming</option>
+                <option value="Tennis">Tennis</option>
+                <option value="Golf">Golf</option>
+                <option value="Volleyball">Volleyball</option>
+                <option value="Wrestling">Wrestling</option>
+                <option value="Lacrosse">Lacrosse</option>
+                <option value="Hockey">Hockey</option>
+                <option value="Gymnastics">Gymnastics</option>
+                <option value="Cross Country">Cross Country</option>
+                <option value="Boxing">Boxing</option>
+                <option value="MMA">MMA</option>
+                <option value="Rowing">Rowing</option>
+                <option value="Cycling">Cycling</option>
+                <option value="Skiing">Skiing</option>
+                <option value="Snowboarding">Snowboarding</option>
+                <option value="Surfing">Surfing</option>
+                <option value="Skateboarding">Skateboarding</option>
+                <option value="Cheerleading">Cheerleading</option>
+                <option value="Esports">Esports</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label className="text-white">Position</Label>
@@ -170,7 +197,7 @@ export function ProgramCreatorDetails({
                     },
                   })
                 }
-                className="w-full h-10 rounded-md bg-white/10 border border-white/20 text-white px-3"
+                className="w-full h-10 rounded-md bg-[#1a1a2e] border border-white/20 text-white px-3 [&>option]:bg-[#1a1a2e] [&>option]:text-white"
               >
                 <option value="">Select level</option>
                 <option value="high_school">High School</option>
@@ -236,7 +263,7 @@ export function ProgramCreatorDetails({
                     },
                   })
                 }
-                className="w-full h-10 rounded-md bg-white/10 border border-white/20 text-white px-3"
+                className="w-full h-10 rounded-md bg-[#1a1a2e] border border-white/20 text-white px-3 [&>option]:bg-[#1a1a2e] [&>option]:text-white"
               >
                 <option value="">Select type</option>
                 <option value="independent">Independent</option>

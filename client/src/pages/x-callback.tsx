@@ -76,15 +76,18 @@ export default function XCallback() {
 
       if ((window as any).opener) {
         try {
-          console.log('[X-Callback] Posting result to opener:', result);
+          console.log('[X-Callback] Posting result to opener');
           (window as any).opener.postMessage(
             { type: 'twitter-oauth-result', result },
             window.location.origin
           );
-          (window as any).opener.twitterCallbackData = result; // fallback
-          console.log('[X-Callback] Posted to opener, closing popup...');
-        } catch (error) {
-          console.error('[X-Callback] Error posting to opener:', error);
+        } catch (e) {
+          console.warn('[X-Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        }
+        try {
+          (window as any).opener.twitterCallbackData = result;
+        } catch {
+          // Cross-origin frame access blocked — localStorage fallback already set above
         }
         window.close();
         return;

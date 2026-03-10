@@ -590,12 +590,39 @@ export default function CreatorTypeSelection() {
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Sport <span className="text-brand-primary">*</span>
                         </label>
-                        <Input
+                        <select
                           value={state.sport}
                           onChange={(e) => setState((s) => ({ ...s, sport: e.target.value }))}
-                          placeholder="e.g., Basketball, Football, Soccer"
-                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
-                        />
+                          className="w-full h-12 rounded-md bg-[#1a1a2e] border border-white/10 text-white px-3 text-base [&>option]:bg-[#1a1a2e] [&>option]:text-white"
+                        >
+                          <option value="">Select sport</option>
+                          <option value="Basketball">Basketball</option>
+                          <option value="Football">Football</option>
+                          <option value="Soccer">Soccer</option>
+                          <option value="Baseball">Baseball</option>
+                          <option value="Softball">Softball</option>
+                          <option value="Track & Field">Track &amp; Field</option>
+                          <option value="Swimming">Swimming</option>
+                          <option value="Tennis">Tennis</option>
+                          <option value="Golf">Golf</option>
+                          <option value="Volleyball">Volleyball</option>
+                          <option value="Wrestling">Wrestling</option>
+                          <option value="Lacrosse">Lacrosse</option>
+                          <option value="Hockey">Hockey</option>
+                          <option value="Gymnastics">Gymnastics</option>
+                          <option value="Cross Country">Cross Country</option>
+                          <option value="Boxing">Boxing</option>
+                          <option value="MMA">MMA</option>
+                          <option value="Rowing">Rowing</option>
+                          <option value="Cycling">Cycling</option>
+                          <option value="Skiing">Skiing</option>
+                          <option value="Snowboarding">Snowboarding</option>
+                          <option value="Surfing">Surfing</option>
+                          <option value="Skateboarding">Skateboarding</option>
+                          <option value="Cheerleading">Cheerleading</option>
+                          <option value="Esports">Esports</option>
+                          <option value="Other">Other</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -604,7 +631,7 @@ export default function CreatorTypeSelection() {
                         <select
                           value={state.educationLevel}
                           onChange={(e) => setState((s) => ({ ...s, educationLevel: e.target.value }))}
-                          className="w-full h-12 rounded-md bg-white/5 border border-white/10 text-white px-3 text-base"
+                          className="w-full h-12 rounded-md bg-[#1a1a2e] border border-white/10 text-white px-3 text-base [&>option]:bg-[#1a1a2e] [&>option]:text-white"
                         >
                           <option value="">Select level</option>
                           <option value="high_school">High School</option>
@@ -642,7 +669,7 @@ export default function CreatorTypeSelection() {
                         <select
                           value={state.artistType}
                           onChange={(e) => setState((s) => ({ ...s, artistType: e.target.value }))}
-                          className="w-full h-12 rounded-md bg-white/5 border border-white/10 text-white px-3 text-base"
+                          className="w-full h-12 rounded-md bg-[#1a1a2e] border border-white/10 text-white px-3 text-base [&>option]:bg-[#1a1a2e] [&>option]:text-white"
                         >
                           <option value="">Select type</option>
                           <option value="independent">Independent</option>

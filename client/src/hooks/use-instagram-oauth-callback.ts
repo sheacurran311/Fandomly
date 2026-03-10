@@ -74,22 +74,28 @@ function handleOAuthError(error: string, errorDescription: string | null) {
   // If opened in popup, communicate result to parent
   if (window.opener) {
     console.log('[Instagram OAuth] Communicating error to parent window');
-    window.opener.postMessage(
-      {
-        type: 'instagram-oauth-result',
-        result: {
-          success: false,
-          error: errorDescription || error,
+    try {
+      window.opener.postMessage(
+        {
+          type: 'instagram-oauth-result',
+          result: {
+            success: false,
+            error: errorDescription || error,
+          },
         },
-      },
-      window.location.origin
-    );
-
-    // Store result in parent window for fallback
-    (window.opener as any).instagramCallbackData = {
-      success: false,
-      error: errorDescription || error,
-    };
+        window.location.origin
+      );
+    } catch (e) {
+      console.warn('[Instagram OAuth] postMessage blocked (cross-origin)');
+    }
+    try {
+      (window.opener as any).instagramCallbackData = {
+        success: false,
+        error: errorDescription || error,
+      };
+    } catch {
+      // Cross-origin frame access blocked
+    }
 
     // Close the popup after a short delay
     setTimeout(() => window.close(), 500);
@@ -134,40 +140,45 @@ async function handleOAuthSuccess(
     try {
       await (InstagramSDKManager as any).handleCallback(code, effectiveState);
 
-      window.opener.postMessage(
-        {
-          type: 'instagram-oauth-result',
-          result: {
-            success: true,
-            code,
-            state: effectiveState,
+      try {
+        window.opener.postMessage(
+          {
+            type: 'instagram-oauth-result',
+            result: { success: true, code, state: effectiveState },
           },
-        },
-        window.location.origin
-      );
+          window.location.origin
+        );
+      } catch (e) {
+        console.warn('[Instagram OAuth] postMessage blocked (cross-origin)');
+      }
+      try {
+        (window.opener as any).instagramCallbackData = {
+          success: true,
+          code,
+          state: effectiveState,
+        };
+      } catch {
+        // Cross-origin frame access blocked
+      }
 
-      // Store in parent for fallback
-      (window.opener as any).instagramCallbackData = {
-        success: true,
-        code,
-        state: effectiveState,
-      };
-
-      // Close popup
       setTimeout(() => window.close(), 500);
     } catch (error) {
       console.error('[Instagram OAuth] Popup handler error:', error);
 
-      window.opener.postMessage(
-        {
-          type: 'instagram-oauth-result',
-          result: {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+      try {
+        window.opener.postMessage(
+          {
+            type: 'instagram-oauth-result',
+            result: {
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
           },
-        },
-        window.location.origin
-      );
+          window.location.origin
+        );
+      } catch (e) {
+        console.warn('[Instagram OAuth] postMessage blocked (cross-origin)');
+      }
 
       setTimeout(() => window.close(), 500);
     }

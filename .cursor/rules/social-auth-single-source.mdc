@@ -10,6 +10,8 @@ globs:
   - client/src/lib/instagram.ts
   - client/src/hooks/use-social-connections.ts
   - client/src/lib/social-connection-api.ts
+  - client/src/pages/*-callback.tsx
+  - client/src/hooks/use-instagram-oauth-callback.ts
   - server/routes/auth/**
   - server/routes/social/**
   - server/services/auth/**
@@ -75,6 +77,33 @@ Fandomly has TWO separate social auth systems that serve different purposes. The
 - Token exchange endpoints (`/api/social/*/token`) must NOT have `authenticateUser` — they run in popup windows without Fandomly session cookies
 - Platform profile endpoints (`/api/social/twitter/user`, `/discord/me`, `/twitch/me`) must NOT have `authenticateUser` — they use the platform's OAuth token from the Authorization header, not a Fandomly JWT
 
+### Cross-Origin Opener Pattern (MANDATORY for all callback pages)
+
+In hosted environments (Replit, Vercel preview, etc.), `Cross-Origin-Opener-Policy` headers can make `window.opener` exist but belong to a different origin. Accessing any property on a cross-origin opener throws a `DOMException`.
+
+**Every callback page MUST follow this three-layer communication pattern:**
+
+1. **localStorage first** — always write `localStorage.setItem(\`{platform}_oauth_result_{state}\`, ...)` BEFORE touching `window.opener`. This is the reliable COOP fallback.
+2. **postMessage in try/catch** — `window.opener.postMessage(...)` must be wrapped in its own try/catch.
+3. **Direct property set in try/catch** — `(window.opener as any).{platform}CallbackData = result` must be in a separate try/catch.
+
+```typescript
+// CORRECT pattern — all callback pages must use this
+if (state) {
+  try { localStorage.setItem(`platform_oauth_result_${state}`, JSON.stringify(result)); } catch {}
+}
+if (window.opener && !window.opener.closed) {
+  try { window.opener.postMessage({ type: 'platform-oauth-result', result }, window.location.origin); }
+  catch { /* cross-origin — localStorage fallback already set */ }
+  try { (window.opener as any).platformCallbackData = result; }
+  catch { /* cross-origin — localStorage fallback already set */ }
+  window.close();
+  return true;
+}
+```
+
+**NEVER** do bare `window.opener.postMessage(...)` or `window.opener.X = Y` without a try/catch — it WILL throw in cross-origin environments.
+
 ## 3. Particle Network (wallet only)
 
 **Purpose:** Embedded wallet creation, gas sponsorship, on-chain operations.
@@ -96,3 +125,4 @@ Fandomly has TWO separate social auth systems that serve different purposes. The
 - NEVER modify the in-app social OAuth flows (social-integrations.ts, callback pages) when changing primary auth
 - NEVER skip the account dupe check before creating a Particle wallet
 - NEVER use `access_token` from Particle's `getUserInfo()` as a platform API token — it's Particle's internal token
+- NEVER access `window.opener` properties or call `window.opener.postMessage()` without a try/catch — cross-origin environments will throw `DOMException`

@@ -49,7 +49,11 @@ export default function KickCallbackPage() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: 'kick-oauth-result', result }, window.location.origin);
+          try {
+            window.opener.postMessage({ type: 'kick-oauth-result', result }, window.location.origin);
+          } catch (e) {
+            console.warn('[Kick Callback] postMessage blocked (cross-origin), using localStorage fallback');
+          }
           window.close();
           return true;
         }

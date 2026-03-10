@@ -50,11 +50,19 @@ export default function DiscordCallback() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            { type: 'discord-oauth-result', result },
-            window.location.origin
-          );
-          (window.opener as any).discordCallbackData = result;
+          try {
+            window.opener.postMessage(
+              { type: 'discord-oauth-result', result },
+              window.location.origin
+            );
+          } catch (e) {
+            console.warn('[Discord Callback] postMessage blocked (cross-origin), using localStorage fallback');
+          }
+          try {
+            (window.opener as any).discordCallbackData = result;
+          } catch {
+            // Cross-origin frame access blocked — localStorage fallback already set above
+          }
           window.close();
           return true;
         }

@@ -49,11 +49,19 @@ export default function SpotifyCallback() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            { type: 'spotify-oauth-result', result },
-            window.location.origin
-          );
-          (window.opener as any).spotifyCallbackData = result;
+          try {
+            window.opener.postMessage(
+              { type: 'spotify-oauth-result', result },
+              window.location.origin
+            );
+          } catch (e) {
+            console.warn('[Spotify Callback] postMessage blocked (cross-origin), using localStorage fallback');
+          }
+          try {
+            (window.opener as any).spotifyCallbackData = result;
+          } catch {
+            // Cross-origin frame access blocked — localStorage fallback already set above
+          }
           window.close();
           return true;
         }

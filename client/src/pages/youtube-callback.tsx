@@ -57,11 +57,19 @@ export default function YouTubeCallback() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            { type: 'youtube-oauth-result', result },
-            window.location.origin
-          );
-          (window.opener as any).youtubeCallbackData = result;
+          try {
+            window.opener.postMessage(
+              { type: 'youtube-oauth-result', result },
+              window.location.origin
+            );
+          } catch (e) {
+            console.warn('[YouTube Callback] postMessage blocked (cross-origin), using localStorage fallback');
+          }
+          try {
+            (window.opener as any).youtubeCallbackData = result;
+          } catch {
+            // Cross-origin frame access blocked — localStorage fallback already set above
+          }
           window.close();
           return true;
         }

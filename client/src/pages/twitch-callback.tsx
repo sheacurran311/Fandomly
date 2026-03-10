@@ -50,11 +50,19 @@ export default function TwitchCallback() {
           }
         }
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            { type: 'twitch-oauth-result', result },
-            window.location.origin
-          );
-          (window.opener as any).twitchCallbackData = result;
+          try {
+            window.opener.postMessage(
+              { type: 'twitch-oauth-result', result },
+              window.location.origin
+            );
+          } catch (e) {
+            console.warn('[Twitch Callback] postMessage blocked (cross-origin), using localStorage fallback');
+          }
+          try {
+            (window.opener as any).twitchCallbackData = result;
+          } catch {
+            // Cross-origin frame access blocked — localStorage fallback already set above
+          }
           window.close();
           return true;
         }
