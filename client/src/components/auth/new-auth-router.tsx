@@ -37,8 +37,8 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
           let verifier: string | null = null;
           try {
             const rawMap = sessionStorage.getItem('twitter_pkce_map');
-            const map: Record<string, string> = rawMap ? JSON.parse(rawMap) : {};
-            verifier = (reqState && map[reqState]) || null;
+            const map: Record<string, any> = rawMap ? JSON.parse(rawMap) : {};
+            verifier = (reqState && map[reqState]?.verifier) || null;
           } catch {
             // noop
           }

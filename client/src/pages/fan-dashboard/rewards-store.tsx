@@ -106,6 +106,19 @@ const rewardTypeConfig = {
   nft: { icon: ImageIcon, label: 'NFT', color: 'text-green-400', bgColor: 'bg-green-400/20' },
 };
 
+function getRewardTypeConfig(type: string | undefined) {
+  if (type && type in rewardTypeConfig) {
+    return rewardTypeConfig[type as keyof typeof rewardTypeConfig];
+  }
+
+  // Handle older/legacy reward type values gracefully in the fan UI.
+  if (type === 'digital') {
+    return { icon: Gift, label: 'Digital', color: 'text-cyan-400', bgColor: 'bg-cyan-400/20' };
+  }
+
+  return { icon: Gift, label: 'Reward', color: 'text-gray-400', bgColor: 'bg-gray-400/20' };
+}
+
 export default function FanRewardsStore() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -352,7 +365,7 @@ export default function FanRewardsStore() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredRewards.map((reward) => {
-                  const config = rewardTypeConfig[reward.rewardType];
+                  const config = getRewardTypeConfig(reward.rewardType);
                   const Icon = config.icon;
                   const canAfford = reward.canAfford ?? userPoints >= reward.pointsCost;
                   const isOutOfStock =
@@ -472,6 +485,10 @@ export default function FanRewardsStore() {
               </div>
             ) : rewardDetail ? (
               <>
+                {(() => {
+                  const detailConfig = getRewardTypeConfig(rewardDetail.rewardType);
+                  return (
+                    <>
                 <DialogHeader>
                   <DialogTitle className="text-white text-2xl flex items-center gap-3">
                     {rewardDetail.imageUrl && (
@@ -499,9 +516,9 @@ export default function FanRewardsStore() {
                   {/* Type and Cost */}
                   <div className="flex items-center gap-4">
                     <Badge
-                      className={`${rewardTypeConfig[rewardDetail.rewardType].bgColor} ${rewardTypeConfig[rewardDetail.rewardType].color} border-0`}
+                      className={`${detailConfig.bgColor} ${detailConfig.color} border-0`}
                     >
-                      {rewardTypeConfig[rewardDetail.rewardType].label}
+                      {detailConfig.label}
                     </Badge>
                     <div className="flex items-center gap-2">
                       <Coins className="h-5 w-5 text-brand-primary" />
@@ -704,7 +721,9 @@ export default function FanRewardsStore() {
                     )}
                   </Button>
                 </DialogFooter>
-              </>
+                    </>
+                  );
+                })()}
             ) : null}
           </DialogContent>
         </Dialog>

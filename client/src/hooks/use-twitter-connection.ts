@@ -132,7 +132,7 @@ export function useTwitterConnection(): UseTwitterConnectionReturn {
     const handlePKCERequest = (event: MessageEvent) => {
       if (event.data?.type === 'twitter-pkce-request' && event.data?.state) {
         try {
-          const pkceMap = JSON.parse(localStorage.getItem('twitter_pkce_map') || '{}');
+          const pkceMap = JSON.parse(sessionStorage.getItem('twitter_pkce_map') || '{}');
           const verifier = pkceMap[event.data.state]?.verifier;
           
           if (verifier) {

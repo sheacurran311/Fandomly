@@ -7,7 +7,8 @@
  * State B: Token exists → token info + stats
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -564,10 +565,17 @@ function TokenDashboard({ token }: { token: TokenInfo }) {
 
 export default function TokenFactoryPage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const { address } = useAccount();
   const walletAddress =
     address ||
     ((user as unknown as Record<string, unknown>)?.avalancheL1Address as string | undefined);
+
+  useEffect(() => {
+    if (user && user.userType === 'fan') {
+      navigate('/reputation');
+    }
+  }, [user, navigate]);
 
   const { data: reputation, isLoading: repLoading } = useQuery<ReputationData>({
     queryKey: ['/api/reputation/me'],

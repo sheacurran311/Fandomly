@@ -1040,5 +1040,71 @@ export function registerNFTRoutes(app: Express) {
     }
   });
 
+  /**
+   * GET /api/nft/my-nfts
+   * Get all NFTs minted for the authenticated user (reward redemptions, badges, etc.)
+   * with collection/template metadata for display.
+   */
+  app.get('/api/nft/my-nfts', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+
+      const mints = await db
+        .select({
+          id: nftMints.id,
+          collectionId: nftMints.collectionId,
+          templateId: nftMints.templateId,
+          badgeTemplateId: nftMints.badgeTemplateId,
+          recipientWalletAddress: nftMints.recipientWalletAddress,
+          recipientChain: nftMints.recipientChain,
+          mintReason: nftMints.mintReason,
+          contextData: nftMints.contextData,
+          tokenId: nftMints.tokenId,
+          txHash: nftMints.txHash,
+          contractAddress: nftMints.contractAddress,
+          status: nftMints.status,
+          completedAt: nftMints.completedAt,
+          createdAt: nftMints.createdAt,
+          collectionName: nftCollections.name,
+          collectionDescription: nftCollections.description,
+          collectionSymbol: nftCollections.symbol,
+          collectionMetadata: nftCollections.metadata,
+        })
+        .from(nftMints)
+        .leftJoin(nftCollections, eq(nftMints.collectionId, nftCollections.id))
+        .where(eq(nftMints.recipientUserId, userId))
+        .orderBy(desc(nftMints.createdAt));
+
+      const deliveryMap = new Map<string, any>();
+      if (mints.length > 0) {
+        const deliveries = await db
+          .select()
+          .from(nftDeliveries)
+          .where(eq(nftDeliveries.userId, userId));
+        for (const d of deliveries) {
+          deliveryMap.set(d.mintId, d);
+        }
+      }
+
+      const nfts = mints.map((mint) => {
+        const delivery = deliveryMap.get(mint.id);
+        return {
+          ...mint,
+          metadataSnapshot: delivery?.metadataSnapshot || null,
+          isViewed: delivery?.isViewed || false,
+          deliveredAt: delivery?.deliveredAt || null,
+        };
+      });
+
+      res.json({ nfts });
+    } catch (error: unknown) {
+      console.error('Get my NFTs error:', error);
+      res.status(500).json({
+        error: 'Failed to fetch NFTs',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   console.log('NFT routes registered (Avalanche Fuji)');
 }

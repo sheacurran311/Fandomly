@@ -284,7 +284,9 @@ export default function ReputationPage() {
           <div>
             <h1 className="text-xl font-bold text-white">Reputation Score</h1>
             <p className="text-sm text-gray-400">
-              Your on-chain reputation unlocks staking and token creation
+              {userType === 'creator'
+                ? 'Your on-chain reputation unlocks staking and token creation'
+                : 'Your on-chain reputation unlocks staking and exclusive rewards'}
             </p>
           </div>
         </div>
@@ -348,7 +350,7 @@ export default function ReputationPage() {
               <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
                 Reputation Gates
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 ${userType === 'creator' ? 'md:grid-cols-2' : ''} gap-4`}>
                 <ReputationGateCard
                   title="Fan Staking"
                   threshold={REPUTATION_THRESHOLDS.FAN_STAKING}
@@ -358,15 +360,17 @@ export default function ReputationPage() {
                   href="/staking"
                   icon={Coins}
                 />
-                <ReputationGateCard
-                  title="Token Creation"
-                  threshold={REPUTATION_THRESHOLDS.CREATOR_TOKEN}
-                  currentScore={reputation.score}
-                  unlocked={reputation.thresholds.creatorToken}
-                  description="Launch your own creator token for fans to hold and stake."
-                  href="/creator-dashboard/token"
-                  icon={Sparkles}
-                />
+                {userType === 'creator' && (
+                  <ReputationGateCard
+                    title="Token Creation"
+                    threshold={REPUTATION_THRESHOLDS.CREATOR_TOKEN}
+                    currentScore={reputation.score}
+                    unlocked={reputation.thresholds.creatorToken}
+                    description="Launch your own creator token for fans to hold and stake."
+                    href="/creator-dashboard/token"
+                    icon={Sparkles}
+                  />
+                )}
               </div>
             </div>
 

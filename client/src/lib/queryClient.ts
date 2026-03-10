@@ -115,9 +115,10 @@ function parseApiError(
         details: json.details,
       };
     }
-    // Legacy error format
+    // Legacy error format (may include extra fields like missingFields)
     if (json.error) {
-      return { message: json.error };
+      const { error: _err, ...rest } = json;
+      return { message: json.error, details: Object.keys(rest).length > 0 ? rest : undefined };
     }
     if (json.message) {
       return { message: json.message };

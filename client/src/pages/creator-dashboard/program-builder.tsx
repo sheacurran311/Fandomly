@@ -35,11 +35,10 @@ import {
   LayoutGrid,
   Info,
 } from 'lucide-react';
-import { FacebookSDKManager } from '@/lib/facebook';
-import { socialManager } from '@/lib/social-integrations';
-import { TwitterSDKManager } from '@/lib/twitter';
 import { useToast } from '@/hooks/use-toast';
-import { invalidateSocialConnections } from '@/hooks/use-social-connections';
+import {
+  createSocialConnectionHook,
+} from '@/hooks/use-social-connection';
 import { ImageUpload } from '@/components/ui/image-upload';
 import type { Program, Campaign, Task } from '@shared/schema';
 import { type ThemeTemplate, type CreatorTypeForTheme } from '@shared/theme-templates';
@@ -74,6 +73,50 @@ import {
 interface ProgramWithDetails extends Program {
   campaigns?: Campaign[];
   tasks?: Task[];
+}
+
+const useTwitterConn = createSocialConnectionHook('twitter');
+const useInstagramConn = createSocialConnectionHook('instagram');
+const useDiscordConn = createSocialConnectionHook('discord');
+const useFacebookConn = createSocialConnectionHook('facebook');
+const useTikTokConn = createSocialConnectionHook('tiktok');
+const useYouTubeConn = createSocialConnectionHook('youtube');
+const useSpotifyConn = createSocialConnectionHook('spotify');
+const useAppleMusicConn = createSocialConnectionHook('apple_music');
+const useTwitchConn = createSocialConnectionHook('twitch');
+const useKickConn = createSocialConnectionHook('kick');
+
+function usePlatformConnectors() {
+  const twitter = useTwitterConn();
+  const instagram = useInstagramConn();
+  const discord = useDiscordConn();
+  const facebook = useFacebookConn();
+  const tiktok = useTikTokConn();
+  const youtube = useYouTubeConn();
+  const spotify = useSpotifyConn();
+  const apple_music = useAppleMusicConn();
+  const twitch = useTwitchConn();
+  const kick = useKickConn();
+
+  const hooks: Record<string, ReturnType<typeof useTwitterConn>> = {
+    twitter, instagram, discord, facebook,
+    tiktok, youtube, spotify, apple_music, twitch, kick,
+  };
+
+  const connectingPlatform = Object.entries(hooks).find(
+    ([, h]) => h.isConnecting
+  )?.[0] ?? null;
+
+  const connect = async (platformId: string) => {
+    const hook = hooks[platformId];
+    if (!hook) {
+      console.warn('[ProgramBuilder] Unknown platform:', platformId);
+      return;
+    }
+    await hook.connect();
+  };
+
+  return { connect, connectingPlatform, hooks };
 }
 
 export default function ProgramBuilderNew() {
@@ -178,6 +221,9 @@ export default function ProgramBuilderNew() {
       }
       refetchProgram();
     },
+    onError: (error: any) => {
+      console.error('Publish failed:', error);
+    },
   });
 
   if (isLoading) {
@@ -218,7 +264,7 @@ export default function ProgramBuilderNew() {
         ) : selectedProgram ? (
           <ProgramCustomizer
             program={selectedProgram}
-            onPublish={(slug) => publishProgramMutation.mutate({ id: selectedProgram.id, slug })}
+            onPublish={(slug) => publishProgramMutation.mutateAsync({ id: selectedProgram.id, slug })}
             onUpdate={refetchProgram}
             campaigns={programCampaigns}
             tasks={programTasks}
@@ -282,11 +328,21 @@ function ProgramCustomizer({
   // Builder mode state (simple/advanced)
   const [builderMode, setBuilderMode] = useState<BuilderMode>(() => getSavedBuilderMode());
 
-  // Get creator type from user context
-  const creatorType: CreatorType = (user?.creator?.category as CreatorType) || 'content_creator';
+  // Fetch creator profile to get the actual category (athlete, musician, content_creator)
+  const { data: creatorProfile } = useQuery<{ category?: string }>({
+    queryKey: ['/api/creators/user', user?.id],
+    queryFn: async () => {
+      const res = await fetchApi(`/api/creators/user/${user!.id}`);
+      return res as { category?: string };
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const creatorType: CreatorType = (creatorProfile?.category as CreatorType) || 'content_creator';
   const _creatorTemplate = getCreatorTemplate(creatorType);
 
-  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const { connect: connectPlatform, connectingPlatform } = usePlatformConnectors();
   const [recentlyConnected, setRecentlyConnected] = useState<Set<string>>(new Set<string>());
   const [showPreview, setShowPreview] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
@@ -436,99 +492,9 @@ function ProgramCustomizer({
       .filter((p: unknown): p is string => typeof p === 'string' && SOCIAL_PLATFORMS.has(p)) || []
   );
 
-  // Social platform connection handlers
-  // Unified connect handler for all social platforms
   const handleConnectPlatform = async (platformId: string) => {
-    const platformNames: Record<string, string> = {
-      twitter: 'Twitter',
-      instagram: 'Instagram',
-      discord: 'Discord',
-      facebook: 'Facebook',
-      tiktok: 'TikTok',
-      youtube: 'YouTube',
-      spotify: 'Spotify',
-      twitch: 'Twitch',
-    };
-
-    const platformName = platformNames[platformId] || platformId;
-    setConnectingPlatform(platformId);
-
-    try {
-      let result: {
-        success: boolean;
-        error?: string;
-        user?: unknown;
-        accessToken?: string;
-        refreshToken?: string;
-      };
-
-      // Handle platform-specific login logic
-      if (platformId === 'twitter') {
-        result = await TwitterSDKManager.secureLogin('creator');
-        // Twitter requires additional save step
-        if (result.success && result.user) {
-          try {
-            await fetchApi('/api/social-connections', {
-              method: 'POST',
-              body: JSON.stringify({
-                platform: 'twitter',
-                platformUserId: (result.user as any).id,
-                platformUsername: String((result.user as any).username),
-                platformDisplayName: String((result.user as any).name),
-                accessToken: result.accessToken,
-                refreshToken: result.refreshToken,
-                profileData: {
-                  profileImageUrl: (result.user as any).profileImageUrl,
-                  followersCount: (result.user as any).followersCount,
-                  followingCount: (result.user as any).followingCount,
-                },
-              }),
-            });
-          } catch (saveErr) {
-            console.warn(
-              '[ProgramBuilder] Parent save failed (popup may have already saved):',
-              saveErr
-            );
-          }
-        }
-      } else if (platformId === 'facebook') {
-        result = await FacebookSDKManager.login(
-          'pages_show_list,pages_read_engagement,business_management'
-        );
-        result.success = result.success && !!result.accessToken;
-      } else {
-        // Use socialManager for other platforms
-        const api = (socialManager as any)[platformId as keyof typeof socialManager];
-        if (!api) {
-          console.warn('Unknown platform:', platformId);
-          return;
-        }
-        result = await (api as any).secureLogin();
-      }
-
-      if (result.success) {
-        setRecentlyConnected((prev) => new Set(prev).add(platformId));
-        toast({
-          title: `${platformName} Connected! +500 Points`,
-          description: `Successfully connected your ${platformName} account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: 'Connection Failed',
-          description: result.error || `Failed to connect ${platformName}`,
-          variant: 'destructive',
-        });
-      }
-    } catch {
-      toast({
-        title: 'Connection Failed',
-        description: `An error occurred while connecting ${platformName}`,
-        variant: 'destructive',
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
+    await connectPlatform(platformId);
+    setRecentlyConnected((prev) => new Set(prev).add(platformId));
   };
 
   // Handler for QuickThemePicker theme selection
@@ -1451,7 +1417,7 @@ function ProgramCustomizer({
         setShowPublishDialog={setShowPublishDialog}
         onPublish={async (slug) => {
           await updateProgramMutation.mutateAsync(buildSaveData());
-          onPublish(slug);
+          await onPublish(slug);
         }}
         customizeData={customizeData}
         creatorType={creatorType}
@@ -1614,6 +1580,9 @@ function PublishDialog({
   creatorType: CreatorType;
   connectedPlatforms: Set<string>;
 }) {
+  const { toast } = useToast();
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const isAlreadyPublished = program.status === 'published';
   const requirements = getPublishRequirements(customizeData, creatorType, connectedPlatforms);
   const allMet = requirements.every((r) => r.met);
@@ -1661,6 +1630,13 @@ function PublishDialog({
             </div>
           )}
 
+          {publishError && (
+            <Alert className="bg-red-500/10 border-red-500/30">
+              <AlertCircle className="h-4 w-4 text-red-400" />
+              <AlertDescription className="text-red-400">{publishError}</AlertDescription>
+            </Alert>
+          )}
+
           <div>
             <Label className="text-white">Public URL Slug</Label>
             <div className="flex items-center gap-2 mt-2">
@@ -1690,14 +1666,39 @@ function PublishDialog({
             </Button>
             <Button
               onClick={async () => {
-                await onPublish(publishSlug);
-                setShowPublishDialog(false);
+                setIsPublishing(true);
+                setPublishError(null);
+                try {
+                  await onPublish(publishSlug);
+                  setShowPublishDialog(false);
+                  toast({
+                    title: 'Program Published',
+                    description: 'Your program is now live!',
+                  });
+                } catch (err: any) {
+                  const missingFields = err?.details?.missingFields;
+                  const msg = Array.isArray(missingFields) && missingFields.length
+                    ? `Missing: ${missingFields.join(', ')}`
+                    : err?.message || 'Failed to publish. Please try again.';
+                  setPublishError(msg);
+                  toast({
+                    title: 'Publish Failed',
+                    description: msg,
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsPublishing(false);
+                }
               }}
               className="bg-brand-primary hover:bg-brand-primary/80"
-              disabled={!canPublish}
+              disabled={!canPublish || isPublishing}
             >
               <Rocket className="h-4 w-4 mr-2" />
-              {isAlreadyPublished ? 'Update URL' : 'Publish Now'}
+              {isPublishing
+                ? 'Publishing...'
+                : isAlreadyPublished
+                  ? 'Update URL'
+                  : 'Publish Now'}
             </Button>
           </div>
         </div>

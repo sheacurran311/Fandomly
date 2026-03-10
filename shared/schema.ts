@@ -925,6 +925,30 @@ export const rewards = pgTable(
   ]
 );
 
+export const loyaltyProgramTiers = pgTable(
+  'loyalty_program_tiers',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    programId: varchar('program_id')
+      .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
+      .notNull(),
+    name: varchar('name', { length: 100 }).notNull(),
+    minPoints: integer('min_points').notNull(),
+    maxPoints: integer('max_points'),
+    tierOrder: integer('tier_order').notNull(),
+    benefits: jsonb('benefits').default([]),
+    badgeImageUrl: varchar('badge_image_url', { length: 500 }),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('loyalty_tiers_program_idx').on(table.programId, table.tierOrder),
+  ]
+);
+
 export const fanPrograms = pgTable('fan_programs', {
   id: varchar('id')
     .primaryKey()
@@ -941,6 +965,8 @@ export const fanPrograms = pgTable('fan_programs', {
   currentPoints: integer('current_points').default(0),
   totalPointsEarned: integer('total_points_earned').default(0),
   currentTier: text('current_tier'),
+  currentTierId: varchar('current_tier_id').references(() => loyaltyProgramTiers.id),
+  lifetimePoints: integer('lifetime_points').default(0),
   joinedAt: timestamp('joined_at').defaultNow(),
 
   // Soft-delete fields (SaaS industry standard)
@@ -950,6 +976,48 @@ export const fanPrograms = pgTable('fan_programs', {
 
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+export const tierProgressionHistory = pgTable(
+  'tier_progression_history',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    fanProgramId: varchar('fan_program_id')
+      .references(() => fanPrograms.id, { onDelete: 'cascade' })
+      .notNull(),
+    fromTierId: varchar('from_tier_id').references(() => loyaltyProgramTiers.id),
+    toTierId: varchar('to_tier_id').references(() => loyaltyProgramTiers.id),
+    progressionType: varchar('progression_type', { length: 20 }).notNull(),
+    triggerReason: varchar('trigger_reason', { length: 100 }).notNull(),
+    pointsAtChange: integer('points_at_change').notNull(),
+    changedAt: timestamp('changed_at').defaultNow(),
+  },
+  (table) => [
+    index('tier_history_fan_program_idx').on(table.fanProgramId),
+  ]
+);
+
+export const pointExpirationNotifications = pgTable(
+  'point_expiration_notifications',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    transactionId: varchar('transaction_id').notNull(),
+    transactionType: varchar('transaction_type', { length: 20 }).notNull(),
+    notificationType: varchar('notification_type', { length: 20 }).notNull(),
+    pointsAmount: integer('points_amount').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    sentAt: timestamp('sent_at').defaultNow(),
+  },
+  (table) => [
+    index('expiration_notifications_user_idx').on(table.userId, table.notificationType),
+  ]
+);
 
 export const pointTransactions = pgTable(
   'point_transactions',
