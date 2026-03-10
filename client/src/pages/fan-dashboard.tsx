@@ -28,6 +28,30 @@ import { PieChartCard } from '@/components/charts/PieChartCard';
 import { apiRequest } from '@/lib/queryClient';
 import { formatDistanceToNow } from 'date-fns';
 
+function getRedemptionStatusMeta(redemption: any) {
+  const nftStatus = redemption.metadata?.nftMintStatus;
+
+  if (nftStatus === 'completed') {
+    return { label: 'nft minted', className: 'border-green-400/30 text-green-400' };
+  }
+  if (nftStatus === 'pending_wallet') {
+    return { label: 'wallet needed', className: 'border-yellow-400/30 text-yellow-400' };
+  }
+  if (nftStatus === 'pending_manual') {
+    return { label: 'awaiting mint', className: 'border-yellow-400/30 text-yellow-400' };
+  }
+  if (nftStatus === 'failed') {
+    return { label: 'mint failed', className: 'border-red-400/30 text-red-400' };
+  }
+  if (redemption.status === 'fulfilled' || redemption.status === 'completed') {
+    return { label: redemption.status, className: 'border-green-400/30 text-green-400' };
+  }
+  if (redemption.status === 'pending') {
+    return { label: 'pending', className: 'border-yellow-400/30 text-yellow-400' };
+  }
+  return { label: redemption.status || 'unknown', className: 'border-gray-400/30 text-gray-400' };
+}
+
 export default function FanDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: fanStats, isLoading: statsLoading, error: statsError } = useFanStats();
@@ -363,17 +387,21 @@ export default function FanDashboard() {
                   </div>
                 ) : (
                   redemptionHistory.slice(0, 4).map((redemption: any) => (
-                    <div
+                    (() => {
+                      const statusMeta = getRedemptionStatusMeta(redemption);
+                      return <div
                       key={redemption.id}
                       className="flex items-center space-x-3 p-2 rounded-lg bg-white/5"
                     >
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          redemption.status === 'fulfilled'
+                          statusMeta.className.includes('green')
                             ? 'bg-green-400/20 text-green-400'
-                            : redemption.status === 'pending'
+                            : statusMeta.className.includes('yellow')
                               ? 'bg-yellow-400/20 text-yellow-400'
-                              : 'bg-gray-400/20 text-gray-400'
+                              : statusMeta.className.includes('red')
+                                ? 'bg-red-400/20 text-red-400'
+                                : 'bg-gray-400/20 text-gray-400'
                         }`}
                       >
                         <Gift className="h-4 w-4" />
@@ -387,20 +415,21 @@ export default function FanDashboard() {
                             addSuffix: true,
                           })}
                         </p>
+                        {redemption.metadata?.nftMintMessage && (
+                          <p className="text-xs text-yellow-300 mt-1">{redemption.metadata.nftMintMessage}</p>
+                        )}
+                        {redemption.metadata?.nftMintError && (
+                          <p className="text-xs text-red-300 mt-1">{redemption.metadata.nftMintError}</p>
+                        )}
                       </div>
                       <Badge
                         variant="outline"
-                        className={`text-xs shrink-0 ${
-                          redemption.status === 'fulfilled'
-                            ? 'border-green-400/30 text-green-400'
-                            : redemption.status === 'pending'
-                              ? 'border-yellow-400/30 text-yellow-400'
-                              : 'border-gray-400/30 text-gray-400'
-                        }`}
+                        className={`text-xs shrink-0 ${statusMeta.className}`}
                       >
-                        {redemption.status}
+                        {statusMeta.label}
                       </Badge>
-                    </div>
+                    </div>;
+                    })()
                   ))
                 )}
               </CardContent>

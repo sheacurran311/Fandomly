@@ -36,6 +36,30 @@ import { LineChartCard } from "@/components/charts/LineChartCard";
 import { PieChartCard } from "@/components/charts/PieChartCard";
 import { apiRequest } from "@/lib/queryClient";
 
+function getRedemptionStatusMeta(redemption: any) {
+  const nftStatus = redemption.metadata?.nftMintStatus;
+
+  if (nftStatus === 'completed') {
+    return { label: 'NFT minted', className: 'bg-green-500/20 text-green-400' };
+  }
+  if (nftStatus === 'pending_wallet') {
+    return { label: 'Wallet needed', className: 'bg-yellow-500/20 text-yellow-400' };
+  }
+  if (nftStatus === 'pending_manual') {
+    return { label: 'Awaiting mint', className: 'bg-yellow-500/20 text-yellow-400' };
+  }
+  if (nftStatus === 'failed') {
+    return { label: 'Mint failed', className: 'bg-red-500/20 text-red-400' };
+  }
+  if (redemption.status === 'fulfilled' || redemption.status === 'completed') {
+    return { label: redemption.status, className: 'bg-green-500/20 text-green-400' };
+  }
+  if (redemption.status === 'pending') {
+    return { label: 'pending', className: 'bg-yellow-500/20 text-yellow-400' };
+  }
+  return { label: redemption.status || 'unknown', className: 'bg-gray-500/20 text-gray-400' };
+}
+
 export default function FanPoints() {
   const { toast } = useToast();
   const [timeframe, setTimeframe] = useState<Timeframe>('weekly');
@@ -73,10 +97,16 @@ export default function FanPoints() {
 
   const handleRedeemReward = async (rewardId: string, programId: string) => {
     try {
-      await redeemRewardMutation.mutateAsync({ rewardId, programId });
+      const data: any = await redeemRewardMutation.mutateAsync({ rewardId, programId });
+      const nftMessage = data?.redemption?.metadata?.nftMintMessage;
+      const nftStatus = data?.redemption?.metadata?.nftMintStatus;
       toast({
         title: "🎉 Reward Redeemed!",
-        description: "Your reward has been successfully redeemed.",
+        description:
+          nftMessage ||
+          (nftStatus === 'completed'
+            ? 'Your NFT was minted successfully.'
+            : "Your reward has been successfully redeemed."),
       });
     } catch (error) {
       toast({
@@ -492,7 +522,11 @@ export default function FanPoints() {
                               size="sm" 
                               className="bg-brand-primary hover:bg-brand-primary/80"
                               onClick={() => handleRedeemReward(reward.id, reward.programId)}
-                              disabled={redeemRewardMutation.isPending || (pointsSummary?.availablePoints || 0) < reward.pointsCost}
+                              disabled={
+                                redeemRewardMutation.isPending ||
+                                !reward.programId ||
+                                (pointsSummary?.availablePoints || 0) < reward.pointsCost
+                              }
                             >
                               {redeemRewardMutation.isPending ? 'Redeeming...' : 'Redeem'}
                             </Button>
@@ -528,6 +562,9 @@ export default function FanPoints() {
                 ) : (
                   <div className="space-y-3">
                     {redemptionHistory.map((redemption: any) => (
+                      (() => {
+                        const statusMeta = getRedemptionStatusMeta(redemption);
+                        return (
                       <div key={redemption.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                         <div className="flex items-center gap-4">
                           <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -538,19 +575,27 @@ export default function FanPoints() {
                             <p className="text-xs text-gray-400">
                               {format(new Date(redemption.redeemedAt), 'MMM dd, yyyy')}
                             </p>
+                            {redemption.metadata?.nftMintMessage && (
+                              <p className="text-xs text-yellow-300 mt-1">
+                                {redemption.metadata.nftMintMessage}
+                              </p>
+                            )}
+                            {redemption.metadata?.nftMintError && (
+                              <p className="text-xs text-red-300 mt-1">
+                                {redemption.metadata.nftMintError}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
-                          <Badge className={
-                            redemption.status === 'fulfilled' ? 'bg-green-500/20 text-green-400' :
-                            redemption.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-red-500/20 text-red-400'
-                          }>
-                            {redemption.status}
+                          <Badge className={statusMeta.className}>
+                            {statusMeta.label}
                           </Badge>
                           <p className="text-xs text-gray-400 mt-1">-{redemption.pointsSpent} pts</p>
                         </div>
                       </div>
+                        );
+                      })()
                     ))}
                   </div>
                 )}

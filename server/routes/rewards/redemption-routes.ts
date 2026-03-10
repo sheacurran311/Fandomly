@@ -19,6 +19,7 @@ import {
   users,
   nftMints,
   nftTemplates,
+  nftCollections,
   fandomlyBadgeTemplates,
 } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
@@ -27,6 +28,7 @@ import { z } from 'zod';
 import { storage } from '../../core/storage';
 import { tierProgressionService } from '../../services/tier-progression-service';
 import { getBlockchainNFTService } from '../../services/nft/blockchain-nft-service';
+import { getIPFSService } from '../../services/nft/ipfs-service';
 import type { Address } from 'viem';
 
 // Validation schemas
@@ -494,8 +496,24 @@ export function registerRedemptionRoutes(app: Express) {
                   throw new Error('Collection ID required for NFT minting');
                 }
 
-                // Get template metadata if available
-                let tokenUri = 'ipfs://placeholder'; // Default URI
+                const [collection] = await db
+                  .select()
+                  .from(nftCollections)
+                  .where(eq(nftCollections.id, collectionId))
+                  .limit(1);
+
+                if (!collection) {
+                  throw new Error('NFT collection not found');
+                }
+
+                const onChainCollectionId = (collection.metadata as Record<string, unknown> | null)
+                  ?.onChainCollectionId;
+                if (typeof onChainCollectionId !== 'number') {
+                  throw new Error('NFT collection is missing its on-chain collection ID');
+                }
+
+                const collectionMetadata = (collection.metadata as Record<string, unknown> | null) || {};
+                let metadataJson: Record<string, unknown>;
 
                 if (templateId) {
                   const [template] = await db
@@ -504,18 +522,67 @@ export function registerRedemptionRoutes(app: Express) {
                     .where(eq(nftTemplates.id, templateId))
                     .limit(1);
 
-                  if (template?.metadata) {
-                    // Use metadata.image as tokenUri or construct from metadata
-                    const metadata = template.metadata as any;
-                    tokenUri = metadata.image || 'ipfs://placeholder';
+                  if (!template) {
+                    throw new Error('NFT template not found');
                   }
+
+                  const templateMetadata = (template.metadata as Record<string, any>) || {};
+                  metadataJson = {
+                    name: template.name || reward.name,
+                    description:
+                      template.description || reward.description || collection.description || reward.name,
+                    image:
+                      nftData.imageUrl ||
+                      templateMetadata.image ||
+                      collectionMetadata.collectionImageUrl,
+                    animation_url: templateMetadata.animationUrl,
+                    external_url: templateMetadata.externalUrl,
+                    attributes: [
+                      ...(Array.isArray(templateMetadata.attributes)
+                        ? templateMetadata.attributes
+                        : []),
+                      { trait_type: 'Reward', value: reward.name },
+                      { trait_type: 'Collection', value: collection.name },
+                    ],
+                    properties: templateMetadata.properties,
+                  };
+                } else {
+                  metadataJson = {
+                    name: reward.name,
+                    description: reward.description || collection.description || reward.name,
+                    image: nftData.imageUrl || collectionMetadata.collectionImageUrl,
+                    attributes: [
+                      { trait_type: 'Reward Type', value: 'NFT Reward' },
+                      { trait_type: 'Collection', value: collection.name },
+                      ...(nftData.soulbound
+                        ? [{ trait_type: 'Soulbound', value: 'Yes' }]
+                        : []),
+                    ],
+                  };
                 }
+
+                if (
+                  typeof metadataJson.image !== 'string' ||
+                  metadataJson.image.trim().length === 0
+                ) {
+                  throw new Error('NFT reward image is required for minting');
+                }
+
+                const ipfs = getIPFSService();
+                if (!ipfs) {
+                  throw new Error('IPFS service unavailable');
+                }
+
+                const uploadedMetadata = await ipfs.uploadMetadata(
+                  metadataJson as any,
+                  `${reward.name}-${result.id}`
+                );
 
                 // Mint the NFT
                 const mintResult = await nftService.mintNFT(
                   walletAddress as Address,
-                  parseInt(collectionId),
-                  tokenUri
+                  onChainCollectionId,
+                  uploadedMetadata.ipfsUri
                 );
 
                 // Record the mint
@@ -531,7 +598,9 @@ export function registerRedemptionRoutes(app: Express) {
                     mintReason: 'reward_redemption',
                     contextData: {
                       rewardId: reward.id,
+                      redemptionId: result.id,
                       pointsSpent: totalPointsCost,
+                      metadataUri: uploadedMetadata.ipfsUri,
                     },
                     txHash: mintResult.txHash,
                     tokenId: mintResult.tokenId || null,
@@ -544,11 +613,13 @@ export function registerRedemptionRoutes(app: Express) {
                 await db
                   .update(rewardRedemptions)
                   .set({
+                    status: 'completed',
                     metadata: {
                       ...((result.metadata as any) || {}),
                       nftMintId: nftMint.id,
                       nftMintTxHash: mintResult.txHash,
                       nftTokenId: mintResult.tokenId,
+                      nftMetadataUri: uploadedMetadata.ipfsUri,
                       nftMintStatus: 'completed',
                     },
                   })
@@ -616,8 +687,14 @@ export function registerRedemptionRoutes(app: Express) {
         }
       }
 
+      const [updatedRedemption] = await db
+        .select()
+        .from(rewardRedemptions)
+        .where(eq(rewardRedemptions.id, result.id))
+        .limit(1);
+
       res.status(201).json({
-        redemption: result,
+        redemption: updatedRedemption || result,
         pointsDeducted: totalPointsCost,
         newBalance: (fanProgram.currentPoints || 0) - totalPointsCost,
       });

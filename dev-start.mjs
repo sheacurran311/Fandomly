@@ -8,7 +8,7 @@
  * Handles:
  *  1. Killing any stale tsx/server/proxy processes before starting
  *  2. Starting dev-ws-proxy.mjs as a managed child process
- *  3. Starting the Express/Vite server via tsx with dev-preload.mjs
+ *  3. Starting the Express/Vite server via tsx watch with dev-preload.mjs
  *  4. Forwarding SIGINT/SIGTERM so both children exit cleanly
  */
 
@@ -45,11 +45,13 @@ const proxy = spawnChild('node', ['dev-ws-proxy.mjs']);
 await new Promise((r) => setTimeout(r, 500));
 
 const server = spawnChild(
-  'node',
+  'npx',
   [
-    '--require', './node_modules/tsx/dist/preflight.cjs',
-    '--import', 'file:///home/runner/workspace/node_modules/tsx/dist/loader.mjs',
-    '--import', './dev-preload.mjs',
+    'tsx',
+    'watch',
+    '--clear-screen=false',
+    '--import',
+    './dev-preload.mjs',
     'server/index.ts',
   ],
   { NODE_ENV: 'development' }

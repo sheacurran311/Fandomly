@@ -6,7 +6,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, getCsrfToken, getAuthHeaders } from '@/lib/queryClient';
+import { apiRequest, getCsrfToken, getAuthHeaders, readJsonResponse } from '@/lib/queryClient';
 
 export interface NftCollection {
   id: string;
@@ -109,17 +109,19 @@ export function useUploadImage() {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || 'Failed to upload image');
+        const error = await readJsonResponse<{ message?: string; error?: string }>(response).catch(
+          () => ({})
+        );
+        throw new Error(error.message || error.error || 'Failed to upload image');
       }
 
-      return response.json() as Promise<{
+      return readJsonResponse<{
         success: boolean;
         ipfsHash: string;
         ipfsUri: string;
         gatewayUrl: string;
         size: number;
-      }>;
+      }>(response);
     },
   });
 }
@@ -146,15 +148,17 @@ export function useUploadVideo() {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || 'Failed to upload video');
+        const error = await readJsonResponse<{ message?: string; error?: string }>(response).catch(
+          () => ({})
+        );
+        throw new Error(error.message || error.error || 'Failed to upload video');
       }
 
-      return response.json() as Promise<{
+      return readJsonResponse<{
         success: boolean;
         video: { ipfsHash: string; ipfsUri: string; gatewayUrl: string };
         thumbnail: { ipfsHash: string; ipfsUri: string; gatewayUrl: string };
-      }>;
+      }>(response);
     },
   });
 }

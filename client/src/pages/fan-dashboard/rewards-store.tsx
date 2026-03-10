@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, readJsonResponse } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -67,6 +67,13 @@ interface Reward {
     contractAddress?: string;
     tokenId?: string;
   };
+  rewardData?: {
+    nftData?: {
+      collectionName?: string;
+      imageUrl?: string;
+      autoMintOnRedeem?: boolean;
+    };
+  };
   programId?: string;
   creatorName?: string;
 }
@@ -126,13 +133,16 @@ export default function FanRewardsStore() {
     queryKey: ['/api/rewards/catalog'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/rewards/catalog');
-      return response.json();
+      return readJsonResponse(response);
     },
     enabled: !!user,
   });
 
   const rewards = catalogData?.rewards || [];
   const userPoints = catalogData?.userPoints || 0;
+  const fanWalletAddress =
+    ((user as any)?.avalancheL1Address as string | undefined) ||
+    ((user as any)?.walletAddress as string | undefined);
 
   // Fetch reward detail
   const { data: rewardDetail, isLoading: isLoadingDetail } = useQuery<Reward>({
@@ -140,21 +150,27 @@ export default function FanRewardsStore() {
     queryFn: async () => {
       if (!selectedReward?.id) return null;
       const response = await apiRequest('GET', `/api/rewards/catalog/${selectedReward.id}`);
-      return response.json();
+      return readJsonResponse(response);
     },
     enabled: !!selectedReward?.id && showDetailDialog,
   });
 
   // Redeem mutation
   const redeemMutation = useMutation({
-    mutationFn: async (data: { rewardId: string; shippingAddress?: ShippingAddress }) => {
+    mutationFn: async (data: { rewardId: string; programId: string; shippingAddress?: ShippingAddress }) => {
       const response = await apiRequest('POST', '/api/rewards/redeem', data);
-      return response.json();
+      return readJsonResponse(response);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      const nftMessage = data?.redemption?.metadata?.nftMintMessage;
+      const nftStatus = data?.redemption?.metadata?.nftMintStatus;
       toast({
         title: 'Reward Redeemed!',
-        description: 'Your reward has been successfully redeemed.',
+        description:
+          nftMessage ||
+          (nftStatus === 'completed'
+            ? 'Your NFT was minted successfully.'
+            : 'Your reward has been successfully redeemed.'),
       });
       setShowConfirmDialog(false);
       setShowShippingDialog(false);
@@ -208,12 +224,28 @@ export default function FanRewardsStore() {
 
   const handleConfirmRedeem = () => {
     if (!selectedReward) return;
-    redeemMutation.mutate({ rewardId: selectedReward.id });
+    if (!selectedReward.programId) {
+      toast({
+        title: 'Redemption Failed',
+        description: 'This reward is not linked to a loyalty program.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    redeemMutation.mutate({ rewardId: selectedReward.id, programId: selectedReward.programId });
   };
 
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReward) return;
+    if (!selectedReward.programId) {
+      toast({
+        title: 'Redemption Failed',
+        description: 'This reward is not linked to a loyalty program.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     // Validate required fields
     if (
@@ -233,6 +265,7 @@ export default function FanRewardsStore() {
 
     redeemMutation.mutate({
       rewardId: selectedReward.id,
+      programId: selectedReward.programId!,
       shippingAddress,
     });
   };
@@ -587,6 +620,41 @@ export default function FanRewardsStore() {
                     </div>
                   )}
 
+                  {rewardDetail.rewardType === 'nft' && (
+                    <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                      <h4 className="font-semibold text-white flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5 text-green-400" />
+                        NFT Delivery
+                      </h4>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Collection: </span>
+                        <span className="text-white">
+                          {rewardDetail.rewardData?.nftData?.collectionName || 'Selected NFT collection'}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-400">Delivery: </span>
+                        <span className="text-white">
+                          {rewardDetail.rewardData?.nftData?.autoMintOnRedeem === false
+                            ? 'Manual mint by creator after redemption'
+                            : 'Auto-mint to your connected wallet after redemption'}
+                        </span>
+                      </div>
+                      {!fanWalletAddress && (
+                        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+                          No wallet is connected yet. You can still redeem this NFT reward, but minting
+                          will stay pending until your wallet is connected.
+                        </div>
+                      )}
+                      {fanWalletAddress && (
+                        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">
+                          This NFT will be minted to {fanWalletAddress.slice(0, 6)}...
+                          {fanWalletAddress.slice(-4)}.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Your Points */}
                   <div className="p-4 bg-brand-primary/10 rounded-lg border border-brand-primary/30">
                     <div className="flex items-center justify-between">
@@ -616,6 +684,7 @@ export default function FanRewardsStore() {
                     onClick={handleRedeemClick}
                     disabled={
                       !rewardDetail.canAfford ||
+                      !rewardDetail.programId ||
                       (rewardDetail.stockRemaining !== undefined &&
                         rewardDetail.stockRemaining <= 0) ||
                       redeemMutation.isPending
@@ -650,6 +719,13 @@ export default function FanRewardsStore() {
                 on {selectedReward?.name}?
               </DialogDescription>
             </DialogHeader>
+            {selectedReward?.rewardType === 'nft' && (
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-gray-300">
+                {fanWalletAddress
+                  ? `This NFT will be minted to ${fanWalletAddress.slice(0, 6)}...${fanWalletAddress.slice(-4)} after redemption.`
+                  : 'This NFT reward can still be redeemed without a wallet, but minting will remain pending until you connect one.'}
+              </div>
+            )}
             <DialogFooter>
               <Button
                 variant="outline"

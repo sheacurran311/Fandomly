@@ -48,7 +48,9 @@ export function registerRewardManagementRoutes(app: Express, storage: any) {
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
       try {
-        const creator = await storage.getCreator(req.params.creatorId);
+        const creator =
+          (await storage.getCreator(req.params.creatorId)) ||
+          (await storage.getCreatorByUserId(req.params.creatorId));
         if (!creator) {
           return res.status(404).json({ error: 'Creator not found' });
         }

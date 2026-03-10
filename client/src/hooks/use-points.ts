@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, readJsonResponse } from '@/lib/queryClient';
 import { useAuth } from './use-auth';
 
 // Types for point transactions and rewards
@@ -37,12 +37,16 @@ interface RewardRedemption {
   id: string;
   fanId: string;
   rewardId: string;
+  programId?: string;
   pointsSpent: number;
-  status: 'pending' | 'fulfilled' | 'cancelled';
+  status: 'pending' | 'completed' | 'fulfilled' | 'failed' | 'cancelled';
   metadata?: any;
   redeemedAt: string;
   fulfilledAt?: string;
-  reward?: Reward;
+  reward?: Reward & {
+    rewardType?: string;
+  };
+  programName?: string;
 }
 
 interface FanProgram {
@@ -125,12 +129,39 @@ export const useRewardRedemptions = () => {
     queryKey: ['reward-redemptions', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      
-      const response = await apiRequest('GET', `/api/reward-redemptions/user/${user.id}`);
-      const redemptions: RewardRedemption[] = await response.json();
-      
-      // Sort by most recent first
-      return redemptions.sort((a, b) => new Date(b.redeemedAt).getTime() - new Date(a.redeemedAt).getTime());
+
+      const response = await apiRequest('GET', '/api/rewards/redemptions');
+      const data = await readJsonResponse<{ redemptions: any[] }>(response);
+
+      const redemptions: RewardRedemption[] = (data.redemptions || []).map((row: any) => ({
+        id: row.id,
+        fanId: row.fanId ?? row.fan_id,
+        rewardId: row.rewardId ?? row.reward_id,
+        programId: row.programId ?? row.program_id,
+        pointsSpent: row.pointsSpent ?? row.points_spent ?? 0,
+        status: row.status,
+        metadata: row.metadata ?? null,
+        redeemedAt: row.redeemedAt ?? row.redeemed_at,
+        fulfilledAt: row.fulfilledAt ?? row.fulfilled_at,
+        programName: row.programName ?? row.program_name,
+        reward: {
+          id: row.rewardId ?? row.reward_id,
+          programId: row.programId ?? row.program_id,
+          name: row.rewardName ?? row.reward_name ?? 'Reward',
+          description: row.rewardDescription ?? row.reward_description ?? '',
+          pointsCost: row.pointsCost ?? row.points_cost ?? 0,
+          type: row.rewardType ?? row.reward_type ?? 'digital',
+          rewardType: row.rewardType ?? row.reward_type,
+          availability: 'unlimited',
+          imageUrl: row.rewardImage ?? row.reward_image,
+          isActive: true,
+          createdAt: row.createdAt ?? row.created_at ?? row.redeemedAt ?? row.redeemed_at,
+        },
+      }));
+
+      return redemptions.sort(
+        (a, b) => new Date(b.redeemedAt).getTime() - new Date(a.redeemedAt).getTime()
+      );
     },
     enabled: !!user?.id,
   });
@@ -184,16 +215,14 @@ export const usePointsSummary = () => {
 // Mutation to redeem a reward
 export const useRedeemReward = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   return useMutation({
     mutationFn: async ({ rewardId, programId }: { rewardId: string; programId: string }) => {
-      const response = await apiRequest('POST', '/api/reward-redemptions', {
-        fanId: user?.id,
+      const response = await apiRequest('POST', '/api/rewards/redeem', {
         rewardId,
-        programId
+        programId,
       });
-      return response.json();
+      return readJsonResponse(response);
     },
     onSuccess: () => {
       // Invalidate related queries to refresh data

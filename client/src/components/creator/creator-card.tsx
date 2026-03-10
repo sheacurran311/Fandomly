@@ -201,11 +201,13 @@ function CreatorCard({
       creator.tenant?.branding?.logoUrl
   );
 
-  // URL: prefer program slug, fall back to tenant slug or username
-  const creatorUrl = creator.program?.slug || creator.tenant?.slug || creator.user?.username;
+  // Build the destination URL: /programs/:slug when a program slug exists,
+  // otherwise fall back to the creator's public profile at /@username
+  const programSlug = creator.program?.slug || creator.tenant?.slug;
+  const creatorProfileUrl = creator.user?.username ? `/@${creator.user.username}` : null;
+  const destinationUrl = programSlug ? `/programs/${programSlug}` : creatorProfileUrl;
 
   const handleCardClick = () => {
-    // For selection variant, clicking the card toggles selection
     if (variant === 'selection' && onSelect) {
       onSelect(creator.id);
       return;
@@ -213,16 +215,15 @@ function CreatorCard({
 
     if (!user && onUnauthenticatedClick) {
       onUnauthenticatedClick();
-    } else if (creatorUrl) {
-      // Use /programs/:slug URL structure for consistent routing
-      window.location.href = `/programs/${creatorUrl}`;
+    } else if (destinationUrl) {
+      window.location.href = destinationUrl;
     }
   };
 
   const handleVisitProgramClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (creatorUrl) {
-      window.location.href = `/programs/${creatorUrl}`;
+    if (destinationUrl) {
+      window.location.href = destinationUrl;
     }
   };
 

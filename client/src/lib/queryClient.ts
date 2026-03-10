@@ -80,6 +80,25 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 /**
+ * Read a response that is expected to be JSON and surface the raw body when it isn't.
+ */
+export async function readJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  if (!text) {
+    throw new Error('Empty response body');
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const contentType = response.headers.get('content-type') || 'unknown content-type';
+    const preview = text.slice(0, 160).replace(/\s+/g, ' ').trim();
+    throw new Error(`Expected JSON but received ${contentType}: ${preview}`);
+  }
+}
+
+/**
  * Parse API error response and extract meaningful error message
  */
 function parseApiError(

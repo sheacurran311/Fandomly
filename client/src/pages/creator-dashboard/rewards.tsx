@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useMemo, createElement } from 'react';
+import { useState, useMemo, createElement, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,7 +36,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { apiRequest, getCsrfToken, getAuthHeaders } from '@/lib/queryClient';
+import { apiRequest, getCsrfToken, getAuthHeaders, readJsonResponse } from '@/lib/queryClient';
 import {
   Gift,
   Ticket,
@@ -62,7 +62,11 @@ import { VideoUpload } from '@/components/ui/video-upload';
 import PlatformRewards from '@/components/rewards/platform-rewards';
 
 // Form schema extending insertRewardSchema with additional validation
-const rewardCreationFormSchema = insertRewardSchema.extend({
+const rewardCreationFormSchema = insertRewardSchema
+  .omit({
+    tenantId: true,
+  })
+  .extend({
   name: z.string().min(1, 'Reward name is required').max(100, 'Name too long'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   pointsCost: z.number().min(1, 'Points cost must be at least 1'),
@@ -71,7 +75,26 @@ const rewardCreationFormSchema = insertRewardSchema.extend({
   }),
   maxRedemptions: z.number().min(1).optional().nullable(),
   // Type-specific validation handled dynamically
-});
+})
+  .superRefine((data, ctx) => {
+    if (data.rewardType === 'nft') {
+      const nftData = (data.rewardData as any)?.nftData;
+      if (!nftData?.collectionId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rewardData', 'nftData', 'collectionId'],
+          message: 'Please select an NFT collection',
+        });
+      }
+      if (!nftData?.imageUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rewardData', 'nftData', 'imageUrl'],
+          message: 'Please upload or paste an NFT image URL',
+        });
+      }
+    }
+  });
 
 type RewardFormData = z.infer<typeof rewardCreationFormSchema>;
 
@@ -126,8 +149,30 @@ export default function RewardsManagement() {
     queryKey: ['/api/rewards', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await apiRequest('GET', `/api/rewards/creator/${user.id}`);
-      return response.json();
+      const response = await apiRequest('GET', '/api/rewards');
+      return readJsonResponse(response);
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: nftCollectionsData } = useQuery({
+    queryKey: ['/api/nft/collections', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { collections: [] as Array<Record<string, any>> };
+      const response = await apiRequest('GET', '/api/nft/collections');
+      return readJsonResponse<{ collections: Array<Record<string, any>> }>(response);
+    },
+    enabled: !!user?.id,
+  });
+
+  const nftCollections = nftCollectionsData?.collections || [];
+
+  const { data: programs = [] } = useQuery({
+    queryKey: ['/api/programs', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await apiRequest('GET', '/api/programs');
+      return readJsonResponse<Array<{ id: string; name: string }>>(response);
     },
     enabled: !!user?.id,
   });
@@ -214,6 +259,8 @@ export default function RewardsManagement() {
                     <DialogTitle className="text-white">Create New Reward</DialogTitle>
                   </DialogHeader>
                   <RewardCreationForm
+                    programs={programs}
+                    collections={nftCollections}
                     onSubmit={handleCreateReward}
                     onCancel={() => setCreateModalOpen(false)}
                   />
@@ -477,6 +524,11 @@ function NftImageUploadField({
 }) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setPreview(value || null);
+  }, [value]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -500,12 +552,17 @@ function NftImageUploadField({
         headers,
       });
       if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
+      const data = await readJsonResponse<{ gatewayUrl: string }>(res);
       onChange(data.gatewayUrl);
       setPreview(data.gatewayUrl);
-    } catch {
+    } catch (error) {
       setPreview(null);
       onChange('');
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Could not upload image to IPFS',
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
     }
@@ -555,9 +612,13 @@ function NftImageUploadField({
 
 // Reward Creation Form Component with react-hook-form + zodResolver
 function RewardCreationForm({
+  programs,
+  collections,
   onSubmit,
   onCancel,
 }: {
+  programs: Array<{ id: string; name: string }>;
+  collections: Array<Record<string, any>>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
 }) {
@@ -565,10 +626,13 @@ function RewardCreationForm({
   const { toast } = useToast();
   const form = useForm<RewardFormData>({
     resolver: zodResolver(rewardCreationFormSchema),
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       name: '',
       description: '',
       rewardType: undefined,
+      programId: programs[0]?.id || '',
       pointsCost: 50,
       maxRedemptions: null,
       rewardData: {
@@ -606,6 +670,11 @@ function RewardCreationForm({
         nftData: {
           collectionId: '',
           templateId: '',
+          collectionName: '',
+          collectionDescription: '',
+          imageUrl: '',
+          maxSupply: '',
+          soulbound: false,
           autoMintOnRedeem: true,
         } as any,
       },
@@ -614,11 +683,45 @@ function RewardCreationForm({
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedRewardType = form.watch('rewardType');
+  const watchedCollectionId = form.watch('rewardData.nftData.collectionId' as any);
+
+  useEffect(() => {
+    const currentProgramId = form.getValues('programId');
+    if (!currentProgramId && programs[0]?.id) {
+      form.setValue('programId', programs[0].id, { shouldValidate: true });
+    }
+  }, [form, programs]);
+
+  useEffect(() => {
+    const selectedCollection = collections.find((collection) => collection.id === watchedCollectionId);
+    if (!selectedCollection) return;
+
+    const metadata = (selectedCollection.metadata as Record<string, unknown> | undefined) || {};
+    const currentNftData = (form.getValues('rewardData.nftData' as any) as Record<string, any>) || {};
+
+    form.setValue('rewardData.nftData.collectionName' as any, selectedCollection.name, {
+      shouldValidate: true,
+    });
+    form.setValue(
+      'rewardData.nftData.collectionDescription' as any,
+      selectedCollection.description || '',
+      { shouldValidate: false }
+    );
+
+    if (!currentNftData.imageUrl && typeof metadata.collectionImageUrl === 'string') {
+      form.setValue('rewardData.nftData.imageUrl' as any, metadata.collectionImageUrl, {
+        shouldValidate: true,
+      });
+    }
+  }, [collections, form, watchedCollectionId]);
 
   const handleFormSubmit = (data: RewardFormData) => {
+    const nftData = (data.rewardData as any)?.nftData;
+
     // Process form data based on reward type
     const processedData = {
       ...data,
+      imageUrl: watchedRewardType === 'nft' ? nftData?.imageUrl || null : (data as any).imageUrl,
       // Ensure proper type-specific data structure
       rewardData:
         watchedRewardType === 'raffle'
@@ -686,6 +789,31 @@ function RewardCreationForm({
           />
 
           <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control as any}
+              name="programId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white">Loyalty Program</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Select loyalty program" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {programs.map((program) => (
+                          <SelectItem key={program.id} value={program.id}>
+                            {program.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage className="text-red-400" />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control as any}
               name="rewardType"
@@ -775,40 +903,44 @@ function RewardCreationForm({
             <p className="text-sm text-gray-400">
               Configure the NFT collection that will be minted as a reward on Avalanche Fuji
             </p>
+            {collections.length === 0 && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-400" />
+                <AlertDescription className="text-yellow-300 text-sm">
+                  Create an NFT collection in `NFT Collections` before creating an NFT reward.
+                </AlertDescription>
+              </Alert>
+            )}
             <FormField
               control={form.control as any}
-              name="rewardData.nftData.collectionName"
+              name="rewardData.nftData.collectionId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white">Collection Name</FormLabel>
+                  <FormLabel className="text-white">NFT Collection</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., Campaign Achievement NFT"
-                      className="mt-2 bg-white/10 border-white/20 text-white"
-                    />
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger className="mt-2 bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Select an existing NFT collection" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {collections.map((collection) => (
+                          <SelectItem key={collection.id} value={collection.id}>
+                            {collection.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage className="text-red-400" />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control as any}
-              name="rewardData.nftData.collectionDescription"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white">Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Describe what this NFT represents..."
-                      className="mt-2 bg-white/10 border-white/20 text-white"
-                    />
-                  </FormControl>
-                  <FormMessage className="text-red-400" />
-                </FormItem>
-              )}
-            />
+            {watchedCollectionId && (
+              <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 text-sm text-indigo-200">
+                {collections.find((collection) => collection.id === watchedCollectionId)?.description ||
+                  'This reward will mint into the selected collection.'}
+              </div>
+            )}
             <FormField
               control={form.control as any}
               name="rewardData.nftData.imageUrl"
@@ -831,6 +963,7 @@ function RewardCreationForm({
                   <FormControl>
                     <Input
                       {...field}
+                      value={field.value ?? ''}
                       type="number"
                       placeholder="Leave empty for unlimited"
                       className="mt-2 bg-white/10 border-white/20 text-white"
@@ -844,7 +977,7 @@ function RewardCreationForm({
               <input
                 type="checkbox"
                 id="nft-soulbound"
-                checked={form.watch('rewardData.nftData.soulbound' as any)}
+                checked={!!form.watch('rewardData.nftData.soulbound' as any)}
                 onChange={(e) =>
                   form.setValue('rewardData.nftData.soulbound' as any, e.target.checked)
                 }

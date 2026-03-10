@@ -23,7 +23,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { Express } from 'express';
+import { Express, type Response } from 'express';
 import { eq, desc } from 'drizzle-orm';
 import multer from 'multer';
 import { getBlockchainNFTService } from '../../services/nft/blockchain-nft-service';
@@ -70,6 +70,14 @@ const upload = multer({
   },
 });
 
+function sendJsonResponse(res: Response, status: number, body: unknown) {
+  const payload = JSON.stringify(body);
+  res.status(status);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.removeHeader('Content-Length');
+  res.end(payload);
+}
+
 // ── Route Registration ──────────────────────────────────────────────────
 
 export function registerNFTRoutes(app: Express) {
@@ -87,15 +95,17 @@ export function registerNFTRoutes(app: Express) {
     upload.single('image'),
     async (req: AuthenticatedRequest, res) => {
       try {
+        console.log('[NFT Upload] Image upload request received');
         const ipfs = getIPFSService();
-        if (!ipfs) return res.status(503).json({ error: 'IPFS service not available' });
+        if (!ipfs) return sendJsonResponse(res, 503, { error: 'IPFS service not available' });
 
         const file = req.file;
-        if (!file) return res.status(400).json({ error: 'No image file provided' });
+        if (!file) return sendJsonResponse(res, 400, { error: 'No image file provided' });
 
         const result = await ipfs.uploadImage(file.buffer, file.originalname, file.mimetype);
 
-        res.json({
+        console.log('[NFT Upload] Image upload succeeded');
+        sendJsonResponse(res, 200, {
           success: true,
           ipfsHash: result.ipfsHash,
           ipfsUri: result.ipfsUri,
@@ -104,7 +114,7 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Upload image error:', error);
-        res.status(500).json({
+        sendJsonResponse(res, 500, {
           error: 'Failed to upload image',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -125,15 +135,18 @@ export function registerNFTRoutes(app: Express) {
     ]),
     async (req: AuthenticatedRequest, res) => {
       try {
+        console.log('[NFT Upload] Video upload request received');
         const ipfs = getIPFSService();
-        if (!ipfs) return res.status(503).json({ error: 'IPFS service not available' });
+        if (!ipfs) return sendJsonResponse(res, 503, { error: 'IPFS service not available' });
 
         const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
         const videoFile = files?.video?.[0];
         const thumbnailFile = files?.thumbnail?.[0];
 
-        if (!videoFile) return res.status(400).json({ error: 'No video file provided' });
-        if (!thumbnailFile) return res.status(400).json({ error: 'No thumbnail file provided' });
+        if (!videoFile) return sendJsonResponse(res, 400, { error: 'No video file provided' });
+        if (!thumbnailFile) {
+          return sendJsonResponse(res, 400, { error: 'No thumbnail file provided' });
+        }
 
         const [videoResult, thumbnailResult] = await Promise.all([
           ipfs.uploadVideo(videoFile.buffer, videoFile.originalname, videoFile.mimetype),
@@ -144,7 +157,8 @@ export function registerNFTRoutes(app: Express) {
           ),
         ]);
 
-        res.json({
+        console.log('[NFT Upload] Video upload succeeded');
+        sendJsonResponse(res, 200, {
           success: true,
           video: {
             ipfsHash: videoResult.ipfsHash,
@@ -161,7 +175,7 @@ export function registerNFTRoutes(app: Express) {
         });
       } catch (error: unknown) {
         console.error('Upload video error:', error);
-        res.status(500).json({
+        sendJsonResponse(res, 500, {
           error: 'Failed to upload video',
           message: error instanceof Error ? error.message : String(error),
         });

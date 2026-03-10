@@ -51,6 +51,7 @@ import { registerCampaignV2Routes } from './campaigns/campaign-routes-v2';
 import { registerReputationRoutes } from './reputation/reputation-routes';
 import { registerBlockchainRoutes } from './blockchain/blockchain-routes';
 import { registerBadgeRoutes } from './blockchain/badge-routes';
+import { registerNFTRoutes } from './nft/nft-routes';
 import { registerStripeWebhookRoutes } from './stripe/stripe-webhook-routes';
 import { errorHandler } from '../lib/api-errors';
 import { getTierLimits, type SubscriptionTier } from '@shared/subscription-config';
@@ -3300,6 +3301,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register creator activity routes (M21 extraction)
   registerCreatorActivityRoutes(app);
+
+  // Register NFT routes
+  registerNFTRoutes(app);
 
   // Register health check routes
   registerHealthRoutes(app);

@@ -30,29 +30,6 @@ export default function FindCreators() {
     staleTime: 30000, // 30 seconds
   });
 
-  // Debug logging
-  console.log('Find Creators - Query Status:', { isLoading, isError, error });
-  console.log('Find Creators - Total creators from API:', creators.length);
-  console.log('Find Creators - User data:', { userData: !!userData, userType: userData?.userType });
-  console.log('Find Creators - Filters active:', { 
-    showActiveOnly, 
-    showVerifiedOnly, 
-    selectedCategory,
-    sortBy 
-  });
-  
-  // Debug: Log banner image data for first few creators
-  if (creators.length > 0) {
-    console.log('Find Creators - Image data sample:', creators.slice(0, 3).map((c: CreatorWithExtras) => ({
-      displayName: c.displayName,
-      imageUrl: c.imageUrl,
-      userProfileAvatar: c.user?.profileData?.avatar,
-      userProfileBanner: c.user?.profileData?.bannerImage,
-      tenantBrandingBanner: c.tenant?.branding?.bannerUrl,
-      tenantBrandingLogo: c.tenant?.branding?.logoUrl
-    })));
-  }
-
   const handleUnauthenticatedClick = () => {
     // Trigger auth modal for unauthenticated users
     openAuthModal();
@@ -64,25 +41,22 @@ export default function FindCreators() {
       creator.bio?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || creator.category === selectedCategory;
 
-    // Filter by active status - only apply if toggle is ON
     const matchesActive = !showActiveOnly || (creator as CreatorWithExtras).isLive;
 
-    // Filter by verified status - only apply if toggle is ON
     const matchesVerified = !showVerifiedOnly || (creator as CreatorWithExtras).isVerified;
 
-    // IMPORTANT: Only show creators who have at least one published program
-    // This prevents showing creators who haven't set up their program yet
-    const hasPublishedProgram = creator.hasPublishedProgram === true;
-
-    return matchesSearch && matchesCategory && matchesActive && matchesVerified && hasPublishedProgram;
+    return matchesSearch && matchesCategory && matchesActive && matchesVerified;
   }), [creators, searchQuery, selectedCategory, showActiveOnly, showVerifiedOnly]);
 
-  console.log('Find Creators - After filtering:', filteredCreators.length);
-
-  // Sort creators - default is newest first
   const sortedCreators = useMemo(() => [...filteredCreators].sort((a, b) => {
     const aDate = (a as Creator).createdAt ? new Date((a as Creator).createdAt!).getTime() : 0;
     const bDate = (b as Creator).createdAt ? new Date((b as Creator).createdAt!).getTime() : 0;
+
+    // Always surface creators with published programs first
+    const aHasProgram = (a as CreatorWithExtras).hasPublishedProgram ? 1 : 0;
+    const bHasProgram = (b as CreatorWithExtras).hasPublishedProgram ? 1 : 0;
+    if (aHasProgram !== bHasProgram) return bHasProgram - aHasProgram;
+
     if (sortBy === "active") {
       const aLive = (a as CreatorWithExtras).isLive;
       const bLive = (b as CreatorWithExtras).isLive;
