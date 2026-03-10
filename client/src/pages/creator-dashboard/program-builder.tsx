@@ -36,9 +36,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import {
-  createSocialConnectionHook,
-} from '@/hooks/use-social-connection';
+import { usePlatformConnectors } from '@/hooks/use-social-connection';
 import { ImageUpload } from '@/components/ui/image-upload';
 import type { Program, Campaign, Task } from '@shared/schema';
 import { type ThemeTemplate, type CreatorTypeForTheme } from '@shared/theme-templates';
@@ -73,50 +71,6 @@ import {
 interface ProgramWithDetails extends Program {
   campaigns?: Campaign[];
   tasks?: Task[];
-}
-
-const useTwitterConn = createSocialConnectionHook('twitter');
-const useInstagramConn = createSocialConnectionHook('instagram');
-const useDiscordConn = createSocialConnectionHook('discord');
-const useFacebookConn = createSocialConnectionHook('facebook');
-const useTikTokConn = createSocialConnectionHook('tiktok');
-const useYouTubeConn = createSocialConnectionHook('youtube');
-const useSpotifyConn = createSocialConnectionHook('spotify');
-const useAppleMusicConn = createSocialConnectionHook('apple_music');
-const useTwitchConn = createSocialConnectionHook('twitch');
-const useKickConn = createSocialConnectionHook('kick');
-
-function usePlatformConnectors() {
-  const twitter = useTwitterConn();
-  const instagram = useInstagramConn();
-  const discord = useDiscordConn();
-  const facebook = useFacebookConn();
-  const tiktok = useTikTokConn();
-  const youtube = useYouTubeConn();
-  const spotify = useSpotifyConn();
-  const apple_music = useAppleMusicConn();
-  const twitch = useTwitchConn();
-  const kick = useKickConn();
-
-  const hooks: Record<string, ReturnType<typeof useTwitterConn>> = {
-    twitter, instagram, discord, facebook,
-    tiktok, youtube, spotify, apple_music, twitch, kick,
-  };
-
-  const connectingPlatform = Object.entries(hooks).find(
-    ([, h]) => h.isConnecting
-  )?.[0] ?? null;
-
-  const connect = async (platformId: string) => {
-    const hook = hooks[platformId];
-    if (!hook) {
-      console.warn('[ProgramBuilder] Unknown platform:', platformId);
-      return;
-    }
-    await hook.connect();
-  };
-
-  return { connect, connectingPlatform, hooks };
 }
 
 export default function ProgramBuilderNew() {

@@ -345,11 +345,11 @@ function DistributeTokens({ token }: { token: TokenInfo }) {
               <select
                 value={selectedWallet}
                 onChange={(e) => setSelectedWallet(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2 text-sm"
+                className="w-full bg-[#1a1a2e] border border-white/10 text-white rounded-md px-3 py-2 text-sm"
               >
-                <option value="">Choose a fan...</option>
+                <option value="" className="bg-[#1a1a2e] text-gray-400">Choose a fan...</option>
                 {members.map((m) => (
-                  <option key={m.walletAddress} value={m.walletAddress}>
+                  <option key={m.walletAddress} value={m.walletAddress} className="bg-[#1a1a2e] text-white">
                     {m.displayName || m.username} ({m.walletAddress.slice(0, 6)}...
                     {m.walletAddress.slice(-4)})
                   </option>

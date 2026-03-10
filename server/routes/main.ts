@@ -604,6 +604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           creatorType,
           username: proposedUsername,
           subscriptionTier: requestedTier,
+          typeSpecificData: incomingTypeData,
         } = req.body;
 
         // Validate creatorType
@@ -755,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bio: '',
             category: creatorType,
             followerCount: 0,
-            typeSpecificData: {},
+            typeSpecificData: incomingTypeData && typeof incomingTypeData === 'object' ? incomingTypeData : {},
             brandColors: {
               primary: '#8B5CF6',
               secondary: '#06B6D4',
@@ -766,10 +767,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log('Created creator record:', creator.id);
         } else {
-          // Update creator category if it changed
-          creator = await storage.updateCreator(creator.id, {
-            category: creatorType,
-          });
+          // Update creator category and type-specific data if provided
+          const updateData: Record<string, unknown> = { category: creatorType };
+          if (incomingTypeData && typeof incomingTypeData === 'object') {
+            updateData.typeSpecificData = {
+              ...((creator.typeSpecificData as Record<string, unknown>) || {}),
+              ...incomingTypeData,
+            };
+          }
+          creator = await storage.updateCreator(creator.id, updateData);
         }
 
         // Step 4: Create draft program with smart defaults (if none exists)

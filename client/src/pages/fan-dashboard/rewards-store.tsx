@@ -36,6 +36,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAccount } from '@particle-network/connectkit';
 
 // Types
 interface Reward {
@@ -153,17 +154,34 @@ export default function FanRewardsStore() {
 
   const rewards = catalogData?.rewards || [];
   const userPoints = catalogData?.userPoints || 0;
+  const { address: particleAddress } = useAccount();
   const fanWalletAddress =
+    particleAddress ||
     ((user as any)?.avalancheL1Address as string | undefined) ||
     ((user as any)?.walletAddress as string | undefined);
 
-  // Fetch reward detail
+  // Fetch reward detail — the endpoint returns { reward, userBalance, canRedeem, ... }
+  // so we flatten it into the Reward shape the UI expects.
   const { data: rewardDetail, isLoading: isLoadingDetail } = useQuery<Reward>({
     queryKey: ['/api/rewards/catalog', selectedReward?.id],
     queryFn: async () => {
       if (!selectedReward?.id) return null;
       const response = await apiRequest('GET', `/api/rewards/catalog/${selectedReward.id}`);
-      return readJsonResponse(response);
+      const data: any = await readJsonResponse(response);
+      const r = data.reward ?? data;
+      return {
+        ...r,
+        pointsCost: r.pointsCost ?? r.points_cost ?? 0,
+        rewardType: r.rewardType ?? r.reward_type ?? 'custom',
+        imageUrl: r.imageUrl ?? r.image_url,
+        stockCount: r.stockCount ?? r.stock_quantity,
+        stockRemaining: r.stockQuantity != null ? r.stockQuantity : r.stockRemaining ?? r.stock_quantity,
+        isActive: r.isActive ?? r.is_active ?? true,
+        programId: r.programId ?? r.program_id ?? selectedReward?.programId,
+        rewardData: r.rewardData ?? r.reward_data,
+        canAfford: data.canRedeem ?? (data.userBalance >= (r.pointsCost ?? r.points_cost ?? 0)),
+        creatorName: r.creatorName ?? selectedReward?.creatorName,
+      } as Reward;
     },
     enabled: !!selectedReward?.id && showDetailDialog,
   });
@@ -367,10 +385,10 @@ export default function FanRewardsStore() {
                 {filteredRewards.map((reward) => {
                   const config = getRewardTypeConfig(reward.rewardType);
                   const Icon = config.icon;
-                  const canAfford = reward.canAfford ?? userPoints >= reward.pointsCost;
+                  const canAfford = reward.canAfford ?? userPoints >= (reward.pointsCost ?? 0);
                   const isOutOfStock =
-                    reward.stockRemaining !== undefined && reward.stockRemaining <= 0;
-                  const needsPoints = reward.pointsCost - userPoints;
+                    reward.stockRemaining != null && reward.stockRemaining <= 0;
+                  const needsPoints = (reward.pointsCost ?? 0) - userPoints;
 
                   return (
                     <Card
@@ -400,8 +418,8 @@ export default function FanRewardsStore() {
                           </Badge>
                         </div>
 
-                        {/* Stock Badge */}
-                        {reward.stockRemaining !== undefined && (
+                        {/* Stock Badge — only show when stock is tracked (non-null) */}
+                        {reward.stockRemaining != null && (
                           <div className="absolute top-3 right-3">
                             <Badge
                               className={
@@ -484,8 +502,7 @@ export default function FanRewardsStore() {
                 <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
               </div>
             ) : rewardDetail ? (
-              <>
-                {(() => {
+                (() => {
                   const detailConfig = getRewardTypeConfig(rewardDetail.rewardType);
                   return (
                     <>
@@ -523,13 +540,13 @@ export default function FanRewardsStore() {
                     <div className="flex items-center gap-2">
                       <Coins className="h-5 w-5 text-brand-primary" />
                       <span className="text-xl font-bold text-white">
-                        {rewardDetail.pointsCost.toLocaleString()} points
+                        {(rewardDetail.pointsCost ?? 0).toLocaleString()} points
                       </span>
                     </div>
                   </div>
 
-                  {/* Stock Info */}
-                  {rewardDetail.stockRemaining !== undefined && (
+                  {/* Stock Info — only show when stock is tracked (non-null) */}
+                  {rewardDetail.stockRemaining != null && (
                     <div className="flex items-center gap-2 text-sm">
                       <Package className="h-4 w-4 text-gray-400" />
                       <span className="text-gray-300">
@@ -702,7 +719,7 @@ export default function FanRewardsStore() {
                     disabled={
                       !rewardDetail.canAfford ||
                       !rewardDetail.programId ||
-                      (rewardDetail.stockRemaining !== undefined &&
+                      (rewardDetail.stockRemaining != null &&
                         rewardDetail.stockRemaining <= 0) ||
                       redeemMutation.isPending
                     }
@@ -723,7 +740,7 @@ export default function FanRewardsStore() {
                 </DialogFooter>
                     </>
                   );
-                })()}
+                })()
             ) : null}
           </DialogContent>
         </Dialog>

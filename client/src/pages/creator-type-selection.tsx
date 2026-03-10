@@ -17,10 +17,7 @@ import {
   type CreatorType,
 } from '@/components/program/creator-program-templates';
 import { PlatformConnectionPriority } from '@/components/program/platform-connection-priority';
-import { invalidateSocialConnections } from '@/hooks/use-social-connections';
-import { FacebookSDKManager } from '@/lib/facebook';
-import { socialManager } from '@/lib/social-integrations';
-import { TwitterSDKManager } from '@/lib/twitter';
+import { usePlatformConnectors } from '@/hooks/use-social-connection';
 import {
   SUBSCRIPTION_TIERS,
   SELECTABLE_TIERS,
@@ -70,6 +67,14 @@ interface OnboardingState {
   themeId: string;
   logoUrl: string | null;
   subscriptionTier: SubscriptionTier;
+  // Athlete fields
+  sport: string;
+  educationLevel: string;
+  // Musician fields
+  bandArtistName: string;
+  artistType: string;
+  musicGenre: string;
+  musicCatalogUrl: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -152,10 +157,15 @@ export default function CreatorTypeSelection() {
     themeId: '',
     logoUrl: null,
     subscriptionTier: 'free',
+    sport: '',
+    educationLevel: '',
+    bandArtistName: '',
+    artistType: '',
+    musicGenre: '',
+    musicCatalogUrl: '',
   });
 
-  // Social connection state
-  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const { connect: connectPlatform, connectingPlatform } = usePlatformConnectors();
   const [recentlyConnected, setRecentlyConnected] = useState<Set<string>>(new Set<string>());
 
   // Fetch social connections
@@ -209,102 +219,31 @@ export default function CreatorTypeSelection() {
     [user, state.username]
   );
 
-  // Social platform connection handler (mirrors program-builder logic)
   const handleConnectPlatform = async (platformId: string) => {
-    const platformNames: Record<string, string> = {
-      twitter: 'Twitter',
-      instagram: 'Instagram',
-      discord: 'Discord',
-      facebook: 'Facebook',
-      tiktok: 'TikTok',
-      youtube: 'YouTube',
-      spotify: 'Spotify',
-      twitch: 'Twitch',
-      apple_music: 'Apple Music',
-    };
-    const platformName = platformNames[platformId] || platformId;
-    setConnectingPlatform(platformId);
-
-    try {
-      let result: {
-        success: boolean;
-        error?: string;
-        user?: unknown;
-        accessToken?: string;
-        refreshToken?: string;
-      };
-
-      if (platformId === 'twitter') {
-        result = await TwitterSDKManager.secureLogin('creator');
-        if (result.success && result.user) {
-          try {
-            await fetchApi('/api/social-connections', {
-              method: 'POST',
-              body: JSON.stringify({
-                platform: 'twitter',
-                platformUserId: (result.user as any).id,
-                platformUsername: String((result.user as any).username),
-                platformDisplayName: String((result.user as any).name),
-                accessToken: result.accessToken,
-                refreshToken: result.refreshToken,
-                profileData: {
-                  profileImageUrl: (result.user as any).profileImageUrl,
-                  followersCount: (result.user as any).followersCount,
-                  followingCount: (result.user as any).followingCount,
-                },
-              }),
-            });
-          } catch (saveErr) {
-            console.warn('[Onboarding] Twitter save failed:', saveErr);
-          }
-        }
-      } else if (platformId === 'facebook') {
-        result = await FacebookSDKManager.login(
-          'pages_show_list,pages_read_engagement,business_management'
-        );
-        result.success = result.success && !!result.accessToken;
-      } else if (platformId === 'apple_music') {
-        const { AppleMusicAPI } = await import('@/lib/social-integrations');
-        const appleMusic = new AppleMusicAPI();
-        result = await appleMusic.secureLogin();
-      } else {
-        const api = (socialManager as any)[platformId as keyof typeof socialManager];
-        if (!api) {
-          console.warn('Unknown platform:', platformId);
-          return;
-        }
-        result = await (api as any).secureLogin();
-      }
-
-      if (result.success) {
-        setRecentlyConnected((prev) => new Set(prev).add(platformId));
-        toast({
-          title: `${platformName} Connected! +500 Points`,
-          description: `Successfully connected your ${platformName} account`,
-        });
-        invalidateSocialConnections();
-      } else {
-        toast({
-          title: 'Connection Failed',
-          description: result.error || `Failed to connect ${platformName}`,
-          variant: 'destructive',
-        });
-      }
-    } catch {
-      toast({
-        title: 'Connection Failed',
-        description: `An error occurred while connecting ${platformName}`,
-        variant: 'destructive',
-      });
-    } finally {
-      setConnectingPlatform(null);
-    }
+    await connectPlatform(platformId);
+    setRecentlyConnected((prev) => new Set(prev).add(platformId));
   };
 
   // API: create creator + tenant + program, then update program with user choices
   const finishMutation = useMutation({
     mutationFn: async () => {
       if (!state.creatorType) throw new Error('No creator type selected');
+
+      // Build type-specific data payload
+      const typeSpecificData: Record<string, unknown> = {};
+      if (state.creatorType === 'athlete') {
+        typeSpecificData.athlete = {
+          sport: state.sport.trim(),
+          education: { level: state.educationLevel },
+        };
+      } else if (state.creatorType === 'musician') {
+        typeSpecificData.musician = {
+          bandArtistName: state.bandArtistName.trim(),
+          artistType: state.artistType,
+          musicGenre: state.musicGenre.trim(),
+          musicCatalogUrl: state.musicCatalogUrl.trim(),
+        };
+      }
 
       // Step 1: Atomic scaffold (tenant + creator + draft program)
       const result = await fetchApi('/api/auth/set-creator-type', {
@@ -313,6 +252,7 @@ export default function CreatorTypeSelection() {
           creatorType: state.creatorType,
           username: state.username.trim() || undefined,
           subscriptionTier: state.subscriptionTier,
+          typeSpecificData,
         }),
       });
 
@@ -349,6 +289,10 @@ export default function CreatorTypeSelection() {
           };
         }
 
+        if (Object.keys(typeSpecificData).length > 0) {
+          pageConfig.creatorDetails = typeSpecificData;
+        }
+
         if (Object.keys(pageConfig).length > 0) {
           updatePayload.pageConfig = pageConfig;
         }
@@ -381,8 +325,17 @@ export default function CreatorTypeSelection() {
   // Navigation helpers
   const canAdvance = () => {
     if (currentStep === 0) return !!state.creatorType;
-    if (currentStep === 1)
-      return isUsernameValid(state.username) && state.programName.trim().length > 0;
+    if (currentStep === 1) {
+      const baseValid = isUsernameValid(state.username) && state.programName.trim().length > 0;
+      if (!baseValid) return false;
+      if (state.creatorType === 'athlete') {
+        return !!state.sport.trim() && !!state.educationLevel;
+      }
+      if (state.creatorType === 'musician') {
+        return !!state.bandArtistName.trim() && !!state.artistType && !!state.musicGenre.trim() && !!state.musicCatalogUrl.trim();
+      }
+      return true;
+    }
     return true;
   };
 
@@ -627,6 +580,103 @@ export default function CreatorTypeSelection() {
                     {state.programDescription.length}/300 characters
                   </p>
                 </div>
+
+                {/* Athlete-specific fields */}
+                {state.creatorType === 'athlete' && (
+                  <div className="space-y-4 p-4 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                    <p className="text-xs uppercase tracking-wider text-sky-400 font-medium">Athlete Details</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Sport <span className="text-brand-primary">*</span>
+                        </label>
+                        <Input
+                          value={state.sport}
+                          onChange={(e) => setState((s) => ({ ...s, sport: e.target.value }))}
+                          placeholder="e.g., Basketball, Football, Soccer"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Education Level <span className="text-brand-primary">*</span>
+                        </label>
+                        <select
+                          value={state.educationLevel}
+                          onChange={(e) => setState((s) => ({ ...s, educationLevel: e.target.value }))}
+                          className="w-full h-12 rounded-md bg-white/5 border border-white/10 text-white px-3 text-base"
+                        >
+                          <option value="">Select level</option>
+                          <option value="high_school">High School</option>
+                          <option value="college_d1">College D1</option>
+                          <option value="college_d2">College D2</option>
+                          <option value="college_d3">College D3</option>
+                          <option value="professional">Professional</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Musician-specific fields */}
+                {state.creatorType === 'musician' && (
+                  <div className="space-y-4 p-4 rounded-xl bg-violet-500/5 border border-violet-500/15">
+                    <p className="text-xs uppercase tracking-wider text-violet-400 font-medium">Musician Details</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Artist / Band Name <span className="text-brand-primary">*</span>
+                        </label>
+                        <Input
+                          value={state.bandArtistName}
+                          onChange={(e) => setState((s) => ({ ...s, bandArtistName: e.target.value }))}
+                          placeholder="Your stage name or band name"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Artist Type <span className="text-brand-primary">*</span>
+                        </label>
+                        <select
+                          value={state.artistType}
+                          onChange={(e) => setState((s) => ({ ...s, artistType: e.target.value }))}
+                          className="w-full h-12 rounded-md bg-white/5 border border-white/10 text-white px-3 text-base"
+                        >
+                          <option value="">Select type</option>
+                          <option value="independent">Independent</option>
+                          <option value="signed">Signed</option>
+                          <option value="hobby">Hobby</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Music Genre <span className="text-brand-primary">*</span>
+                        </label>
+                        <Input
+                          value={state.musicGenre}
+                          onChange={(e) => setState((s) => ({ ...s, musicGenre: e.target.value }))}
+                          placeholder="e.g., Hip Hop, Pop, Rock"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Music Catalog URL <span className="text-brand-primary">*</span>
+                        </label>
+                        <Input
+                          value={state.musicCatalogUrl}
+                          onChange={(e) => setState((s) => ({ ...s, musicCatalogUrl: e.target.value }))}
+                          placeholder="Spotify, Apple Music, or SoundCloud link"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Points Name */}
                 <div>

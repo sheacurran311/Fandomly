@@ -417,3 +417,52 @@ export function useSocialConnection(platform: SocialPlatform): UseSocialConnecti
   const hook = createSocialConnectionHook(platform);
   return hook();
 }
+
+const _useTwitterConn = createSocialConnectionHook('twitter');
+const _useInstagramConn = createSocialConnectionHook('instagram');
+const _useDiscordConn = createSocialConnectionHook('discord');
+const _useFacebookConn = createSocialConnectionHook('facebook');
+const _useTikTokConn = createSocialConnectionHook('tiktok');
+const _useYouTubeConn = createSocialConnectionHook('youtube');
+const _useSpotifyConn = createSocialConnectionHook('spotify');
+const _useAppleMusicConn = createSocialConnectionHook('apple_music');
+const _useTwitchConn = createSocialConnectionHook('twitch');
+const _useKickConn = createSocialConnectionHook('kick');
+
+/**
+ * Aggregated hook that provides connect/disconnect for ALL platforms.
+ * Use this in pages that show multi-platform connection UIs
+ * (program builder, onboarding, social settings, etc.)
+ */
+export function usePlatformConnectors() {
+  const twitter = _useTwitterConn();
+  const instagram = _useInstagramConn();
+  const discord = _useDiscordConn();
+  const facebook = _useFacebookConn();
+  const tiktok = _useTikTokConn();
+  const youtube = _useYouTubeConn();
+  const spotify = _useSpotifyConn();
+  const apple_music = _useAppleMusicConn();
+  const twitch = _useTwitchConn();
+  const kick = _useKickConn();
+
+  const hooks: Record<string, UseSocialConnectionReturn> = {
+    twitter, instagram, discord, facebook,
+    tiktok, youtube, spotify, apple_music, twitch, kick,
+  };
+
+  const connectingPlatform = Object.entries(hooks).find(
+    ([, h]) => h.isConnecting
+  )?.[0] ?? null;
+
+  const connect = async (platformId: string) => {
+    const hook = hooks[platformId];
+    if (!hook) {
+      console.warn('[usePlatformConnectors] Unknown platform:', platformId);
+      return;
+    }
+    await hook.connect();
+  };
+
+  return { connect, connectingPlatform, hooks };
+}

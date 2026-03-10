@@ -45,6 +45,13 @@ interface ProgramCreator {
   imageUrl?: string;
   bannerImage?: string;
   verified?: boolean;
+  category?: 'athlete' | 'musician' | 'content_creator';
+  location?: string;
+  creatorDetails?: {
+    athlete?: { sport?: string; education?: { level?: string }; position?: string; school?: string; currentSponsors?: string };
+    musician?: { bandArtistName?: string; artistType?: string; musicGenre?: string; musicCatalogUrl?: string };
+    contentCreator?: { aboutMe?: string; contentType?: string[]; topicsOfFocus?: string[] | string };
+  };
   socialLinks?: {
     twitter?: string;
     instagram?: string;
@@ -827,6 +834,14 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
             </div>
           </div>
 
+          {/* Creator type-specific details */}
+          {creator.creatorDetails && (
+            <>
+              <Separator className="bg-gray-200" />
+              <CreatorDetailsDisplay category={creator.category} details={creator.creatorDetails} location={creator.location} />
+            </>
+          )}
+
           {/* Show social links only if enabled */}
           {profileVisibility.showSocialLinks && creator.socialLinks && (
             <>
@@ -1154,6 +1169,83 @@ function TasksTab({
             />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Creator Details Display — type-specific profile information
+function CreatorDetailsDisplay({
+  category,
+  details,
+  location,
+}: {
+  category?: string;
+  details: NonNullable<ProgramCreator['creatorDetails']>;
+  location?: string;
+}) {
+  const EDUCATION_LABELS: Record<string, string> = {
+    high_school: 'High School',
+    college_d1: 'College D1',
+    college_d2: 'College D2',
+    college_d3: 'College D3',
+    professional: 'Professional',
+    other: 'Other',
+  };
+
+  const items: { label: string; value: string }[] = [];
+
+  if (category === 'athlete' && details.athlete) {
+    const a = details.athlete;
+    if (a.sport) items.push({ label: 'Sport', value: a.sport });
+    if (a.position) items.push({ label: 'Position', value: a.position });
+    if (a.education?.level) items.push({ label: 'Level', value: EDUCATION_LABELS[a.education.level] || a.education.level });
+    if (a.school) items.push({ label: 'School', value: a.school });
+    if (a.currentSponsors) items.push({ label: 'Sponsors', value: a.currentSponsors });
+  } else if (category === 'musician' && details.musician) {
+    const m = details.musician;
+    if (m.bandArtistName) items.push({ label: 'Artist', value: m.bandArtistName });
+    if (m.artistType) items.push({ label: 'Type', value: m.artistType.charAt(0).toUpperCase() + m.artistType.slice(1) });
+    if (m.musicGenre) items.push({ label: 'Genre', value: m.musicGenre });
+  } else if (category === 'content_creator' && details.contentCreator) {
+    const cc = details.contentCreator;
+    if (cc.contentType?.length) items.push({ label: 'Content', value: cc.contentType.join(', ') });
+    if (cc.topicsOfFocus) {
+      const topics = Array.isArray(cc.topicsOfFocus) ? cc.topicsOfFocus.join(', ') : cc.topicsOfFocus;
+      if (topics) items.push({ label: 'Topics', value: topics });
+    }
+  }
+
+  if (location) items.push({ label: 'Location', value: location });
+
+  if (items.length === 0) return null;
+
+  const categoryLabel = category === 'athlete' ? 'Athlete' : category === 'musician' ? 'Musician' : 'Content Creator';
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <h4 className="text-gray-900 font-semibold">{categoryLabel} Info</h4>
+        {category === 'athlete' && <Trophy className="h-4 w-4 text-sky-500" />}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {items.map((item) => (
+          <div key={item.label} className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-gray-500 text-xs mb-0.5">{item.label}</p>
+            <p className="text-gray-900 text-sm font-medium">{item.value}</p>
+          </div>
+        ))}
+      </div>
+      {category === 'musician' && details.musician?.musicCatalogUrl && (
+        <a
+          href={details.musician.musicCatalogUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 mt-3 text-sm text-brand-primary hover:underline"
+        >
+          <Globe className="h-3.5 w-3.5" />
+          Listen to Music
+        </a>
       )}
     </div>
   );

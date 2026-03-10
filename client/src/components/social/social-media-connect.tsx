@@ -22,11 +22,9 @@ import {
   Video,
 } from 'lucide-react';
 import { FaTiktok, FaSpotify, FaDiscord, FaTwitch, FaYoutube } from 'react-icons/fa';
-import { socialManager, type SocialMediaAccount } from '@/lib/social-integrations';
-import { TwitterSDKManager } from '@/lib/twitter';
 import { useToast } from '@/hooks/use-toast';
 import { invalidateSocialConnections } from '@/hooks/use-social-connections';
-import { fetchApi } from '@/lib/queryClient';
+import { usePlatformConnectors } from '@/hooks/use-social-connection';
 import { disconnectSocialPlatform } from '@/lib/social-connection-api';
 
 interface SocialPlatform {
@@ -122,7 +120,7 @@ export default function SocialMediaConnect({
 }: SocialMediaConnectProps) {
   const { user } = useAuth();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
-  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const { connect: hookConnect, connectingPlatform, hooks: platformHooks } = usePlatformConnectors();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -151,313 +149,27 @@ export default function SocialMediaConnect({
     loadAccounts();
   }, [onAccountsChange]);
 
-  // Check for OAuth callbacks
-  useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      const error = urlParams.get('error');
-
-      if (error) {
-        toast({
-          title: 'Connection Failed',
-          description: `OAuth error: ${error}`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (code && state) {
-        const platform = state.replace('_auth', '');
-        // Skip Twitter - it uses popup flow via TwitterSDKManager, not redirect
-        if (platform !== 'twitter') {
-          await handleOAuthSuccess(platform, code);
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      }
-    };
-
-    handleOAuthCallback();
-  }, []);
-
-  const handleOAuthSuccess = async (platform: string, code: string) => {
-    // Skip Twitter - it uses popup flow via TwitterSDKManager, not redirect
-    if (platform === 'twitter') {
-      console.log('[Social Connect] Skipping Twitter redirect callback - uses popup flow');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const account = await socialManager.connectAccount(platform, code);
-
-      if (!account) {
-        throw new Error('Failed to connect account - no account data received');
-      }
-
-      const connectedAccount: ConnectedAccount = {
-        platform: account.platform,
-        username: account.username,
-        displayName: account.displayName,
-        followers: account.followers,
-        verified: account.verified,
-        profileUrl: account.profileUrl,
-        lastSync: new Date(),
-        status: 'connected',
-      };
-
-      setConnectedAccounts((prev) => {
-        const filtered = prev.filter((acc) => acc.platform !== platform);
-        const updated = [...filtered, connectedAccount];
-        onAccountsChange?.(updated);
-        return updated;
-      });
-
-      toast({
-        title: 'Account Connected',
-        description: `Successfully connected your ${platform} account`,
-      });
-    } catch (error) {
-      console.error('OAuth success handling error:', error);
-      toast({
-        title: 'Connection Failed',
-        description: `Failed to connect ${platform} account`,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-      setConnectingPlatform(null);
-    }
-  };
-
   const connectPlatform = async (platformId: string) => {
-    if (connectingPlatform) return;
-
-    setConnectingPlatform(platformId);
+    await hookConnect(platformId);
+    invalidateSocialConnections();
+    // Reload local account list to reflect changes
     try {
-      if (platformId === 'twitter') {
-        // Use popup PKCE flow via TwitterSDKManager
-        const userType = (window as any).__userType || 'auth';
-        const result = await TwitterSDKManager.secureLogin(userType);
-        if (result.success && result.accessToken) {
-          // Fetch profile directly using the token
-          const userInfo = await TwitterSDKManager.fetchUserInfo(result.accessToken);
-          if (!userInfo) throw new Error('Failed to load X profile');
-          const connectedAccount: ConnectedAccount = {
-            platform: 'twitter',
-            username: userInfo.username,
-            displayName: userInfo.name,
-            followers: userInfo.followersCount || 0,
-            verified: false,
-            profileUrl: `https://twitter.com/${userInfo.username}`,
-            lastSync: new Date(),
-            status: 'connected',
-          };
-          setConnectedAccounts((prev) => {
-            const filtered = prev.filter((acc) => acc.platform !== 'twitter');
-            const updated = [...filtered, connectedAccount];
-            onAccountsChange?.(updated);
-            return updated;
-          });
-          // Save connection via authenticated endpoint (supports cookie & JWT auth)
-          try {
-            await fetchApi('/api/social-connections', {
-              method: 'POST',
-              body: JSON.stringify({
-                platform: 'twitter',
-                platformUserId: userInfo.id,
-                platformUsername: userInfo.username,
-                platformDisplayName: userInfo.name,
-                accessToken: result.accessToken,
-                profileData: {
-                  profileImageUrl: userInfo.profileImageUrl,
-                  followersCount: userInfo.followersCount,
-                  followingCount: userInfo.followingCount,
-                },
-              }),
-            });
-            console.log('[SocialMediaConnect] Twitter connection saved');
-          } catch (saveErr) {
-            console.warn('[SocialMediaConnect] Save failed (popup may have saved):', saveErr);
-          }
-          toast({
-            title: 'X Connected! 🎉',
-            description: 'Successfully connected to X (Twitter).',
-          });
-        } else if (!result.success) {
-          throw new Error(result.error || 'Twitter connect failed');
-        }
-      } else if (platformId === 'tiktok') {
-        // Use popup flow for TikTok
-        const tiktokAPI = socialManager['tiktok'];
-        const result = await tiktokAPI.secureLogin();
-        if (result.success) {
-          toast({
-            title: 'TikTok Connected! 🎉',
-            description: 'Successfully connected to TikTok.',
-          });
-          // Reload accounts to get the new connection
-          const res = await fetch('/api/social/accounts', { credentials: 'include' });
-          const accounts = await res.json();
-          const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
-            platform: a.platform,
-            username: a.username,
-            displayName: a.displayName,
-            followers: Number(a.followers || 0),
-            verified: Boolean(a.verified || false),
-            profileUrl: a.profileUrl || '#',
-            lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-            status: a.isActive === false ? 'expired' : 'connected',
-          }));
-          setConnectedAccounts(mapped);
-          onAccountsChange?.(mapped);
-        } else {
-          throw new Error(result.error || 'TikTok connect failed');
-        }
-      } else if (platformId === 'youtube') {
-        // Use popup flow for YouTube
-        const youtubeAPI = socialManager['youtube'];
-        const result = await youtubeAPI.secureLogin();
-        if (result.success) {
-          toast({
-            title: 'YouTube Connected! 🎉',
-            description: result.channelName
-              ? `Successfully connected ${result.channelName}`
-              : 'Successfully connected to YouTube.',
-          });
-          // Reload accounts to get the new connection
-          const res = await fetch('/api/social/accounts', { credentials: 'include' });
-          const accounts = await res.json();
-          const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
-            platform: a.platform,
-            username: a.username,
-            displayName: a.displayName,
-            followers: Number(a.followers || 0),
-            verified: Boolean(a.verified || false),
-            profileUrl: a.profileUrl || '#',
-            lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-            status: a.isActive === false ? 'expired' : 'connected',
-          }));
-          setConnectedAccounts(mapped);
-          onAccountsChange?.(mapped);
-        } else {
-          throw new Error(result.error || 'YouTube connect failed');
-        }
-      } else if (platformId === 'spotify') {
-        // Use popup flow for Spotify
-        const spotifyAPI = socialManager['spotify'];
-        const result = await spotifyAPI.secureLogin();
-        if (result.success) {
-          toast({
-            title: 'Spotify Connected! 🎉',
-            description: result.displayName
-              ? `Successfully connected ${result.displayName}`
-              : 'Successfully connected to Spotify.',
-          });
-          // Reload accounts to get the new connection
-          const res = await fetch('/api/social/accounts', { credentials: 'include' });
-          const accounts = await res.json();
-          const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
-            platform: a.platform,
-            username: a.username,
-            displayName: a.displayName,
-            followers: Number(a.followers || 0),
-            verified: Boolean(a.verified || false),
-            profileUrl: a.profileUrl || '#',
-            lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-            status: a.isActive === false ? 'expired' : 'connected',
-          }));
-          setConnectedAccounts(mapped);
-          onAccountsChange?.(mapped);
-        } else {
-          throw new Error(result.error || 'Spotify connect failed');
-        }
-      } else if (platformId === 'discord') {
-        // Use OAuth flow for Discord
-        const discordAPI = socialManager['discord'];
-        if (discordAPI) {
-          const result = await discordAPI.secureLogin();
-          if (result.success) {
-            toast({
-              title: 'Discord Connected! 🎉',
-              description: result.displayName
-                ? `Successfully connected ${result.displayName}`
-                : 'Successfully connected to Discord.',
-            });
-            // Reload accounts to get the new connection
-            const res = await fetch('/api/social/accounts', { credentials: 'include' });
-            const accounts = await res.json();
-            const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
-              platform: a.platform,
-              username: a.username,
-              displayName: a.displayName,
-              followers: Number(a.followers || 0),
-              verified: Boolean(a.verified || false),
-              profileUrl: a.profileUrl || '#',
-              lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-              status: a.isActive === false ? 'expired' : 'connected',
-            }));
-            setConnectedAccounts(mapped);
-            onAccountsChange?.(mapped);
-          } else {
-            throw new Error(result.error || 'Discord connect failed');
-          }
-        } else {
-          throw new Error('Discord integration not configured');
-        }
-      } else if (platformId === 'twitch') {
-        // Use OAuth flow for Twitch
-        const twitchAPI = socialManager['twitch'];
-        if (twitchAPI) {
-          const result = await twitchAPI.secureLogin();
-          if (result.success) {
-            toast({
-              title: 'Twitch Connected! 🎉',
-              description: result.displayName
-                ? `Successfully connected ${result.displayName}`
-                : 'Successfully connected to Twitch.',
-            });
-            // Reload accounts to get the new connection
-            const res = await fetch('/api/social/accounts', { credentials: 'include' });
-            const accounts = await res.json();
-            const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
-              platform: a.platform,
-              username: a.username,
-              displayName: a.displayName,
-              followers: Number(a.followers || 0),
-              verified: Boolean(a.verified || false),
-              profileUrl: a.profileUrl || '#',
-              lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
-              status: a.isActive === false ? 'expired' : 'connected',
-            }));
-            setConnectedAccounts(mapped);
-            onAccountsChange?.(mapped);
-          } else {
-            throw new Error(result.error || 'Twitch connect failed');
-          }
-        } else {
-          throw new Error('Twitch integration not configured');
-        }
-      } else {
-        // Fallback for other platforms (Instagram, etc.)
-        const authUrl = socialManager.getAuthUrl(platformId);
-        window.location.href = authUrl;
-      }
-      // Invalidate social connections cache so all components get fresh data
-      invalidateSocialConnections();
-    } catch (error) {
-      console.error('Connect platform error:', error);
-      toast({
-        title: 'Connection Error',
-        description:
-          error instanceof Error
-            ? error.message
-            : `Failed to initiate ${platformId} connection. Please check your API keys.`,
-        variant: 'destructive',
-      });
-    } finally {
-      setConnectingPlatform(null);
+      const res = await fetch('/api/social/accounts', { credentials: 'include' });
+      const accounts = await res.json();
+      const mapped: ConnectedAccount[] = (accounts || []).map((a: any) => ({
+        platform: a.platform,
+        username: a.username,
+        displayName: a.displayName,
+        followers: Number(a.followers || 0),
+        verified: Boolean(a.verified || false),
+        profileUrl: a.profileUrl || '#',
+        lastSync: a.connectedAt ? new Date(a.connectedAt) : undefined,
+        status: a.isActive === false ? 'expired' : 'connected',
+      }));
+      setConnectedAccounts(mapped);
+      onAccountsChange?.(mapped);
+    } catch {
+      // Hook already showed toast on success/failure
     }
   };
 

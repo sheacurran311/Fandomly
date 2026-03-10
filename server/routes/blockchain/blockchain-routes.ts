@@ -26,12 +26,14 @@ import {
   REPUTATION_REGISTRY_ABI,
 } from '@shared/blockchain-config';
 import { db } from '../../db';
-import { eq, and, isNotNull } from 'drizzle-orm';
+import { eq, and, or, isNotNull, sql } from 'drizzle-orm';
 import {
   users,
   socialConnections,
   creators,
   tenantMemberships,
+  fanPrograms,
+  loyaltyPrograms,
   tokenDistributions,
 } from '@shared/schema';
 
@@ -557,32 +559,42 @@ export function registerBlockchainRoutes(app: Express) {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
-        // Find creator's tenant
         const [creator] = await db
-          .select({ tenantId: creators.tenantId })
+          .select({ id: creators.id, tenantId: creators.tenantId })
           .from(creators)
           .where(eq(creators.userId, userId));
 
-        if (!creator?.tenantId) {
+        if (!creator) {
           return res.status(403).json({ error: 'Not a creator' });
         }
 
-        const members = await db
-          .select({
-            userId: users.id,
-            username: users.username,
-            displayName: users.displayName,
-            walletAddress: users.avalancheL1Address,
-          })
-          .from(tenantMemberships)
-          .innerJoin(users, eq(users.id, tenantMemberships.userId))
-          .where(
-            and(
-              eq(tenantMemberships.tenantId, creator.tenantId),
-              isNotNull(users.avalancheL1Address)
+        // Fans may appear in tenantMemberships OR fanPrograms (enrollment).
+        // Wallet address may be in avalancheL1Address (Particle save) or walletAddress.
+        // Use a raw UNION query to combine both sources and deduplicate.
+        const result = await db.execute(sql`
+          SELECT DISTINCT ON (u.id)
+            u.id AS "userId",
+            u.username,
+            u.username AS "displayName",
+            COALESCE(u.avalanche_l1_address, u.wallet_address) AS "walletAddress"
+          FROM users u
+          WHERE u.id != ${userId}
+            AND (u.avalanche_l1_address IS NOT NULL OR u.wallet_address IS NOT NULL)
+            AND (
+              EXISTS (
+                SELECT 1 FROM tenant_memberships tm
+                WHERE tm.user_id = u.id AND tm.tenant_id = ${creator.tenantId}
+              )
+              OR EXISTS (
+                SELECT 1 FROM fan_programs fp
+                JOIN loyalty_programs lp ON lp.id = fp.program_id
+                WHERE fp.fan_id = u.id AND lp.creator_id = ${creator.id}
+              )
             )
-          );
+          ORDER BY u.id
+        `);
 
+        const members = (result as any).rows || [];
         return res.json({ members });
       } catch (error) {
         console.error('[BlockchainRoutes] Community wallets error:', error);

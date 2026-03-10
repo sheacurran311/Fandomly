@@ -372,6 +372,45 @@ export default function CreatorPublic() {
                           <div className="text-white">{creator.user.profileData.location}</div>
                         </div>
                       )}
+
+                      {/* Athlete details */}
+                      {creator.category === 'athlete' && (creator.typeSpecificData as any)?.athlete && (() => {
+                        const a = (creator.typeSpecificData as any).athlete;
+                        const educLabels: Record<string, string> = { high_school: 'High School', college_d1: 'College D1', college_d2: 'College D2', college_d3: 'College D3', professional: 'Professional', other: 'Other' };
+                        return (
+                          <>
+                            {a.sport && <div><label className="text-sm text-gray-400 mb-1 block">Sport</label><div className="text-white">{a.sport}</div></div>}
+                            {a.position && <div><label className="text-sm text-gray-400 mb-1 block">Position</label><div className="text-white">{a.position}</div></div>}
+                            {a.education?.level && <div><label className="text-sm text-gray-400 mb-1 block">Level</label><div className="text-white">{educLabels[a.education.level] || a.education.level}</div></div>}
+                            {a.school && <div><label className="text-sm text-gray-400 mb-1 block">School</label><div className="text-white">{a.school}</div></div>}
+                            {a.currentSponsors && <div><label className="text-sm text-gray-400 mb-1 block">Sponsors</label><div className="text-white">{a.currentSponsors}</div></div>}
+                          </>
+                        );
+                      })()}
+
+                      {/* Musician details */}
+                      {creator.category === 'musician' && (creator.typeSpecificData as any)?.musician && (() => {
+                        const m = (creator.typeSpecificData as any).musician;
+                        return (
+                          <>
+                            {m.bandArtistName && <div><label className="text-sm text-gray-400 mb-1 block">Artist</label><div className="text-white">{m.bandArtistName}</div></div>}
+                            {m.artistType && <div><label className="text-sm text-gray-400 mb-1 block">Artist Type</label><div className="text-white capitalize">{m.artistType}</div></div>}
+                            {m.musicGenre && <div><label className="text-sm text-gray-400 mb-1 block">Genre</label><div className="text-white">{m.musicGenre}</div></div>}
+                            {m.musicCatalogUrl && <div><label className="text-sm text-gray-400 mb-1 block">Music</label><a href={m.musicCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline flex items-center gap-1"><ExternalLink className="h-3.5 w-3.5" />Listen</a></div>}
+                          </>
+                        );
+                      })()}
+
+                      {/* Content creator details */}
+                      {creator.category === 'content_creator' && (creator.typeSpecificData as any)?.contentCreator && (() => {
+                        const cc = (creator.typeSpecificData as any).contentCreator;
+                        return (
+                          <>
+                            {cc.contentType?.length > 0 && <div><label className="text-sm text-gray-400 mb-1 block">Content</label><div className="text-white">{cc.contentType.join(', ')}</div></div>}
+                            {cc.topicsOfFocus && <div><label className="text-sm text-gray-400 mb-1 block">Topics</label><div className="text-white">{Array.isArray(cc.topicsOfFocus) ? cc.topicsOfFocus.join(', ') : cc.topicsOfFocus}</div></div>}
+                          </>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>

@@ -11,7 +11,7 @@ import {
   loyaltyPrograms,
   taskCompletions,
 } from '@shared/schema';
-import { eq, and, sql, count } from 'drizzle-orm';
+import { eq, and, sql, count, desc } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { platformPointsService } from '../../services/points/platform-points-service';
 import { getSafeDateGroupConfig } from '../../utils/safe-sql';
@@ -586,4 +586,24 @@ export function registerFanDashboardRoutes(app: Express) {
       }
     }
   );
+
+  /**
+   * GET /api/campaigns/creator/:creatorId
+   * Public: list active campaigns for a given creator (used by fan dashboard)
+   */
+  app.get('/api/campaigns/creator/:creatorId', async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+      const results = await db
+        .select()
+        .from(campaigns)
+        .where(and(eq(campaigns.creatorId, creatorId), eq(campaigns.status, 'active')))
+        .orderBy(desc(campaigns.createdAt));
+
+      res.json(results);
+    } catch (error) {
+      console.error('Failed to fetch campaigns for creator:', error);
+      res.status(500).json({ error: 'Failed to fetch campaigns' });
+    }
+  });
 }

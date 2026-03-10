@@ -100,7 +100,7 @@ export function registerRedemptionRoutes(app: Express) {
           r.category,
           r.reward_data as "rewardData",
           r.created_at as "createdAt",
-          COALESCE(r.stock_quantity, 0) as "stockRemaining",
+          r.stock_quantity as "stockRemaining",
           CASE WHEN r.stock_quantity IS NULL OR r.stock_quantity > 0 THEN TRUE ELSE FALSE END as "inStock",
           COUNT(rr.id) FILTER (WHERE rr.fan_id = ${userId}) as "userRedemptionCount"
         FROM rewards r
@@ -143,7 +143,7 @@ export function registerRedemptionRoutes(app: Express) {
       // Mark which rewards user can afford
       const rewardsWithAffordability = ((rewardsResult as any).rows || []).map((r: any) => ({
         ...r,
-        canAfford: userBalance >= (r.points_cost || 0),
+        canAfford: userBalance >= (r.pointsCost || r.points_cost || 0),
         userBalance,
       }));
 

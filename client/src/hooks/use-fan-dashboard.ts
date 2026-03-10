@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './use-auth';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, readJsonResponse } from '@/lib/queryClient';
 
 interface FanStats {
   platformPoints: number;
@@ -76,11 +76,11 @@ const fetchActiveCampaigns = async (fanId: string): Promise<Campaign[]> => {
     // Fetch campaigns for all creators in parallel
     const campaignPromises = fanPrograms.map(async (program: any) => {
       try {
-        const campaignsResponse = await apiRequest('GET', `/api/campaigns/creator/${program.creatorId}`);
+        const campaignsResponse = await fetch(`/api/campaigns/creator/${program.creatorId}`);
         if (!campaignsResponse.ok) {
           return [];
         }
-        const creatorCampaigns = await campaignsResponse.json();
+        const creatorCampaigns = await readJsonResponse<any[]>(campaignsResponse);
         
         // Transform campaigns with calculated fields
         return creatorCampaigns.map((campaign: any) => {
