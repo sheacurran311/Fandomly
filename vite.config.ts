@@ -284,10 +284,46 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       onwarn(warning, warn) {
         if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return;
         warn(warning);
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@reown') || id.includes('@walletconnect')) {
+              return 'vendor-walletconnect';
+            }
+            if (id.includes('@particle-network')) {
+              return 'vendor-particle';
+            }
+            if (id.includes('lottie-web') || id.includes('lottie-react')) {
+              return 'vendor-lottie';
+            }
+            if (id.includes('@aws-sdk') || id.includes('@smithy')) {
+              return 'vendor-aws';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'vendor-radix';
+            }
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('framer-motion')) {
+              return 'vendor-framer';
+            }
+            if (
+              id.includes('react-dom') ||
+              id.includes('/react/') ||
+              id.includes('react/index') ||
+              id.includes('scheduler')
+            ) {
+              return 'vendor-react';
+            }
+          }
+        },
       },
     },
   },

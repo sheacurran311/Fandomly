@@ -1,17 +1,18 @@
 diff --git a/node_modules/@particle-network/wallet/dist/esm/index.mjs b/node_modules/@particle-network/wallet/dist/esm/index.mjs
-index 1234567..abcdefg 100644
+index 4be3365..ae8cb8f 100644
 --- a/node_modules/@particle-network/wallet/dist/esm/index.mjs
 +++ b/node_modules/@particle-network/wallet/dist/esm/index.mjs
-@@ -511,7 +511,10 @@ function walletUrl({ projectConfig, walletOptions, options, customEventHandler }
-       supportChains = supportChains.map((chain) => {
+@@ -513,7 +513,12 @@ function walletUrl({
          return {
            name: chain.name,
            id: chain.id,
 -          chainType: chain.chainType
 +          chainType: chain.chainType,
-+          nativeCurrency: chain.nativeCurrency,
 +          rpcUrl: chain.rpcUrl,
-+          blockExplorerUrl: chain.blockExplorerUrl
++          icon: chain.icon,
++          blockExplorerUrl: chain.blockExplorerUrl,
++          testnet: chain.testnet,
++          nativeCurrency: chain.nativeCurrency
          };
        });
      }
