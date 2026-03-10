@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   motion,
   useScroll,
@@ -23,6 +23,12 @@ import {
   Palette,
   Zap,
   LogIn,
+  ExternalLink,
+  FileText,
+  Coins,
+  Award,
+  Users,
+  Trophy,
 } from 'lucide-react';
 import {
   SiFacebook,
@@ -37,27 +43,11 @@ import {
 } from 'react-icons/si';
 import { Link } from 'wouter';
 import { SectionGeometry } from '@/components/landing/section-geometry';
-import { isParticleAuthEnabled } from '@/lib/particle-config';
-
-// Lazy-load Particle ConnectButton only when needed (not in LANDING_ONLY mode)
-const ParticleConnectButton = lazy(() =>
-  import('@particle-network/connectkit').then((mod) => ({
-    default: mod.ConnectButton,
-  }))
-);
-
-// Build-time flag — true in production landing-only mode, false in dev/full-app mode
-declare const __LANDING_ONLY__: boolean;
 
 // ============================================================
-// DEV ACCESS PANEL — only shown in full-app mode (LANDING_ONLY=false)
-// Shows the Particle ConnectButton so developers and early access users
-// can sign in directly from the landing page without navigating to /login.
-// This panel is NOT rendered in production (LANDING_ONLY=true builds).
+// SIGN-IN PANEL — shown below hero signup, links to /login
 // ============================================================
-function DevAccessPanel() {
-  const particleEnabled = isParticleAuthEnabled();
-
+function SignInPanel() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -69,38 +59,165 @@ function DevAccessPanel() {
         <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/[0.08]" />
         <span className="text-xs text-gray-500 font-medium uppercase tracking-wider px-2 flex items-center gap-1.5">
           <LogIn className="w-3 h-3" />
-          Early Access
+          Already have an account?
         </span>
         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/[0.08]" />
       </div>
-      <p className="text-sm text-gray-500 mb-4">
-        Already have access? <span className="text-brand-primary">Sign in to your dashboard.</span>
-      </p>
-
-      {particleEnabled ? (
-        <div
-          data-particle-connect-btn
-          className="[&>div]:w-full [&>div]:h-11 [&>div]:rounded-xl [&>div]:font-semibold [&>div]:text-sm"
-        >
-          <Suspense
-            fallback={
-              <div className="h-11 w-full rounded-xl bg-brand-primary/20 border border-brand-primary/30 flex items-center justify-center">
-                <Loader2 className="w-4 h-4 animate-spin text-brand-primary" />
-              </div>
-            }
-          >
-            <ParticleConnectButton label="Sign in with Fandomly" />
-          </Suspense>
-        </div>
-      ) : (
-        <Link href="/login">
-          <button className="w-full h-11 rounded-xl bg-brand-primary/20 border border-brand-primary/30 text-brand-primary hover:bg-brand-primary/30 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
-            <LogIn className="w-4 h-4" />
-            Sign in to Dashboard
-          </button>
-        </Link>
-      )}
+      <Link href="/login">
+        <button className="w-full h-11 rounded-xl bg-brand-primary/20 border border-brand-primary/30 text-brand-primary hover:bg-brand-primary/30 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
+          <LogIn className="w-4 h-4" />
+          Sign in to Dashboard
+        </button>
+      </Link>
     </motion.div>
+  );
+}
+
+// ============================================================
+// HACKATHON JUDGE GUIDE — sticky banner + quick-nav for judges
+// ============================================================
+function HackathonJudgeGuide() {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const CONTRACTS = [
+    {
+      name: 'ReputationRegistry',
+      address: '0x9a0f05d971bb5bb908fc45ce51e948712265e518',
+      desc: 'On-chain reputation scores (0-1000) gating staking and token creation',
+      icon: ShieldCheck,
+    },
+    {
+      name: 'CreatorTokenFactory',
+      address: '0xd8d942262792dd1d794b52137f93359ef530dcd9',
+      desc: 'Deploys one ERC-20 per creator with 1M supply',
+      icon: Coins,
+    },
+    {
+      name: 'FanStaking',
+      address: '0xfca2572ed381cfc8d7cca205f9da0b4e2b7d6d89',
+      desc: 'Stake creator tokens for AVAX rewards with social multiplier',
+      icon: Trophy,
+    },
+    {
+      name: 'FandomlyBadge (ERC-1155)',
+      address: '0x4ad8bbb28fba6beaee346e61ac03d18903331356',
+      desc: 'Soulbound achievement badges with batch minting',
+      icon: Award,
+    },
+    {
+      name: 'FandomlyNFT (ERC-721)',
+      address: '0x1cfb20643302b88c1291a950f263b5c17d8f7aa6',
+      desc: 'Platform NFT collections for reward redemptions',
+      icon: Sparkles,
+    },
+    {
+      name: 'CreatorCollectionFactory',
+      address: '0xc0e2fc4eac83b421856527992de427a01aeeea7b',
+      desc: 'Per-creator ERC-721 contracts with royalties',
+      icon: Users,
+    },
+  ];
+
+  return (
+    <div className="relative z-50">
+      {/* Collapsed banner */}
+      <div className="bg-gradient-to-r from-[#E84142]/90 to-[#E84142]/70 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm">
+                Avalanche Build Games 2025 -- Judge Guide
+              </p>
+              <p className="text-white/70 text-xs hidden sm:block">
+                6 contracts live on Fuji C-Chain (43113) -- Click to explore
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://43113.testnet.snowtrace.io/address/0x95A6bEb968633D1440e89F462a133519808f8015"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-medium transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Snowtrace
+            </a>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold transition-colors"
+            >
+              {isExpanded ? 'Close' : 'View Contracts'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded panel */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="overflow-hidden bg-[#0e0520]/95 backdrop-blur-xl border-b border-white/10"
+          >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {CONTRACTS.map((c) => (
+                  <a
+                    key={c.name}
+                    href={`https://43113.testnet.snowtrace.io/address/${c.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-start gap-3 p-4 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:border-[#E84142]/40 hover:bg-white/[0.06] transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[#E84142]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <c.icon className="w-4 h-4 text-[#E84142]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold truncate group-hover:text-[#E84142] transition-colors">
+                        {c.name}
+                      </p>
+                      <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{c.desc}</p>
+                      <p className="text-gray-600 text-[10px] font-mono mt-1 truncate">
+                        {c.address}
+                      </p>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-600 group-hover:text-[#E84142] flex-shrink-0 mt-1 transition-colors" />
+                  </a>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                <span>
+                  Chain: <span className="text-gray-400">Avalanche Fuji C-Chain (43113)</span>
+                </span>
+                <span>
+                  Deployer: <span className="text-gray-400 font-mono">0x95A6...8015</span>
+                </span>
+                <span>
+                  Native: <span className="text-gray-400">AVAX</span>
+                </span>
+                <span>
+                  Compiler: <span className="text-gray-400">Solidity 0.8.20</span>
+                </span>
+                <Link
+                  href="/login"
+                  className="ml-auto text-[#E84142] hover:text-[#E84142]/80 font-semibold transition-colors flex items-center gap-1"
+                >
+                  <LogIn className="w-3 h-3" />
+                  Sign in to test the app
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -507,26 +624,49 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0118] overflow-x-hidden selection:bg-[#e10698]/30 selection:text-white">
-      {/* ===== DEV-MODE ENVIRONMENT BANNER =====
-          Only visible when running in full-app mode (not production LANDING_ONLY build).
-          Reminds developers that this is the development environment and auth is active. */}
-      {!__LANDING_ONLY__ && (
-        <div className="bg-brand-primary/10 border-b border-brand-primary/20 px-4 py-2 text-center">
-          <p className="text-xs text-brand-primary font-medium">
-            Development environment — full app active.{' '}
-            <Link href="/login" className="underline hover:text-brand-secondary transition-colors">
-              Sign in
-            </Link>{' '}
-            or{' '}
-            <Link
-              href="/creator-dashboard"
-              className="underline hover:text-brand-secondary transition-colors"
+      {/* ===== HACKATHON JUDGE GUIDE BANNER ===== */}
+      <HackathonJudgeGuide />
+
+      {/* ===== LANDING PAGE NAV BAR ===== */}
+      <nav className="sticky top-0 z-40 bg-[#0a0118]/80 backdrop-blur-lg border-b border-white/[0.05]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+          <Link href="/" className="flex items-center">
+            <img src="/fandomly2.png" alt="Fandomly" className="h-14 w-auto" />
+          </Link>
+          <div className="hidden md:flex items-center gap-6">
+            <a
+              href="#features"
+              className="text-gray-400 hover:text-white text-sm font-medium transition-colors"
             >
-              go to dashboard
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              className="text-gray-400 hover:text-white text-sm font-medium transition-colors"
+            >
+              How It Works
+            </a>
+            <Link
+              href="/find-creators"
+              className="text-gray-400 hover:text-white text-sm font-medium transition-colors"
+            >
+              Explore
             </Link>
-          </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/login">
+              <button className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors">
+                Sign In
+              </button>
+            </Link>
+            <Link href="/login">
+              <button className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-[#e10698] to-[#14feee] rounded-xl hover:opacity-90 transition-opacity">
+                Get Started
+              </button>
+            </Link>
+          </div>
         </div>
-      )}
+      </nav>
 
       {/* ===== HERO ===== */}
       <section
@@ -602,9 +742,7 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.4 }}
             >
               <LandingSignup variant="hero" />
-              {/* In full-app (dev) mode, show a sign-in panel below the beta signup.
-                  In production LANDING_ONLY mode this is tree-shaken away entirely. */}
-              {!__LANDING_ONLY__ && <DevAccessPanel />}
+              <SignInPanel />
             </motion.div>
           </div>
 
@@ -976,6 +1114,7 @@ export default function Home() {
 
       {/* ===== HOW IT WORKS ===== */}
       <section
+        id="how-it-works"
         className="relative z-10 py-24 md:py-32 px-6 md:px-12"
         style={{ backgroundColor: 'rgba(255,255,255,0.008)' }}
       >
@@ -1315,7 +1454,7 @@ export default function Home() {
       </section>
 
       {/* ===== FEATURES GRID ===== */}
-      <section className="relative z-10 py-24 md:py-32 px-6 md:px-12">
+      <section id="features" className="relative z-10 py-24 md:py-32 px-6 md:px-12">
         <SectionGeometry variant="features" />
         <div className="max-w-7xl mx-auto">
           <motion.div
