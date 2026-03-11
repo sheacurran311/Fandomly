@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
 import { fetchApi } from '@/lib/queryClient';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { CampaignBuilderModal } from '@/pages/campaign-builder';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +27,6 @@ export default function CreatorCampaigns() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showCampaignModal, setShowCampaignModal] = useState(false);
 
   // Fetch real campaigns data
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<any[]>({
@@ -292,12 +290,6 @@ export default function CreatorCampaigns() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Campaign Builder Modal */}
-      <CampaignBuilderModal
-        isOpen={showCampaignModal}
-        onClose={() => setShowCampaignModal(false)}
-      />
     </DashboardLayout>
   );
 }

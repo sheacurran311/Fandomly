@@ -24,7 +24,6 @@ import BrandTypeSelection from '@/pages/brand-type-selection';
 import BrandOnboarding from '@/pages/brand-onboarding';
 // CreatorOnboarding is deprecated - replaced by program builder with setup checklist
 // Old route redirects to creator-dashboard via auth router
-import CampaignBuilder from '@/pages/campaign-builder';
 import TenantSetup from '@/pages/tenant-setup';
 import BrandingStudio from '@/pages/branding-studio';
 import CreatorDashboard from '@/pages/creator-dashboard';
@@ -127,7 +126,6 @@ function Router() {
         path="/creator-onboarding"
         component={() => <RedirectTo href="/creator-dashboard" />}
       />
-      <Route path="/campaign-builder" component={CampaignBuilder} />
       <Route path="/tenant-setup" component={TenantSetup} />
       <Route path="/branding-studio" component={BrandingStudio} />
       <Route path="/creator-dashboard">
