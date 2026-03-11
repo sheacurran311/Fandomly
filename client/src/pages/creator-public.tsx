@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'wouter';
+import { useParams, Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,9 @@ import {
   MessageCircle,
   Video,
   Zap,
+  Youtube,
+  Music,
+  Disc,
 } from 'lucide-react';
 import type { Creator, Task, Campaign } from '@shared/schema';
 
@@ -62,10 +65,12 @@ interface CreatorPublicData {
     totalRewards: number;
     engagementRate?: number;
   };
+  connectedSocials?: { platform: string; platformUsername: string | null }[];
 }
 
 export default function CreatorPublic() {
   const { creatorUrl } = useParams<{ creatorUrl: string }>();
+  const [, setLocation] = useLocation();
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -108,9 +113,11 @@ export default function CreatorPublic() {
     enabled: !!user?.id && !!creatorData,
   });
 
-  // Check if user has joined this creator's program
+  // Check if user has joined this creator's program (check both creatorId and tenantId as fallback)
   const hasJoinedProgram = userPrograms.some(
-    (program: any) => program.creatorId === creatorData?.creator?.id
+    (program: any) =>
+      program.creatorId === creatorData?.creator?.id ||
+      program.tenantId === creatorData?.creator?.tenantId
   );
 
   // Join program mutation
@@ -194,7 +201,7 @@ export default function CreatorPublic() {
     );
   }
 
-  const { creator, tasks, campaigns, fanCount, stats } = creatorData;
+  const { creator, tasks, campaigns, fanCount, stats, connectedSocials = [] } = creatorData;
   const settings = creator.publicPageSettings || {
     showAbout: true,
     showTasks: true,
@@ -267,6 +274,39 @@ export default function CreatorPublic() {
 
                 {creator.bio && <p className="text-gray-400 max-w-2xl mb-4">{creator.bio}</p>}
 
+                {/* Connected Social Profiles */}
+                {connectedSocials.length > 0 && (
+                  <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
+                    {connectedSocials.map((social) => {
+                      const iconMap: Record<string, React.ReactNode> = {
+                        twitter: <Twitter className="h-4 w-4" />,
+                        x: <Twitter className="h-4 w-4" />,
+                        instagram: <Instagram className="h-4 w-4" />,
+                        facebook: <Facebook className="h-4 w-4" />,
+                        youtube: <Youtube className="h-4 w-4" />,
+                        tiktok: <Music className="h-4 w-4" />,
+                        discord: <Disc className="h-4 w-4" />,
+                        twitch: <Video className="h-4 w-4" />,
+                      };
+                      const icon = iconMap[social.platform];
+                      if (!icon) return null;
+                      return (
+                        <div
+                          key={social.platform}
+                          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                          title={
+                            social.platformUsername
+                              ? `@${social.platformUsername}`
+                              : social.platform
+                          }
+                        >
+                          <span className="text-white">{icon}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Stats Row */}
                 <div className="flex items-center justify-center md:justify-start gap-6 text-sm">
                   <div className="flex items-center gap-2">
@@ -327,6 +367,22 @@ export default function CreatorPublic() {
                   size="lg"
                   variant="outline"
                   className="border-white/20 text-white hover:bg-white/10"
+                  onClick={async () => {
+                    const url = window.location.href;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title: `${creator.displayName} on Fandomly`, url });
+                      } catch {
+                        // User cancelled share
+                      }
+                    } else {
+                      await navigator.clipboard.writeText(url);
+                      toast({
+                        title: 'Link copied!',
+                        description: 'Share link copied to clipboard',
+                      });
+                    }
+                  }}
                 >
                   <Share2 className="h-5 w-5" />
                 </Button>
@@ -546,7 +602,24 @@ export default function CreatorPublic() {
                       {publishedTasks.slice(0, 3).map((task: Task) => (
                         <div
                           key={task.id}
-                          className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                          className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                          onClick={() => {
+                            if (!user) {
+                              toast({
+                                title: 'Sign in required',
+                                description: 'Sign in to start completing tasks',
+                              });
+                              return;
+                            }
+                            if (!hasJoinedProgram) {
+                              toast({
+                                title: 'Join first',
+                                description: "Join this creator's program to start tasks",
+                              });
+                              return;
+                            }
+                            setLocation('/fan-dashboard/tasks');
+                          }}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">

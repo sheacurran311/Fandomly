@@ -37,7 +37,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
           let verifier: string | null = null;
           try {
             const rawMap = sessionStorage.getItem('twitter_pkce_map');
-            const map: Record<string, any> = rawMap ? JSON.parse(rawMap) : {};
+            const map: Record<string, Record<string, string>> = rawMap ? JSON.parse(rawMap) : {};
             verifier = (reqState && map[reqState]?.verifier) || null;
           } catch {
             // noop
@@ -90,7 +90,7 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
   const fanOnboardingRoutes = ['/fan-onboarding/profile', '/fan-onboarding/choose-creators'];
   // Simplified: creator onboarding is just type selection now (no multi-step wizard)
   const creatorOnboardingRoutes = ['/creator-type-selection'];
-  const brandOnboardingRoutes = ['/brand-type-selection'];
+  const brandOnboardingRoutes = ['/brand-type-selection', '/brand-onboarding'];
   const publicRoutes = [
     '/privacy-policy',
     '/data-deletion',

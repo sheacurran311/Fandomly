@@ -251,6 +251,38 @@ export function registerCreatorRoutes(app: Express, storage: IStorage) {
       const tenantMembers = await storage.getTenantMembers(tenant.id);
       const fanCount = tenantMembers.length;
 
+      // Calculate real stats — count completed task completions for this tenant
+      const { eq, and, sql } = await import('drizzle-orm');
+      const { taskCompletions, socialConnections } = await import('@shared/schema');
+      let totalRewards = 0;
+      try {
+        const completedCount = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(taskCompletions)
+          .where(
+            and(eq(taskCompletions.tenantId, tenant.id), eq(taskCompletions.status, 'completed'))
+          );
+        totalRewards = completedCount[0]?.count || 0;
+      } catch {
+        // Fallback to 0 if query fails
+      }
+
+      // Get creator's connected social profiles (verified platforms)
+      let connectedSocials: { platform: string; platformUsername: string | null }[] = [];
+      try {
+        connectedSocials = await db
+          .select({
+            platform: socialConnections.platform,
+            platformUsername: socialConnections.platformUsername,
+          })
+          .from(socialConnections)
+          .where(
+            and(eq(socialConnections.userId, creator.userId), eq(socialConnections.isActive, true))
+          );
+      } catch {
+        // Fallback to empty array if query fails
+      }
+
       // Construct response
       res.json({
         creator: {
@@ -268,9 +300,10 @@ export function registerCreatorRoutes(app: Express, storage: IStorage) {
         tasks: publishedTasks,
         campaigns: activeCampaigns,
         fanCount,
+        connectedSocials,
         stats: {
           activeCampaigns: activeCampaigns.length,
-          totalRewards: 0,
+          totalRewards,
           engagementRate: undefined,
         },
       });
