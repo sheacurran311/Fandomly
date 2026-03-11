@@ -1,0 +1,15 @@
+diff --git a/node_modules/@neondatabase/serverless/index.mjs b/node_modules/@neondatabase/serverless/index.mjs
+index 5fbd961..413c1dd 100644
+--- a/node_modules/@neondatabase/serverless/index.mjs
++++ b/node_modules/@neondatabase/serverless/index.mjs
+@@ -1381,8 +1381,8 @@ lient timeout");let i,s=!1;this.options.connectionTimeoutMillis&&(i=setTimeout((
+ this.log("ending client due to timeout"),s=!0,t.connection?t.connection.stream.destroy():
+ t.end()},this.options.connectionTimeoutMillis)),this.log("connecting new client"),
+ t.connect(o=>{if(i&&clearTimeout(i),t.on("error",n),o)this.log("client failed to\
+- connect",o),this._clients=this._clients.filter(u=>u!==t),s&&(o.message="Connect\
+-ion terminated due to connection timeout"),this._pulseQueue(),e.timedOut||e.callback(
++ connect",o),this._clients=this._clients.filter(u=>u!==t),s&&(function(){try{o.message="Connect\
++ion terminated due to connection timeout"}catch(x){}}()),this._pulseQueue(),e.timedOut||e.callback(
+ o,void 0,Ms);else{if(this.log("new client connected"),this.options.maxLifetimeSeconds!==
+ 0){let u=setTimeout(()=>{this.log("ending client due to expired lifetime"),this.
+ _expired.add(t),this._idle.findIndex(h=>h.client===t)!==-1&&this._acquireClient(
