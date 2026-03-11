@@ -1,4 +1,4 @@
-import { Trophy, Target, Flame, Search, Star, Plus, Grid, List } from 'lucide-react';
+import { Trophy, Target, Flame, Search, Star, Plus, Grid, List, BarChart3 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import { TimeframeSelector, type Timeframe } from '@/components/charts/Timeframe
 import { LineChartCard } from '@/components/charts/LineChartCard';
 import { PieChartCard } from '@/components/charts/PieChartCard';
 import { BarChartCard } from '@/components/charts/BarChartCard';
+import { CollapsibleSection } from '@/components/program/collapsible-section';
 
 type ViewType = 'table' | 'cards';
 
@@ -255,106 +256,44 @@ export default function FanTasksPage() {
           </Card>
         </div>
 
-        {/* Task Activity & Insights */}
-        <div className="mb-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Task Analytics</h2>
-            <TimeframeSelector selected={timeframe} onChange={setTimeframe} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Task Completion Over Time */}
-            <LineChartCard
-              title="Task Completions"
-              description="Your task completion activity over time"
-              data={
-                taskStats?.completions?.map((item: Record<string, unknown>) => ({
-                  period: item.period,
-                  completed: item.completed,
-                  inProgress: item.in_progress || 0,
-                })) || []
-              }
-              dataKeys={[
-                { key: 'completed', color: '#10b981', name: 'Completed' },
-                { key: 'inProgress', color: '#3b82f6', name: 'In Progress' },
-              ]}
-              xAxisKey="period"
-              height={300}
-            />
-
-            {/* Task Types Breakdown */}
-            <PieChartCard
-              title="Task Types"
-              description="Breakdown of available tasks by type"
-              data={taskTypeData}
-              height={300}
-            />
-
-            {/* Task Completion Rate */}
-            <BarChartCard
-              title="Completion Rate"
-              description="Track your completion progress"
-              data={[
-                {
-                  status: 'Completed',
-                  count: stats.completed,
-                  color: '#10b981',
-                },
-                {
-                  status: 'In Progress',
-                  count: stats.inProgress,
-                  color: '#3b82f6',
-                },
-                {
-                  status: 'Available',
-                  count: stats.total - stats.completed - stats.inProgress,
-                  color: '#6b7280',
-                },
-              ]}
-              dataKeys={[{ key: 'count', color: '#8b5cf6', name: 'Tasks' }]}
-              xAxisKey="status"
-              height={300}
-            />
-
-            {/* Platform vs Creator Tasks */}
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white">Task Distribution</CardTitle>
-                <p className="text-sm text-gray-400">Platform vs Creator tasks</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                    <div>
-                      <p className="text-sm text-gray-400">Platform Tasks</p>
-                      <p className="text-2xl font-bold text-white">{platformTasks.length}</p>
-                      <p className="text-xs text-gray-500 mt-1">Earn Fandomly Points</p>
-                    </div>
-                    <Star className="h-8 w-8 text-purple-400" />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <div>
-                      <p className="text-sm text-gray-400">Creator Tasks</p>
-                      <p className="text-2xl font-bold text-white">{tasks.length}</p>
-                      <p className="text-xs text-gray-500 mt-1">Earn Creator Points</p>
-                    </div>
-                    <Trophy className="h-8 w-8 text-blue-400" />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                    <div>
-                      <p className="text-sm text-gray-400">Points Balance</p>
-                      <p className="text-2xl font-bold text-white">
-                        {platformPoints.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">Platform Points</p>
-                    </div>
-                    <Star className="h-8 w-8 text-yellow-400" />
-                  </div>
+        {/* Platform Tasks Section */}
+        {platformTasks.length > 0 && (
+          <Card className="bg-gradient-to-r from-brand-primary/10 to-brand-secondary/10 border-brand-primary/30 mb-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-white flex items-center">
+                    <Star className="mr-2 h-5 w-5 text-brand-primary" />
+                    Fandomly Tasks
+                  </CardTitle>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Earn Fandomly Points - Redeemable for platform rewards, NFTs, and special offers
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    NOTE: Not redeemable for any creator-issued rewards
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/40">
+                  {platformPoints} Points
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPlatformTasks ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-400">Loading platform tasks...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {platformTasks.map((task: Task) => (
+                    <PlatformTaskCard key={task.id} task={task} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Creator Tasks Section */}
         <div className="mb-4">
@@ -477,44 +416,112 @@ export default function FanTasksPage() {
           </div>
         )}
 
-        {/* Platform Tasks Section */}
-        {platformTasks.length > 0 && (
-          <Card className="bg-gradient-to-r from-brand-primary/10 to-brand-secondary/10 border-brand-primary/30 mt-8">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white flex items-center">
-                    <Star className="mr-2 h-5 w-5 text-brand-primary" />
-                    Fandomly Tasks
-                  </CardTitle>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Earn Fandomly Points - Redeemable for platform rewards, NFTs, and special offers
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    NOTE: Not redeemable for any creator-issued rewards
-                  </p>
-                </div>
-                <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/40">
-                  {platformPoints} Points
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoadingPlatformTasks ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div>
-                  <p className="mt-2 text-sm text-gray-400">Loading platform tasks...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {platformTasks.map((task: Task) => (
-                    <PlatformTaskCard key={task.id} task={task} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Task Analytics - Collapsed by default */}
+        <div className="mt-8">
+          <CollapsibleSection
+            title="Task Analytics"
+            icon={BarChart3}
+            description="View your task completion trends and insights"
+            defaultOpen={false}
+          >
+            <div className="mb-4 flex justify-end">
+              <TimeframeSelector selected={timeframe} onChange={setTimeframe} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Task Completion Over Time */}
+              <LineChartCard
+                title="Task Completions"
+                description="Your task completion activity over time"
+                data={
+                  taskStats?.completions?.map((item: Record<string, unknown>) => ({
+                    period: item.period,
+                    completed: item.completed,
+                    inProgress: item.in_progress || 0,
+                  })) || []
+                }
+                dataKeys={[
+                  { key: 'completed', color: '#10b981', name: 'Completed' },
+                  { key: 'inProgress', color: '#3b82f6', name: 'In Progress' },
+                ]}
+                xAxisKey="period"
+                height={300}
+              />
+
+              {/* Task Types Breakdown */}
+              <PieChartCard
+                title="Task Types"
+                description="Breakdown of available tasks by type"
+                data={taskTypeData}
+                height={300}
+              />
+
+              {/* Task Completion Rate */}
+              <BarChartCard
+                title="Completion Rate"
+                description="Track your completion progress"
+                data={[
+                  {
+                    status: 'Completed',
+                    count: stats.completed,
+                    color: '#10b981',
+                  },
+                  {
+                    status: 'In Progress',
+                    count: stats.inProgress,
+                    color: '#3b82f6',
+                  },
+                  {
+                    status: 'Available',
+                    count: stats.total - stats.completed - stats.inProgress,
+                    color: '#6b7280',
+                  },
+                ]}
+                dataKeys={[{ key: 'count', color: '#8b5cf6', name: 'Tasks' }]}
+                xAxisKey="status"
+                height={300}
+              />
+
+              {/* Platform vs Creator Tasks */}
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Task Distribution</CardTitle>
+                  <p className="text-sm text-gray-400">Platform vs Creator tasks</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                      <div>
+                        <p className="text-sm text-gray-400">Platform Tasks</p>
+                        <p className="text-2xl font-bold text-white">{platformTasks.length}</p>
+                        <p className="text-xs text-gray-500 mt-1">Earn Fandomly Points</p>
+                      </div>
+                      <Star className="h-8 w-8 text-purple-400" />
+                    </div>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <div>
+                        <p className="text-sm text-gray-400">Creator Tasks</p>
+                        <p className="text-2xl font-bold text-white">{tasks.length}</p>
+                        <p className="text-xs text-gray-500 mt-1">Earn Creator Points</p>
+                      </div>
+                      <Trophy className="h-8 w-8 text-blue-400" />
+                    </div>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <div>
+                        <p className="text-sm text-gray-400">Points Balance</p>
+                        <p className="text-2xl font-bold text-white">
+                          {platformPoints.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Platform Points</p>
+                      </div>
+                      <Star className="h-8 w-8 text-yellow-400" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </CollapsibleSection>
+        </div>
       </div>
     </DashboardLayout>
   );

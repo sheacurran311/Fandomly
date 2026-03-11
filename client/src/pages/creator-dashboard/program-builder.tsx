@@ -701,7 +701,9 @@ function ProgramCustomizer({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button
-                onClick={() => setLocation('/creator-dashboard/campaigns')}
+                onClick={() =>
+                  setLocation(`/creator-dashboard/campaign-builder?programId=${program.id}`)
+                }
                 variant="outline"
                 className="border-white/10 text-white hover:bg-white/5 h-auto py-6 flex-col items-start"
               >
@@ -1217,7 +1219,9 @@ function ProgramCustomizer({
                   Campaigns ({campaigns.length})
                 </h3>
                 <Button
-                  onClick={() => (window.location.href = '/creator-dashboard/campaigns')}
+                  onClick={() =>
+                    setLocation(`/creator-dashboard/campaign-builder?programId=${program.id}`)
+                  }
                   size="sm"
                   variant="outline"
                   className="border-white/20 text-white hover:bg-white/10"

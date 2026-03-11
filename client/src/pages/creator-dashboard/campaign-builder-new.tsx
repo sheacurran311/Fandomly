@@ -51,7 +51,7 @@ import {
   Target,
   Save,
 } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import {
   useCreateCampaign,
   useUpdateCampaign,
@@ -107,10 +107,12 @@ interface SponsorData {
 export default function CampaignBuilderNew() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
 
   // Core state
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [programId, setProgramId] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
 
   // Unified campaign data state
@@ -170,6 +172,24 @@ export default function CampaignBuilderNew() {
     queryFn: () => fetchApi<Campaign[]>(`/api/campaigns/creator/${user?.creator?.id}`),
     enabled: !!user?.creator?.id,
   });
+
+  // Fetch creator's programs for auto-detecting programId
+  const { data: creatorPrograms = [] } = useQuery<{ id: string }[]>({
+    queryKey: ['/api/programs'],
+    queryFn: () => fetchApi<{ id: string }[]>('/api/programs'),
+    enabled: !!user?.creator?.id,
+  });
+
+  // Resolve programId from URL params or auto-detect from creator's program
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const urlProgramId = params.get('programId');
+    if (urlProgramId) {
+      setProgramId(urlProgramId);
+    } else if (creatorPrograms.length > 0 && !programId) {
+      setProgramId(creatorPrograms[0].id);
+    }
+  }, [search, creatorPrograms, programId]);
 
   // Task assignment mutations
   const assignTaskMutation = useMutation({
@@ -329,6 +349,7 @@ export default function CampaignBuilderNew() {
     const payload: Record<string, unknown> = {
       name: campaignData.name?.trim() || 'Untitled Campaign',
       description: campaignData.description?.trim() || undefined,
+      programId: programId || undefined,
       bannerImageUrl: campaignData.bannerImageUrl || undefined,
       accentColor: campaignData.accentColor,
       campaignMultiplier: campaignData.campaignMultiplier,
