@@ -944,9 +944,7 @@ export const loyaltyProgramTiers = pgTable(
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (table) => [
-    index('loyalty_tiers_program_idx').on(table.programId, table.tierOrder),
-  ]
+  (table) => [index('loyalty_tiers_program_idx').on(table.programId, table.tierOrder)]
 );
 
 export const fanPrograms = pgTable('fan_programs', {
@@ -993,9 +991,7 @@ export const tierProgressionHistory = pgTable(
     pointsAtChange: integer('points_at_change').notNull(),
     changedAt: timestamp('changed_at').defaultNow(),
   },
-  (table) => [
-    index('tier_history_fan_program_idx').on(table.fanProgramId),
-  ]
+  (table) => [index('tier_history_fan_program_idx').on(table.fanProgramId)]
 );
 
 export const pointExpirationNotifications = pgTable(
@@ -1014,9 +1010,7 @@ export const pointExpirationNotifications = pgTable(
     expiresAt: timestamp('expires_at').notNull(),
     sentAt: timestamp('sent_at').defaultNow(),
   },
-  (table) => [
-    index('expiration_notifications_user_idx').on(table.userId, table.notificationType),
-  ]
+  (table) => [index('expiration_notifications_user_idx').on(table.userId, table.notificationType)]
 );
 
 export const pointTransactions = pgTable(
@@ -4546,3 +4540,10 @@ export const dataRetentionPolicies = pgTable(
 
 export type DataRetentionPolicy = typeof dataRetentionPolicies.$inferSelect;
 export type InsertDataRetentionPolicy = typeof dataRetentionPolicies.$inferInsert;
+
+// ─── Stripe Webhook Idempotency ──────────────────────────────────
+export const processedStripeEvents = pgTable('processed_stripe_events', {
+  eventId: varchar('event_id', { length: 255 }).primaryKey(),
+  eventType: varchar('event_type', { length: 100 }).notNull(),
+  processedAt: timestamp('processed_at').defaultNow().notNull(),
+});

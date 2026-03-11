@@ -48,9 +48,7 @@ export function registerTenantRoutes(app: Express) {
     requireRole(['customer_admin', 'fandomly_admin']),
     async (req: AuthenticatedRequest, res) => {
       try {
-        console.log('Creating tenant with data:', req.body);
         const tenantData = createTenantSchema.parse(req.body);
-        console.log('Parsed tenant data:', tenantData);
 
         // Verify the owner exists and has proper permissions
         const owner = await storage.getUser(tenantData.ownerId);
@@ -59,12 +57,10 @@ export function registerTenantRoutes(app: Express) {
         }
 
         if (owner.userType !== 'creator') {
-          return res
-            .status(403)
-            .json({
-              error:
-                "Only creators can create tenants. Please ensure you're registered as a creator.",
-            });
+          return res.status(403).json({
+            error:
+              "Only creators can create tenants. Please ensure you're registered as a creator.",
+          });
         }
 
         if (owner.role !== 'customer_admin' && owner.role !== 'fandomly_admin') {

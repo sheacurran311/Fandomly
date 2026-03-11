@@ -12,24 +12,33 @@
 import type { Express, Request, Response } from 'express';
 import express from 'express';
 import { db } from '../../db';
-import { tenants } from '@shared/schema';
+import { tenants, processedStripeEvents } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripe, getTierForPriceId } from '../../services/stripe-service';
 import { getTierLimits } from '@shared/subscription-config';
 
 /**
- * Set of event IDs we've already processed (in-memory dedup).
- * In production, persist to DB for cross-instance idempotency.
+ * DB-backed idempotency: check if an event was already processed.
+ * Falls back to allowing processing if the DB check fails (fail-open).
  */
-const processedEvents = new Set<string>();
-const MAX_PROCESSED_CACHE = 10000;
+async function isAlreadyProcessed(eventId: string): Promise<boolean> {
+  try {
+    const [existing] = await db
+      .select({ eventId: processedStripeEvents.eventId })
+      .from(processedStripeEvents)
+      .where(eq(processedStripeEvents.eventId, eventId))
+      .limit(1);
+    return !!existing;
+  } catch {
+    return false;
+  }
+}
 
-function markProcessed(eventId: string) {
-  processedEvents.add(eventId);
-  // Prevent unbounded growth
-  if (processedEvents.size > MAX_PROCESSED_CACHE) {
-    const first = processedEvents.values().next().value;
-    if (first) processedEvents.delete(first);
+async function markProcessed(eventId: string, eventType: string) {
+  try {
+    await db.insert(processedStripeEvents).values({ eventId, eventType }).onConflictDoNothing();
+  } catch {
+    // Non-critical — worst case we re-process on next restart
   }
 }
 
@@ -66,7 +75,7 @@ export function registerStripeWebhookRoutes(app: Express) {
       }
 
       // Idempotency: skip already-processed events
-      if (processedEvents.has(event.id)) {
+      if (await isAlreadyProcessed(event.id)) {
         return res.json({ received: true, duplicate: true });
       }
 
@@ -75,7 +84,7 @@ export function registerStripeWebhookRoutes(app: Express) {
 
       try {
         await handleStripeEvent(event);
-        markProcessed(event.id);
+        await markProcessed(event.id, event.type);
       } catch (err) {
         console.error(`[StripeWebhook] Error processing event ${event.type}:`, err);
         // Don't fail the response — it was already sent

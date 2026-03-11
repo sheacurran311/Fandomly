@@ -1,3 +1,6 @@
+import { checkEnvironment } from './lib/env-check';
+checkEnvironment();
+
 import './lib/sentry';
 import express, { type Request } from 'express';
 import cors from 'cors';

@@ -5,6 +5,7 @@ import { db } from '../../db';
 import { loyaltyPrograms, campaigns, tasks } from '@shared/schema';
 import { eq, and, desc, sql, or } from 'drizzle-orm';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
+import { publicEndpointLimiter } from '../../middleware/rate-limit';
 import { enforceSubscriptionLimitForUser } from '../../services/subscription-limit-service';
 
 // Validation schemas
@@ -327,21 +328,8 @@ export function registerProgramRoutes(app: Express) {
         return res.status(404).json({ error: 'Creator not found' });
       }
 
-      // Debug logging - log incoming request
-      console.log('🔧 [BACKEND] Updating program:', id);
-      console.log(
-        '📥 [BACKEND] Request body pageConfig:',
-        JSON.stringify(req.body.pageConfig, null, 2)
-      );
-
       // Validate request body
       const validatedData = updateProgramSchema.parse(req.body);
-
-      // Debug logging - log validated data
-      console.log(
-        '✅ [BACKEND] Validated pageConfig:',
-        JSON.stringify(validatedData.pageConfig, null, 2)
-      );
 
       // Update program - normalize theme.mode for schema compatibility
       const updatePayload = validatedData.pageConfig
@@ -375,16 +363,10 @@ export function registerProgramRoutes(app: Express) {
         return res.status(404).json({ error: 'Program not found' });
       }
 
-      // Debug logging - log what was saved to DB
-      console.log(
-        '💾 [BACKEND] Saved to DB pageConfig:',
-        JSON.stringify(updatedProgram.pageConfig, null, 2)
-      );
-
       res.json(updatedProgram);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        console.error('❌ [BACKEND] Validation error:', error.errors);
+        console.error('[Program] Validation error:', error.errors);
         return res.status(400).json({ error: 'Validation error', details: error.errors });
       }
 
@@ -709,7 +691,7 @@ export function registerProgramRoutes(app: Express) {
    * GET /api/programs/public/:slug
    * Get public program page by slug (for fans to view)
    */
-  app.get('/api/programs/public/:slug', async (req, res) => {
+  app.get('/api/programs/public/:slug', publicEndpointLimiter, async (req, res) => {
     try {
       const { slug } = req.params;
       const { creators: creatorsTable, users, tenants } = await import('@shared/schema');
@@ -759,18 +741,9 @@ export function registerProgramRoutes(app: Express) {
 
       const { program, creator, user } = result[0];
 
-      // Debug logging for public endpoint
-      console.log('🌍 [PUBLIC API] Fetching program:', slug);
-      console.log(
-        '📤 [PUBLIC API] Program pageConfig from DB:',
-        JSON.stringify(program.pageConfig, null, 2)
-      );
-
       // Get visibility settings from pageConfig
       const visibility = (program.pageConfig as any)?.visibility || {};
       const profileDataVisibility = visibility.profileData || {};
-
-      console.log('👁️ [PUBLIC API] Visibility settings:', JSON.stringify(visibility, null, 2));
 
       // Get published campaigns for this program (only if showCampaigns is not explicitly false)
       const programCampaigns =

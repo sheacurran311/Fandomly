@@ -82,3 +82,17 @@ export const transactionLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
   message: { error: 'Too many transaction requests. Please wait a moment and try again.' },
 });
+
+/**
+ * Public endpoint rate limit: 60 requests per minute per IP
+ * Applies to unauthenticated public routes (referral click tracking,
+ * public creator/program pages) to prevent abuse and scraping.
+ */
+export const publicEndpointLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many requests. Please try again later.' },
+});

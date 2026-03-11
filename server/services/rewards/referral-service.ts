@@ -212,8 +212,6 @@ export class CreatorReferralService {
    */
   async getCreatorReferralStats(creatorId: string) {
     try {
-      console.log('📊 Getting creator referral stats for:', creatorId);
-
       const [referral] = await db
         .select()
         .from(creatorReferrals)
@@ -221,11 +219,8 @@ export class CreatorReferralService {
         .limit(1);
 
       if (!referral) {
-        console.log('❌ No referral found for creator:', creatorId);
         return null;
       }
-
-      console.log('✅ Found referral:', referral.referralCode);
 
       // Get referred creators
       const referredCreators = await db
@@ -237,8 +232,6 @@ export class CreatorReferralService {
             sql`${creatorReferrals.referredCreatorId} IS NOT NULL`
           )
         );
-
-      console.log('📈 Found referred creators:', referredCreators.length);
 
       return {
         referralCode: referral.referralCode,
@@ -257,7 +250,7 @@ export class CreatorReferralService {
         })),
       };
     } catch (error) {
-      console.error('❌ Error in getCreatorReferralStats:', error);
+      console.error('[ReferralService] Error in getCreatorReferralStats:', error);
       throw error;
     }
   }
@@ -448,8 +441,6 @@ export class FanReferralService {
    */
   async getFanReferralStats(fanId: string) {
     try {
-      console.log('📊 Getting fan referral stats for:', fanId);
-
       const [referral] = await db
         .select()
         .from(fanReferrals)
@@ -457,11 +448,8 @@ export class FanReferralService {
         .limit(1);
 
       if (!referral) {
-        console.log('❌ No fan referral found for user:', fanId);
         return null;
       }
-
-      console.log('✅ Found fan referral:', referral.referralCode);
 
       // Count referred fans
       const referredFans = await db
@@ -476,8 +464,6 @@ export class FanReferralService {
 
       const friendsWithFirstTask = referredFans.filter((r) => r.firstTaskCompletedAt).length;
       const friendsWithProfileComplete = referredFans.filter((r) => r.profileCompletedAt).length;
-
-      console.log('📈 Found referred fans:', referredFans.length);
 
       return {
         referralCode: referral.referralCode,
@@ -501,7 +487,7 @@ export class FanReferralService {
         })),
       };
     } catch (error) {
-      console.error('❌ Error in getFanReferralStats:', error);
+      console.error('[ReferralService] Error in getFanReferralStats:', error);
       throw error;
     }
   }
