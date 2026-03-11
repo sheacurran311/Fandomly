@@ -24,6 +24,7 @@ import {
 } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
+import { transactionLimiter } from '../../middleware/rate-limit';
 import { z } from 'zod';
 import { storage } from '../../core/storage';
 import { tierProgressionService } from '../../services/tier-progression-service';
@@ -245,464 +246,487 @@ export function registerRedemptionRoutes(app: Express) {
    * POST /api/rewards/redeem
    * Initiate a reward redemption
    */
-  app.post('/api/rewards/redeem', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.id;
+  app.post(
+    '/api/rewards/redeem',
+    transactionLimiter,
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user!.id;
 
-      // Validate request
-      const validation = redeemRewardSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          error: 'Invalid request data',
-          details: validation.error.issues,
-        });
-      }
+        // Validate request
+        const validation = redeemRewardSchema.safeParse(req.body);
+        if (!validation.success) {
+          return res.status(400).json({
+            error: 'Invalid request data',
+            details: validation.error.issues,
+          });
+        }
 
-      const { rewardId, programId, quantity, shippingAddress, metadata } = validation.data;
+        const { rewardId, programId, quantity, shippingAddress, metadata } = validation.data;
 
-      // Get reward
-      const [reward] = await db.select().from(rewards).where(eq(rewards.id, rewardId)).limit(1);
+        // Get reward
+        const [reward] = await db.select().from(rewards).where(eq(rewards.id, rewardId)).limit(1);
 
-      if (!reward || !reward.isActive) {
-        return res.status(404).json({ error: 'Reward not found or inactive' });
-      }
+        if (!reward || !reward.isActive) {
+          return res.status(404).json({ error: 'Reward not found or inactive' });
+        }
 
-      const totalPointsCost = (reward.pointsCost || 0) * quantity;
-      const effectiveProgramId = programId || reward.programId;
+        const totalPointsCost = (reward.pointsCost || 0) * quantity;
+        const effectiveProgramId = programId || reward.programId;
 
-      // Get user's fan program to check balance
-      if (!effectiveProgramId) {
-        return res.status(400).json({ error: 'Program ID required for redemption' });
-      }
+        // Get user's fan program to check balance
+        if (!effectiveProgramId) {
+          return res.status(400).json({ error: 'Program ID required for redemption' });
+        }
 
-      const [fanProgram] = await db
-        .select()
-        .from(fanPrograms)
-        .where(and(eq(fanPrograms.fanId, userId), eq(fanPrograms.programId, effectiveProgramId)))
-        .limit(1);
+        const [fanProgram] = await db
+          .select()
+          .from(fanPrograms)
+          .where(and(eq(fanPrograms.fanId, userId), eq(fanPrograms.programId, effectiveProgramId)))
+          .limit(1);
 
-      if (!fanProgram) {
-        return res.status(403).json({ error: 'You are not enrolled in this program' });
-      }
+        if (!fanProgram) {
+          return res.status(403).json({ error: 'You are not enrolled in this program' });
+        }
 
-      // Check sufficient balance
-      if ((fanProgram.currentPoints || 0) < totalPointsCost) {
-        return res.status(400).json({
-          error: 'Insufficient points',
-          required: totalPointsCost,
-          available: fanProgram.currentPoints || 0,
-        });
-      }
+        // Check sufficient balance
+        if ((fanProgram.currentPoints || 0) < totalPointsCost) {
+          return res.status(400).json({
+            error: 'Insufficient points',
+            required: totalPointsCost,
+            available: fanProgram.currentPoints || 0,
+          });
+        }
 
-      // Check stock
-      if (reward.stockQuantity !== null && reward.stockQuantity < quantity) {
-        return res.status(400).json({
-          error: 'Insufficient stock',
-          requested: quantity,
-          available: reward.stockQuantity,
-        });
-      }
+        // Check stock
+        if (reward.stockQuantity !== null && reward.stockQuantity < quantity) {
+          return res.status(400).json({
+            error: 'Insufficient stock',
+            requested: quantity,
+            available: reward.stockQuantity,
+          });
+        }
 
-      // Check per-user redemption limit
-      const maxPerUser = (reward.redemptionRules as any)?.maxPerUser;
-      if (maxPerUser) {
-        const userRedemptionCountResult = await db.execute(sql`
+        // Check per-user redemption limit
+        const maxPerUser = (reward.redemptionRules as any)?.maxPerUser;
+        if (maxPerUser) {
+          const userRedemptionCountResult = await db.execute(sql`
           SELECT COALESCE(SUM(quantity), 0) as total
           FROM reward_redemptions
           WHERE reward_id = ${rewardId} AND fan_id = ${userId}
         `);
-        const currentCount = parseInt((userRedemptionCountResult as any).rows?.[0]?.total || '0');
+          const currentCount = parseInt((userRedemptionCountResult as any).rows?.[0]?.total || '0');
 
-        if (currentCount + quantity > maxPerUser) {
-          return res.status(400).json({
-            error: 'Redemption limit exceeded',
-            maxAllowed: maxPerUser,
-            alreadyRedeemed: currentCount,
-          });
+          if (currentCount + quantity > maxPerUser) {
+            return res.status(400).json({
+              error: 'Redemption limit exceeded',
+              maxAllowed: maxPerUser,
+              alreadyRedeemed: currentCount,
+            });
+          }
         }
-      }
 
-      // Start transaction: deduct points and create redemption
-      const result = await db.transaction(async (tx) => {
-        // Deduct points atomically — WHERE ensures no negative balance from concurrent requests
-        const deductResult = await tx.execute(sql`
+        // Start transaction: deduct points and create redemption
+        const result = await db.transaction(async (tx) => {
+          // Deduct points atomically — WHERE ensures no negative balance from concurrent requests
+          const deductResult = await tx.execute(sql`
           UPDATE fan_programs
           SET current_points = current_points - ${totalPointsCost}
           WHERE id = ${fanProgram.id} AND current_points >= ${totalPointsCost}
         `);
-        if ((deductResult as any).rowCount === 0) {
-          throw new Error('Insufficient points (concurrent request)');
-        }
+          if ((deductResult as any).rowCount === 0) {
+            throw new Error('Insufficient points (concurrent request)');
+          }
 
-        // Record point transaction
-        await tx.execute(sql`
+          // Record point transaction
+          await tx.execute(sql`
           INSERT INTO point_transactions 
             (fan_program_id, tenant_id, points, type, source, metadata, created_at)
           VALUES 
             (${fanProgram.id}, ${reward.tenantId || ''}, ${-totalPointsCost}, 'spent', 'reward_redemption', ${JSON.stringify({ rewardId, rewardName: reward.name })}, NOW())
         `);
 
-        // Reduce stock if tracked (atomic guard against negative stock)
-        if (reward.stockQuantity !== null) {
-          const stockResult = await tx.execute(sql`
+          // Reduce stock if tracked (atomic guard against negative stock)
+          if (reward.stockQuantity !== null) {
+            const stockResult = await tx.execute(sql`
             UPDATE rewards
             SET stock_quantity = stock_quantity - ${quantity}
             WHERE id = ${rewardId} AND stock_quantity >= ${quantity}
           `);
-          if ((stockResult as any).rowCount === 0) {
-            throw new Error('Insufficient stock (concurrent request)');
+            if ((stockResult as any).rowCount === 0) {
+              throw new Error('Insufficient stock (concurrent request)');
+            }
           }
-        }
 
-        // Create redemption record
-        const [redemption] = await tx
-          .insert(rewardRedemptions)
-          .values({
-            userId,
-            fanId: userId,
-            rewardId,
-            programId: effectiveProgramId,
-            tenantId: reward.tenantId || '',
-            quantity,
-            pointsSpent: totalPointsCost,
-            status: reward.rewardType === 'digital' ? 'completed' : 'pending',
-            shippingAddress: shippingAddress || null,
-            metadata: metadata || null,
-          } as any)
-          .returning();
+          // Create redemption record
+          const [redemption] = await tx
+            .insert(rewardRedemptions)
+            .values({
+              userId,
+              fanId: userId,
+              rewardId,
+              programId: effectiveProgramId,
+              tenantId: reward.tenantId || '',
+              quantity,
+              pointsSpent: totalPointsCost,
+              status: reward.rewardType === 'digital' ? 'completed' : 'pending',
+              shippingAddress: shippingAddress || null,
+              metadata: metadata || null,
+            } as any)
+            .returning();
 
-        return redemption;
-      });
+          return redemption;
+        });
 
-      // Check tier progression after points deduction
-      await tierProgressionService.checkAndUpdateTier(fanProgram.id, 'reward_redemption');
+        // Check tier progression after points deduction
+        await tierProgressionService.checkAndUpdateTier(fanProgram.id, 'reward_redemption');
 
-      // If this is an NFT reward, trigger minting
-      if (reward.rewardType === 'nft') {
-        const nftData = (reward.rewardData as any)?.nftData;
+        // If this is an NFT reward, trigger minting
+        if (reward.rewardType === 'nft') {
+          const nftData = (reward.rewardData as any)?.nftData;
 
-        if (nftData?.autoMintOnRedeem) {
-          // Fetch wallet address before try/catch so it's accessible in the catch block
-          const [rewardUser] = await db
-            .select({
-              avalancheL1Address: users.avalancheL1Address,
-              walletAddress: users.walletAddress,
-            })
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1);
+          if (nftData?.autoMintOnRedeem) {
+            // Fetch wallet address before try/catch so it's accessible in the catch block
+            const [rewardUser] = await db
+              .select({
+                avalancheL1Address: users.avalancheL1Address,
+                walletAddress: users.walletAddress,
+              })
+              .from(users)
+              .where(eq(users.id, userId))
+              .limit(1);
 
-          const walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress;
+            const walletAddress = rewardUser?.avalancheL1Address || rewardUser?.walletAddress;
 
-          // Attempt to mint NFT immediately
-          try {
-            if (!walletAddress) {
-              // User doesn't have a wallet - defer minting
-              console.log(
-                `[Redemption] NFT reward deferred - user ${userId} has no wallet address`
-              );
+            // Attempt to mint NFT immediately
+            try {
+              if (!walletAddress) {
+                // User doesn't have a wallet - defer minting
+                console.log(
+                  `[Redemption] NFT reward deferred - user ${userId} has no wallet address`
+                );
 
-              // Update redemption to indicate pending mint
+                // Update redemption to indicate pending mint
+                await db
+                  .update(rewardRedemptions)
+                  .set({
+                    metadata: {
+                      ...((result.metadata as any) || {}),
+                      nftMintStatus: 'pending_wallet',
+                      nftMintMessage: 'Connect your wallet to receive your NFT',
+                    },
+                  })
+                  .where(eq(rewardRedemptions.id, result.id));
+              } else {
+                // Get blockchain service
+                const nftService = getBlockchainNFTService();
+
+                if (!nftService) {
+                  console.error('[Redemption] Blockchain NFT service not available');
+                  throw new Error('NFT service unavailable');
+                }
+
+                // Determine if this is a badge or regular NFT
+                const isBadge = nftData.badgeTemplateId || nftData.badgeTypeId;
+
+                if (isBadge) {
+                  // Mint as a badge (ERC-1155)
+                  const badgeTemplateId = nftData.badgeTemplateId;
+
+                  if (!badgeTemplateId) {
+                    throw new Error('Badge template ID required for badge NFT');
+                  }
+
+                  // Get badge template
+                  const [badgeTemplate] = await db
+                    .select()
+                    .from(fandomlyBadgeTemplates)
+                    .where(eq(fandomlyBadgeTemplates.id, badgeTemplateId))
+                    .limit(1);
+
+                  if (!badgeTemplate || !badgeTemplate.onChainBadgeTypeId) {
+                    throw new Error('Badge template not found or not deployed on-chain');
+                  }
+
+                  // Mint the badge
+                  const mintResult = await nftService.mintBadge(
+                    walletAddress as Address,
+                    badgeTemplate.onChainBadgeTypeId,
+                    1
+                  );
+
+                  // Record the mint
+                  const [nftMint] = await db
+                    .insert(nftMints)
+                    .values({
+                      crossmintActionId: `redemption-badge-${Date.now()}-${userId}`,
+                      badgeTemplateId: badgeTemplateId,
+                      recipientUserId: userId,
+                      recipientWalletAddress: walletAddress,
+                      recipientChain: 'avalanche-fuji',
+                      mintReason: 'reward_redemption',
+                      contextData: {
+                        rewardId: reward.id,
+                        pointsSpent: totalPointsCost,
+                      },
+                      txHash: mintResult.txHash,
+                      status: 'success',
+                      completedAt: new Date(),
+                    } as any)
+                    .returning();
+
+                  // Update redemption with mint info
+                  await db
+                    .update(rewardRedemptions)
+                    .set({
+                      metadata: {
+                        ...((result.metadata as any) || {}),
+                        nftMintId: nftMint.id,
+                        nftMintTxHash: mintResult.txHash,
+                        nftMintStatus: 'completed',
+                      },
+                    })
+                    .where(eq(rewardRedemptions.id, result.id));
+
+                  console.log(
+                    `[Redemption] Badge NFT minted for user ${userId}, tx: ${mintResult.txHash}`
+                  );
+                } else {
+                  // Mint as regular NFT (ERC-721)
+                  const collectionId = nftData.collectionId;
+                  const templateId = nftData.templateId;
+
+                  if (!collectionId) {
+                    throw new Error('Collection ID required for NFT minting');
+                  }
+
+                  const [collection] = await db
+                    .select()
+                    .from(nftCollections)
+                    .where(eq(nftCollections.id, collectionId))
+                    .limit(1);
+
+                  if (!collection) {
+                    throw new Error('NFT collection not found');
+                  }
+
+                  const onChainCollectionId = (
+                    collection.metadata as Record<string, unknown> | null
+                  )?.onChainCollectionId;
+                  if (typeof onChainCollectionId !== 'number') {
+                    throw new Error('NFT collection is missing its on-chain collection ID');
+                  }
+
+                  const collectionMetadata =
+                    (collection.metadata as Record<string, unknown> | null) || {};
+                  let metadataJson: Record<string, unknown>;
+
+                  if (templateId) {
+                    const [template] = await db
+                      .select()
+                      .from(nftTemplates)
+                      .where(eq(nftTemplates.id, templateId))
+                      .limit(1);
+
+                    if (!template) {
+                      throw new Error('NFT template not found');
+                    }
+
+                    const templateMetadata = (template.metadata as Record<string, any>) || {};
+                    metadataJson = {
+                      name: template.name || reward.name,
+                      description:
+                        template.description ||
+                        reward.description ||
+                        collection.description ||
+                        reward.name,
+                      image:
+                        nftData.imageUrl ||
+                        templateMetadata.image ||
+                        collectionMetadata.collectionImageUrl,
+                      animation_url: templateMetadata.animationUrl,
+                      external_url: templateMetadata.externalUrl,
+                      attributes: [
+                        ...(Array.isArray(templateMetadata.attributes)
+                          ? templateMetadata.attributes
+                          : []),
+                        { trait_type: 'Reward', value: reward.name },
+                        { trait_type: 'Collection', value: collection.name },
+                      ],
+                      properties: templateMetadata.properties,
+                    };
+                  } else {
+                    metadataJson = {
+                      name: reward.name,
+                      description: reward.description || collection.description || reward.name,
+                      image: nftData.imageUrl || collectionMetadata.collectionImageUrl,
+                      attributes: [
+                        { trait_type: 'Reward Type', value: 'NFT Reward' },
+                        { trait_type: 'Collection', value: collection.name },
+                        ...(nftData.soulbound ? [{ trait_type: 'Soulbound', value: 'Yes' }] : []),
+                      ],
+                    };
+                  }
+
+                  if (
+                    typeof metadataJson.image !== 'string' ||
+                    metadataJson.image.trim().length === 0
+                  ) {
+                    throw new Error('NFT reward image is required for minting');
+                  }
+
+                  const ipfs = getIPFSService();
+                  if (!ipfs) {
+                    throw new Error('IPFS service unavailable');
+                  }
+
+                  const uploadedMetadata = await ipfs.uploadMetadata(
+                    metadataJson as any,
+                    `${reward.name}-${result.id}`
+                  );
+
+                  // Mint the NFT
+                  const mintResult = await nftService.mintNFT(
+                    walletAddress as Address,
+                    onChainCollectionId,
+                    uploadedMetadata.ipfsUri
+                  );
+
+                  // Record the mint
+                  const [nftMint] = await db
+                    .insert(nftMints)
+                    .values({
+                      crossmintActionId: `redemption-nft-${Date.now()}-${userId}`,
+                      collectionId: collectionId,
+                      templateId: templateId || null,
+                      recipientUserId: userId,
+                      recipientWalletAddress: walletAddress,
+                      recipientChain: 'avalanche-fuji',
+                      mintReason: 'reward_redemption',
+                      contextData: {
+                        rewardId: reward.id,
+                        redemptionId: result.id,
+                        pointsSpent: totalPointsCost,
+                        metadataUri: uploadedMetadata.ipfsUri,
+                      },
+                      txHash: mintResult.txHash,
+                      tokenId: mintResult.tokenId || null,
+                      status: 'success',
+                      completedAt: new Date(),
+                    } as any)
+                    .returning();
+
+                  // Update redemption with mint info
+                  await db
+                    .update(rewardRedemptions)
+                    .set({
+                      status: 'completed',
+                      metadata: {
+                        ...((result.metadata as any) || {}),
+                        nftMintId: nftMint.id,
+                        nftMintTxHash: mintResult.txHash,
+                        nftTokenId: mintResult.tokenId,
+                        nftMetadataUri: uploadedMetadata.ipfsUri,
+                        nftMintStatus: 'completed',
+                      },
+                    })
+                    .where(eq(rewardRedemptions.id, result.id));
+
+                  console.log(
+                    `[Redemption] NFT minted for user ${userId}, tx: ${mintResult.txHash}, tokenId: ${mintResult.tokenId}`
+                  );
+                }
+              }
+            } catch (mintError) {
+              console.error('[Redemption] NFT minting failed:', mintError);
+
+              // Record failed mint in nftMints table so retry logic can pick it up
+              try {
+                await db.insert(nftMints).values({
+                  crossmintActionId: `redemption-failed-${Date.now()}-${userId}`,
+                  recipientUserId: userId,
+                  recipientWalletAddress: walletAddress || null,
+                  recipientChain: 'avalanche-fuji',
+                  mintReason: 'reward_redemption',
+                  contextData: {
+                    rewardId: reward.id,
+                    redemptionId: result.id,
+                    pointsSpent: totalPointsCost,
+                    nftData,
+                  },
+                  status: 'failed',
+                } as any);
+              } catch {
+                /* best-effort */
+              }
+
+              // Update redemption to indicate failed mint
               await db
                 .update(rewardRedemptions)
                 .set({
                   metadata: {
                     ...((result.metadata as any) || {}),
-                    nftMintStatus: 'pending_wallet',
-                    nftMintMessage: 'Connect your wallet to receive your NFT',
+                    nftMintStatus: 'failed',
+                    nftMintError: mintError instanceof Error ? mintError.message : 'Unknown error',
                   },
                 })
                 .where(eq(rewardRedemptions.id, result.id));
-            } else {
-              // Get blockchain service
-              const nftService = getBlockchainNFTService();
 
-              if (!nftService) {
-                console.error('[Redemption] Blockchain NFT service not available');
-                throw new Error('NFT service unavailable');
-              }
-
-              // Determine if this is a badge or regular NFT
-              const isBadge = nftData.badgeTemplateId || nftData.badgeTypeId;
-
-              if (isBadge) {
-                // Mint as a badge (ERC-1155)
-                const badgeTemplateId = nftData.badgeTemplateId;
-
-                if (!badgeTemplateId) {
-                  throw new Error('Badge template ID required for badge NFT');
-                }
-
-                // Get badge template
-                const [badgeTemplate] = await db
-                  .select()
-                  .from(fandomlyBadgeTemplates)
-                  .where(eq(fandomlyBadgeTemplates.id, badgeTemplateId))
-                  .limit(1);
-
-                if (!badgeTemplate || !badgeTemplate.onChainBadgeTypeId) {
-                  throw new Error('Badge template not found or not deployed on-chain');
-                }
-
-                // Mint the badge
-                const mintResult = await nftService.mintBadge(
-                  walletAddress as Address,
-                  badgeTemplate.onChainBadgeTypeId,
-                  1
-                );
-
-                // Record the mint
-                const [nftMint] = await db
-                  .insert(nftMints)
-                  .values({
-                    crossmintActionId: `redemption-badge-${Date.now()}-${userId}`,
-                    badgeTemplateId: badgeTemplateId,
-                    recipientUserId: userId,
-                    recipientWalletAddress: walletAddress,
-                    recipientChain: 'avalanche-fuji',
-                    mintReason: 'reward_redemption',
-                    contextData: {
-                      rewardId: reward.id,
-                      pointsSpent: totalPointsCost,
-                    },
-                    txHash: mintResult.txHash,
-                    status: 'success',
-                    completedAt: new Date(),
-                  } as any)
-                  .returning();
-
-                // Update redemption with mint info
-                await db
-                  .update(rewardRedemptions)
-                  .set({
-                    metadata: {
-                      ...((result.metadata as any) || {}),
-                      nftMintId: nftMint.id,
-                      nftMintTxHash: mintResult.txHash,
-                      nftMintStatus: 'completed',
-                    },
-                  })
-                  .where(eq(rewardRedemptions.id, result.id));
-
-                console.log(
-                  `[Redemption] Badge NFT minted for user ${userId}, tx: ${mintResult.txHash}`
-                );
-              } else {
-                // Mint as regular NFT (ERC-721)
-                const collectionId = nftData.collectionId;
-                const templateId = nftData.templateId;
-
-                if (!collectionId) {
-                  throw new Error('Collection ID required for NFT minting');
-                }
-
-                const [collection] = await db
-                  .select()
-                  .from(nftCollections)
-                  .where(eq(nftCollections.id, collectionId))
-                  .limit(1);
-
-                if (!collection) {
-                  throw new Error('NFT collection not found');
-                }
-
-                const onChainCollectionId = (collection.metadata as Record<string, unknown> | null)
-                  ?.onChainCollectionId;
-                if (typeof onChainCollectionId !== 'number') {
-                  throw new Error('NFT collection is missing its on-chain collection ID');
-                }
-
-                const collectionMetadata = (collection.metadata as Record<string, unknown> | null) || {};
-                let metadataJson: Record<string, unknown>;
-
-                if (templateId) {
-                  const [template] = await db
-                    .select()
-                    .from(nftTemplates)
-                    .where(eq(nftTemplates.id, templateId))
-                    .limit(1);
-
-                  if (!template) {
-                    throw new Error('NFT template not found');
-                  }
-
-                  const templateMetadata = (template.metadata as Record<string, any>) || {};
-                  metadataJson = {
-                    name: template.name || reward.name,
-                    description:
-                      template.description || reward.description || collection.description || reward.name,
-                    image:
-                      nftData.imageUrl ||
-                      templateMetadata.image ||
-                      collectionMetadata.collectionImageUrl,
-                    animation_url: templateMetadata.animationUrl,
-                    external_url: templateMetadata.externalUrl,
-                    attributes: [
-                      ...(Array.isArray(templateMetadata.attributes)
-                        ? templateMetadata.attributes
-                        : []),
-                      { trait_type: 'Reward', value: reward.name },
-                      { trait_type: 'Collection', value: collection.name },
-                    ],
-                    properties: templateMetadata.properties,
-                  };
-                } else {
-                  metadataJson = {
-                    name: reward.name,
-                    description: reward.description || collection.description || reward.name,
-                    image: nftData.imageUrl || collectionMetadata.collectionImageUrl,
-                    attributes: [
-                      { trait_type: 'Reward Type', value: 'NFT Reward' },
-                      { trait_type: 'Collection', value: collection.name },
-                      ...(nftData.soulbound
-                        ? [{ trait_type: 'Soulbound', value: 'Yes' }]
-                        : []),
-                    ],
-                  };
-                }
-
-                if (
-                  typeof metadataJson.image !== 'string' ||
-                  metadataJson.image.trim().length === 0
-                ) {
-                  throw new Error('NFT reward image is required for minting');
-                }
-
-                const ipfs = getIPFSService();
-                if (!ipfs) {
-                  throw new Error('IPFS service unavailable');
-                }
-
-                const uploadedMetadata = await ipfs.uploadMetadata(
-                  metadataJson as any,
-                  `${reward.name}-${result.id}`
-                );
-
-                // Mint the NFT
-                const mintResult = await nftService.mintNFT(
-                  walletAddress as Address,
-                  onChainCollectionId,
-                  uploadedMetadata.ipfsUri
-                );
-
-                // Record the mint
-                const [nftMint] = await db
-                  .insert(nftMints)
-                  .values({
-                    crossmintActionId: `redemption-nft-${Date.now()}-${userId}`,
-                    collectionId: collectionId,
-                    templateId: templateId || null,
-                    recipientUserId: userId,
-                    recipientWalletAddress: walletAddress,
-                    recipientChain: 'avalanche-fuji',
-                    mintReason: 'reward_redemption',
-                    contextData: {
-                      rewardId: reward.id,
-                      redemptionId: result.id,
-                      pointsSpent: totalPointsCost,
-                      metadataUri: uploadedMetadata.ipfsUri,
-                    },
-                    txHash: mintResult.txHash,
-                    tokenId: mintResult.tokenId || null,
-                    status: 'success',
-                    completedAt: new Date(),
-                  } as any)
-                  .returning();
-
-                // Update redemption with mint info
-                await db
-                  .update(rewardRedemptions)
-                  .set({
-                    status: 'completed',
-                    metadata: {
-                      ...((result.metadata as any) || {}),
-                      nftMintId: nftMint.id,
-                      nftMintTxHash: mintResult.txHash,
-                      nftTokenId: mintResult.tokenId,
-                      nftMetadataUri: uploadedMetadata.ipfsUri,
-                      nftMintStatus: 'completed',
-                    },
-                  })
-                  .where(eq(rewardRedemptions.id, result.id));
-
-                console.log(
-                  `[Redemption] NFT minted for user ${userId}, tx: ${mintResult.txHash}, tokenId: ${mintResult.tokenId}`
-                );
-              }
+              // Don't fail the entire redemption - points were already spent
+              // Failed mints are recorded in nft_mints with status='failed' for retry
             }
-          } catch (mintError) {
-            console.error('[Redemption] NFT minting failed:', mintError);
+          } else {
+            // Auto-mint is disabled - mark for manual fulfillment
+            console.log(
+              `[Redemption] NFT reward redeemed, manual minting required for user ${userId}`
+            );
 
-            // Record failed mint in nftMints table so retry logic can pick it up
-            try {
-              await db.insert(nftMints).values({
-                crossmintActionId: `redemption-failed-${Date.now()}-${userId}`,
-                recipientUserId: userId,
-                recipientWalletAddress: walletAddress || null,
-                recipientChain: 'avalanche-fuji',
-                mintReason: 'reward_redemption',
-                contextData: {
-                  rewardId: reward.id,
-                  redemptionId: result.id,
-                  pointsSpent: totalPointsCost,
-                  nftData,
-                },
-                status: 'failed',
-              } as any);
-            } catch {
-              /* best-effort */
-            }
-
-            // Update redemption to indicate failed mint
             await db
               .update(rewardRedemptions)
               .set({
                 metadata: {
                   ...((result.metadata as any) || {}),
-                  nftMintStatus: 'failed',
-                  nftMintError: mintError instanceof Error ? mintError.message : 'Unknown error',
+                  nftMintStatus: 'pending_manual',
+                  nftMintMessage: 'NFT will be minted by the creator',
                 },
               })
               .where(eq(rewardRedemptions.id, result.id));
-
-            // Don't fail the entire redemption - points were already spent
-            // Failed mints are recorded in nft_mints with status='failed' for retry
           }
-        } else {
-          // Auto-mint is disabled - mark for manual fulfillment
-          console.log(
-            `[Redemption] NFT reward redeemed, manual minting required for user ${userId}`
-          );
-
-          await db
-            .update(rewardRedemptions)
-            .set({
-              metadata: {
-                ...((result.metadata as any) || {}),
-                nftMintStatus: 'pending_manual',
-                nftMintMessage: 'NFT will be minted by the creator',
-              },
-            })
-            .where(eq(rewardRedemptions.id, result.id));
         }
+
+        const [updatedRedemption] = await db
+          .select()
+          .from(rewardRedemptions)
+          .where(eq(rewardRedemptions.id, result.id))
+          .limit(1);
+
+        res.status(201).json({
+          redemption: updatedRedemption || result,
+          pointsDeducted: totalPointsCost,
+          newBalance: (fanProgram.currentPoints || 0) - totalPointsCost,
+        });
+
+        // Send redemption confirmation email (non-blocking)
+        try {
+          const [rewardUser] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+          if (rewardUser?.email) {
+            const { sendRedemptionEmail } = await import('../../services/email-service');
+            sendRedemptionEmail(rewardUser.email, reward.name, totalPointsCost).catch(() => {});
+          }
+        } catch {
+          /* email is non-critical */
+        }
+      } catch (error) {
+        console.error('Error processing redemption:', error);
+        res.status(500).json({ error: 'Failed to process redemption' });
       }
-
-      const [updatedRedemption] = await db
-        .select()
-        .from(rewardRedemptions)
-        .where(eq(rewardRedemptions.id, result.id))
-        .limit(1);
-
-      res.status(201).json({
-        redemption: updatedRedemption || result,
-        pointsDeducted: totalPointsCost,
-        newBalance: (fanProgram.currentPoints || 0) - totalPointsCost,
-      });
-    } catch (error) {
-      console.error('Error processing redemption:', error);
-      res.status(500).json({ error: 'Failed to process redemption' });
     }
-  });
+  );
 
   /**
    * GET /api/rewards/redemptions

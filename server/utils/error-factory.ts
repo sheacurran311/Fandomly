@@ -4,6 +4,7 @@
  */
 
 import { Response } from 'express';
+import { Sentry } from '../lib/sentry';
 
 // Standard error codes
 export enum ErrorCode {
@@ -12,20 +13,20 @@ export enum ErrorCode {
   FORBIDDEN = 'FORBIDDEN',
   INVALID_TOKEN = 'INVALID_TOKEN',
   SESSION_EXPIRED = 'SESSION_EXPIRED',
-  
+
   // Validation (400)
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   INVALID_INPUT = 'INVALID_INPUT',
   MISSING_REQUIRED_FIELD = 'MISSING_REQUIRED_FIELD',
-  
+
   // Resource errors (404, 409)
   NOT_FOUND = 'NOT_FOUND',
   ALREADY_EXISTS = 'ALREADY_EXISTS',
   CONFLICT = 'CONFLICT',
-  
+
   // Rate limiting (429)
   RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
-  
+
   // Server errors (500)
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
@@ -55,7 +56,7 @@ export interface ApiError {
   error: {
     code: ErrorCode;
     message: string;
-    details?: Record<string, any>[];
+    details?: Record<string, unknown>[];
     requestId?: string;
   };
 }
@@ -63,10 +64,10 @@ export interface ApiError {
 // Custom error classes
 export class AppError extends Error {
   code: ErrorCode;
-  details?: Record<string, any>[];
+  details?: Record<string, unknown>[];
   statusCode: number;
 
-  constructor(code: ErrorCode, message: string, details?: Record<string, any>[]) {
+  constructor(code: ErrorCode, message: string, details?: Record<string, unknown>[]) {
     super(message);
     this.name = 'AppError';
     this.code = code;
@@ -76,7 +77,7 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: Record<string, any>[]) {
+  constructor(message: string, details?: Record<string, unknown>[]) {
     super(ErrorCode.VALIDATION_ERROR, message, details);
     this.name = 'ValidationError';
   }
@@ -127,11 +128,15 @@ export function sendError(res: Response, error: AppError): Response {
       details: error.details,
     },
   };
-  
+
   return res.status(error.statusCode).json(response);
 }
 
-export function sendValidationError(res: Response, message: string, details?: Record<string, any>[]): Response {
+export function sendValidationError(
+  res: Response,
+  message: string,
+  details?: Record<string, unknown>[]
+): Response {
   return sendError(res, new ValidationError(message, details));
 }
 
@@ -151,53 +156,82 @@ export function sendConflictError(res: Response, message: string): Response {
   return sendError(res, new ConflictError(message));
 }
 
-export function sendInternalError(res: Response, message: string = 'An internal error occurred'): Response {
+export function sendInternalError(
+  res: Response,
+  message: string = 'An internal error occurred'
+): Response {
   const error = new AppError(ErrorCode.INTERNAL_ERROR, message);
   console.error('[Internal Error]', message);
+  Sentry.captureMessage(message, 'error');
   return sendError(res, error);
 }
 
 // Express error handling middleware
-export function errorHandler(err: any, req: any, res: Response, next: any) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function errorHandler(
+  err: unknown,
+  req: { method?: string; originalUrl?: string; url?: string; user?: { id?: string } },
+  res: Response,
+  _next: unknown
+) {
   // Log the error
   console.error('[Error Handler]', err);
-  
+
+  // Report to Sentry (skip expected client errors like 4xx)
+  if (!(err instanceof AppError) || err.statusCode >= 500) {
+    Sentry.captureException(err, {
+      extra: {
+        method: req.method,
+        url: req.originalUrl || req.url,
+        userId: req.user?.id,
+      },
+    });
+  }
+
   // If it's our custom AppError, use it directly
   if (err instanceof AppError) {
     return sendError(res, err);
   }
-  
+
+  // Cast to object for property checks on non-AppError errors
+  const e = err as Record<string, unknown>;
+
   // Zod validation errors
-  if (err.name === 'ZodError') {
-    const details = err.errors?.map((e: any) => ({
-      path: e.path.join('.'),
-      message: e.message,
+  if (e.name === 'ZodError' && Array.isArray(e.errors)) {
+    const details = e.errors.map((item: Record<string, unknown>) => ({
+      path: Array.isArray(item.path) ? item.path.join('.') : '',
+      message: String(item.message ?? ''),
     }));
     return sendValidationError(res, 'Validation failed', details);
   }
-  
+
   // JSON parsing errors
-  if (err.type === 'entity.parse.failed') {
+  if (e.type === 'entity.parse.failed') {
     return sendValidationError(res, 'Invalid JSON in request body');
   }
-  
+
   // Multer file upload errors
-  if (err.code === 'LIMIT_FILE_SIZE') {
+  if (e.code === 'LIMIT_FILE_SIZE') {
     return sendValidationError(res, 'File size exceeds limit');
   }
-  
+
   // Database errors
-  if (err.code && err.code.startsWith('23')) { // PostgreSQL error codes
-    if (err.code === '23505') { // Unique violation
+  if (typeof e.code === 'string' && e.code.startsWith('23')) {
+    if (e.code === '23505') {
+      // Unique violation
       return sendConflictError(res, 'A record with this value already exists');
     }
-    if (err.code === '23503') { // Foreign key violation
+    if (e.code === '23503') {
+      // Foreign key violation
       return sendValidationError(res, 'Referenced record does not exist');
     }
   }
-  
+
   // Default to internal error
-  const message = process.env.NODE_ENV === 'development' ? err.message : 'An internal error occurred';
+  const message =
+    process.env.NODE_ENV === 'development' && err instanceof Error
+      ? err.message
+      : 'An internal error occurred';
   return sendInternalError(res, message);
 }
 
@@ -212,7 +246,12 @@ export interface ApiSuccess<T> {
   };
 }
 
-export function sendSuccess<T>(res: Response, data: T, statusCode: number = 200, meta?: ApiSuccess<T>['meta']): Response {
+export function sendSuccess<T>(
+  res: Response,
+  data: T,
+  statusCode: number = 200,
+  meta?: ApiSuccess<T>['meta']
+): Response {
   const response: ApiSuccess<T> = { data };
   if (meta) {
     response.meta = meta;

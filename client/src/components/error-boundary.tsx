@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Sentry } from '@/lib/sentry';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -17,7 +18,7 @@ interface State {
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false
+    hasError: false,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -27,19 +28,29 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
     // Check if this is a TikTok-related error
-    const isTikTokError = error.message?.includes('atob') || 
-                         error.stack?.includes('tiktok') ||
-                         error.stack?.includes('webapp-login-page');
-    
+    const isTikTokError =
+      error.message?.includes('atob') ||
+      error.stack?.includes('tiktok') ||
+      error.stack?.includes('webapp-login-page');
+
     if (isTikTokError) {
-      console.warn('TikTok sandbox environment error detected - this is a known issue with TikTok\'s JavaScript');
+      console.warn(
+        "TikTok sandbox environment error detected - this is a known issue with TikTok's JavaScript"
+      );
     }
-    
+
+    // Report to Sentry (skip known TikTok noise)
+    if (!isTikTokError) {
+      Sentry.captureException(error, {
+        extra: { componentStack: errorInfo.componentStack },
+      });
+    }
+
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     });
 
     // Call the onError callback if provided
@@ -57,9 +68,10 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       // Check if this is a TikTok-related error
-      const isTikTokError = this.state.error?.message?.includes('atob') || 
-                           this.state.error?.stack?.includes('tiktok') ||
-                           this.state.error?.stack?.includes('webapp-login-page');
+      const isTikTokError =
+        this.state.error?.message?.includes('atob') ||
+        this.state.error?.stack?.includes('tiktok') ||
+        this.state.error?.stack?.includes('webapp-login-page');
 
       // Use custom fallback if provided
       if (this.props.fallback) {
@@ -78,35 +90,29 @@ export class ErrorBoundary extends Component<Props, State> {
                 {isTikTokError ? 'TikTok Integration Issue' : 'Something went wrong'}
               </CardTitle>
               <CardDescription>
-                {isTikTokError 
-                  ? 'This appears to be a known issue with TikTok\'s sandbox environment. The error is in TikTok\'s own JavaScript files, not your application.'
-                  : 'An unexpected error occurred. Please try refreshing the page.'
-                }
+                {isTikTokError
+                  ? "This appears to be a known issue with TikTok's sandbox environment. The error is in TikTok's own JavaScript files, not your application."
+                  : 'An unexpected error occurred. Please try refreshing the page.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {isTikTokError && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
-                    <strong>Note:</strong> This InvalidCharacterError from TikTok's authentication page is a known issue in their sandbox environment. 
-                    Your application is working correctly - the error originates from TikTok's own JavaScript files.
+                    <strong>Note:</strong> This InvalidCharacterError from TikTok&apos;s
+                    authentication page is a known issue in their sandbox environment. Your
+                    application is working correctly - the error originates from TikTok&apos;s own
+                    JavaScript files.
                   </p>
                 </div>
               )}
-              
+
               <div className="flex gap-2">
-                <Button 
-                  onClick={this.handleReload}
-                  className="flex-1"
-                >
+                <Button onClick={this.handleReload} className="flex-1">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Reload Page
                 </Button>
-                <Button 
-                  variant="outline"
-                  onClick={this.handleReset}
-                  className="flex-1"
-                >
+                <Button variant="outline" onClick={this.handleReset} className="flex-1">
                   Try Again
                 </Button>
               </div>
@@ -122,7 +128,9 @@ export class ErrorBoundary extends Component<Props, State> {
                     {this.state.errorInfo && (
                       <div className="mt-2 pt-2 border-t border-gray-300">
                         <div className="font-semibold mb-1">Component Stack:</div>
-                        <div className="whitespace-pre-wrap">{this.state.errorInfo.componentStack}</div>
+                        <div className="whitespace-pre-wrap">
+                          {this.state.errorInfo.componentStack}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -149,9 +157,9 @@ export function withErrorBoundary<P extends object>(
       <WrappedComponent {...props} />
     </ErrorBoundary>
   );
-  
+
   WithErrorBoundaryComponent.displayName = `withErrorBoundary(${WrappedComponent.displayName || WrappedComponent.name})`;
-  
+
   return WithErrorBoundaryComponent;
 }
 

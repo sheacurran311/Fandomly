@@ -48,9 +48,24 @@ interface ProgramCreator {
   category?: 'athlete' | 'musician' | 'content_creator';
   location?: string;
   creatorDetails?: {
-    athlete?: { sport?: string; education?: { level?: string }; position?: string; school?: string; currentSponsors?: string };
-    musician?: { bandArtistName?: string; artistType?: string; musicGenre?: string; musicCatalogUrl?: string };
-    contentCreator?: { aboutMe?: string; contentType?: string[]; topicsOfFocus?: string[] | string };
+    athlete?: {
+      sport?: string;
+      education?: { level?: string };
+      position?: string;
+      school?: string;
+      currentSponsors?: string;
+    };
+    musician?: {
+      bandArtistName?: string;
+      artistType?: string;
+      musicGenre?: string;
+      musicCatalogUrl?: string;
+    };
+    contentCreator?: {
+      aboutMe?: string;
+      contentType?: string[];
+      topicsOfFocus?: string[] | string;
+    };
   };
   socialLinks?: {
     twitter?: string;
@@ -98,6 +113,19 @@ export default function ProgramPublic() {
     enabled: !!(slug || programId),
   });
 
+  // Update document title for browser tab
+  useEffect(() => {
+    if (programData?.name) {
+      const creatorName = programData.creator?.displayName || '';
+      document.title = creatorName
+        ? `${programData.name} by ${creatorName} | Fandomly`
+        : `${programData.name} | Fandomly`;
+      return () => {
+        document.title = 'Fandomly - AI-Powered Loyalty Platform for Creators';
+      };
+    }
+  }, [programData]);
+
   // Inject CSS variables for branding (Phase 1: Enhanced Theming)
   // IMPORTANT: This must be called BEFORE any conditional returns to avoid hooks error
   useEffect(() => {
@@ -111,14 +139,10 @@ export default function ProgramPublic() {
       accent: '#F59E0B',
     };
 
-    console.log('🎨 [FRONTEND] Applying theme CSS variables');
-    console.log('🎨 [FRONTEND] Theme object:', theme);
-    console.log('🎨 [FRONTEND] Brand colors:', brandColors);
-
     // === COLORS ===
     // Check for Phase 1 enhanced theme structure
     if (theme?.colors) {
-      console.log('✨ [FRONTEND] Using Phase 1 enhanced theme structure');
+      // Phase 1 enhanced theme structure
       // Brand colors
       root.style.setProperty('--color-primary', theme.colors.primary ?? '');
       root.style.setProperty('--color-secondary', theme.colors.secondary ?? '');
@@ -141,7 +165,7 @@ export default function ProgramPublic() {
       root.style.setProperty('--color-error', theme.colors.error ?? '');
       root.style.setProperty('--color-info', theme.colors.info ?? '');
     } else {
-      console.log('📦 [FRONTEND] Using Phase 0 basic theme structure');
+      // Phase 0 basic theme structure fallback
       // Fallback to Phase 0 basic colors for backward compatibility
       if (brandColors.primary) {
         root.style.setProperty('--color-primary', brandColors.primary);
@@ -159,11 +183,11 @@ export default function ProgramPublic() {
       // Phase 0: Apply backgroundColor and textColor if provided
       if (theme?.backgroundColor) {
         root.style.setProperty('--color-background', theme.backgroundColor);
-        console.log('🎨 [FRONTEND] Set background color:', theme.backgroundColor);
+        // Applied background color
       }
       if (theme?.textColor) {
         root.style.setProperty('--color-text-primary', theme.textColor);
-        console.log('🎨 [FRONTEND] Set text color:', theme.textColor);
+        // Applied text color
       }
     }
 
@@ -838,7 +862,11 @@ function ProfileTab({ program, creator }: { program: ProgramPublicData; creator:
           {creator.creatorDetails && (
             <>
               <Separator className="bg-gray-200" />
-              <CreatorDetailsDisplay category={creator.category} details={creator.creatorDetails} location={creator.location} />
+              <CreatorDetailsDisplay
+                category={creator.category}
+                details={creator.creatorDetails}
+                location={creator.location}
+              />
             </>
           )}
 
@@ -1199,19 +1227,29 @@ function CreatorDetailsDisplay({
     const a = details.athlete;
     if (a.sport) items.push({ label: 'Sport', value: a.sport });
     if (a.position) items.push({ label: 'Position', value: a.position });
-    if (a.education?.level) items.push({ label: 'Level', value: EDUCATION_LABELS[a.education.level] || a.education.level });
+    if (a.education?.level)
+      items.push({
+        label: 'Level',
+        value: EDUCATION_LABELS[a.education.level] || a.education.level,
+      });
     if (a.school) items.push({ label: 'School', value: a.school });
     if (a.currentSponsors) items.push({ label: 'Sponsors', value: a.currentSponsors });
   } else if (category === 'musician' && details.musician) {
     const m = details.musician;
     if (m.bandArtistName) items.push({ label: 'Artist', value: m.bandArtistName });
-    if (m.artistType) items.push({ label: 'Type', value: m.artistType.charAt(0).toUpperCase() + m.artistType.slice(1) });
+    if (m.artistType)
+      items.push({
+        label: 'Type',
+        value: m.artistType.charAt(0).toUpperCase() + m.artistType.slice(1),
+      });
     if (m.musicGenre) items.push({ label: 'Genre', value: m.musicGenre });
   } else if (category === 'content_creator' && details.contentCreator) {
     const cc = details.contentCreator;
     if (cc.contentType?.length) items.push({ label: 'Content', value: cc.contentType.join(', ') });
     if (cc.topicsOfFocus) {
-      const topics = Array.isArray(cc.topicsOfFocus) ? cc.topicsOfFocus.join(', ') : cc.topicsOfFocus;
+      const topics = Array.isArray(cc.topicsOfFocus)
+        ? cc.topicsOfFocus.join(', ')
+        : cc.topicsOfFocus;
       if (topics) items.push({ label: 'Topics', value: topics });
     }
   }
@@ -1220,7 +1258,8 @@ function CreatorDetailsDisplay({
 
   if (items.length === 0) return null;
 
-  const categoryLabel = category === 'athlete' ? 'Athlete' : category === 'musician' ? 'Musician' : 'Content Creator';
+  const categoryLabel =
+    category === 'athlete' ? 'Athlete' : category === 'musician' ? 'Musician' : 'Content Creator';
 
   return (
     <div>

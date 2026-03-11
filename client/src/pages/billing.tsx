@@ -1,26 +1,18 @@
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { apiRequest } from '@/lib/queryClient';
+import { useQuery } from '@tanstack/react-query';
 import { CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
 // Initialize Stripe with testing keys in development, production keys in production
 const getStripePublicKey = () => {
-  // Debug: Log available env vars
-  console.log('Stripe env debug:', {
-    DEV: import.meta.env.DEV,
-    MODE: import.meta.env.MODE,
-    TESTING_VITE_STRIPE_PUBLIC_KEY: import.meta.env.TESTING_VITE_STRIPE_PUBLIC_KEY,
-    VITE_STRIPE_PUBLIC_KEY: import.meta.env.VITE_STRIPE_PUBLIC_KEY
-  });
-  
   // In development, prefer testing keys
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
     return import.meta.env.TESTING_VITE_STRIPE_PUBLIC_KEY || import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -62,7 +54,7 @@ function SubscriptionStatus() {
       const res = await apiRequest('GET', '/api/subscription-status');
       return res.json() as Promise<SubscriptionStatusResponse>;
     },
-    enabled: isAuthenticated // Only run query when user is authenticated
+    enabled: isAuthenticated, // Only run query when user is authenticated
   });
 
   if (isLoading) {
@@ -87,13 +79,33 @@ function SubscriptionStatus() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-500/20 text-green-400"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge>;
+        return (
+          <Badge className="bg-green-500/20 text-green-400">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Active
+          </Badge>
+        );
       case 'trialing':
-        return <Badge className="bg-blue-500/20 text-blue-400"><Clock className="h-3 w-3 mr-1" />Trial</Badge>;
+        return (
+          <Badge className="bg-blue-500/20 text-blue-400">
+            <Clock className="h-3 w-3 mr-1" />
+            Trial
+          </Badge>
+        );
       case 'past_due':
-        return <Badge className="bg-yellow-500/20 text-yellow-400"><AlertTriangle className="h-3 w-3 mr-1" />Past Due</Badge>;
+        return (
+          <Badge className="bg-yellow-500/20 text-yellow-400">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            Past Due
+          </Badge>
+        );
       case 'canceled':
-        return <Badge className="bg-red-500/20 text-red-400"><XCircle className="h-3 w-3 mr-1" />Canceled</Badge>;
+        return (
+          <Badge className="bg-red-500/20 text-red-400">
+            <XCircle className="h-3 w-3 mr-1" />
+            Canceled
+          </Badge>
+        );
       case 'no_subscription':
         return <Badge className="bg-gray-500/20 text-gray-400">No Subscription</Badge>;
       default:
@@ -115,7 +127,7 @@ function SubscriptionStatus() {
             <span className="text-sm text-gray-600">Status</span>
             {getStatusBadge(subscription?.status || 'no_subscription')}
           </div>
-          
+
           {subscription?.status !== 'no_subscription' && subscription?.subscriptionId && (
             <>
               <Separator />
@@ -161,9 +173,9 @@ function SubscriptionForm() {
 
     if (!stripe || !elements) {
       toast({
-        title: "Payment System Not Ready",
-        description: "Please wait for the payment system to load.",
-        variant: "destructive",
+        title: 'Payment System Not Ready',
+        description: 'Please wait for the payment system to load.',
+        variant: 'destructive',
       });
       return;
     }
@@ -180,21 +192,21 @@ function SubscriptionForm() {
 
       if (error) {
         toast({
-          title: "Payment Failed",
+          title: 'Payment Failed',
           description: error.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Subscription Successful",
-          description: "Your subscription has been activated!",
+          title: 'Subscription Successful',
+          description: 'Your subscription has been activated!',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
-        title: "Subscription Error",
-        description: error.message || "Failed to process subscription",
-        variant: "destructive",
+        title: 'Subscription Error',
+        description: error instanceof Error ? error.message : 'Failed to process subscription',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -205,21 +217,19 @@ function SubscriptionForm() {
     <Card>
       <CardHeader>
         <CardTitle>Subscribe to Premium</CardTitle>
-        <CardDescription>
-          Upgrade your account to access premium features
-        </CardDescription>
+        <CardDescription>Upgrade your account to access premium features</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <PaymentElement />
-          
-          <Button 
-            type="submit" 
+
+          <Button
+            type="submit"
             className="w-full bg-brand-primary hover:bg-brand-primary/80"
             disabled={!stripe || !elements || isLoading}
             data-testid="button-subscribe"
           >
-            {isLoading ? "Processing..." : "Subscribe"}
+            {isLoading ? 'Processing...' : 'Subscribe'}
           </Button>
         </form>
       </CardContent>
@@ -239,9 +249,9 @@ function CheckoutForm({ amount }: { amount: number }) {
 
     if (!stripe || !elements) {
       toast({
-        title: "Payment System Not Ready",
-        description: "Please wait for the payment system to load.",
-        variant: "destructive",
+        title: 'Payment System Not Ready',
+        description: 'Please wait for the payment system to load.',
+        variant: 'destructive',
       });
       return;
     }
@@ -258,21 +268,21 @@ function CheckoutForm({ amount }: { amount: number }) {
 
       if (error) {
         toast({
-          title: "Payment Failed",
+          title: 'Payment Failed',
           description: error.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Payment Successful",
-          description: "Thank you for your purchase!",
+          title: 'Payment Successful',
+          description: 'Thank you for your purchase!',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
-        title: "Payment Error",
-        description: error.message || "Failed to process payment",
-        variant: "destructive",
+        title: 'Payment Error',
+        description: error instanceof Error ? error.message : 'Failed to process payment',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -283,21 +293,19 @@ function CheckoutForm({ amount }: { amount: number }) {
     <Card>
       <CardHeader>
         <CardTitle>One-Time Payment</CardTitle>
-        <CardDescription>
-          Complete your ${amount} payment
-        </CardDescription>
+        <CardDescription>Complete your ${amount} payment</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <PaymentElement />
-          
-          <Button 
-            type="submit" 
+
+          <Button
+            type="submit"
             className="w-full bg-brand-primary hover:bg-brand-primary/80"
             disabled={!stripe || !elements || isLoading}
             data-testid="button-pay"
           >
-            {isLoading ? "Processing..." : `Pay $${amount}`}
+            {isLoading ? 'Processing...' : `Pay $${amount}`}
           </Button>
         </form>
       </CardContent>
@@ -307,31 +315,29 @@ function CheckoutForm({ amount }: { amount: number }) {
 
 // Subscription wrapper with dynamic Elements setup
 function SubscriptionWrapper() {
-  const [clientSecret, setClientSecret] = useState<string>("");
+  const [clientSecret, setClientSecret] = useState<string>('');
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
 
-  const getSubscriptionSecret = async () => {
-    try {
-      const response = await apiRequest('POST', '/api/get-or-create-subscription', {});
-      const data: PaymentResponse = await response.json();
-      if (data.clientSecret) {
-        setClientSecret(data.clientSecret);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Setup Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   useEffect(() => {
-    if (isAuthenticated) {
-      getSubscriptionSecret();
-    }
-  }, [isAuthenticated]);
+    if (!isAuthenticated) return;
+    const fetchSecret = async () => {
+      try {
+        const response = await apiRequest('POST', '/api/get-or-create-subscription', {});
+        const data: PaymentResponse = await response.json();
+        if (data.clientSecret) {
+          setClientSecret(data.clientSecret);
+        }
+      } catch (error: unknown) {
+        toast({
+          title: 'Setup Failed',
+          description: error instanceof Error ? error.message : 'Setup failed',
+          variant: 'destructive',
+        });
+      }
+    };
+    fetchSecret();
+  }, [isAuthenticated, toast]);
 
   if (!clientSecret) {
     return (
@@ -344,15 +350,18 @@ function SubscriptionWrapper() {
   }
 
   return (
-    <Elements stripe={stripePromise} options={{ 
-      clientSecret,
-      appearance: {
-        theme: 'night',
-        variables: {
-          colorPrimary: '#8B5CF6',
-        }
-      }
-    }}>
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        appearance: {
+          theme: 'night',
+          variables: {
+            colorPrimary: '#8B5CF6',
+          },
+        },
+      }}
+    >
       <SubscriptionForm />
     </Elements>
   );
@@ -360,7 +369,7 @@ function SubscriptionWrapper() {
 
 // Checkout wrapper with dynamic Elements setup
 function CheckoutWrapper({ amount }: { amount: number }) {
-  const [clientSecret, setClientSecret] = useState<string>("");
+  const [clientSecret, setClientSecret] = useState<string>('');
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
 
@@ -373,11 +382,11 @@ function CheckoutWrapper({ amount }: { amount: number }) {
           if (data.clientSecret) {
             setClientSecret(data.clientSecret);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           toast({
-            title: "Payment Setup Failed",
-            description: error.message,
-            variant: "destructive",
+            title: 'Payment Setup Failed',
+            description: error instanceof Error ? error.message : 'Payment setup failed',
+            variant: 'destructive',
           });
         }
       };
@@ -396,15 +405,18 @@ function CheckoutWrapper({ amount }: { amount: number }) {
   }
 
   return (
-    <Elements stripe={stripePromise} options={{ 
-      clientSecret,
-      appearance: {
-        theme: 'night',
-        variables: {
-          colorPrimary: '#8B5CF6',
-        }
-      }
-    }}>
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        appearance: {
+          theme: 'night',
+          variables: {
+            colorPrimary: '#8B5CF6',
+          },
+        },
+      }}
+    >
       <CheckoutForm amount={amount} />
     </Elements>
   );
@@ -428,12 +440,10 @@ export default function BillingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Subscription Plans</CardTitle>
-            <CardDescription>
-              Recurring monthly or annual plans
-            </CardDescription>
+            <CardDescription>Recurring monthly or annual plans</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
+            <Button
               onClick={() => setPaymentType('subscription')}
               className="w-full bg-brand-primary hover:bg-brand-primary/80"
               data-testid="button-setup-subscription"
@@ -446,9 +456,7 @@ export default function BillingPage() {
         <Card>
           <CardHeader>
             <CardTitle>One-Time Payments</CardTitle>
-            <CardDescription>
-              Pay for credits or premium features
-            </CardDescription>
+            <CardDescription>Pay for credits or premium features</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -466,7 +474,7 @@ export default function BillingPage() {
                 data-testid="input-payment-amount"
               />
             </div>
-            <Button 
+            <Button
               onClick={() => setPaymentType('checkout')}
               className="w-full bg-brand-secondary hover:bg-brand-secondary/80"
               data-testid="button-setup-checkout"
@@ -479,11 +487,11 @@ export default function BillingPage() {
 
       {paymentType === 'subscription' && <SubscriptionWrapper />}
       {paymentType === 'checkout' && <CheckoutWrapper amount={checkoutAmount} />}
-      
+
       {paymentType && (
         <div className="flex justify-center">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setPaymentType(null)}
             data-testid="button-cancel-payment"
           >

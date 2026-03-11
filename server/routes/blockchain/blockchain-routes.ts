@@ -17,6 +17,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
+import { transactionLimiter } from '../../middleware/rate-limit';
 import {
   FANDOMLY_CHAIN,
   CONTRACTS,
@@ -26,16 +27,8 @@ import {
   REPUTATION_REGISTRY_ABI,
 } from '@shared/blockchain-config';
 import { db } from '../../db';
-import { eq, and, or, isNotNull, sql } from 'drizzle-orm';
-import {
-  users,
-  socialConnections,
-  creators,
-  tenantMemberships,
-  fanPrograms,
-  loyaltyPrograms,
-  tokenDistributions,
-} from '@shared/schema';
+import { eq, sql } from 'drizzle-orm';
+import { users, socialConnections, creators, tokenDistributions } from '@shared/schema';
 
 // ============================================================================
 // CHAIN + CLIENTS
@@ -123,6 +116,7 @@ export function registerBlockchainRoutes(app: Express) {
    */
   app.post(
     '/api/blockchain/create-token',
+    transactionLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
       try {
@@ -420,6 +414,7 @@ export function registerBlockchainRoutes(app: Express) {
    */
   app.post(
     '/api/blockchain/staking/set-multiplier',
+    transactionLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
       try {
@@ -494,6 +489,7 @@ export function registerBlockchainRoutes(app: Express) {
    */
   app.post(
     '/api/blockchain/ensure-reputation',
+    transactionLimiter,
     authenticateUser,
     async (req: AuthenticatedRequest, res) => {
       try {
@@ -594,7 +590,7 @@ export function registerBlockchainRoutes(app: Express) {
           ORDER BY u.id
         `);
 
-        const members = (result as any).rows || [];
+        const members = (result as { rows?: unknown[] }).rows || [];
         return res.json({ members });
       } catch (error) {
         console.error('[BlockchainRoutes] Community wallets error:', error);

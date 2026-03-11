@@ -163,6 +163,13 @@ export function registerAuthRoutes(app: Express) {
         } as any);
 
         console.log('[Social Auth] Created new user:', user.id);
+
+        // Send welcome email (non-blocking)
+        if (email) {
+          import('../../services/email-service').then(({ sendWelcomeEmail }) => {
+            sendWelcomeEmail(email, generatedUsername).catch(() => {});
+          });
+        }
       }
 
       if (!user) {

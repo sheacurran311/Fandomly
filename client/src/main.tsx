@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import './polyfills';
+import './lib/sentry';
 
 import { createRoot } from 'react-dom/client';
 import App from './App';

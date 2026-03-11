@@ -264,7 +264,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         // No session — normal unauthenticated state
-        console.log('[Auth] No existing session');
         setState((prev) => ({
           ...prev,
           isLoading: false,
@@ -273,7 +272,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
     } catch (error) {
-      console.log('[Auth] Session check failed', error);
+      console.warn('[Auth] Session check failed', error);
     }
 
     setState((prev) => ({
@@ -616,7 +615,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Returns a promise that resolves after state is updated and React has flushed.
   const refreshUser = useCallback(async () => {
     if (!accessTokenStorage) {
-      console.log('[Auth] No access token, cannot refresh user');
+      // No access token — skip refresh
       return;
     }
 

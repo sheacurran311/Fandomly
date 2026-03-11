@@ -1,3 +1,4 @@
+import './lib/sentry';
 import express, { type Request } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -184,6 +185,11 @@ app.use((req, res, next) => {
   // Use standardized error handling middleware
   const { errorHandler } = await import('./utils/error-factory');
   app.use(errorHandler);
+
+  // OG meta tags for social crawlers on public pages (before SPA catch-all)
+  const { ogTagsMiddleware } = await import('./middleware/og-tags');
+  const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 5000}`;
+  app.use(ogTagsMiddleware(baseUrl));
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

@@ -9,6 +9,12 @@
     <meta property="og:description" content="Reward fans for real engagement. Cross-platform loyalty for creators." />
     <meta property="og:image" content="/fandomly-logo-with-text.png" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Fandomly" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Fandomly - AI-Powered Loyalty Platform for Creators" />
+    <meta name="twitter:description" content="Reward fans for real engagement. Cross-platform loyalty for creators." />
+    <meta name="twitter:image" content="/fandomly-logo-with-text.png" />
+    <meta name="theme-color" content="#0f0a1f" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,7 +25,7 @@
   <body>
     <div id="fb-root"></div>
     <script>
-      console.log('[FB index.html] Script starting...');
+      // [FB index.html] Script starting...');
       // Optional globals can be set before this script:
       // window.FACEBOOK_FAN_APP_ID, window.FACEBOOK_CREATOR_APP_ID, window.FACEBOOK_APP_ID, window.FACEBOOK_API_VERSION
       (function(){
@@ -33,7 +39,7 @@
         window.__FB_DEFAULTS__ = { FAN_APP_ID: FAN_APP_ID, CREATOR_APP_ID: CREATOR_APP_ID, API_VERSION: API_VERSION };
 
         window.fbAsyncInit = function() {
-          console.log('[FB index.html] fbAsyncInit called, FB object:', typeof FB);
+          // [FB index.html] fbAsyncInit called, FB object:', typeof FB);
           try {
             FB.init({
               appId      : INITIAL_APP_ID,
@@ -42,7 +48,7 @@
               version    : API_VERSION
             });
             window.__FB_CURRENT_APP_ID__ = INITIAL_APP_ID;
-            console.log('[FB index.html] FB.init completed with App ID:', INITIAL_APP_ID);
+            // [FB index.html] FB.init completed with App ID:', INITIAL_APP_ID);
             FB.AppEvents.logPageView();
           } catch (e) {
             console.error('[FB index.html] FB.init failed:', e);
@@ -64,7 +70,7 @@
           // Global function for Facebook login button callback
           window.checkLoginState = function() {
             FB.getLoginStatus(function(response) {
-              console.log('Facebook login status:', response);
+              // Facebook login status callback
               if (window.handleFacebookLoginStatus) {
                 window.handleFacebookLoginStatus(response);
               }
@@ -76,7 +82,7 @@
       (function(d, s, id){
          var js, fjs = d.getElementsByTagName(s)[0];
          if (d.getElementById(id)) {
-           console.log('[FB index.html] Script already exists, checking if FB loaded:', typeof window.FB);
+           // [FB index.html] Script already exists, checking if FB loaded:', typeof window.FB);
            return;
          }
          js = d.createElement(s); js.id = id;
@@ -85,12 +91,12 @@
          js.defer = true;
          js.crossOrigin = "anonymous";
          js.onload = function() { 
-           console.log('[FB index.html] SDK script loaded, FB:', typeof window.FB); 
+           // [FB index.html] SDK script loaded, FB:', typeof window.FB); 
          };
          js.onerror = function(e) { 
            console.error('[FB index.html] SDK script FAILED to load:', e); 
          };
-         console.log('[FB index.html] Inserting FB SDK script...');
+         // [FB index.html] Inserting FB SDK script...');
          if (fjs && fjs.parentNode) {
            fjs.parentNode.insertBefore(js, fjs);
          } else {

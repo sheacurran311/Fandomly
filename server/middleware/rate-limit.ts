@@ -68,3 +68,17 @@ export const authRateLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
   message: { error: 'Too many authentication attempts. Please try again later.' },
 });
+
+/**
+ * Transaction rate limit: 10 requests per minute per IP
+ * Applies to reward redemptions, staking, NFT minting — operations
+ * that cost points or trigger on-chain transactions.
+ */
+export const transactionLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many transaction requests. Please wait a moment and try again.' },
+});

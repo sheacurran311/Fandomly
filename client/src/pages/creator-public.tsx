@@ -1,18 +1,18 @@
-import { useState } from "react";
-import { useParams, Link } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { apiRequest } from "@/lib/queryClient";
-import { transformImageUrl } from "@/lib/image-utils";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
-import { 
-  Heart, 
-  Share2, 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'wouter';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { apiRequest } from '@/lib/queryClient';
+import { transformImageUrl } from '@/lib/image-utils';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Heart,
+  Share2,
   Star,
   Trophy,
   Users,
@@ -21,7 +21,6 @@ import {
   Crown,
   Target,
   TrendingUp,
-  Calendar,
   Clock,
   ExternalLink,
   Facebook,
@@ -31,9 +30,9 @@ import {
   Sparkles,
   MessageCircle,
   Video,
-  Zap
-} from "lucide-react";
-import type { Creator, Task, Campaign } from "@shared/schema";
+  Zap,
+} from 'lucide-react';
+import type { Creator, Task, Campaign } from '@shared/schema';
 
 interface CreatorPublicData {
   creator: Creator & {
@@ -74,7 +73,7 @@ export default function CreatorPublic() {
 
   // Fetch creator public data
   const { data: creatorData, isLoading } = useQuery<CreatorPublicData>({
-    queryKey: ["/api/creators/public", creatorUrl],
+    queryKey: ['/api/creators/public', creatorUrl],
     queryFn: async () => {
       const response = await fetch(`/api/creators/public/${creatorUrl}`, {
         credentials: 'include',
@@ -87,66 +86,80 @@ export default function CreatorPublic() {
     enabled: !!creatorUrl,
   });
 
+  // Update document title for browser tab
+  useEffect(() => {
+    if (creatorData?.creator) {
+      const name = creatorData.creator.user?.displayName || creatorData.creator.user?.username;
+      document.title = `${name} on Fandomly`;
+      return () => {
+        document.title = 'Fandomly - AI-Powered Loyalty Platform for Creators';
+      };
+    }
+  }, [creatorData]);
+
   // Fetch user's fan programs to check join status
   const { data: userPrograms = [] } = useQuery({
-    queryKey: ["/api/fan-programs/user", user?.id],
+    queryKey: ['/api/fan-programs/user', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await apiRequest("GET", `/api/fan-programs/user/${user.id}`);
+      const response = await apiRequest('GET', `/api/fan-programs/user/${user.id}`);
       return await response.json();
     },
     enabled: !!user?.id && !!creatorData,
   });
 
   // Check if user has joined this creator's program
-  const hasJoinedProgram = userPrograms.some((program: any) => 
-    program.creatorId === creatorData?.creator?.id
+  const hasJoinedProgram = userPrograms.some(
+    (program: any) => program.creatorId === creatorData?.creator?.id
   );
 
   // Join program mutation
   const joinProgramMutation = useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("Must be authenticated to join");
-      if (!creatorData) throw new Error("Creator data not loaded");
-      
+      if (!user) throw new Error('Must be authenticated to join');
+      if (!creatorData) throw new Error('Creator data not loaded');
+
       // Fetch creator's loyalty programs
-      const programsResponse = await fetch(`/api/loyalty-programs/creator/${creatorData.creator.id}`, {
-        credentials: 'include',
-      });
-      
+      const programsResponse = await fetch(
+        `/api/loyalty-programs/creator/${creatorData.creator.id}`,
+        {
+          credentials: 'include',
+        }
+      );
+
       if (!programsResponse.ok) {
-        throw new Error("No loyalty programs available");
+        throw new Error('No loyalty programs available');
       }
-      
+
       const programs = await programsResponse.json();
-      
+
       if (programs.length === 0) {
         throw new Error("This creator hasn't created a loyalty program yet");
       }
-      
+
       // Join the first active program
       const program = programs[0];
-      const response = await apiRequest("POST", "/api/fan-programs", {
+      const response = await apiRequest('POST', '/api/fan-programs', {
         tenantId: program.tenantId,
         programId: program.id,
       });
-      
+
       return await response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Success!",
+        title: 'Success!',
         description: `You've joined ${creatorData?.creator?.displayName}'s loyalty program!`,
       });
       // Invalidate queries to refresh join state
-      queryClient.invalidateQueries({ queryKey: ["/api/fan-programs/user", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/fan-programs/user', user?.id] });
     },
     onError: (error) => {
-      console.error("Join program error:", error);
+      console.error('Join program error:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to join program",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to join program',
+        variant: 'destructive',
       });
     },
   });
@@ -168,7 +181,9 @@ export default function CreatorPublic() {
         <div className="text-center">
           <div className="text-6xl mb-4">🔍</div>
           <h2 className="text-2xl font-bold text-white mb-2">Creator Not Found</h2>
-          <p className="text-gray-400 mb-6">The creator page you're looking for doesn't exist.</p>
+          <p className="text-gray-400 mb-6">
+            The creator page you&apos;re looking for doesn&apos;t exist.
+          </p>
           <Link href="/find-creators">
             <Button variant="outline" className="border-brand-primary text-brand-primary">
               Browse Creators
@@ -186,25 +201,27 @@ export default function CreatorPublic() {
     showSocialPosts: true,
     showAnalytics: false,
     showRewards: true,
-    showCommunity: true
+    showCommunity: true,
   };
   const branding = creator.tenant?.branding;
 
   // Filter published tasks (not draft and is active)
-  const publishedTasks = tasks.filter(t => !t.isDraft && t.isActive);
-  const activeCampaigns = campaigns.filter(c => c.status === 'active');
+  const publishedTasks = tasks.filter((t) => !t.isDraft && t.isActive);
+  const activeCampaigns = campaigns.filter((c) => c.status === 'active');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-dark-bg via-brand-dark-purple to-brand-dark-bg">
       {/* Hero Section with Banner */}
       <section className="relative h-[400px] md:h-[500px]">
         {/* Banner Image */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: (creator as { bannerImage?: string }).bannerImage ?? creator.user?.profileData?.bannerImage
-              ? `url(${transformImageUrl((creator as { bannerImage?: string }).bannerImage ?? creator.user?.profileData?.bannerImage ?? '')})`
-              : `linear-gradient(135deg, ${branding?.primaryColor || '#1a1f3a'}, ${branding?.secondaryColor || '#0f1629'})`,
+            backgroundImage:
+              ((creator as { bannerImage?: string }).bannerImage ??
+              creator.user?.profileData?.bannerImage)
+                ? `url(${transformImageUrl((creator as { bannerImage?: string }).bannerImage ?? creator.user?.profileData?.bannerImage ?? '')})`
+                : `linear-gradient(135deg, ${branding?.primaryColor || '#1a1f3a'}, ${branding?.secondaryColor || '#0f1629'})`,
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-brand-dark-bg/50 to-brand-dark-bg"></div>
@@ -217,7 +234,10 @@ export default function CreatorPublic() {
               {/* Profile Photo */}
               <div className="relative">
                 <Avatar className="w-32 h-32 md:w-40 md:h-40 border-4 border-white/20 shadow-xl">
-                  <AvatarImage src={transformImageUrl(creator.imageUrl) || undefined} alt={creator.displayName} />
+                  <AvatarImage
+                    src={transformImageUrl(creator.imageUrl) || undefined}
+                    alt={creator.displayName}
+                  />
                   <AvatarFallback className="text-4xl bg-gradient-to-br from-brand-primary to-brand-secondary text-white">
                     {creator.displayName.charAt(0).toUpperCase()}
                   </AvatarFallback>
@@ -245,9 +265,7 @@ export default function CreatorPublic() {
 
                 <p className="text-lg text-gray-300 mb-3">@{creator.user?.username}</p>
 
-                {creator.bio && (
-                  <p className="text-gray-400 max-w-2xl mb-4">{creator.bio}</p>
-                )}
+                {creator.bio && <p className="text-gray-400 max-w-2xl mb-4">{creator.bio}</p>}
 
                 {/* Stats Row */}
                 <div className="flex items-center justify-center md:justify-start gap-6 text-sm">
@@ -263,7 +281,9 @@ export default function CreatorPublic() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Gift className="h-4 w-4 text-purple-400" />
-                    <span className="text-white font-semibold">{stats.totalRewards.toLocaleString()}</span>
+                    <span className="text-white font-semibold">
+                      {stats.totalRewards.toLocaleString()}
+                    </span>
                     <span className="text-gray-400">Rewards Given</span>
                   </div>
                 </div>
@@ -282,13 +302,15 @@ export default function CreatorPublic() {
                 <Button
                   size="lg"
                   disabled={joinProgramMutation.isPending || hasJoinedProgram}
-                  className={hasJoinedProgram
-                    ? "bg-green-500 hover:bg-green-500/80 text-white" 
-                    : "bg-brand-primary hover:bg-brand-primary/90 text-white"}
+                  className={
+                    hasJoinedProgram
+                      ? 'bg-green-500 hover:bg-green-500/80 text-white'
+                      : 'bg-brand-primary hover:bg-brand-primary/90 text-white'
+                  }
                   onClick={() => joinProgramMutation.mutate()}
                 >
                   {joinProgramMutation.isPending ? (
-                    "Joining..."
+                    'Joining...'
                   ) : hasJoinedProgram ? (
                     <>
                       <CheckCircle className="h-5 w-5 mr-2" />
@@ -324,7 +346,9 @@ export default function CreatorPublic() {
                   <Sparkles className="h-6 w-6 text-brand-accent" />
                   Unlock Premium Benefits
                 </h3>
-                <p className="text-gray-300">Get exclusive access to private campaigns, direct messages, and more!</p>
+                <p className="text-gray-300">
+                  Get exclusive access to private campaigns, direct messages, and more!
+                </p>
               </div>
               <Button
                 size="lg"
@@ -360,12 +384,14 @@ export default function CreatorPublic() {
                         <div>
                           <label className="text-sm text-gray-400 mb-1 block">Type</label>
                           <div className="text-white flex items-center gap-2 capitalize">
-                            {creator.category === 'athlete' && <Trophy className="h-4 w-4 text-amber-400" />}
+                            {creator.category === 'athlete' && (
+                              <Trophy className="h-4 w-4 text-amber-400" />
+                            )}
                             {creator.category.replace('_', ' ')}
                           </div>
                         </div>
                       )}
-                      
+
                       {creator.user?.profileData?.location && (
                         <div>
                           <label className="text-sm text-gray-400 mb-1 block">Location</label>
@@ -374,43 +400,133 @@ export default function CreatorPublic() {
                       )}
 
                       {/* Athlete details */}
-                      {creator.category === 'athlete' && (creator.typeSpecificData as any)?.athlete && (() => {
-                        const a = (creator.typeSpecificData as any).athlete;
-                        const educLabels: Record<string, string> = { high_school: 'High School', college_d1: 'College D1', college_d2: 'College D2', college_d3: 'College D3', professional: 'Professional', other: 'Other' };
-                        return (
-                          <>
-                            {a.sport && <div><label className="text-sm text-gray-400 mb-1 block">Sport</label><div className="text-white">{a.sport}</div></div>}
-                            {a.position && <div><label className="text-sm text-gray-400 mb-1 block">Position</label><div className="text-white">{a.position}</div></div>}
-                            {a.education?.level && <div><label className="text-sm text-gray-400 mb-1 block">Level</label><div className="text-white">{educLabels[a.education.level] || a.education.level}</div></div>}
-                            {a.school && <div><label className="text-sm text-gray-400 mb-1 block">School</label><div className="text-white">{a.school}</div></div>}
-                            {a.currentSponsors && <div><label className="text-sm text-gray-400 mb-1 block">Sponsors</label><div className="text-white">{a.currentSponsors}</div></div>}
-                          </>
-                        );
-                      })()}
+                      {creator.category === 'athlete' &&
+                        (creator.typeSpecificData as any)?.athlete &&
+                        (() => {
+                          const a = (creator.typeSpecificData as any).athlete;
+                          const educLabels: Record<string, string> = {
+                            high_school: 'High School',
+                            college_d1: 'College D1',
+                            college_d2: 'College D2',
+                            college_d3: 'College D3',
+                            professional: 'Professional',
+                            other: 'Other',
+                          };
+                          return (
+                            <>
+                              {a.sport && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">Sport</label>
+                                  <div className="text-white">{a.sport}</div>
+                                </div>
+                              )}
+                              {a.position && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">
+                                    Position
+                                  </label>
+                                  <div className="text-white">{a.position}</div>
+                                </div>
+                              )}
+                              {a.education?.level && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">Level</label>
+                                  <div className="text-white">
+                                    {educLabels[a.education.level] || a.education.level}
+                                  </div>
+                                </div>
+                              )}
+                              {a.school && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">School</label>
+                                  <div className="text-white">{a.school}</div>
+                                </div>
+                              )}
+                              {a.currentSponsors && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">
+                                    Sponsors
+                                  </label>
+                                  <div className="text-white">{a.currentSponsors}</div>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
 
                       {/* Musician details */}
-                      {creator.category === 'musician' && (creator.typeSpecificData as any)?.musician && (() => {
-                        const m = (creator.typeSpecificData as any).musician;
-                        return (
-                          <>
-                            {m.bandArtistName && <div><label className="text-sm text-gray-400 mb-1 block">Artist</label><div className="text-white">{m.bandArtistName}</div></div>}
-                            {m.artistType && <div><label className="text-sm text-gray-400 mb-1 block">Artist Type</label><div className="text-white capitalize">{m.artistType}</div></div>}
-                            {m.musicGenre && <div><label className="text-sm text-gray-400 mb-1 block">Genre</label><div className="text-white">{m.musicGenre}</div></div>}
-                            {m.musicCatalogUrl && <div><label className="text-sm text-gray-400 mb-1 block">Music</label><a href={m.musicCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline flex items-center gap-1"><ExternalLink className="h-3.5 w-3.5" />Listen</a></div>}
-                          </>
-                        );
-                      })()}
+                      {creator.category === 'musician' &&
+                        (creator.typeSpecificData as any)?.musician &&
+                        (() => {
+                          const m = (creator.typeSpecificData as any).musician;
+                          return (
+                            <>
+                              {m.bandArtistName && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">Artist</label>
+                                  <div className="text-white">{m.bandArtistName}</div>
+                                </div>
+                              )}
+                              {m.artistType && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">
+                                    Artist Type
+                                  </label>
+                                  <div className="text-white capitalize">{m.artistType}</div>
+                                </div>
+                              )}
+                              {m.musicGenre && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">Genre</label>
+                                  <div className="text-white">{m.musicGenre}</div>
+                                </div>
+                              )}
+                              {m.musicCatalogUrl && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">Music</label>
+                                  <a
+                                    href={m.musicCatalogUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-brand-primary hover:underline flex items-center gap-1"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    Listen
+                                  </a>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
 
                       {/* Content creator details */}
-                      {creator.category === 'content_creator' && (creator.typeSpecificData as any)?.contentCreator && (() => {
-                        const cc = (creator.typeSpecificData as any).contentCreator;
-                        return (
-                          <>
-                            {cc.contentType?.length > 0 && <div><label className="text-sm text-gray-400 mb-1 block">Content</label><div className="text-white">{cc.contentType.join(', ')}</div></div>}
-                            {cc.topicsOfFocus && <div><label className="text-sm text-gray-400 mb-1 block">Topics</label><div className="text-white">{Array.isArray(cc.topicsOfFocus) ? cc.topicsOfFocus.join(', ') : cc.topicsOfFocus}</div></div>}
-                          </>
-                        );
-                      })()}
+                      {creator.category === 'content_creator' &&
+                        (creator.typeSpecificData as any)?.contentCreator &&
+                        (() => {
+                          const cc = (creator.typeSpecificData as any).contentCreator;
+                          return (
+                            <>
+                              {cc.contentType?.length > 0 && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">
+                                    Content
+                                  </label>
+                                  <div className="text-white">{cc.contentType.join(', ')}</div>
+                                </div>
+                              )}
+                              {cc.topicsOfFocus && (
+                                <div>
+                                  <label className="text-sm text-gray-400 mb-1 block">Topics</label>
+                                  <div className="text-white">
+                                    {Array.isArray(cc.topicsOfFocus)
+                                      ? cc.topicsOfFocus.join(', ')
+                                      : cc.topicsOfFocus}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -437,7 +553,10 @@ export default function CreatorPublic() {
                               <h4 className="text-white font-semibold mb-1">{task.name}</h4>
                               <p className="text-sm text-gray-400">{task.description}</p>
                             </div>
-                            <Badge variant="outline" className="border-brand-accent/30 text-brand-accent">
+                            <Badge
+                              variant="outline"
+                              className="border-brand-accent/30 text-brand-accent"
+                            >
                               <Star className="h-3 w-3 mr-1" />
                               {(task as { pointsToReward?: number }).pointsToReward ?? 0} pts
                             </Badge>
@@ -448,7 +567,7 @@ export default function CreatorPublic() {
                           </div>
                         </div>
                       ))}
-                      
+
                       {activeCampaigns.slice(0, 2).map((campaign: any) => (
                         <div
                           key={campaign.id}
@@ -499,12 +618,16 @@ export default function CreatorPublic() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Rewards Distributed</span>
-                      <span className="text-white font-semibold">{stats.totalRewards.toLocaleString()}</span>
+                      <span className="text-white font-semibold">
+                        {stats.totalRewards.toLocaleString()}
+                      </span>
                     </div>
                     {stats.engagementRate && (
                       <div className="flex items-center justify-between">
                         <span className="text-gray-400">Engagement Rate</span>
-                        <span className="text-green-400 font-semibold">{stats.engagementRate}%</span>
+                        <span className="text-green-400 font-semibold">
+                          {stats.engagementRate}%
+                        </span>
                       </div>
                     )}
                   </CardContent>
@@ -586,7 +709,9 @@ export default function CreatorPublic() {
                       </div>
                       <div>
                         <h4 className="text-white font-semibold mb-1">Private Campaigns</h4>
-                        <p className="text-sm text-gray-400">Access exclusive campaigns and challenges</p>
+                        <p className="text-sm text-gray-400">
+                          Access exclusive campaigns and challenges
+                        </p>
                       </div>
                     </div>
                     <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
@@ -668,9 +793,10 @@ export default function CreatorPublic() {
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-gray-300">
-                Premium subscriptions are coming soon! Get ready for exclusive content, direct access, and VIP rewards.
+                Premium subscriptions are coming soon! Get ready for exclusive content, direct
+                access, and VIP rewards.
               </p>
-              
+
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10 text-center">
                   <h4 className="text-white font-bold mb-2">Basic</h4>
@@ -678,18 +804,22 @@ export default function CreatorPublic() {
                   <p className="text-sm text-gray-400 mb-4">Enroll and earn rewards</p>
                   <Badge className="bg-green-500/20 text-green-400">Current</Badge>
                 </div>
-                
+
                 <div className="p-4 rounded-lg bg-purple-500/20 border border-purple-500/30 text-center transform scale-105">
                   <Badge className="bg-purple-500/30 text-purple-300 mb-2">Popular</Badge>
                   <h4 className="text-white font-bold mb-2">Premium</h4>
-                  <div className="text-3xl font-bold text-purple-400 mb-2">$9.99<span className="text-sm">/mo</span></div>
+                  <div className="text-3xl font-bold text-purple-400 mb-2">
+                    $9.99<span className="text-sm">/mo</span>
+                  </div>
                   <p className="text-sm text-gray-400 mb-4">Private campaigns + DMs</p>
                   <Badge className="bg-yellow-500/20 text-yellow-400">Coming Soon</Badge>
                 </div>
-                
+
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10 text-center">
                   <h4 className="text-white font-bold mb-2">VIP</h4>
-                  <div className="text-3xl font-bold text-brand-accent mb-2">$24.99<span className="text-sm">/mo</span></div>
+                  <div className="text-3xl font-bold text-brand-accent mb-2">
+                    $24.99<span className="text-sm">/mo</span>
+                  </div>
                   <p className="text-sm text-gray-400 mb-4">Everything + Cameos</p>
                   <Badge className="bg-yellow-500/20 text-yellow-400">Coming Soon</Badge>
                 </div>
@@ -711,4 +841,3 @@ export default function CreatorPublic() {
     </div>
   );
 }
-
