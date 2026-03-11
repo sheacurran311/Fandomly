@@ -35,6 +35,7 @@ import {
   Music,
   Disc,
 } from 'lucide-react';
+import { SiKick } from 'react-icons/si';
 import type { Creator, Task, Campaign } from '@shared/schema';
 
 interface CreatorPublicData {
@@ -287,6 +288,7 @@ export default function CreatorPublic() {
                         tiktok: <Music className="h-4 w-4" />,
                         discord: <Disc className="h-4 w-4" />,
                         twitch: <Video className="h-4 w-4" />,
+                        kick: <SiKick className="h-4 w-4 text-[#53FC18]" />,
                       };
                       const icon = iconMap[social.platform];
                       if (!icon) return null;

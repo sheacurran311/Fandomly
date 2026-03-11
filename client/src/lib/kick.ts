@@ -93,9 +93,10 @@ export class KickAPI {
     };
   }
 
-  async secureLogin(): Promise<{ success: boolean; error?: string }> {
-    // Generate CSRF state token and PKCE challenge before entering promise
-    const state = `kick_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  async secureLogin(mode?: 'auth' | 'connect'): Promise<{ success: boolean; error?: string }> {
+    // Generate CSRF state token; embed _auth_ marker so kick-callback.tsx can distinguish flows
+    const authMarker = mode === 'auth' ? '_auth_' : '';
+    const state = `kick_${authMarker}${Date.now()}_${Math.random().toString(36).slice(2)}`;
     sessionStorage.setItem('kick_oauth_state', state);
 
     const { url: authUrl, codeVerifier } = await this.getAuthUrl(state);

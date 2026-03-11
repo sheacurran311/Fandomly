@@ -25,7 +25,7 @@ Fandomly has TWO separate social auth systems that serve different purposes. The
 
 **Purpose:** User identity + Fandomly JWT issuance.
 
-**Entry point:** `client/src/components/auth/auth-modal.tsx` renders social login buttons (Google, Twitter, Facebook, TikTok, Discord, Twitch, YouTube, Spotify).
+**Entry point:** `client/src/components/auth/auth-modal.tsx` renders social login buttons (Google, Twitter, Facebook, TikTok, Kick, Discord, Twitch, YouTube, Spotify).
 
 **Flow:**
 1. User clicks a social provider in the auth modal
@@ -60,10 +60,11 @@ Fandomly has TWO separate social auth systems that serve different purposes. The
 5. Platform API access is now available for task verification, etc.
 
 **Key files:**
-- `client/src/lib/social-integrations.ts` — main OAuth popup flows for all 10 platforms
+- `client/src/lib/social-integrations.ts` — main OAuth popup flows for TikTok, YouTube, Spotify, Discord, Twitch
 - `client/src/lib/twitter.ts` — Twitter PKCE flow
 - `client/src/lib/facebook.ts` — Facebook SDK manager
 - `client/src/lib/instagram.ts` — Instagram OAuth flow
+- `client/src/lib/kick.ts` — Kick OAuth 2.1 + PKCE flow (KickAPI)
 - `client/src/hooks/use-social-connections.ts` — React Query hook for connection state
 - `client/src/lib/social-connection-api.ts` — API client for connection CRUD
 - `server/routes/social/social-connection-routes.ts` — server CRUD (all routes require `authenticateUser`)
@@ -75,7 +76,7 @@ Fandomly has TWO separate social auth systems that serve different purposes. The
 - These connections are SEPARATE from the primary login — a user can log in with Google but connect Twitter for tasks
 - NEVER modify callback pages, social-integrations.ts, or the SDK managers when working on primary auth
 - Token exchange endpoints (`/api/social/*/token`) must NOT have `authenticateUser` — they run in popup windows without Fandomly session cookies
-- Platform profile endpoints (`/api/social/twitter/user`, `/tiktok/user`, `/spotify/me`, `/discord/me`, `/twitch/me`, `/youtube/me`) must NOT have `authenticateUser` — they use the platform's OAuth token from the Authorization header, not a Fandomly JWT
+- Platform profile endpoints (`/api/social/twitter/user`, `/tiktok/user`, `/spotify/me`, `/discord/me`, `/twitch/me`, `/youtube/me`, `/kick/me`) must NOT have `authenticateUser` — they use the platform's OAuth token from the Authorization header, not a Fandomly JWT
 
 ### Cross-Origin Opener Pattern (MANDATORY for all callback pages)
 
@@ -141,7 +142,7 @@ This applies to `/me`, `/me/permissions`, `/me/accounts`, and any other Graph AP
 
 ## Critical Don'ts
 
-- NEVER add `authenticateUser` to platform profile endpoints (`/api/social/twitter/user`, `/tiktok/user`, `/spotify/me`, `/discord/me`, `/twitch/me`, `/youtube/me`) — they use platform tokens, not Fandomly JWTs
+- NEVER add `authenticateUser` to platform profile endpoints (`/api/social/twitter/user`, `/tiktok/user`, `/spotify/me`, `/discord/me`, `/twitch/me`, `/youtube/me`, `/kick/me`) — they use platform tokens, not Fandomly JWTs
 - NEVER call `FB.api()` without passing `access_token` explicitly — the SDK's global token state can be stale from a previous flow
 - NEVER let the Particle Auth Listener initiate login or logout independently
 - NEVER modify the in-app social OAuth flows (social-integrations.ts, callback pages) when changing primary auth

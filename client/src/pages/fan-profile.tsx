@@ -35,12 +35,14 @@ import {
   Phone
 } from "lucide-react";
 import { FaSpotify } from "react-icons/fa";
+import { SiKick } from "react-icons/si";
 import { useTwitterConnection } from "@/hooks/use-twitter-connection";
 import {
   useFacebookConnection,
   useTikTokConnection,
   useYouTubeConnection,
   useSpotifyConnection,
+  useKickConnection,
 } from "@/hooks/use-social-connection";
 import { FacebookSDKManager } from "@/lib/facebook";
 import { getCreatorTypeLabel } from "@shared/fanInterestOptions";
@@ -100,6 +102,15 @@ export default function FanProfile() {
     disconnect: disconnectSpotify,
   } = useSpotifyConnection();
   const spotifyDisplayName = spotifyUserInfo?.displayName || spotifyUserInfo?.name || null;
+
+  const {
+    isConnected: kickConnected,
+    isConnecting: kickConnecting,
+    userInfo: kickUserInfo,
+    connect: connectKick,
+    disconnect: disconnectKick,
+  } = useKickConnection();
+  const kickDisplayName = kickUserInfo?.displayName || kickUserInfo?.username || null;
 
   // Facebook profile import mutation (Fan-specific — uses FacebookSDKManager directly for the FB Graph API call)
   const importFacebookProfile = useMutation({
@@ -652,6 +663,45 @@ export default function FanProfile() {
                         disabled={spotifyConnecting}
                       >
                         {spotifyConnecting ? 'Connecting…' : 'Connect'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Kick */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <SiKick className="h-5 w-5 text-[#53FC18]" />
+                      <div>
+                        <div className="text-white font-medium">Kick</div>
+                        <div className="text-xs text-gray-400">
+                          {kickConnected && kickDisplayName ? `Connected as ${kickDisplayName}` : 'Connect your Kick account'}
+                        </div>
+                      </div>
+                    </div>
+                    {kickConnected ? (
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-500/20 text-green-400 text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Connected
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-white/20 text-gray-300 hover:bg-white/10"
+                          onClick={disconnectKick}
+                        >
+                          <Unlink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-[#53FC18]/30 text-[#53FC18] hover:bg-[#53FC18]/10"
+                        onClick={connectKick}
+                        disabled={kickConnecting}
+                      >
+                        {kickConnecting ? 'Connecting…' : 'Connect'}
                       </Button>
                     )}
                   </div>

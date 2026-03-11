@@ -35,6 +35,7 @@ import {
 import { Twitter } from 'lucide-react';
 import { FaYoutube } from 'react-icons/fa';
 import { FaSpotify, FaDiscord, FaTwitch } from 'react-icons/fa';
+import { SiKick } from 'react-icons/si';
 import {
   useTikTokConnection,
   useSpotifyConnection,
@@ -43,6 +44,7 @@ import {
   useDiscordConnection,
   useFacebookConnection,
   useInstagramConnection,
+  useKickConnection,
 } from '@/hooks/use-social-connection';
 import { useTwitterConnection } from '@/hooks/use-twitter-connection';
 import CreatorReferralDashboard from '@/components/referrals/CreatorReferralDashboard';
@@ -144,6 +146,15 @@ export default function Profile() {
     disconnect: disconnectTwitch,
   } = useTwitchConnection();
   const twitchDisplayName = twitchUserInfo?.displayName || twitchUserInfo?.username || null;
+
+  const {
+    isConnected: kickConnected,
+    isConnecting: kickConnecting,
+    userInfo: kickUserInfo,
+    connect: connectKick,
+    disconnect: disconnectKick,
+  } = useKickConnection();
+  const kickDisplayName = kickUserInfo?.displayName || kickUserInfo?.username || null;
 
   // Username editing state
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -940,6 +951,63 @@ export default function Profile() {
                               data-testid="button-connect-twitch"
                             >
                               {twitchConnecting ? 'Connecting...' : 'Connect'}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {/* Kick integration */}
+                      <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <SiKick className="h-5 w-5 text-[#53FC18]" />
+                          <div>
+                            <div className="text-white font-medium">Kick</div>
+                            <div className="text-xs text-gray-400">
+                              {kickConnected && kickDisplayName
+                                ? `Connected as ${kickDisplayName}`
+                                : 'Connect your Kick account'}
+                            </div>
+                          </div>
+                        </div>
+                        {kickConnected ? (
+                          <div className="flex gap-2 items-center">
+                            <Badge className="bg-green-500/20 text-green-400">Connected</Badge>
+                            <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                              Rewarded
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-white/20 text-white hover:bg-white/10"
+                              onClick={() =>
+                                window.open(`https://kick.com/${kickDisplayName}`, '_blank')
+                              }
+                            >
+                              Channel
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-white/20 text-white hover:bg-white/10"
+                              onClick={disconnectKick}
+                              data-testid="button-disconnect-kick"
+                            >
+                              <Unlink className="h-4 w-4 mr-1" />
+                              Disconnect
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 items-center">
+                            <Badge className="bg-brand-secondary/20 text-brand-secondary text-xs">
+                              +500 Points
+                            </Badge>
+                            <Button
+                              className="bg-[#53FC18] text-black hover:bg-[#53FC18]/80"
+                              size="sm"
+                              onClick={connectKick}
+                              disabled={kickConnecting}
+                              data-testid="button-connect-kick"
+                            >
+                              {kickConnecting ? 'Connecting...' : 'Connect'}
                             </Button>
                           </div>
                         )}

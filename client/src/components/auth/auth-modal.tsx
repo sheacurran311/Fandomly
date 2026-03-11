@@ -23,6 +23,7 @@ import {
   FaYoutube,
   FaSpotify,
 } from 'react-icons/fa';
+import { SiKick } from 'react-icons/si';
 import { TwitterSDKManager } from '@/lib/twitter';
 import { FacebookSDKManager } from '@/lib/facebook';
 import {
@@ -32,6 +33,7 @@ import {
   DiscordAPI,
   TwitchAPI,
 } from '@/lib/social-integrations';
+import { KickAPI } from '@/lib/kick';
 import { useToast } from '@/hooks/use-toast';
 import { getPostAuthRedirect } from '@/lib/auth-redirect';
 
@@ -71,6 +73,12 @@ const primaryProviders: AuthProvider[] = [
 
 const moreProviders: AuthProvider[] = [
   {
+    id: 'kick',
+    name: 'Kick',
+    icon: <SiKick className="w-5 h-5 text-[#53FC18]" />,
+    color: 'bg-white/10 hover:bg-white/20 text-white border border-white/10',
+  },
+  {
     id: 'discord',
     name: 'Discord',
     icon: <FaDiscord className="w-5 h-5 text-[#5865F2]" />,
@@ -102,6 +110,7 @@ const youtubeApi = new YouTubeAPI();
 const spotifyApi = new SpotifyAPI();
 const discordApi = new DiscordAPI();
 const twitchApi = new TwitchAPI();
+const kickApi = new KickAPI();
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -171,6 +180,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             return discordApi.secureLogin('auth');
           case 'twitch':
             return twitchApi.secureLogin('auth');
+          case 'kick':
+            return kickApi.secureLogin('auth');
           default:
             throw new Error(`Provider ${providerId} not configured`);
         }

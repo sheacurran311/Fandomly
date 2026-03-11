@@ -25,6 +25,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { FaDiscord, FaTwitch, FaSpotify, FaTiktok, FaYoutube } from 'react-icons/fa';
+import { SiKick } from 'react-icons/si';
 import { cn } from '@/lib/utils';
 import { getCreatorTemplate, type CreatorType } from './creator-program-templates';
 
@@ -130,6 +131,16 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
     buttonBorderClass: 'border-purple-600/30',
     buttonTextClass: 'text-purple-500',
     buttonHoverClass: 'hover:bg-purple-600/10',
+  },
+  kick: {
+    id: 'kick',
+    name: 'Kick',
+    icon: <SiKick className="h-5 w-5" />,
+    iconBgClass: 'bg-green-500/20',
+    iconColorClass: 'text-green-400',
+    buttonBorderClass: 'border-green-500/30',
+    buttonTextClass: 'text-green-400',
+    buttonHoverClass: 'hover:bg-green-500/10',
   },
 };
 
