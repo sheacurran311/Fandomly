@@ -236,6 +236,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         const redirectUrl = getPostAuthRedirect(authResult.user, authResult.isNewUser || false);
         setLocation(redirectUrl);
       } else if (authResult.linkRequired) {
+        console.log('[Auth Modal] Account linking required — showing link confirmation dialog');
         setPendingLinkData({
           provider: providerId,
           callbackData: {
@@ -247,6 +248,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             profile_data: profileData,
           },
         });
+      } else {
+        console.warn('[Auth Modal] Unexpected auth result:', authResult);
       }
     } catch (err: any) {
       toast({
@@ -294,6 +297,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   const showLinkConfirmation = pendingLinkData && linkRequired;
+
+  if (showLinkConfirmation) {
+    console.log('[Auth Modal] Rendering link confirmation UI', {
+      provider: pendingLinkData.provider,
+      existingProviders: linkRequired.existingProviders,
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

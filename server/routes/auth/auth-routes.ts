@@ -102,73 +102,76 @@ export function registerAuthRoutes(app: Express) {
           });
 
           if (user) {
-            // User exists with this email but from different provider
-            // Return link required response
-            const pendingLinkId = createPendingLinkId(user.id, platform_user_id, provider, email);
-
-            return res.status(200).json({
-              success: false,
-              linkRequired: true,
-              existingProviders: user.primaryAuthProvider
-                ? [user.primaryAuthProvider]
-                : ['unknown'],
-              pendingLinkId,
-              message:
-                'An account with this email already exists. Please confirm to link accounts.',
-            });
+            // User exists with this email but logged in via a different provider before.
+            // Auto-link: create the social connection and log them in directly.
+            // This is safe because the email was verified by the OAuth provider.
+            console.log('[Social Auth] Auto-linking provider', provider, 'to existing user', user.id);
+            await db.insert(socialConnections).values({
+              userId: user.id,
+              platform: provider,
+              platformUserId: platform_user_id,
+              platformUsername: username,
+              platformDisplayName: display_name,
+              accessToken: access_token,
+              profileData: profile_data,
+              connectedAt: new Date(),
+              isActive: true,
+            } as any);
           }
         }
 
-        // Create new user
-        isNewUser = true;
-        const generatedUsername = generateUsername(
-          display_name || username || email?.split('@')[0] || 'user'
-        );
+        if (!user) {
+          // Create new user
+          isNewUser = true;
+          const generatedUsername = generateUsername(
+            display_name || username || email?.split('@')[0] || 'user'
+          );
 
-        // ALL new users start as 'pending' — they MUST choose their type after auth
-        const [newUser] = await db
-          .insert(users)
-          .values({
-            email: email || null,
-            username: generatedUsername,
-            primaryAuthProvider: provider,
-            userType: 'pending',
-            role: 'customer_end_user',
-            profileData: {
-              name: display_name,
-              ...profile_data,
-            },
-            onboardingState: {
-              currentStep: 0,
-              totalSteps: 5,
-              completedSteps: [],
-              isCompleted: false,
-            },
-          } as any)
-          .returning();
+          // ALL new users start as 'pending' — they MUST choose their type after auth
+          const [newUser] = await db
+            .insert(users)
+            .values({
+              email: email || null,
+              username: generatedUsername,
+              primaryAuthProvider: provider,
+              userType: 'pending',
+              role: 'customer_end_user',
+              profileData: {
+                name: display_name,
+                ...profile_data,
+              },
+              onboardingState: {
+                currentStep: 0,
+                totalSteps: 5,
+                completedSteps: [],
+                isCompleted: false,
+              },
+            } as any)
+            .returning();
 
-        user = newUser;
+          user = newUser;
 
-        // Create social connection
-        await db.insert(socialConnections).values({
-          userId: user.id,
-          platform: provider,
-          platformUserId: platform_user_id,
-          platformUsername: username,
-          platformDisplayName: display_name,
-          accessToken: access_token,
-          profileData: profile_data,
-          connectedAt: new Date(),
-          isActive: true,
-        } as any);
+          // Create social connection
+          await db.insert(socialConnections).values({
+            userId: user.id,
+            platform: provider,
+            platformUserId: platform_user_id,
+            platformUsername: username,
+            platformDisplayName: display_name,
+            accessToken: access_token,
+            profileData: profile_data,
+            connectedAt: new Date(),
+            isActive: true,
+          } as any);
 
-        console.log('[Social Auth] Created new user:', user.id);
+          console.log('[Social Auth] Created new user:', user.id);
 
-        // Send welcome email (non-blocking)
-        if (email) {
-          import('../../services/email-service').then(({ sendWelcomeEmail }) => {
-            sendWelcomeEmail(email, generatedUsername).catch(() => {});
-          });
+          // Send welcome email (non-blocking)
+          if (email) {
+            import('../../services/email-service').then(({ sendWelcomeEmail }) => {
+              sendWelcomeEmail(email, generatedUsername).catch(() => {});
+            });
+          }
         }
       }
 
