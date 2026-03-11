@@ -22,6 +22,7 @@ import {
   Instagram,
   Facebook,
   Music,
+  Lock,
 } from 'lucide-react';
 import { FaDiscord, FaTwitch, FaSpotify, FaTiktok, FaYoutube } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
@@ -154,6 +155,8 @@ export interface PlatformConnectionPriorityProps {
   asCard?: boolean;
   /** Show only priority platforms without expansion */
   compactMode?: boolean;
+  /** Max connections allowed on current plan (-1 = unlimited) */
+  maxConnections?: number;
   className?: string;
 }
 
@@ -166,6 +169,7 @@ export function PlatformConnectionPriority({
   onConnect,
   asCard = true,
   compactMode = false,
+  maxConnections = -1,
   className,
 }: PlatformConnectionPriorityProps) {
   const [showMore, setShowMore] = useState(false);
@@ -179,6 +183,8 @@ export function PlatformConnectionPriority({
 
   const connectedCount = connectedPlatforms.size;
   const totalPlatforms = priorityPlatforms.length;
+  const hasLimit = maxConnections > 0;
+  const atLimit = hasLimit && connectedCount >= maxConnections;
 
   const getConnectionUsername = (platformId: string) => {
     const connection = socialConnections.find((c) => c.platform === platformId);
@@ -226,6 +232,11 @@ export function PlatformConnectionPriority({
               <span className="text-green-400 text-sm font-medium">Connected</span>
             )}
           </div>
+        ) : atLimit ? (
+          <Badge variant="outline" className="border-white/10 text-gray-500">
+            <Lock className="h-3 w-3 mr-1" />
+            Upgrade to connect
+          </Badge>
         ) : (
           <Button
             onClick={() => onConnect(platformId)}
@@ -257,6 +268,29 @@ export function PlatformConnectionPriority({
 
   const content = (
     <div className="space-y-3">
+      {/* Limit counter (shown when not using card mode, e.g. onboarding) */}
+      {!asCard && hasLimit && (
+        <div
+          className={cn(
+            'flex items-center justify-between p-3 rounded-lg border',
+            atLimit ? 'bg-amber-500/10 border-amber-500/20' : 'bg-white/5 border-white/10'
+          )}
+        >
+          <span className="text-sm text-gray-300">Social connections</span>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={cn(
+                atLimit ? 'border-amber-500/30 text-amber-400' : 'border-white/20 text-gray-300'
+              )}
+            >
+              {connectedCount}/{maxConnections}
+            </Badge>
+            {atLimit && <span className="text-xs text-amber-400">Upgrade for more</span>}
+          </div>
+        </div>
+      )}
+
       {/* Primary platforms (always visible) */}
       {primaryPlatforms.map(renderPlatformItem)}
 
@@ -308,10 +342,16 @@ export function PlatformConnectionPriority({
             variant="outline"
             className={cn(
               'border-white/20',
-              connectedCount > 0 ? 'text-green-400 border-green-500/30' : 'text-gray-400'
+              atLimit
+                ? 'text-amber-400 border-amber-500/30'
+                : connectedCount > 0
+                  ? 'text-green-400 border-green-500/30'
+                  : 'text-gray-400'
             )}
           >
-            {connectedCount}/{totalPlatforms} connected
+            {hasLimit
+              ? `${connectedCount}/${maxConnections} connected`
+              : `${connectedCount}/${totalPlatforms} connected`}
           </Badge>
         </div>
       </CardHeader>

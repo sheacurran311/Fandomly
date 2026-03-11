@@ -332,7 +332,12 @@ export default function CreatorTypeSelection() {
         return !!state.sport.trim() && !!state.educationLevel;
       }
       if (state.creatorType === 'musician') {
-        return !!state.bandArtistName.trim() && !!state.artistType && !!state.musicGenre.trim() && !!state.musicCatalogUrl.trim();
+        return (
+          !!state.bandArtistName.trim() &&
+          !!state.artistType &&
+          !!state.musicGenre.trim() &&
+          !!state.musicCatalogUrl.trim()
+        );
       }
       return true;
     }
@@ -584,7 +589,9 @@ export default function CreatorTypeSelection() {
                 {/* Athlete-specific fields */}
                 {state.creatorType === 'athlete' && (
                   <div className="space-y-4 p-4 rounded-xl bg-sky-500/5 border border-sky-500/15">
-                    <p className="text-xs uppercase tracking-wider text-sky-400 font-medium">Athlete Details</p>
+                    <p className="text-xs uppercase tracking-wider text-sky-400 font-medium">
+                      Athlete Details
+                    </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -630,7 +637,9 @@ export default function CreatorTypeSelection() {
                         </label>
                         <select
                           value={state.educationLevel}
-                          onChange={(e) => setState((s) => ({ ...s, educationLevel: e.target.value }))}
+                          onChange={(e) =>
+                            setState((s) => ({ ...s, educationLevel: e.target.value }))
+                          }
                           className="w-full h-12 rounded-md bg-[#1a1a2e] border border-white/10 text-white px-3 text-base [&>option]:bg-[#1a1a2e] [&>option]:text-white"
                         >
                           <option value="">Select level</option>
@@ -649,7 +658,9 @@ export default function CreatorTypeSelection() {
                 {/* Musician-specific fields */}
                 {state.creatorType === 'musician' && (
                   <div className="space-y-4 p-4 rounded-xl bg-violet-500/5 border border-violet-500/15">
-                    <p className="text-xs uppercase tracking-wider text-violet-400 font-medium">Musician Details</p>
+                    <p className="text-xs uppercase tracking-wider text-violet-400 font-medium">
+                      Musician Details
+                    </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -657,7 +668,9 @@ export default function CreatorTypeSelection() {
                         </label>
                         <Input
                           value={state.bandArtistName}
-                          onChange={(e) => setState((s) => ({ ...s, bandArtistName: e.target.value }))}
+                          onChange={(e) =>
+                            setState((s) => ({ ...s, bandArtistName: e.target.value }))
+                          }
                           placeholder="Your stage name or band name"
                           className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
                         />
@@ -696,7 +709,9 @@ export default function CreatorTypeSelection() {
                         </label>
                         <Input
                           value={state.musicCatalogUrl}
-                          onChange={(e) => setState((s) => ({ ...s, musicCatalogUrl: e.target.value }))}
+                          onChange={(e) =>
+                            setState((s) => ({ ...s, musicCatalogUrl: e.target.value }))
+                          }
                           placeholder="Spotify, Apple Music, or SoundCloud link"
                           className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 h-12 text-base"
                         />
@@ -861,6 +876,7 @@ export default function CreatorTypeSelection() {
                   connectingPlatform={connectingPlatform}
                   onConnect={handleConnectPlatform}
                   asCard={false}
+                  maxConnections={SUBSCRIPTION_TIERS.free.limits.maxSocialConnections}
                 />
               )}
             </div>

@@ -13,9 +13,21 @@ export function useLimitExceededHandler() {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (detail?.code === 'LIMIT_EXCEEDED') {
+        const info = detail.details || {};
+        const labelMap: Record<string, string> = {
+          socialConnections: 'social connections',
+          tasks: 'tasks',
+          campaigns: 'campaigns',
+          programs: 'loyalty programs',
+        };
+        const limitLabel = labelMap[info.limitType] || 'items';
+        const tierName = info.tier || 'free';
+        const max = info.max;
         toast({
           title: 'Plan Limit Reached',
-          description: `${detail.message} Visit your Subscription page to upgrade.`,
+          description: max
+            ? `You\u2019ve used all ${max} ${limitLabel} included in your ${tierName} plan. Upgrade your subscription to unlock more.`
+            : detail.message || 'You\u2019ve reached your plan limit. Upgrade to continue.',
           variant: 'destructive',
         });
       }

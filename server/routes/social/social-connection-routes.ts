@@ -167,7 +167,11 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       });
       if (user?.currentTenantId) {
         try {
-          await enforceSubscriptionLimitForUser(user.currentTenantId, 'socialConnections', req.user?.role);
+          await enforceSubscriptionLimitForUser(
+            user.currentTenantId,
+            'socialConnections',
+            req.user?.role
+          );
         } catch (limitErr: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if ((limitErr as any).code === 'LIMIT_EXCEEDED') {
@@ -176,7 +180,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
               error: (limitErr as any).message,
               code: 'LIMIT_EXCEEDED',
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ...(limitErr as any).details,
+              details: (limitErr as any).details,
             });
           }
           throw limitErr;
