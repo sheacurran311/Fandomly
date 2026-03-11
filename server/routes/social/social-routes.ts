@@ -1148,10 +1148,10 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // TikTok user info
-  app.get('/api/social/tiktok/user', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // TikTok user info — uses platform OAuth token, not Fandomly JWT.
+  // Called from popup window during auth/connection flow that doesn't share session cookies.
+  app.get('/api/social/tiktok/user', async (req: Request, res: Response) => {
     try {
-      // Prefer X-Social-Token header (avoids JWT middleware noise), fall back to Authorization
       const socialTokenHeader = req.headers['x-social-token'] as string | undefined;
       const authHeader = req.headers.authorization;
       const accessToken = (socialTokenHeader || authHeader)?.replace('Bearer ', '');
@@ -1486,10 +1486,10 @@ export function registerSocialRoutes(app: Express) {
     }
   });
 
-  // Spotify user profile
-  app.get('/api/social/spotify/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+  // Spotify user profile — uses platform OAuth token, not Fandomly JWT.
+  // Called from popup window during auth/connection flow that doesn't share session cookies.
+  app.get('/api/social/spotify/me', async (req: Request, res: Response) => {
     try {
-      // Prefer X-Social-Token header (avoids JWT middleware noise), fall back to Authorization
       const socialTokenHeader = req.headers['x-social-token'] as string | undefined;
       const authHeader = req.headers.authorization;
       const accessToken = (socialTokenHeader || authHeader)?.replace('Bearer ', '');

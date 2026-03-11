@@ -292,11 +292,10 @@ export default function NewAuthRouter({ children }: AuthRouterProps) {
       return;
     }
 
-    // Disabled for hackathon demo — all users can access creator dashboard
-    // if (currentPath.startsWith('/creator-dashboard') && user.userType === 'fan') {
-    //   setLocation('/fan-dashboard');
-    //   return;
-    // }
+    if (currentPath.startsWith('/creator-dashboard') && user.userType === 'fan') {
+      setLocation('/fan-dashboard');
+      return;
+    }
 
     function redirectToDashboard() {
       // Pending users are already caught by the iron wall above, but safety net:

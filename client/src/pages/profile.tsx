@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { useLocation } from 'wouter';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +49,14 @@ import CreatorReferralDashboard from '@/components/referrals/CreatorReferralDash
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function Profile() {
   const { user, isLoading, isAuthenticated, refreshUser } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user?.userType === 'fan') {
+      setLocation('/fan-profile');
+    }
+  }, [isLoading, isAuthenticated, user?.userType, setLocation]);
 
   // Fetch creator's program for program details section
   const { data: programs = [], isLoading: programsLoading } = useQuery<
@@ -164,7 +172,7 @@ export default function Profile() {
   }
 
   return (
-    <DashboardLayout userType="creator">
+    <DashboardLayout userType={user.userType === 'fan' ? 'fan' : 'creator'}>
       <div className="p-3 sm:p-4 lg:pl-6 lg:pr-2">
         {/* Header */}
         <div className="mb-8">

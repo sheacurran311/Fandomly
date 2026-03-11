@@ -376,14 +376,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
           };
         }
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        });
+        const doFetch = () =>
+          fetch(endpoint, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+        let response = await doFetch();
+
+        // Auto-retry once on 500 connection timeout (Neon serverless cold-start / stale WS)
+        if (response.status === 500) {
+          try {
+            const peek = await response.clone().json();
+            if (
+              typeof peek?.message === 'string' &&
+              (peek.message.includes('Connection terminated') || peek.message.includes('timeout'))
+            ) {
+              console.warn('[Auth] DB connection timeout — retrying once...');
+              await new Promise((r) => setTimeout(r, 1000));
+              response = await doFetch();
+            }
+          } catch {
+            // clone/json parse failed — fall through to normal error handling
+          }
+        }
 
         const data: AuthResult = await response.json();
 

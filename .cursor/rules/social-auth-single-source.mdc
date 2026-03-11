@@ -75,7 +75,7 @@ Fandomly has TWO separate social auth systems that serve different purposes. The
 - These connections are SEPARATE from the primary login — a user can log in with Google but connect Twitter for tasks
 - NEVER modify callback pages, social-integrations.ts, or the SDK managers when working on primary auth
 - Token exchange endpoints (`/api/social/*/token`) must NOT have `authenticateUser` — they run in popup windows without Fandomly session cookies
-- Platform profile endpoints (`/api/social/twitter/user`, `/discord/me`, `/twitch/me`) must NOT have `authenticateUser` — they use the platform's OAuth token from the Authorization header, not a Fandomly JWT
+- Platform profile endpoints (`/api/social/twitter/user`, `/tiktok/user`, `/spotify/me`, `/discord/me`, `/twitch/me`, `/youtube/me`) must NOT have `authenticateUser` — they use the platform's OAuth token from the Authorization header, not a Fandomly JWT
 
 ### Cross-Origin Opener Pattern (MANDATORY for all callback pages)
 
@@ -104,6 +104,27 @@ if (window.opener && !window.opener.closed) {
 
 **NEVER** do bare `window.opener.postMessage(...)` or `window.opener.X = Y` without a try/catch — it WILL throw in cross-origin environments.
 
+### Facebook SDK — Explicit access_token (MANDATORY)
+
+The Facebook JS SDK maintains a **global** access token. When the app uses two flows (auth modal via `secureLogin('auth')` and dashboard connection via `secureLogin('fan')`/`secureLogin('creator')`), the global token can belong to a previous flow. The SDK warns: *"You are overriding current access token"*.
+
+If `FB.api('/me', ...)` is called without an explicit token, it uses the **stale global** token, causing silent failures (the `/me` response returns an error object instead of user data).
+
+**ALWAYS pass `access_token` explicitly to every `FB.api()` call:**
+
+```typescript
+// CORRECT — uses the token from the current login response
+window.FB.api('/me', 'GET', {
+  fields: 'id,name,email,picture.width(200).height(200)',
+  access_token: accessToken,  // ← from response.authResponse.accessToken
+}, callback);
+
+// WRONG — relies on global SDK state which may be stale
+window.FB.api('/me', 'GET', { fields: 'id,name,email' }, callback);
+```
+
+This applies to `/me`, `/me/permissions`, `/me/accounts`, and any other Graph API call in `facebook.ts`.
+
 ## 3. Particle Network (wallet only)
 
 **Purpose:** Embedded wallet creation, gas sponsorship, on-chain operations.
@@ -120,7 +141,8 @@ if (window.opener && !window.opener.closed) {
 
 ## Critical Don'ts
 
-- NEVER add `authenticateUser` to `/api/social/twitter/user`, `/api/social/discord/me`, `/api/social/twitch/me` — they use platform tokens, not Fandomly JWTs
+- NEVER add `authenticateUser` to platform profile endpoints (`/api/social/twitter/user`, `/tiktok/user`, `/spotify/me`, `/discord/me`, `/twitch/me`, `/youtube/me`) — they use platform tokens, not Fandomly JWTs
+- NEVER call `FB.api()` without passing `access_token` explicitly — the SDK's global token state can be stale from a previous flow
 - NEVER let the Particle Auth Listener initiate login or logout independently
 - NEVER modify the in-app social OAuth flows (social-integrations.ts, callback pages) when changing primary auth
 - NEVER skip the account dupe check before creating a Particle wallet

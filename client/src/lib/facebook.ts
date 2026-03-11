@@ -513,17 +513,18 @@ class FacebookSDKManager {
     resolve: (result: FacebookLoginResult) => void,
     isAuthFlow: boolean = false
   ): void {
-    // Get user info and verify permissions
+    // Pass access_token explicitly to avoid "overriding current access token" SDK bug
+    // where the global token state can be stale or belong to a different flow.
     window.FB.api(
       '/me',
       'GET',
       {
         fields: 'id,name,email,picture.width(200).height(200)',
+        access_token: accessToken,
       },
       (userResponse) => {
         if (userResponse && !userResponse.error) {
-          // Verify permissions
-          window.FB.api('/me/permissions', 'GET', {}, async (permResponse) => {
+          window.FB.api('/me/permissions', 'GET', { access_token: accessToken }, async (permResponse) => {
             const result = await this.processPermissions(
               userResponse,
               accessToken,
@@ -595,7 +596,7 @@ class FacebookSDKManager {
             window.FB.api(
               '/me/accounts',
               'GET',
-              { fields: 'id,name,access_token' },
+              { fields: 'id,name,access_token', access_token: accessToken },
               (pagesResponse) => {
                 if (pagesResponse && !pagesResponse.error && pagesResponse.data) {
                   pages = pagesResponse.data;
