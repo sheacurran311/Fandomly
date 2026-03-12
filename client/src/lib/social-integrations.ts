@@ -573,21 +573,27 @@ export class YouTubeAPI {
   }
 
   async getUserProfile(accessToken: string): Promise<SocialMediaAccount> {
-    const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true&access_token=${accessToken}`
-    );
-    const data = await response.json();
+    // Route through server proxy to avoid CORS — direct YouTube API calls from browser are blocked
+    const response = await fetch('/api/social/youtube/me', {
+      headers: { 'X-Social-Token': `Bearer ${accessToken}` },
+    });
 
-    const channel = data.items[0];
+    if (!response.ok) {
+      throw new Error(`Failed to fetch YouTube profile: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const channel = data.items?.[0];
+    if (!channel) throw new Error('No YouTube channel found');
 
     return {
       platform: 'youtube',
       username: channel.snippet.customUrl || channel.id,
       displayName: channel.snippet.title,
       profileUrl: `https://youtube.com/channel/${channel.id}`,
-      followers: parseInt(channel.statistics.subscriberCount),
+      followers: parseInt(channel.statistics?.subscriberCount || '0'),
       verified: false,
-      profileImage: channel.snippet.thumbnails.default.url,
+      profileImage: channel.snippet.thumbnails?.default?.url,
       accessToken,
       connectedAt: new Date(),
     };

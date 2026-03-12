@@ -416,7 +416,7 @@ export default function CreatorSocial() {
       bgColor: 'bg-purple-400/20',
     },
     {
-      platform: 'YouTube Channel',
+      platform: 'YouTube',
       icon: FaYoutube,
       handle: youtubeConnected && youtubeChannelName ? youtubeChannelName : 'Your Channel',
       followers: youtubeConnected
