@@ -160,12 +160,12 @@ async function countCurrentUsage(tenantId: string, limitType: LimitType): Promis
 
       if (!tenant) return 0;
 
+      // Count DISTINCT platforms ever connected (active + inactive).
+      // Disconnecting does not free a slot — once a platform is connected it counts permanently.
       const [result] = await db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(DISTINCT ${socialConnections.platform})` })
         .from(socialConnections)
-        .where(
-          and(eq(socialConnections.userId, tenant.ownerId), eq(socialConnections.isActive, true))
-        );
+        .where(eq(socialConnections.userId, tenant.ownerId));
       return Number(result?.count ?? 0);
     }
     default:

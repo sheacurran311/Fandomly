@@ -16,7 +16,7 @@
  */
 
 import { db } from '../../db';
-import { sql, eq, count } from 'drizzle-orm';
+import { sql, eq, and, count } from 'drizzle-orm';
 import {
   fanPrograms,
   taskCompletions,
@@ -205,7 +205,7 @@ async function collectFanSignals(userId: string): Promise<FanSignals> {
       db
         .select({ total: count() })
         .from(socialConnections)
-        .where(eq(socialConnections.userId, userId)),
+        .where(and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true))),
 
       db
         .select({
@@ -260,11 +260,11 @@ async function collectCreatorSignals(
         .innerJoin(tasks, eq(tasks.id, taskCompletions.taskId))
         .where(eq(tasks.tenantId, creator.tenantId)),
 
-      // Connected social accounts
+      // Connected social accounts (active only)
       db
         .select({ total: count() })
         .from(socialConnections)
-        .where(eq(socialConnections.userId, userId)),
+        .where(and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true))),
 
       // Reward redemptions by fans
       db

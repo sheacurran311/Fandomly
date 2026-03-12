@@ -21,8 +21,14 @@ import {
   extractContentId,
   type SocialTaskSettings,
 } from '@shared/taskFieldSchemas';
-import { taskCompletions, manualReviewQueue, creators, socialConnections } from '@shared/schema';
-import { eq, and, isNull, desc, sql } from 'drizzle-orm';
+import {
+  tasks,
+  taskCompletions,
+  manualReviewQueue,
+  creators,
+  socialConnections,
+} from '@shared/schema';
+import { eq, and, isNull, isNotNull, desc, sql } from 'drizzle-orm';
 import { uploadScreenshot, getFileUrl } from '../../middleware/upload';
 import { unifiedVerification } from '../../services/verification/unified-verification';
 import { taskFrequencyService } from '../../services/task-frequency-service';
@@ -372,6 +378,130 @@ const createTaskSchema = z
       message: 'Points reward requires pointsToReward; Multiplier reward requires multiplierValue',
     }
   );
+
+// ----- Duplicate Task Prevention -----
+
+// Task types that are "one-and-done" per program — only one instance ever allowed
+// regardless of any URL. Follows, subscribes, joins, profile tasks, check-ins, etc.
+const ONE_AND_DONE_TASK_TYPES = new Set([
+  // Follow
+  'twitter_follow',
+  'instagram_follow',
+  'tiktok_follow',
+  'spotify_follow',
+  'twitch_follow',
+  'kick_follow',
+  'facebook_like_page',
+  'follow',
+  // Subscribe / Join
+  'youtube_subscribe',
+  'twitch_subscribe',
+  'kick_subscribe',
+  'patreon_support',
+  'patreon_tier_check',
+  'discord_join',
+  'discord_verify',
+  'facebook_join_group',
+  'join',
+  // Profile actions
+  'twitter_include_name',
+  'twitter_include_bio',
+  'complete_profile',
+  // Check-in / visits / milestones
+  'check_in',
+  'website_visit',
+  'follower_milestone',
+  // Referral
+  'referral',
+]);
+
+/**
+ * Extract the distinguishing URL from task settings for content-specific tasks.
+ * Returns null for one-and-done tasks (they don't need URL deduplication).
+ */
+function extractTaskContentUrl(settings: Record<string, any>): string | null {
+  return (
+    settings?.contentUrl ||
+    settings?.pageUrl ||
+    settings?.channelUrl ||
+    settings?.playlistUrl ||
+    settings?.artistUrl ||
+    settings?.videoUrl ||
+    settings?.postUrl ||
+    settings?.tweetUrl ||
+    settings?.mediaUrl ||
+    null
+  );
+}
+
+/**
+ * Check if a duplicate task already exists for this creator + program.
+ * - One-and-done tasks: only one per (programId, taskType, platform)
+ * - Content tasks: allow duplicates only if the target URL differs
+ */
+async function checkDuplicateTask(
+  creatorId: string,
+  programId: string,
+  taskType: string,
+  platform: string,
+  settings: Record<string, any>
+): Promise<{ isDuplicate: boolean; reason?: string }> {
+  const isOneAndDone = ONE_AND_DONE_TASK_TYPES.has(taskType);
+
+  // Query existing non-deleted tasks with same type + platform + program
+  const existing = await db
+    .select({
+      id: tasks.id,
+      name: tasks.name,
+      customSettings: tasks.customSettings,
+    })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.creatorId, creatorId),
+        eq(tasks.programId, programId),
+        eq(tasks.taskType, taskType),
+        eq(tasks.platform, platform),
+        isNull(tasks.deletedAt)
+      )
+    )
+    .limit(10);
+
+  if (existing.length === 0) {
+    return { isDuplicate: false };
+  }
+
+  // One-and-done: any existing task of this type is a duplicate
+  if (isOneAndDone) {
+    return {
+      isDuplicate: true,
+      reason: `A "${taskType}" task already exists in this program.`,
+    };
+  }
+
+  // Content tasks: allow if the URL is different
+  const newUrl = extractTaskContentUrl(settings);
+  if (!newUrl) {
+    // No URL — treat as one-and-done (can't distinguish)
+    return {
+      isDuplicate: true,
+      reason: `A "${taskType}" task already exists. Provide a unique content URL to create another.`,
+    };
+  }
+
+  for (const task of existing) {
+    const existingSettings = (task.customSettings || {}) as Record<string, any>;
+    const existingUrl = extractTaskContentUrl(existingSettings);
+    if (existingUrl === newUrl) {
+      return {
+        isDuplicate: true,
+        reason: `A "${taskType}" task with this URL already exists ("${task.name}").`,
+      };
+    }
+  }
+
+  return { isDuplicate: false };
+}
 
 export function registerTaskRoutes(app: Express) {
   // Get all published tasks (for fans) - REQUIRES AUTH
@@ -735,6 +865,29 @@ export function registerTaskRoutes(app: Express) {
               ? validatedData.customSettings
               : {},
       };
+
+      // Check for duplicate tasks (creator tasks only)
+      if (!isPlatformTask && creatorId && validatedData.programId) {
+        const taskSettings =
+          'settings' in validatedData
+            ? validatedData.settings
+            : 'customSettings' in validatedData
+              ? validatedData.customSettings
+              : {};
+        const dupCheck = await checkDuplicateTask(
+          creatorId,
+          validatedData.programId,
+          validatedData.taskType,
+          'platform' in validatedData ? validatedData.platform : 'system',
+          taskSettings as Record<string, any>
+        );
+        if (dupCheck.isDuplicate) {
+          return res.status(409).json({
+            error: dupCheck.reason || 'A duplicate task already exists.',
+            code: 'DUPLICATE_TASK',
+          });
+        }
+      }
 
       // Create task in database
       const task = await storage.createTask(taskData as any);

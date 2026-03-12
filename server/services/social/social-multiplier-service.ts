@@ -28,7 +28,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { FANDOMLY_CHAIN, CONTRACTS, FAN_STAKING_ABI } from '@shared/blockchain-config';
 import { db } from '../../db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { socialConnections, users } from '@shared/schema';
 
 // ============================================================================
@@ -98,7 +98,7 @@ export class SocialMultiplierService {
     const connections = await db
       .select({ platform: socialConnections.platform })
       .from(socialConnections)
-      .where(eq(socialConnections.userId, userId));
+      .where(and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true)));
 
     if (connections.length === 0) {
       return MULTIPLIER_BASE; // Default 1.0x
@@ -243,11 +243,11 @@ export class SocialMultiplierService {
     onChain: number | null;
     connectedPlatforms: Array<{ platform: string; multiplier: number }>;
   }> {
-    // Get connected platforms
+    // Get connected platforms (active only)
     const connections = await db
       .select({ platform: socialConnections.platform })
       .from(socialConnections)
-      .where(eq(socialConnections.userId, userId));
+      .where(and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true)));
 
     const connectedPlatforms = connections
       .map((conn) => ({
@@ -295,7 +295,9 @@ export function initializeSocialMultiplierService(): SocialMultiplierService | n
 
   const key = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as `0x${string}`;
   socialMultiplierService = new SocialMultiplierService(key);
-  console.log(`[SocialMultiplier] Initialized (${FANDOMLY_CHAIN.name}, chain ${FANDOMLY_CHAIN.id})`);
+  console.log(
+    `[SocialMultiplier] Initialized (${FANDOMLY_CHAIN.name}, chain ${FANDOMLY_CHAIN.id})`
+  );
   return socialMultiplierService;
 }
 

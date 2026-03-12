@@ -30,7 +30,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 
     const connections = await db.query.socialConnections.findMany({
-      where: eq(socialConnections.userId, userId),
+      where: and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true)),
     });
 
     // Return connections without sensitive tokens
@@ -67,7 +67,11 @@ router.get('/:platform', authenticateUser, async (req: AuthenticatedRequest, res
     }
 
     const connection = await db.query.socialConnections.findFirst({
-      where: and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)),
+      where: and(
+        eq(socialConnections.userId, userId),
+        eq(socialConnections.platform, platform),
+        eq(socialConnections.isActive, true)
+      ),
     });
 
     if (!connection) {
@@ -314,9 +318,10 @@ router.post('/disconnect', authenticateUser, async (req: AuthenticatedRequest, r
 
     const platformLower = platform.toLowerCase();
 
-    // Remove from socialConnections table (primary - source of truth)
+    // Soft-delete: mark inactive instead of removing (preserves history for limit counting)
     await db
-      .delete(socialConnections)
+      .update(socialConnections)
+      .set({ isActive: false, updatedAt: new Date() })
       .where(
         and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platformLower))
       );
@@ -364,9 +369,10 @@ router.delete('/:platform', authenticateUser, async (req: AuthenticatedRequest, 
       return res.status(401).json({ error: 'User ID required' });
     }
 
-    // Remove from socialConnections table
+    // Soft-delete: mark inactive instead of removing (preserves history for limit counting)
     await db
-      .delete(socialConnections)
+      .update(socialConnections)
+      .set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(socialConnections.userId, userId), eq(socialConnections.platform, platform)));
 
     // Update social multiplier on FanStaking contract (non-blocking)

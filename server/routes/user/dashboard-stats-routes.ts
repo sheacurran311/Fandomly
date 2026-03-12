@@ -100,11 +100,11 @@ export function registerDashboardStatsRoutes(app: Express) {
 
         const stats = ((statsResult as any).rows?.[0] as any) || {};
 
-        // Get social connections count
+        // Get social connections count (active only)
         const [socialResult] = await db
           .select({ count: count() })
           .from(socialConnections)
-          .where(eq(socialConnections.userId, userId));
+          .where(and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true)));
 
         // Get recent activity (last 10 completions)
         const recentCompletions = await db
