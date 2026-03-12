@@ -99,7 +99,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
     }
 
     // Calculate current verification status
-    const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
+    const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator' | 'brand';
     const platformActivity = await getPlatformActivity(creator.id, userId);
     const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
@@ -143,7 +143,7 @@ router.post('/check', authenticateUser, async (req: AuthenticatedRequest, res) =
     }
 
     // Calculate verification status
-    const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
+    const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator' | 'brand';
     const platformActivity = await getPlatformActivity(creator.id, userId);
     const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
@@ -214,7 +214,7 @@ router.post(
       }
 
       // Calculate current verification data
-      const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
+      const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator' | 'brand';
       const platformActivity = await getPlatformActivity(creator.id);
       const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
@@ -270,7 +270,7 @@ router.post(
       }
 
       // Recalculate verification data and remove verification
-      const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
+      const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator' | 'brand';
       const platformActivity = await getPlatformActivity(creator.id);
       const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 

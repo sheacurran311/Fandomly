@@ -15,7 +15,7 @@ export const CREATOR_VERIFICATION_REQUIREMENTS = {
     'displayName', // Creator/brand name
     'bio', // Tell your story
     'imageUrl', // Profile photo
-    'category', // athlete | musician | content_creator
+    'category', // athlete | musician | content_creator | brand
   ],
 
   // Type-Specific Fields (Required based on creator type)
@@ -36,6 +36,12 @@ export const CREATOR_VERIFICATION_REQUIREMENTS = {
     'contentType', // Type of content (video, podcast, gaming, etc.)
     'topicsOfFocus', // Main topics
     'mainContentPlatforms', // Auto from integrations (X, Instagram, TikTok, etc.)
+  ],
+
+  brand: [
+    'brandName', // Brand/Company name
+    'brandDescription', // Brand/Company description
+    'brandWebsite', // Brand/Company website
   ],
 
   // Social Media (At least 4 required)
@@ -146,6 +152,23 @@ export const CREATOR_FIELD_INFO: Record<
     label: 'Music Genre',
     description: 'Primary genre(s)',
     category: 'musician',
+  },
+
+  // Brand
+  brandName: {
+    label: 'Brand / Company Name',
+    description: 'Your brand or company name',
+    category: 'brand',
+  },
+  brandDescription: {
+    label: 'Brand Description',
+    description: 'Describe your brand or company',
+    category: 'brand',
+  },
+  brandWebsite: {
+    label: 'Brand Website',
+    description: 'Your brand or company website URL',
+    category: 'brand',
   },
 
   // Content Creator
@@ -260,62 +283,64 @@ export interface PlatformActivityContext {
  */
 export function calculateCreatorVerification(
   creator: Record<string, unknown>,
-  creatorType: 'athlete' | 'musician' | 'content_creator',
+  creatorType: 'athlete' | 'musician' | 'content_creator' | 'brand',
   platformActivity?: PlatformActivityContext
 ): CreatorVerificationData {
-  const requiredFields = [
-    ...CREATOR_VERIFICATION_REQUIREMENTS.basic,
-    ...CREATOR_VERIFICATION_REQUIREMENTS[
-      creatorType === 'content_creator' ? 'contentCreator' : creatorType
-    ],
-  ];
+  const typeKey = creatorType === 'content_creator' ? 'contentCreator' : creatorType;
+  const typeSpecificFields =
+    (CREATOR_VERIFICATION_REQUIREMENTS[
+      typeKey as keyof typeof CREATOR_VERIFICATION_REQUIREMENTS
+    ] as readonly string[]) || [];
+  const requiredFields = [...CREATOR_VERIFICATION_REQUIREMENTS.basic, ...typeSpecificFields];
 
   const filledFields: string[] = [];
   const missingFields: string[] = [];
+
+  // Published program means the program builder already validated all type-specific
+  // fields (name, bio, logo, sport/education, artist info, content type, etc.)
+  // plus at least 1 connected social account. Auto-verify those fields.
+  const hasPublished = !!platformActivity?.hasPublishedProgram;
 
   // Check basic + type-specific fields
   requiredFields.forEach((field) => {
     let isFilled = false;
 
-    // Check basic creator fields — bio and imageUrl are satisfied by published program data
-    if (field === 'bio') {
+    // --- Basic fields ---
+    if (field === 'displayName' || field === 'category') {
+      isFilled = !!creator[field];
+    } else if (field === 'bio') {
       isFilled = !!(platformActivity?.programDescription || creator[field]);
     } else if (field === 'imageUrl') {
       isFilled = !!(platformActivity?.programLogo || creator[field]);
-    } else if (['displayName', 'category'].includes(field)) {
-      isFilled = !!creator[field];
     }
 
-    // Content creator: aboutMe is satisfied by program description, mainContentPlatforms by connected accounts
-    else if (creatorType === 'content_creator' && field === 'aboutMe') {
-      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)
-        ?.contentCreator;
-      isFilled = !!(typeData?.[field] || platformActivity?.programDescription);
-    } else if (creatorType === 'content_creator' && field === 'mainContentPlatforms') {
-      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)
-        ?.contentCreator;
-      const fromProfile = typeData?.[field];
+    // --- Type-specific fields: auto-verified when program is published ---
+    // The program builder enforces all type-specific fields before allowing publish,
+    // so a published program guarantees these are filled.
+    else if (hasPublished && (typeSpecificFields as readonly string[]).includes(field)) {
+      isFilled = true;
+    }
+
+    // --- Brand fallbacks: brandName satisfied by displayName, brandDescription by program desc ---
+    else if (field === 'brandName') {
+      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)?.brand;
+      isFilled = !!(typeData?.brandName || creator.displayName);
+    } else if (field === 'brandDescription') {
+      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)?.brand;
+      isFilled = !!(typeData?.brandDescription || platformActivity?.programDescription);
+    }
+
+    // --- Fallback: check mainContentPlatforms from connected accounts ---
+    else if (field === 'mainContentPlatforms') {
       const fromConnections = platformActivity?.connectedPlatformIds;
-      isFilled = !!(
-        (Array.isArray(fromProfile) && fromProfile.length > 0) ||
-        (Array.isArray(fromConnections) && fromConnections.length > 0)
-      );
+      isFilled = !!(Array.isArray(fromConnections) && fromConnections.length > 0);
     }
 
-    // Musician: bandArtistName is satisfied by creator displayName
-    else if (creatorType === 'musician' && field === 'bandArtistName') {
-      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)
-        ?.musician;
-      isFilled = !!(typeData?.[field] || creator.displayName);
-    }
-
-    // Check type-specific data (generic fallback for all other fields)
+    // --- Fallback: check type-specific data from creator profile ---
     else if (creator.typeSpecificData) {
       const typeSpecificData = creator.typeSpecificData as Record<string, Record<string, unknown>>;
-      const typeData =
-        typeSpecificData[creatorType === 'content_creator' ? 'contentCreator' : creatorType];
+      const typeData = typeSpecificData[typeKey];
       if (typeData && typeData[field] !== undefined && typeData[field] !== null) {
-        // For arrays, check if not empty
         if (Array.isArray(typeData[field])) {
           isFilled = (typeData[field] as unknown[]).length > 0;
         } else {

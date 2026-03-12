@@ -16,6 +16,7 @@ import {
   taskAssignments,
   taskTemplates,
   taskCompletions,
+  socialConnections,
   rewardDistributions,
   notifications,
   auditLog,
@@ -380,10 +381,14 @@ export class DatabaseStorage implements IStorage {
     if (updatedCreator) {
       try {
         const { calculateCreatorVerification } = await import('@shared/creatorVerificationSchema');
-        const creatorType = updatedCreator.category as 'athlete' | 'musician' | 'content_creator';
+        const creatorType = updatedCreator.category as
+          | 'athlete'
+          | 'musician'
+          | 'content_creator'
+          | 'brand';
 
         // Query platform activity for verification requirements
-        const [programResult, taskResult] = await Promise.all([
+        const queries: Promise<any>[] = [
           db
             .select({ total: count() })
             .from(loyaltyPrograms)
@@ -392,10 +397,36 @@ export class DatabaseStorage implements IStorage {
             .select({ total: count() })
             .from(tasks)
             .where(and(eq(tasks.creatorId, id), eq(tasks.ownershipLevel, 'creator'))),
-        ]);
+          db
+            .select({
+              description: loyaltyPrograms.description,
+              pageConfig: loyaltyPrograms.pageConfig,
+            })
+            .from(loyaltyPrograms)
+            .where(and(eq(loyaltyPrograms.creatorId, id), eq(loyaltyPrograms.status, 'published')))
+            .limit(1),
+        ];
+        if (updatedCreator.userId) {
+          queries.push(
+            db
+              .select({ platform: socialConnections.platform })
+              .from(socialConnections)
+              .where(eq(socialConnections.userId, updatedCreator.userId))
+          );
+        }
+        const [programResult, taskResult, publishedPrograms, connectedPlatformsResult] =
+          await Promise.all(queries);
+        const program = publishedPrograms?.[0];
+        const pageConfig = (program?.pageConfig as Record<string, any>) || {};
+        const connectedPlatformIds =
+          connectedPlatformsResult?.map((c: any) => c.platform).filter(Boolean) || [];
         const platformActivity = {
           activeProgramCount: Number(programResult[0]?.total) || 0,
           publishedTaskCount: Number(taskResult[0]?.total) || 0,
+          hasPublishedProgram: !!program,
+          programDescription: program?.description || null,
+          programLogo: (pageConfig.logo as string) || null,
+          connectedPlatformIds,
         };
 
         const verificationData = calculateCreatorVerification(

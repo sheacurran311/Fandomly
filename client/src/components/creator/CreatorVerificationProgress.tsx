@@ -50,14 +50,15 @@ export function CreatorVerificationProgress({
     verificationMethod,
   } = verificationData;
 
-  const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
+  const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator' | 'brand';
 
   // Get field groups
   const basicFields = CREATOR_VERIFICATION_REQUIREMENTS.basic;
+  const typeKey = creatorType === 'content_creator' ? 'contentCreator' : creatorType;
   const typeSpecificFields =
-    CREATOR_VERIFICATION_REQUIREMENTS[
-      creatorType === 'content_creator' ? 'contentCreator' : creatorType
-    ];
+    (CREATOR_VERIFICATION_REQUIREMENTS[
+      typeKey as keyof typeof CREATOR_VERIFICATION_REQUIREMENTS
+    ] as readonly string[]) || [];
   const socialFields = CREATOR_VERIFICATION_REQUIREMENTS.socialMedia;
 
   const isFieldComplete = (field: string) => {
@@ -253,7 +254,9 @@ export function CreatorVerificationProgress({
                 ? 'Athletic'
                 : creatorType === 'musician'
                   ? 'Music'
-                  : 'Content Creator'}{' '}
+                  : creatorType === 'brand'
+                    ? 'Brand'
+                    : 'Content Creator'}{' '}
               Information
               <Badge variant="secondary" className="text-xs">
                 {typeSpecificFields.filter((f) => isFieldComplete(f)).length}/
