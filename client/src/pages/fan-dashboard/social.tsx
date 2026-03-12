@@ -188,7 +188,7 @@ export default function FanSocial() {
       description: 'Connect to participate in TikTok campaigns',
     },
     {
-      platform: 'YouTube Channel',
+      platform: 'YouTube',
       icon: FaYoutube,
       handle: youtubeConnected && youtubeChannelName ? youtubeChannelName : 'Your Channel',
       followers: youtubeSubscribers,
