@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, and, count } from 'drizzle-orm';
 import { db } from '../../db';
-import { creators, loyaltyPrograms, tasks } from '@shared/schema';
+import { creators, loyaltyPrograms, tasks, socialConnections } from '@shared/schema';
 import {
   authenticateUser,
   requireFandomlyAdmin,
@@ -22,8 +22,11 @@ const router = Router();
 /**
  * Query platform activity counts for a creator (programs + tasks).
  */
-async function getPlatformActivity(creatorId: string): Promise<PlatformActivityContext> {
-  const [programResult, taskResult, publishedPrograms] = await Promise.all([
+async function getPlatformActivity(
+  creatorId: string,
+  userId?: string
+): Promise<PlatformActivityContext> {
+  const queries: Promise<unknown>[] = [
     db
       .select({ total: count() })
       .from(loyaltyPrograms)
@@ -40,10 +43,30 @@ async function getPlatformActivity(creatorId: string): Promise<PlatformActivityC
       .from(loyaltyPrograms)
       .where(and(eq(loyaltyPrograms.creatorId, creatorId), eq(loyaltyPrograms.status, 'published')))
       .limit(1),
-  ]);
+  ];
+
+  // Fetch connected platforms if we have a userId
+  if (userId) {
+    queries.push(
+      db
+        .select({ platform: socialConnections.platform })
+        .from(socialConnections)
+        .where(eq(socialConnections.userId, userId))
+    );
+  }
+
+  const results = await Promise.all(queries);
+  const [programResult, taskResult, publishedPrograms, connectedPlatformsResult] = results as [
+    { total: number }[],
+    { total: number }[],
+    { description: string | null; pageConfig: unknown }[],
+    { platform: string }[]?,
+  ];
 
   const program = publishedPrograms[0];
   const pageConfig = (program?.pageConfig as Record<string, unknown>) || {};
+  const connectedPlatformIds =
+    connectedPlatformsResult?.map((c) => c.platform).filter((p): p is string => !!p) || [];
 
   return {
     activeProgramCount: Number(programResult[0]?.total) || 0,
@@ -51,6 +74,7 @@ async function getPlatformActivity(creatorId: string): Promise<PlatformActivityC
     hasPublishedProgram: !!program,
     programDescription: program?.description || null,
     programLogo: (pageConfig.logo as string) || null,
+    connectedPlatformIds,
   };
 }
 
@@ -76,7 +100,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
 
     // Calculate current verification status
     const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
-    const platformActivity = await getPlatformActivity(creator.id);
+    const platformActivity = await getPlatformActivity(creator.id, userId);
     const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
     res.json({
@@ -120,7 +144,7 @@ router.post('/check', authenticateUser, async (req: AuthenticatedRequest, res) =
 
     // Calculate verification status
     const creatorType = creator.category as 'athlete' | 'musician' | 'content_creator';
-    const platformActivity = await getPlatformActivity(creator.id);
+    const platformActivity = await getPlatformActivity(creator.id, userId);
     const verificationData = calculateCreatorVerification(creator, creatorType, platformActivity);
 
     // Update verification data in database

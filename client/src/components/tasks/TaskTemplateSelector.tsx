@@ -796,9 +796,9 @@ const TASK_TEMPLATES: TaskTemplate[] = [
     estimatedSetupTime: '3 minutes',
     benefits: ['User-generated content', 'Viral campaign potential', 'Authentic brand advocacy'],
     useCases: ['Hashtag challenges', 'UGC campaigns', 'Brand awareness'],
-    verificationTier: 'T3',
-    verificationMethod: 'manual',
-    recommendedPoints: 25,
+    verificationTier: 'T2',
+    verificationMethod: 'code_repost',
+    recommendedPoints: 40,
   },
 
   // Interactive Templates

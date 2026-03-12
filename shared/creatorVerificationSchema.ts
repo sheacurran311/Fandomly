@@ -245,6 +245,8 @@ export interface PlatformActivityContext {
   programDescription?: string | null;
   /** Program logo/image (serves as "profile photo" for verification) */
   programLogo?: string | null;
+  /** Connected social platform IDs (for mainContentPlatforms auto-fill) */
+  connectedPlatformIds?: string[];
 }
 
 /**
@@ -284,7 +286,30 @@ export function calculateCreatorVerification(
       isFilled = !!creator[field];
     }
 
-    // Check type-specific data
+    // Content creator: aboutMe is satisfied by program description, mainContentPlatforms by connected accounts
+    else if (creatorType === 'content_creator' && field === 'aboutMe') {
+      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)
+        ?.contentCreator;
+      isFilled = !!(typeData?.[field] || platformActivity?.programDescription);
+    } else if (creatorType === 'content_creator' && field === 'mainContentPlatforms') {
+      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)
+        ?.contentCreator;
+      const fromProfile = typeData?.[field];
+      const fromConnections = platformActivity?.connectedPlatformIds;
+      isFilled = !!(
+        (Array.isArray(fromProfile) && fromProfile.length > 0) ||
+        (Array.isArray(fromConnections) && fromConnections.length > 0)
+      );
+    }
+
+    // Musician: bandArtistName is satisfied by creator displayName
+    else if (creatorType === 'musician' && field === 'bandArtistName') {
+      const typeData = (creator.typeSpecificData as Record<string, Record<string, unknown>>)
+        ?.musician;
+      isFilled = !!(typeData?.[field] || creator.displayName);
+    }
+
+    // Check type-specific data (generic fallback for all other fields)
     else if (creator.typeSpecificData) {
       const typeSpecificData = creator.typeSpecificData as Record<string, Record<string, unknown>>;
       const typeData =

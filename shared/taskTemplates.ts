@@ -1337,6 +1337,7 @@ export const PLATFORM_TASK_TYPES = {
     { value: 'tiktok_like', label: 'Like Video', icon: 'Heart' },
     { value: 'tiktok_share', label: 'Share Video', icon: 'Share' },
     { value: 'tiktok_comment', label: 'Comment on Video', icon: 'MessageCircle' },
+    { value: 'tiktok_post', label: 'Create Post with Hashtag', icon: 'Camera' },
   ],
   spotify: [
     { value: 'spotify_follow', label: 'Follow Artist', icon: 'UserPlus' },
@@ -1597,9 +1598,10 @@ export const TASK_TYPE_VERIFICATION: Record<
   facebook_comment_photo: { tier: 'T2', method: 'code_comment' },
   facebook_comment_code: { tier: 'T2', method: 'code_comment' },
 
-  // TikTok comment with code
+  // TikTok comment with code + post with hashtag
   tiktok_comment: { tier: 'T2', method: 'code_comment' },
   tiktok_comment_code: { tier: 'T2', method: 'code_comment' },
+  tiktok_post: { tier: 'T2', method: 'code_repost' },
 
   // Twitter quote/reply with code
   twitter_quote_tweet: { tier: 'T2', method: 'code_repost' },
