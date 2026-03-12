@@ -79,13 +79,13 @@ export const CREATOR_FIELD_INFO: Record<
     category: 'basic',
   },
   bio: {
-    label: 'Bio',
-    description: 'Tell your fans about yourself',
+    label: 'Program Description',
+    description: 'Add a description to your program in the Program Builder',
     category: 'basic',
   },
   imageUrl: {
-    label: 'Profile Photo',
-    description: 'Your profile picture',
+    label: 'Program Image',
+    description: 'Add a logo or image to your program in the Program Builder',
     category: 'basic',
   },
   category: {
@@ -239,6 +239,12 @@ export const CREATOR_FIELD_INFO: Record<
 export interface PlatformActivityContext {
   activeProgramCount: number;
   publishedTaskCount: number;
+  /** Whether the creator has a published program */
+  hasPublishedProgram?: boolean;
+  /** Program description (serves as "bio" for verification) */
+  programDescription?: string | null;
+  /** Program logo/image (serves as "profile photo" for verification) */
+  programLogo?: string | null;
 }
 
 /**
@@ -269,8 +275,12 @@ export function calculateCreatorVerification(
   requiredFields.forEach((field) => {
     let isFilled = false;
 
-    // Check basic creator fields
-    if (['displayName', 'bio', 'imageUrl', 'category'].includes(field)) {
+    // Check basic creator fields — bio and imageUrl are satisfied by published program data
+    if (field === 'bio') {
+      isFilled = !!(platformActivity?.programDescription || creator[field]);
+    } else if (field === 'imageUrl') {
+      isFilled = !!(platformActivity?.programLogo || creator[field]);
+    } else if (['displayName', 'category'].includes(field)) {
       isFilled = !!creator[field];
     }
 

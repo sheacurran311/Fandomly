@@ -23,7 +23,7 @@ const router = Router();
  * Query platform activity counts for a creator (programs + tasks).
  */
 async function getPlatformActivity(creatorId: string): Promise<PlatformActivityContext> {
-  const [programResult, taskResult] = await Promise.all([
+  const [programResult, taskResult, publishedPrograms] = await Promise.all([
     db
       .select({ total: count() })
       .from(loyaltyPrograms)
@@ -32,11 +32,25 @@ async function getPlatformActivity(creatorId: string): Promise<PlatformActivityC
       .select({ total: count() })
       .from(tasks)
       .where(and(eq(tasks.creatorId, creatorId), eq(tasks.ownershipLevel, 'creator'))),
+    db
+      .select({
+        description: loyaltyPrograms.description,
+        pageConfig: loyaltyPrograms.pageConfig,
+      })
+      .from(loyaltyPrograms)
+      .where(and(eq(loyaltyPrograms.creatorId, creatorId), eq(loyaltyPrograms.status, 'published')))
+      .limit(1),
   ]);
+
+  const program = publishedPrograms[0];
+  const pageConfig = (program?.pageConfig as Record<string, unknown>) || {};
 
   return {
     activeProgramCount: Number(programResult[0]?.total) || 0,
     publishedTaskCount: Number(taskResult[0]?.total) || 0,
+    hasPublishedProgram: !!program,
+    programDescription: program?.description || null,
+    programLogo: (pageConfig.logo as string) || null,
   };
 }
 
