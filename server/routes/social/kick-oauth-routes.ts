@@ -32,12 +32,10 @@ interface KickTokenResponse {
 }
 
 interface KickUserResponse {
-  id: string;
-  username: string;
-  bio?: string;
-  profile_pic?: string;
-  follower_count?: number;
-  verified?: boolean;
+  user_id: number | string;
+  name: string;
+  email?: string;
+  profile_picture?: string;
 }
 
 /**
@@ -77,10 +75,12 @@ async function exchangeCodeForToken(
 }
 
 /**
- * Fetch user profile from Kick API using a platform access token
+ * Fetch user profile from Kick API using a platform access token.
+ * Kick's public API v1 returns the authenticated user via GET /users (no /me endpoint).
+ * Response: { data: [{ user_id, name, email, profile_picture }], message: "OK" }
  */
 async function fetchKickProfile(accessToken: string): Promise<KickUserResponse> {
-  const response = await fetch(`${KICK_CONFIG.apiBase}/user/me`, {
+  const response = await fetch(`${KICK_CONFIG.apiBase}/users`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
@@ -90,7 +90,13 @@ async function fetchKickProfile(accessToken: string): Promise<KickUserResponse> 
     throw new Error('Failed to fetch Kick profile');
   }
 
-  return response.json();
+  const body = await response.json();
+  // Kick returns { data: [ userObject ], message: "OK" }
+  const user = Array.isArray(body?.data) ? body.data[0] : body;
+  if (!user) {
+    throw new Error('Kick API returned empty user data');
+  }
+  return user;
 }
 
 export function registerKickOAuthRoutes(app: Express) {

@@ -136,27 +136,28 @@ export default function KickCallbackPage() {
         }
 
         const profile = await meResponse.json();
-        if (!profile.id) {
+        // Kick /users returns { data: [user] } — unwrap if needed
+        const kickUser = Array.isArray(profile?.data) ? profile.data[0] : profile;
+        const userId = String(kickUser?.user_id || kickUser?.id || '');
+        const username = kickUser?.name || kickUser?.username || '';
+        if (!userId) {
           throw new Error('No user data received from Kick');
         }
 
-        console.log('[Kick Callback] Profile fetched:', profile.username);
+        console.log('[Kick Callback] Profile fetched:', username);
 
         // ── AUTH FLOW: post full result back to opener for loginWithCallback ──
         if (isAuthFlow) {
           const authResult = {
             success: true,
             accessToken,
-            userId: profile.id,
-            platformUserId: profile.id,
-            username: profile.username,
-            displayName: profile.username,
-            email: undefined, // Kick doesn't provide email
+            userId,
+            platformUserId: userId,
+            username,
+            displayName: username,
+            email: kickUser?.email,
             profileData: {
-              bio: profile.bio,
-              profilePicture: profile.profile_pic,
-              followerCount: profile.follower_count,
-              isVerified: profile.verified,
+              profilePicture: kickUser?.profile_picture,
             },
           };
           if (sendResultToOpener(authResult)) return;
@@ -171,19 +172,17 @@ export default function KickCallbackPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             platform: 'kick',
-            platformUserId: profile.id,
-            platformUsername: profile.username,
-            platformDisplayName: profile.username,
+            platformUserId: userId,
+            platformUsername: username,
+            platformDisplayName: username,
             accessToken,
             refreshToken: tokenData.refresh_token || null,
             tokenExpiresAt: tokenData.expires_in
               ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
               : null,
             profileData: {
-              bio: profile.bio,
-              profilePicture: profile.profile_pic,
-              followerCount: profile.follower_count,
-              isVerified: profile.verified,
+              profilePicture: kickUser?.profile_picture,
+              email: kickUser?.email,
             },
           }),
           credentials: 'include',
@@ -194,10 +193,10 @@ export default function KickCallbackPage() {
           throw new Error(`Failed to save connection: ${errorText}`);
         }
 
-        console.log('[Kick Callback] Connection saved successfully:', profile.username);
-        if (sendResultToOpener({ success: true, username: profile.username })) return;
+        console.log('[Kick Callback] Connection saved successfully:', username);
+        if (sendResultToOpener({ success: true, username })) return;
 
-        toast({ title: 'Kick Connected!', description: `Successfully connected ${profile.username}` });
+        toast({ title: 'Kick Connected!', description: `Successfully connected ${username}` });
         setLocation('/creator-dashboard/social');
       } catch (error) {
         console.error('[Kick Callback] Error:', error);
