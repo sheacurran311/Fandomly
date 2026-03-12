@@ -3,7 +3,6 @@ import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { useCreatorStats, useCreatorActivity } from '@/hooks/use-creator-dashboard';
 import { useContentAnalytics } from '@/hooks/use-analytics';
-import { useSocialConnections } from '@/hooks/use-social-connections';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import DashboardCard from '@/components/dashboard/dashboard-card';
 import RevenueWidget from '@/components/dashboard/revenue-widget';
@@ -29,30 +28,8 @@ import {
   ChevronRight,
   Activity,
   ExternalLink,
-  Link2,
 } from 'lucide-react';
-import {
-  FaFacebook,
-  FaTwitter,
-  FaInstagram,
-  FaTiktok,
-  FaYoutube,
-  FaSpotify,
-  FaDiscord,
-  FaTwitch,
-} from 'react-icons/fa';
-
-// Social platforms configuration
-const SOCIAL_PLATFORMS = [
-  { id: 'facebook', name: 'Facebook', icon: FaFacebook, color: 'text-blue-500' },
-  { id: 'twitter', name: 'X', icon: FaTwitter, color: 'text-gray-400' },
-  { id: 'instagram', name: 'Instagram', icon: FaInstagram, color: 'text-pink-500' },
-  { id: 'tiktok', name: 'TikTok', icon: FaTiktok, color: 'text-white' },
-  { id: 'youtube', name: 'YouTube', icon: FaYoutube, color: 'text-red-500' },
-  { id: 'spotify', name: 'Spotify', icon: FaSpotify, color: 'text-green-500' },
-  { id: 'discord', name: 'Discord', icon: FaDiscord, color: 'text-indigo-400' },
-  { id: 'twitch', name: 'Twitch', icon: FaTwitch, color: 'text-purple-500' },
-];
+import ConnectedPlatformsCard from '@/components/dashboard/connected-platforms-card';
 
 function TopPerformingWidget() {
   const { data, isLoading } = useContentAnalytics('all', 'views', 3);
@@ -124,93 +101,6 @@ function TopPerformingWidget() {
             )
           )}
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Compact social connections status row
-function ConnectedPlatformsRow() {
-  const { isPlatformConnected, isLoading } = useSocialConnections();
-
-  const connectedCount = SOCIAL_PLATFORMS.filter((p) => isPlatformConnected(p.id)).length;
-  const totalCount = SOCIAL_PLATFORMS.length;
-
-  return (
-    <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-white flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link2 className="h-5 w-5 text-brand-secondary" />
-            <span>Connected Platforms</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-3 text-xs text-brand-primary hover:text-white hover:bg-brand-primary/20"
-            onClick={() => (window.location.href = '/creator-dashboard/social')}
-          >
-            <ExternalLink className="h-3 w-3 mr-1" />
-            Manage All
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Platform icons row */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              {SOCIAL_PLATFORMS.map((platform) => {
-                const Icon = platform.icon;
-                const isConnected = isPlatformConnected(platform.id);
-                return (
-                  <div
-                    key={platform.id}
-                    className="flex flex-col items-center gap-1.5 min-w-[60px]"
-                    title={`${platform.name}: ${isConnected ? 'Connected' : 'Not connected'}`}
-                  >
-                    <div
-                      className={`relative p-2.5 rounded-lg transition-colors ${
-                        isConnected ? 'bg-white/10' : 'bg-white/5 opacity-50'
-                      }`}
-                    >
-                      <Icon
-                        className={`h-5 w-5 ${isConnected ? platform.color : 'text-gray-500'}`}
-                      />
-                      {/* Status indicator dot */}
-                      <div
-                        className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-brand-dark-bg ${
-                          isConnected ? 'bg-green-400' : 'bg-gray-500'
-                        }`}
-                      />
-                    </div>
-                    <span
-                      className={`text-[10px] ${isConnected ? 'text-gray-300' : 'text-gray-500'}`}
-                    >
-                      {platform.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Connection summary */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/10">
-              <span className="text-sm text-gray-400">
-                {connectedCount} of {totalCount} platforms connected
-              </span>
-              {connectedCount < totalCount && (
-                <span className="text-xs text-brand-secondary">
-                  +{(totalCount - connectedCount) * 500} potential points
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -1015,7 +905,7 @@ export default function CreatorDashboard() {
           </div>
 
           {/* SECTION 3: Social Networks Row */}
-          <ConnectedPlatformsRow />
+          <ConnectedPlatformsCard />
 
           {/* SECTION 4: Revenue & Performance Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

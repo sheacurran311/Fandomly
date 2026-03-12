@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { fetchApi, queryClient } from '@/lib/queryClient';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import { PLATFORM_IDS } from '@/config/social-platforms';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -430,22 +431,10 @@ function ProgramCustomizer({
   });
 
   // Only count actual social platforms, not auth providers like 'google'
-  const SOCIAL_PLATFORMS = new Set([
-    'twitter',
-    'instagram',
-    'discord',
-    'facebook',
-    'tiktok',
-    'youtube',
-    'spotify',
-    'apple_music',
-    'twitch',
-    'kick',
-  ]);
   const connectedPlatforms = new Set<string>(
     (socialConnectionsData as any)?.connections
       ?.map((c: { platform?: string }) => c.platform)
-      .filter((p: unknown): p is string => typeof p === 'string' && SOCIAL_PLATFORMS.has(p)) || []
+      .filter((p: unknown): p is string => typeof p === 'string' && PLATFORM_IDS.has(p)) || []
   );
 
   const handleConnectPlatform = async (platformId: string) => {

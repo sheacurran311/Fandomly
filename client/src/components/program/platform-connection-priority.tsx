@@ -13,136 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  ChevronDown,
-  Check,
-  Loader2,
-  Gift,
-  Twitter,
-  Instagram,
-  Facebook,
-  Music,
-  Lock,
-} from 'lucide-react';
-import { FaDiscord, FaTwitch, FaSpotify, FaTiktok, FaYoutube } from 'react-icons/fa';
-import { SiKick } from 'react-icons/si';
+import { ChevronDown, Check, Loader2, Gift, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCreatorTemplate, type CreatorType } from './creator-program-templates';
-
-// Platform configuration
-interface PlatformConfig {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-  iconBgClass: string;
-  iconColorClass: string;
-  buttonBorderClass: string;
-  buttonTextClass: string;
-  buttonHoverClass: string;
-}
-
-const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
-  twitter: {
-    id: 'twitter',
-    name: 'Twitter / X',
-    icon: <Twitter className="h-5 w-5" />,
-    iconBgClass: 'bg-blue-500/20',
-    iconColorClass: 'text-blue-400',
-    buttonBorderClass: 'border-blue-500/30',
-    buttonTextClass: 'text-blue-400',
-    buttonHoverClass: 'hover:bg-blue-500/10',
-  },
-  instagram: {
-    id: 'instagram',
-    name: 'Instagram',
-    icon: <Instagram className="h-5 w-5" />,
-    iconBgClass: 'bg-pink-500/20',
-    iconColorClass: 'text-pink-400',
-    buttonBorderClass: 'border-pink-500/30',
-    buttonTextClass: 'text-pink-400',
-    buttonHoverClass: 'hover:bg-pink-500/10',
-  },
-  discord: {
-    id: 'discord',
-    name: 'Discord',
-    icon: <FaDiscord className="h-5 w-5" />,
-    iconBgClass: 'bg-purple-500/20',
-    iconColorClass: 'text-purple-400',
-    buttonBorderClass: 'border-purple-500/30',
-    buttonTextClass: 'text-purple-400',
-    buttonHoverClass: 'hover:bg-purple-500/10',
-  },
-  facebook: {
-    id: 'facebook',
-    name: 'Facebook',
-    icon: <Facebook className="h-5 w-5" />,
-    iconBgClass: 'bg-blue-600/20',
-    iconColorClass: 'text-blue-500',
-    buttonBorderClass: 'border-blue-600/30',
-    buttonTextClass: 'text-blue-500',
-    buttonHoverClass: 'hover:bg-blue-600/10',
-  },
-  tiktok: {
-    id: 'tiktok',
-    name: 'TikTok',
-    icon: <FaTiktok className="h-5 w-5" />,
-    iconBgClass: 'bg-gray-800/50',
-    iconColorClass: 'text-white',
-    buttonBorderClass: 'border-gray-600/30',
-    buttonTextClass: 'text-gray-300',
-    buttonHoverClass: 'hover:bg-gray-600/10',
-  },
-  youtube: {
-    id: 'youtube',
-    name: 'YouTube Channel',
-    icon: <FaYoutube className="h-5 w-5" />,
-    iconBgClass: 'bg-red-500/20',
-    iconColorClass: 'text-red-500',
-    buttonBorderClass: 'border-red-500/30',
-    buttonTextClass: 'text-red-500',
-    buttonHoverClass: 'hover:bg-red-500/10',
-  },
-  spotify: {
-    id: 'spotify',
-    name: 'Spotify',
-    icon: <FaSpotify className="h-5 w-5" />,
-    iconBgClass: 'bg-green-500/20',
-    iconColorClass: 'text-green-400',
-    buttonBorderClass: 'border-green-500/30',
-    buttonTextClass: 'text-green-400',
-    buttonHoverClass: 'hover:bg-green-500/10',
-  },
-  apple_music: {
-    id: 'apple_music',
-    name: 'Apple Music',
-    icon: <Music className="h-5 w-5" />,
-    iconBgClass: 'bg-pink-400/20',
-    iconColorClass: 'text-pink-400',
-    buttonBorderClass: 'border-pink-400/30',
-    buttonTextClass: 'text-pink-400',
-    buttonHoverClass: 'hover:bg-pink-400/10',
-  },
-  twitch: {
-    id: 'twitch',
-    name: 'Twitch',
-    icon: <FaTwitch className="h-5 w-5" />,
-    iconBgClass: 'bg-purple-600/20',
-    iconColorClass: 'text-purple-500',
-    buttonBorderClass: 'border-purple-600/30',
-    buttonTextClass: 'text-purple-500',
-    buttonHoverClass: 'hover:bg-purple-600/10',
-  },
-  kick: {
-    id: 'kick',
-    name: 'Kick',
-    icon: <SiKick className="h-5 w-5" />,
-    iconBgClass: 'bg-green-500/20',
-    iconColorClass: 'text-green-400',
-    buttonBorderClass: 'border-green-500/30',
-    buttonTextClass: 'text-green-400',
-    buttonHoverClass: 'hover:bg-green-500/10',
-  },
-};
+import { SOCIAL_PLATFORMS } from '@/config/social-platforms';
 
 export interface SocialConnection {
   platform: string;
@@ -203,7 +77,7 @@ export function PlatformConnectionPriority({
   };
 
   const renderPlatformItem = (platformId: string) => {
-    const config = PLATFORM_CONFIGS[platformId];
+    const config = SOCIAL_PLATFORMS[platformId];
     if (!config) return null;
 
     const isConnected = connectedPlatforms.has(platformId);
@@ -222,7 +96,7 @@ export function PlatformConnectionPriority({
               config.iconBgClass
             )}
           >
-            <span className={config.iconColorClass}>{config.icon}</span>
+            <config.icon className={cn('h-5 w-5', config.iconColorClass)} />
           </div>
           <div>
             <p className="font-medium text-white">{config.name}</p>

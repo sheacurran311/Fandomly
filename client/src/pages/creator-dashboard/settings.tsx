@@ -31,6 +31,8 @@ import {
   Users,
   Download,
   Loader2,
+  User,
+  ExternalLink,
 } from 'lucide-react';
 import { useCreatorVerification } from '@/hooks/useCreatorVerification';
 import { CreatorVerificationProgress } from '@/components/creator/CreatorVerificationProgress';
@@ -203,11 +205,11 @@ export default function CreatorSettings() {
         </div>
 
         <div className="max-w-4xl">
-          <Tabs defaultValue="account" className="space-y-6">
-            <TabsList className="bg-white/10 border-white/20">
-              <TabsTrigger value="account" className="data-[state=active]:bg-brand-primary">
-                <Users className="h-4 w-4 mr-2" />
-                Account
+          <Tabs defaultValue="profile" className="space-y-6">
+            <TabsList className="bg-white/10 border-white/20 flex-wrap">
+              <TabsTrigger value="profile" className="data-[state=active]:bg-brand-primary">
+                <User className="h-4 w-4 mr-2" />
+                Profile
               </TabsTrigger>
               <TabsTrigger value="notifications" className="data-[state=active]:bg-brand-primary">
                 <Bell className="h-4 w-4 mr-2" />
@@ -221,13 +223,92 @@ export default function CreatorSettings() {
                 <Globe className="h-4 w-4 mr-2" />
                 Store
               </TabsTrigger>
-              <TabsTrigger value="billing" className="data-[state=active]:bg-brand-primary">
+              <TabsTrigger value="subscription" className="data-[state=active]:bg-brand-primary">
                 <CreditCard className="h-4 w-4 mr-2" />
-                Billing
+                Subscription
+              </TabsTrigger>
+              <TabsTrigger value="account" className="data-[state=active]:bg-brand-primary">
+                <Users className="h-4 w-4 mr-2" />
+                Account
               </TabsTrigger>
             </TabsList>
 
-            {/* Account Tab with User Type Switcher */}
+            {/* Profile Tab */}
+            <TabsContent value="profile" className="space-y-6">
+              <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Creator Profile</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="displayName" className="text-gray-300">
+                        Display Name
+                      </Label>
+                      <Input
+                        id="displayName"
+                        value={settings.displayName}
+                        onChange={(e) =>
+                          setSettings((prev) => ({ ...prev, displayName: e.target.value }))
+                        }
+                        className="bg-white/10 border-white/20 text-white"
+                        placeholder="Your display name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email" className="text-gray-300">
+                        Email
+                      </Label>
+                      <Input
+                        id="email"
+                        value={settings.email}
+                        onChange={(e) =>
+                          setSettings((prev) => ({ ...prev, email: e.target.value }))
+                        }
+                        className="bg-white/10 border-white/20 text-white"
+                        placeholder="your@email.com"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="bio" className="text-gray-300">
+                      Bio
+                    </Label>
+                    <Input
+                      id="bio"
+                      value={settings.bio}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, bio: e.target.value }))}
+                      className="bg-white/10 border-white/20 text-white"
+                      placeholder="Tell fans about yourself..."
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSave}
+                    className="bg-brand-primary hover:bg-brand-primary/80"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Profile
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Verification Progress */}
+              {!verificationLoading && verificationData && creator && (
+                <CreatorVerificationProgress
+                  creator={creator as Record<string, unknown>}
+                  verificationData={verificationData}
+                  platformActivity={platformActivity}
+                  showWizardButton={false}
+                />
+              )}
+            </TabsContent>
+
+            {/* Account Tab */}
             <TabsContent value="account" className="space-y-6">
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
@@ -249,15 +330,6 @@ export default function CreatorSettings() {
                   </div>
                 </CardContent>
               </Card>
-              {/* Verification Progress */}
-              {!verificationLoading && verificationData && creator && (
-                <CreatorVerificationProgress
-                  creator={creator as Record<string, unknown>}
-                  verificationData={verificationData}
-                  platformActivity={platformActivity}
-                  showWizardButton={false}
-                />
-              )}
 
               {/* Data Management */}
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
@@ -523,31 +595,30 @@ export default function CreatorSettings() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="billing" className="space-y-6">
+            <TabsContent value="subscription" className="space-y-6">
               <Card className="bg-white/5 backdrop-blur-lg border border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white">Billing & Subscription</CardTitle>
+                  <CardTitle className="text-white">Subscription Management</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-gray-400 text-sm">
-                    Manage your subscription plan, payment method, and view invoices.
+                    View and manage your subscription plan, payment method, and invoices.
                   </p>
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      className="bg-brand-primary hover:bg-brand-primary/80"
+                      onClick={() => (window.location.href = '/creator-dashboard/subscriptions')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Manage Subscription
+                    </Button>
                     <Button
                       variant="outline"
                       className="border-white/20 text-gray-300 hover:bg-white/10"
                       onClick={handleManagePayment}
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
-                      Manage Payment Method
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="border-white/20 text-gray-300 hover:bg-white/10"
-                      onClick={() => (window.location.href = '/creator-dashboard/subscriptions')}
-                    >
-                      <Globe className="h-4 w-4 mr-2" />
-                      View Plans
+                      Payment Method
                     </Button>
                   </div>
                 </CardContent>

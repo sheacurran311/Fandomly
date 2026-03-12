@@ -25,6 +25,7 @@ import {
   Store,
   type LucideIcon,
 } from 'lucide-react';
+import { ROUTES } from './routes';
 
 export interface NavigationItem {
   label: string;
@@ -37,30 +38,35 @@ export interface NavigationItem {
   isCreateButton?: boolean;
 }
 
+/**
+ * Creator sidebar: 8 top-level items (down from 14).
+ *
+ * Consolidated:
+ *   - Activity → Settings submenu
+ *   - My Token + Reputation → Web3 submenu
+ *   - Fandomly Tasks → Settings submenu ("Platform Tasks")
+ *   - Profile → Settings submenu
+ *   - Subscription → Settings submenu
+ */
 export const creatorNavItems: NavigationItem[] = [
-  { label: 'Overview', href: '/creator-dashboard', icon: Home, showInBottomNav: true },
+  { label: 'Overview', href: ROUTES.CREATOR_DASHBOARD, icon: Home, showInBottomNav: true },
   {
     label: 'Analytics',
-    href: '/creator-dashboard/analytics',
+    href: ROUTES.CREATOR_ANALYTICS,
     icon: BarChart3,
     color: 'text-blue-400',
     showInBottomNav: true,
     submenu: [
       {
         label: 'Overview',
-        href: '/creator-dashboard/analytics',
+        href: ROUTES.CREATOR_ANALYTICS,
         icon: BarChart3,
         color: 'text-blue-400',
       },
-      {
-        label: 'Growth',
-        href: '/creator-dashboard/growth',
-        icon: TrendingUp,
-        color: 'text-purple-400',
-      },
+      { label: 'Growth', href: ROUTES.CREATOR_GROWTH, icon: TrendingUp, color: 'text-purple-400' },
       {
         label: 'Revenue',
-        href: '/creator-dashboard/revenue',
+        href: ROUTES.CREATOR_REVENUE,
         icon: DollarSign,
         color: 'text-yellow-400',
       },
@@ -68,148 +74,172 @@ export const creatorNavItems: NavigationItem[] = [
   },
   {
     label: 'Loyalty Manager',
-    href: '/creator-dashboard/program-builder',
+    href: ROUTES.CREATOR_PROGRAM_BUILDER,
     icon: Layers,
     color: 'text-brand-primary',
     submenu: [
       {
         label: 'Program Builder',
-        href: '/creator-dashboard/program-builder',
+        href: ROUTES.CREATOR_PROGRAM_BUILDER,
         icon: Layers,
         color: 'text-brand-primary',
       },
       {
         label: 'Campaigns',
-        href: '/creator-dashboard/campaigns',
+        href: ROUTES.CREATOR_CAMPAIGNS,
         icon: Megaphone,
         color: 'text-orange-400',
       },
-      {
-        label: 'Tasks',
-        href: '/creator-dashboard/tasks',
-        icon: CheckSquare,
-        color: 'text-indigo-400',
-      },
+      { label: 'Tasks', href: ROUTES.CREATOR_TASKS, icon: CheckSquare, color: 'text-indigo-400' },
     ],
   },
   {
     label: 'Rewards',
-    href: '/creator-dashboard/rewards',
+    href: ROUTES.CREATOR_REWARDS,
     icon: Gift,
     color: 'text-emerald-400',
     submenu: [
-      {
-        label: 'Overview',
-        href: '/creator-dashboard/rewards',
-        icon: Gift,
-        color: 'text-emerald-400',
-      },
+      { label: 'Overview', href: ROUTES.CREATOR_REWARDS, icon: Gift, color: 'text-emerald-400' },
       {
         label: 'NFT Collections',
-        href: '/creator-dashboard/nft-collections',
+        href: ROUTES.CREATOR_NFT_COLLECTIONS,
         icon: Image,
         color: 'text-purple-400',
       },
     ],
   },
+  { label: 'Fans', href: ROUTES.CREATOR_FANS, icon: Users, color: 'text-green-400' },
   {
     label: 'Social Accounts',
-    href: '/creator-dashboard/social',
+    href: ROUTES.CREATOR_SOCIAL,
     icon: Instagram,
     color: 'text-pink-400',
     showInBottomNav: true,
   },
   {
-    label: 'Activity',
-    href: '/creator-dashboard/activity',
-    icon: Activity,
-    color: 'text-cyan-400',
+    label: 'Web3',
+    href: ROUTES.CREATOR_TOKEN,
+    icon: Coins,
+    color: 'text-purple-400',
+    submenu: [
+      { label: 'My Token', href: ROUTES.CREATOR_TOKEN, icon: Coins, color: 'text-purple-400' },
+      { label: 'Reputation', href: ROUTES.REPUTATION, icon: Shield, color: 'text-indigo-400' },
+    ],
   },
-  { label: 'Fans', href: '/creator-dashboard/fans', icon: Users, color: 'text-green-400' },
-  { label: 'My Token', href: '/creator-dashboard/token', icon: Coins, color: 'text-purple-400' },
   {
-    label: 'Fandomly Tasks',
-    href: '/creator-dashboard/platform-tasks',
-    icon: Star,
-    color: 'text-yellow-400',
+    label: 'Settings',
+    href: ROUTES.CREATOR_SETTINGS,
+    icon: Settings,
+    submenu: [
+      { label: 'Profile', href: ROUTES.PROFILE, icon: User },
+      {
+        label: 'Subscription',
+        href: ROUTES.CREATOR_SUBSCRIPTIONS,
+        icon: CreditCard,
+        color: 'text-amber-400',
+      },
+      { label: 'Activity', href: ROUTES.CREATOR_ACTIVITY, icon: Activity, color: 'text-cyan-400' },
+      {
+        label: 'Platform Tasks',
+        href: ROUTES.CREATOR_PLATFORM_TASKS,
+        icon: Star,
+        color: 'text-yellow-400',
+      },
+      { label: 'Account Settings', href: ROUTES.CREATOR_SETTINGS, icon: Settings },
+    ],
   },
-  { label: 'Reputation', href: '/reputation', icon: Shield, color: 'text-indigo-400' },
-  { label: 'Profile', href: '/profile', icon: User, showInBottomNav: true },
-  {
-    label: 'Subscription',
-    href: '/creator-dashboard/subscriptions',
-    icon: CreditCard,
-    color: 'text-amber-400',
-  },
-  { label: 'Settings', href: '/creator-dashboard/settings', icon: Settings },
 ];
 
+/**
+ * Fan sidebar: 7 top-level items (down from 11).
+ *
+ * Consolidated:
+ *   - Social Accounts → Settings submenu
+ *   - Staking + Reputation → Web3 submenu
+ *   - Notifications → Settings submenu
+ *   - Profile → Settings submenu
+ */
 export const fanNavItems: NavigationItem[] = [
-  { label: 'Overview', href: '/fan-dashboard', icon: Home, showInBottomNav: true },
+  { label: 'Overview', href: ROUTES.FAN_DASHBOARD, icon: Home, showInBottomNav: true },
   {
     label: 'Joined',
-    href: '/fan-dashboard/joined',
+    href: ROUTES.FAN_JOINED,
     icon: Users,
     color: 'text-brand-primary',
     showInBottomNav: true,
   },
   {
     label: 'Tasks',
-    href: '/fan-dashboard/tasks',
+    href: ROUTES.FAN_TASKS,
     icon: Target,
     color: 'text-brand-accent',
     showInBottomNav: true,
   },
   {
     label: 'Campaigns',
-    href: '/fan-dashboard/campaigns',
+    href: ROUTES.FAN_CAMPAIGNS,
     icon: Trophy,
     color: 'text-yellow-400',
     showInBottomNav: true,
   },
   {
-    label: 'Social Accounts',
-    href: '/fan-dashboard/social',
-    icon: Instagram,
-    color: 'text-pink-400',
-  },
-  {
     label: 'Rewards',
-    href: '/fan-dashboard/achievements',
+    href: ROUTES.FAN_ACHIEVEMENTS,
     icon: Gift,
     color: 'text-emerald-400',
     submenu: [
       {
         label: 'Rewards Store',
-        href: '/fan-dashboard/rewards-store',
+        href: ROUTES.FAN_REWARDS_STORE,
         icon: Store,
         color: 'text-brand-primary',
       },
       {
         label: 'Achievements',
-        href: '/fan-dashboard/achievements',
+        href: ROUTES.FAN_ACHIEVEMENTS,
         icon: Star,
         color: 'text-purple-400',
       },
-      { label: 'Points', href: '/fan-dashboard/points', icon: CreditCard, color: 'text-green-400' },
-      { label: 'My NFTs', href: '/fan-dashboard/nfts', icon: Image, color: 'text-purple-400' },
+      { label: 'Points', href: ROUTES.FAN_POINTS, icon: CreditCard, color: 'text-green-400' },
+      { label: 'My NFTs', href: ROUTES.FAN_NFTS, icon: Image, color: 'text-purple-400' },
     ],
   },
-  { label: 'Staking', href: '/staking', icon: Coins, color: 'text-emerald-400' },
-  { label: 'Reputation', href: '/reputation', icon: Shield, color: 'text-indigo-400' },
   {
-    label: 'Notifications',
-    href: '/fan-dashboard/notifications',
-    icon: Bell,
-    color: 'text-blue-400',
+    label: 'Web3',
+    href: ROUTES.STAKING,
+    icon: Coins,
+    color: 'text-emerald-400',
+    submenu: [
+      { label: 'Staking', href: ROUTES.STAKING, icon: Coins, color: 'text-emerald-400' },
+      { label: 'Reputation', href: ROUTES.REPUTATION, icon: Shield, color: 'text-indigo-400' },
+    ],
   },
-  { label: 'Profile', href: '/fan-profile', icon: User, showInBottomNav: true },
-  { label: 'Settings', href: '/fan-dashboard/settings', icon: Settings },
+  {
+    label: 'Settings',
+    href: ROUTES.FAN_SETTINGS,
+    icon: Settings,
+    submenu: [
+      { label: 'Profile', href: ROUTES.FAN_PROFILE, icon: User },
+      {
+        label: 'Social Accounts',
+        href: ROUTES.FAN_SOCIAL,
+        icon: Instagram,
+        color: 'text-pink-400',
+      },
+      {
+        label: 'Notifications',
+        href: ROUTES.FAN_NOTIFICATIONS,
+        icon: Bell,
+        color: 'text-blue-400',
+      },
+      { label: 'Account Settings', href: ROUTES.FAN_SETTINGS, icon: Settings },
+    ],
+  },
 ];
 
 export const nilNavItem: NavigationItem = {
   label: 'NIL Dashboard',
-  href: '/creator-dashboard/nil',
+  href: ROUTES.CREATOR_NIL,
   icon: Shield,
   color: 'text-purple-400',
 };
@@ -221,7 +251,8 @@ export const getNavigationItems = (
   if (userType === 'creator') {
     if (isNILAthlete) {
       const items = [...creatorNavItems];
-      items.splice(items.length - 2, 0, nilNavItem);
+      // Insert NIL item before Settings (last item)
+      items.splice(items.length - 1, 0, nilNavItem);
       return items;
     }
     return creatorNavItems;
@@ -236,10 +267,10 @@ export const getBottomNavItems = (
   if (userType === 'creator') {
     // For creators: Dashboard, Analytics, (+) Button, Social Accounts, Profile
     return [
-      { label: 'Overview', href: '/creator-dashboard', icon: Home, showInBottomNav: true },
+      { label: 'Overview', href: ROUTES.CREATOR_DASHBOARD, icon: Home, showInBottomNav: true },
       {
         label: 'Analytics',
-        href: '/creator-dashboard/analytics',
+        href: ROUTES.CREATOR_ANALYTICS,
         icon: BarChart3,
         color: 'text-blue-400',
         showInBottomNav: true,
@@ -254,32 +285,27 @@ export const getBottomNavItems = (
         submenu: [
           {
             label: 'Campaigns',
-            href: '/creator-dashboard/campaigns',
+            href: ROUTES.CREATOR_CAMPAIGNS,
             icon: Megaphone,
             color: 'text-orange-400',
           },
           {
             label: 'Tasks',
-            href: '/creator-dashboard/tasks',
+            href: ROUTES.CREATOR_TASKS,
             icon: CheckSquare,
             color: 'text-indigo-400',
           },
-          {
-            label: 'Rewards',
-            href: '/creator-dashboard/rewards',
-            icon: Gift,
-            color: 'text-emerald-400',
-          },
+          { label: 'Rewards', href: ROUTES.CREATOR_REWARDS, icon: Gift, color: 'text-emerald-400' },
         ],
       },
       {
         label: 'Social Accounts',
-        href: '/creator-dashboard/social',
+        href: ROUTES.CREATOR_SOCIAL,
         icon: Instagram,
         color: 'text-pink-400',
         showInBottomNav: true,
       },
-      { label: 'Profile', href: '/profile', icon: User, showInBottomNav: true },
+      { label: 'Profile', href: ROUTES.PROFILE, icon: User, showInBottomNav: true },
     ];
   }
 
