@@ -756,7 +756,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bio: '',
             category: creatorType,
             followerCount: 0,
-            typeSpecificData: incomingTypeData && typeof incomingTypeData === 'object' ? incomingTypeData : {},
+            typeSpecificData:
+              incomingTypeData && typeof incomingTypeData === 'object' ? incomingTypeData : {},
             brandColors: {
               primary: '#8B5CF6',
               secondary: '#06B6D4',
@@ -1906,6 +1907,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantMembers = await storage.getTenantMembers(tenant.id);
       const fanCount = tenantMembers.length;
 
+      // Calculate total completed tasks for this creator's tenant
+      const { taskCompletions: taskCompletionsTable } = await import('@shared/schema');
+      const { eq: eqOp, and: andOp, sql: sqlOp } = await import('drizzle-orm');
+      const [completionStats] = await db
+        .select({ count: sqlOp<number>`count(*)::int` })
+        .from(taskCompletionsTable)
+        .where(
+          andOp(
+            eqOp(taskCompletionsTable.tenantId, tenant.id),
+            eqOp(taskCompletionsTable.status, 'completed')
+          )
+        );
+      const totalRewards = completionStats?.count || 0;
+
       // Construct response
       res.json({
         creator: {
@@ -1925,7 +1940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fanCount,
         stats: {
           activeCampaigns: activeCampaigns.length,
-          totalRewards: 0, // TODO: Calculate from completions
+          totalRewards,
           engagementRate: undefined,
         },
       });
@@ -3361,8 +3376,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantMembers = await storage.getTenantMembers(tenant.id);
       const fanCount = tenantMembers.length;
 
-      // Calculate total rewards distributed (mock for now)
-      const totalRewards = fanCount * 10; // Placeholder calculation
+      // Calculate total completed task completions for this creator's tenant
+      const { taskCompletions: tcTable } = await import('@shared/schema');
+      const { eq: eqFn, and: andFn, sql: sqlFn } = await import('drizzle-orm');
+      const [storeStats] = await db
+        .select({ count: sqlFn<number>`count(*)::int` })
+        .from(tcTable)
+        .where(andFn(eqFn(tcTable.tenantId, tenant.id), eqFn(tcTable.status, 'completed')));
+      const totalRewards = storeStats?.count || 0;
 
       res.json({
         creator: {

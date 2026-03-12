@@ -100,7 +100,7 @@ export function ogTagsMiddleware(baseUrl: string) {
           .select({
             name: loyaltyPrograms.name,
             description: loyaltyPrograms.description,
-            coverImage: loyaltyPrograms.coverImage,
+            pageConfig: loyaltyPrograms.pageConfig,
             creatorDisplayName: creators.displayName,
           })
           .from(loyaltyPrograms)
@@ -109,12 +109,15 @@ export function ogTagsMiddleware(baseUrl: string) {
           .limit(1);
 
         if (program) {
+          const programLogo = (program.pageConfig as Record<string, unknown>)?.logo as
+            | string
+            | undefined;
           return res.send(
             renderOgHtml({
               title: `${program.name} by ${program.creatorDisplayName} | Fandomly`,
               description:
                 program.description || `Join ${program.name} on Fandomly and earn rewards`,
-              image: program.coverImage || undefined,
+              image: programLogo || undefined,
               url: `${baseUrl}/program/${slug}`,
             })
           );

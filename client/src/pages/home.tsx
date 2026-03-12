@@ -16,6 +16,7 @@ import {
   Sparkles,
   PartyPopper,
   X,
+  Menu,
   ShieldCheck,
   Gift,
   Crown,
@@ -614,6 +615,7 @@ function AnimatedNumber({ target, suffix = '' }: { target: number; suffix?: stri
 // MAIN PAGE
 // ============================================================
 export default function Home() {
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -653,7 +655,7 @@ export default function Home() {
               Explore
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3">
             <Link href="/login">
               <button className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors">
                 Sign In
@@ -665,7 +667,66 @@ export default function Home() {
               </button>
             </Link>
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden text-white p-2"
+            onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+            aria-label={isMobileNavOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={isMobileNavOpen}
+          >
+            {isMobileNavOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {isMobileNavOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden overflow-hidden border-t border-white/[0.05]"
+            >
+              <div className="px-4 py-4 space-y-1 bg-[#0a0118]/95 backdrop-blur-xl">
+                <a
+                  href="#features"
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className="block px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors"
+                >
+                  Features
+                </a>
+                <a
+                  href="#how-it-works"
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className="block px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors"
+                >
+                  How It Works
+                </a>
+                <Link
+                  href="/find-creators"
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className="block px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors"
+                >
+                  Explore
+                </Link>
+                <div className="pt-3 flex flex-col gap-2">
+                  <Link href="/login" onClick={() => setIsMobileNavOpen(false)}>
+                    <button className="w-full px-4 py-2.5 text-sm font-medium text-gray-300 hover:text-white border border-white/10 rounded-xl transition-colors">
+                      Sign In
+                    </button>
+                  </Link>
+                  <Link href="/login" onClick={() => setIsMobileNavOpen(false)}>
+                    <button className="w-full px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#e10698] to-[#14feee] rounded-xl hover:opacity-90 transition-opacity">
+                      Get Started
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* ===== HERO ===== */}

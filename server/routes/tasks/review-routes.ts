@@ -348,7 +348,23 @@ export function registerReviewRoutes(app: Express) {
             .where(eq(taskCompletions.id, completionId));
         }
 
-        // TODO: Send notification to fan
+        // Send rejection notification to the fan
+        {
+          const { notifications } = await import('@shared/schema');
+          const taskInfo = await db.query.tasks.findFirst({
+            where: eq(tasks.id, completion.taskId),
+          });
+          await db.insert(notifications).values({
+            userId: completion.userId,
+            tenantId: completion.tenantId,
+            type: 'system',
+            title: 'Task Rejected',
+            message: `Your submission for "${taskInfo?.name || 'a task'}" was not approved.${validatedData.reviewNotes ? ` Reason: ${validatedData.reviewNotes}` : ''}`,
+            metadata: { taskId: completion.taskId, actionUrl: '/fan-dashboard/tasks' },
+            read: false,
+            createdAt: new Date(),
+          });
+        }
 
         res.json({ success: true, message: 'Task rejected' });
       } catch (error: any) {

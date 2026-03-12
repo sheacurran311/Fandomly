@@ -263,53 +263,159 @@ export default function Navigation() {
           {/* Mobile menu */}
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-brand-primary/20">
-              <div className="flex flex-col space-y-4">
+              <div className="flex flex-col space-y-1">
                 {!isAuthenticated ? (
                   <>
                     <Link
                       href="/#features"
-                      className="text-gray-300 hover:text-brand-secondary transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                     >
                       Features
                     </Link>
                     <Link
                       href="/find-creators"
-                      className="text-gray-300 hover:text-brand-secondary transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                     >
                       Find Creators
                     </Link>
                     <Link
                       href="/#ideal-users"
-                      className="text-gray-300 hover:text-brand-secondary transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                     >
                       Who It&apos;s For
                     </Link>
+                    <div className="pt-3">
+                      <Link href="/login">
+                        <Button
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
+                        >
+                          Sign In
+                        </Button>
+                      </Link>
+                    </div>
                   </>
                 ) : (
                   <>
+                    {/* User info header */}
+                    {user && (
+                      <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-lg bg-white/5">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage
+                            src={
+                              transformImageUrl(user.profileData?.avatar || user.avatar) ||
+                              undefined
+                            }
+                            alt={user.profileData?.name || user.username || 'User'}
+                          />
+                          <AvatarFallback className="w-10 h-10 bg-brand-primary text-white text-sm font-bold">
+                            {(user.email?.[0] || user.username?.[0] || 'U').toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">
+                            {user.profileData?.name || user.username || user.email || 'User'}
+                          </p>
+                          <p className="text-xs text-gray-400 truncate">
+                            {user.email || user.username}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Dashboard link */}
+                    <Link
+                      href={
+                        user?.userType === 'creator' || user?.profileData?.brandType
+                          ? '/creator-dashboard'
+                          : '/fan-dashboard'
+                      }
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg text-white font-medium bg-brand-primary/20 hover:bg-brand-primary/30 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+
+                    {/* Navigation links */}
                     <Link
                       href="/find-creators"
-                      className="text-gray-300 hover:text-brand-secondary transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                     >
                       Explore
                     </Link>
                     <Link
                       href="/marketplace"
-                      className="text-gray-300 hover:text-brand-secondary transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                     >
                       Rewards Store
                     </Link>
-                  </>
-                )}
-                {!isAuthenticated && (
-                  <Link href="/login">
-                    <Button
+
+                    {/* Profile & Settings */}
+                    <div className="border-t border-brand-primary/20 my-2" />
+                    <Link
+                      href={user?.userType === 'creator' ? '/profile' : '/fan-profile'}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full bg-brand-primary hover:bg-brand-primary/80 text-white font-medium py-2 rounded-xl transition-all duration-200"
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                     >
-                      Sign In
-                    </Button>
-                  </Link>
+                      <User className="h-4 w-4" />
+                      Profile
+                    </Link>
+                    <Link
+                      href={
+                        user?.userType === 'creator'
+                          ? '/creator-dashboard/settings'
+                          : '/fan-dashboard/settings'
+                      }
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </Link>
+
+                    {/* Admin link */}
+                    {user?.role === 'fandomly_admin' && (
+                      <Link
+                        href="/admin-dashboard/overview"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-3 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        Admin Dashboard
+                      </Link>
+                    )}
+
+                    {/* User type switcher */}
+                    {user && (
+                      <>
+                        <div className="border-t border-brand-primary/20 my-2" />
+                        <div className="px-3 py-2">
+                          <UserTypeSwitcher
+                            userId={user.id}
+                            currentUserType={user.userType as 'fan' | 'creator'}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Logout */}
+                    <div className="border-t border-brand-primary/20 my-2" />
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors w-full text-left"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </button>
+                  </>
                 )}
               </div>
             </div>

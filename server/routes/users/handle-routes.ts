@@ -1,16 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Platform Handle Routes
- * 
+ *
  * API endpoints for managing fan-claimed platform handles.
  * Used for T3 (manual) verification where OAuth isn't available.
  */
 
-import { Express, Response } from "express";
+import { Express, Response } from 'express';
 import { db } from '../../db';
 import { fanPlatformHandles, users } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { z } from "zod";
-import { authenticateUser, AuthenticatedRequest } from "../../middleware/rbac";
+import { z } from 'zod';
+import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 
 /**
  * Handle validation patterns per platform
@@ -31,17 +32,17 @@ const HANDLE_PATTERNS: Record<string, RegExp> = {
  */
 function normalizeHandle(handle: string, platform: string): string {
   let normalized = handle.trim();
-  
+
   // Remove @ prefix for most platforms
   if (normalized.startsWith('@')) {
     normalized = normalized.slice(1);
   }
-  
+
   // Lowercase for most platforms (except YouTube channel IDs)
   if (platform !== 'youtube' || !normalized.startsWith('UC')) {
     normalized = normalized.toLowerCase();
   }
-  
+
   return normalized;
 }
 
@@ -74,7 +75,7 @@ export function registerHandleRoutes(app: Express) {
    * GET /api/users/me/platform-handles
    */
   app.get(
-    "/api/users/me/platform-handles",
+    '/api/users/me/platform-handles',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -88,7 +89,7 @@ export function registerHandleRoutes(app: Express) {
       } catch (error: any) {
         console.error('Error fetching platform handles:', error);
         res.status(500).json({
-          error: "Failed to fetch platform handles",
+          error: 'Failed to fetch platform handles',
           message: error.message,
         });
       }
@@ -100,16 +101,25 @@ export function registerHandleRoutes(app: Express) {
    * GET /api/users/:userId/platform-handles
    */
   app.get(
-    "/api/users/:userId/platform-handles",
+    '/api/users/:userId/platform-handles',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const { userId } = req.params;
         const requesterId = req.user!.id;
 
-        // Check if requester is the user or has permission (creator/admin)
-        // For now, allow any authenticated user to view
-        // TODO: Add proper permission check
+        // Only allow the user themselves, creators, or admins to view handles
+        if (requesterId !== userId) {
+          const requesterUser = await db.query.users.findFirst({
+            where: eq(users.id, requesterId),
+          });
+          if (
+            !requesterUser ||
+            (requesterUser.role !== 'fandomly_admin' && requesterUser.userType !== 'creator')
+          ) {
+            return res.status(403).json({ error: 'Not authorized to view these handles' });
+          }
+        }
 
         const handles = await db.query.fanPlatformHandles.findMany({
           where: eq(fanPlatformHandles.userId, userId),
@@ -119,7 +129,7 @@ export function registerHandleRoutes(app: Express) {
       } catch (error: any) {
         console.error('Error fetching user platform handles:', error);
         res.status(500).json({
-          error: "Failed to fetch platform handles",
+          error: 'Failed to fetch platform handles',
           message: error.message,
         });
       }
@@ -131,15 +141,15 @@ export function registerHandleRoutes(app: Express) {
    * POST /api/users/me/platform-handles
    */
   app.post(
-    "/api/users/me/platform-handles",
+    '/api/users/me/platform-handles',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user!.id;
         const validatedData = saveHandleSchema.parse(req.body);
-        
+
         const { platform, handle } = validatedData;
-        
+
         // Validate format
         const formatValid = validateHandleFormat(handle, platform);
         const normalized = normalizeHandle(handle, platform);
@@ -148,7 +158,7 @@ export function registerHandleRoutes(app: Express) {
         const existing = await db.query.fanPlatformHandles.findFirst({
           where: and(
             eq(fanPlatformHandles.userId, userId),
-            eq(fanPlatformHandles.platform, platform as any),
+            eq(fanPlatformHandles.platform, platform as any)
           ),
         });
 
@@ -188,13 +198,13 @@ export function registerHandleRoutes(app: Express) {
       } catch (error: any) {
         if (error.name === 'ZodError') {
           return res.status(400).json({
-            error: "Invalid request data",
+            error: 'Invalid request data',
             details: error.errors,
           });
         }
         console.error('Error saving platform handle:', error);
         res.status(500).json({
-          error: "Failed to save platform handle",
+          error: 'Failed to save platform handle',
           message: error.message,
         });
       }
@@ -206,16 +216,16 @@ export function registerHandleRoutes(app: Express) {
    * PATCH /api/users/me/platform-handles/:platform
    */
   app.patch(
-    "/api/users/me/platform-handles/:platform",
+    '/api/users/me/platform-handles/:platform',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.user!.id;
         const { platform } = req.params;
         const validatedData = updateHandleSchema.parse(req.body);
-        
+
         const { handle } = validatedData;
-        
+
         // Validate format
         const formatValid = validateHandleFormat(handle, platform);
         const normalized = normalizeHandle(handle, platform);
@@ -224,12 +234,12 @@ export function registerHandleRoutes(app: Express) {
         const existing = await db.query.fanPlatformHandles.findFirst({
           where: and(
             eq(fanPlatformHandles.userId, userId),
-            eq(fanPlatformHandles.platform, platform as any),
+            eq(fanPlatformHandles.platform, platform as any)
           ),
         });
 
         if (!existing) {
-          return res.status(404).json({ error: "Handle not found" });
+          return res.status(404).json({ error: 'Handle not found' });
         }
 
         // Update
@@ -251,13 +261,13 @@ export function registerHandleRoutes(app: Express) {
       } catch (error: any) {
         if (error.name === 'ZodError') {
           return res.status(400).json({
-            error: "Invalid request data",
+            error: 'Invalid request data',
             details: error.errors,
           });
         }
         console.error('Error updating platform handle:', error);
         res.status(500).json({
-          error: "Failed to update platform handle",
+          error: 'Failed to update platform handle',
           message: error.message,
         });
       }
@@ -269,7 +279,7 @@ export function registerHandleRoutes(app: Express) {
    * DELETE /api/users/me/platform-handles/:platform
    */
   app.delete(
-    "/api/users/me/platform-handles/:platform",
+    '/api/users/me/platform-handles/:platform',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -281,7 +291,7 @@ export function registerHandleRoutes(app: Express) {
           .where(
             and(
               eq(fanPlatformHandles.userId, userId),
-              eq(fanPlatformHandles.platform, platform as any),
+              eq(fanPlatformHandles.platform, platform as any)
             )
           );
 
@@ -289,7 +299,7 @@ export function registerHandleRoutes(app: Express) {
       } catch (error: any) {
         console.error('Error deleting platform handle:', error);
         res.status(500).json({
-          error: "Failed to delete platform handle",
+          error: 'Failed to delete platform handle',
           message: error.message,
         });
       }
@@ -301,7 +311,7 @@ export function registerHandleRoutes(app: Express) {
    * POST /api/users/:userId/platform-handles/:platform/verify
    */
   app.post(
-    "/api/users/:userId/platform-handles/:platform/verify",
+    '/api/users/:userId/platform-handles/:platform/verify',
     authenticateUser,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
@@ -309,18 +319,27 @@ export function registerHandleRoutes(app: Express) {
         const creatorUserId = req.user!.id;
         const validatedData = verifyHandleSchema.parse(req.body);
 
-        // TODO: Verify the requester is a creator with permission to verify
+        // Verify the requester is a creator or admin
+        const requesterUser = await db.query.users.findFirst({
+          where: eq(users.id, creatorUserId),
+        });
+        if (
+          !requesterUser ||
+          (requesterUser.role !== 'fandomly_admin' && requesterUser.userType !== 'creator')
+        ) {
+          return res.status(403).json({ error: 'Only creators and admins can verify handles' });
+        }
 
         // Find the handle
         const existing = await db.query.fanPlatformHandles.findFirst({
           where: and(
             eq(fanPlatformHandles.userId, userId),
-            eq(fanPlatformHandles.platform, platform as any),
+            eq(fanPlatformHandles.platform, platform as any)
           ),
         });
 
         if (!existing) {
-          return res.status(404).json({ error: "Handle not found" });
+          return res.status(404).json({ error: 'Handle not found' });
         }
 
         // Update verification status
@@ -339,13 +358,13 @@ export function registerHandleRoutes(app: Express) {
       } catch (error: any) {
         if (error.name === 'ZodError') {
           return res.status(400).json({
-            error: "Invalid request data",
+            error: 'Invalid request data',
             details: error.errors,
           });
         }
         console.error('Error verifying platform handle:', error);
         res.status(500).json({
-          error: "Failed to verify platform handle",
+          error: 'Failed to verify platform handle',
           message: error.message,
         });
       }
