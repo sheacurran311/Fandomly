@@ -19,6 +19,54 @@ const router = Router();
 const SOCIAL_CONNECTION_POINTS = 500;
 
 /**
+ * Exchange a short-lived Facebook/Instagram token for a long-lived one (~60 days).
+ * Returns the original token on failure so the flow can continue.
+ */
+async function exchangeForLongLivedToken(
+  shortLivedToken: string,
+  platform: string
+): Promise<{ token: string; expiresAt: Date | null }> {
+  // Determine which app credentials to use
+  const isCreatorApp = platform === 'facebook'; // Creator connections use the creator app
+  const appId = isCreatorApp
+    ? process.env.FACEBOOK_CREATOR_APP_ID || '1665384740795979'
+    : process.env.FACEBOOK_APP_ID || '4233782626946744';
+  const appSecret = isCreatorApp
+    ? process.env.FACEBOOK_CREATOR_APP_SECRET || process.env.FACEBOOK_APP_SECRET
+    : process.env.FACEBOOK_APP_SECRET;
+
+  if (!appSecret) {
+    console.warn(`[TokenExchange] No app secret for ${platform}, skipping long-lived exchange`);
+    return { token: shortLivedToken, expiresAt: null };
+  }
+
+  try {
+    const url = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${encodeURIComponent(shortLivedToken)}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[TokenExchange] Failed for ${platform}:`, err.error?.message || res.status);
+      return { token: shortLivedToken, expiresAt: null };
+    }
+
+    const data = await res.json();
+    const longLivedToken = data.access_token;
+    const expiresIn = data.expires_in; // seconds
+
+    console.log(`[TokenExchange] Got long-lived token for ${platform}, expires in ${expiresIn}s`);
+
+    return {
+      token: longLivedToken,
+      expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
+    };
+  } catch (error) {
+    console.error(`[TokenExchange] Error for ${platform}:`, error);
+    return { token: shortLivedToken, expiresAt: null };
+  }
+}
+
+/**
  * GET /api/social-connections
  * Get all social connections for the authenticated user
  */
@@ -125,6 +173,17 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'Platform is required' });
     }
 
+    // Exchange short-lived tokens for long-lived ones (Facebook/Instagram)
+    let finalAccessToken = accessToken;
+    let finalTokenExpiresAt = tokenExpiresAt;
+    if (accessToken && (platform === 'facebook' || platform === 'instagram')) {
+      const exchangeResult = await exchangeForLongLivedToken(accessToken, platform);
+      finalAccessToken = exchangeResult.token;
+      if (exchangeResult.expiresAt) {
+        finalTokenExpiresAt = exchangeResult.expiresAt.toISOString();
+      }
+    }
+
     let pointsActuallyAwarded = 0;
 
     // Check if connection already exists
@@ -141,9 +200,9 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
           platformUserId,
           platformUsername,
           platformDisplayName,
-          accessToken,
+          accessToken: finalAccessToken,
           refreshToken,
-          tokenExpiresAt: tokenExpiresAt ? new Date(tokenExpiresAt) : null,
+          tokenExpiresAt: finalTokenExpiresAt ? new Date(finalTokenExpiresAt) : null,
           profileData,
           lastSyncedAt: new Date(),
           isActive: true,
@@ -200,9 +259,9 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
           platformUserId,
           platformUsername,
           platformDisplayName,
-          accessToken,
+          accessToken: finalAccessToken,
           refreshToken,
-          tokenExpiresAt: tokenExpiresAt ? new Date(tokenExpiresAt) : null,
+          tokenExpiresAt: finalTokenExpiresAt ? new Date(finalTokenExpiresAt) : null,
           profileData,
           lastSyncedAt: new Date(),
           isActive: true,

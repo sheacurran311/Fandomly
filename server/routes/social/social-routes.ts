@@ -1648,9 +1648,33 @@ export function registerSocialRoutes(app: Express) {
           ),
         });
 
-        // Encrypt tokens if provided
-        const rawAccessToken = accountData.accessToken || accountData.access_token;
+        // Exchange short-lived Facebook/Instagram tokens for long-lived ones before encrypting
+        let rawAccessToken = accountData.accessToken || accountData.access_token;
         const rawRefreshToken = accountData.refreshToken || accountData.refresh_token;
+
+        if (rawAccessToken && (platform === 'facebook' || platform === 'instagram')) {
+          try {
+            const appSecret = process.env.FACEBOOK_APP_SECRET;
+            const appId =
+              platform === 'facebook'
+                ? process.env.FACEBOOK_CREATOR_APP_ID || '1665384740795979'
+                : process.env.FACEBOOK_APP_ID || '4233782626946744';
+            if (appSecret) {
+              const exchangeUrl = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${encodeURIComponent(rawAccessToken)}`;
+              const exchangeRes = await fetch(exchangeUrl);
+              if (exchangeRes.ok) {
+                const exchangeData = await exchangeRes.json();
+                rawAccessToken = exchangeData.access_token;
+                console.log(`[Social Connect] Exchanged for long-lived ${platform} token`);
+              }
+            }
+          } catch (exchangeErr) {
+            console.warn(
+              `[Social Connect] Long-lived token exchange failed for ${platform}:`,
+              exchangeErr
+            );
+          }
+        }
 
         const connectionData = {
           platformUserId: accountData.user?.id || accountData.id,

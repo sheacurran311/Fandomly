@@ -123,7 +123,12 @@ app.get('/api/csrf-token', (req, res) => {
 // Exclude webhook endpoints that receive external calls
 app.use((req, res, next) => {
   // Skip CSRF for webhooks (they use signature verification instead)
-  if (req.path.startsWith('/api/webhooks/') || req.path.startsWith('/api/stripe/webhook')) {
+  // Covers both /api/webhooks/* and /webhooks/* (Facebook/Instagram use the non-API prefix)
+  if (
+    req.path.startsWith('/api/webhooks/') ||
+    req.path.startsWith('/webhooks/') ||
+    req.path.startsWith('/api/stripe/webhook')
+  ) {
     return next();
   }
   // Skip CSRF for auth callback routes (OAuth redirects)

@@ -90,8 +90,8 @@ const FB_APP_CONFIG = {
       'public_profile',
       'email',
       'pages_show_list',
-      'business_management',
       'pages_read_engagement',
+      'read_insights',
     ],
   },
 };
@@ -524,16 +524,21 @@ class FacebookSDKManager {
       },
       (userResponse) => {
         if (userResponse && !userResponse.error) {
-          window.FB.api('/me/permissions', 'GET', { access_token: accessToken }, async (permResponse) => {
-            const result = await this.processPermissions(
-              userResponse,
-              accessToken,
-              permResponse,
-              requiredScopes,
-              isAuthFlow
-            );
-            resolve(result);
-          });
+          window.FB.api(
+            '/me/permissions',
+            'GET',
+            { access_token: accessToken },
+            async (permResponse) => {
+              const result = await this.processPermissions(
+                userResponse,
+                accessToken,
+                permResponse,
+                requiredScopes,
+                isAuthFlow
+              );
+              resolve(result);
+            }
+          );
         } else {
           console.error(
             '[FB Manager] Failed to get user info:',

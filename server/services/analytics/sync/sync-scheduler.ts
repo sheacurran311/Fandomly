@@ -18,6 +18,7 @@ import {
 import { eq, and, lte, desc } from 'drizzle-orm';
 import { getSyncService } from './index';
 import type { ContentMetricsData } from './types';
+import { safeDecryptToken } from '../../../lib/token-encryption';
 
 interface SchedulerConfig {
   /** How often to check for pending syncs (ms) */
@@ -187,6 +188,15 @@ class SyncScheduler {
       throw new Error(`No active connection with token for ${platform}`);
     }
 
+    // Decrypt token if stored encrypted (some paths encrypt tokens, some don't)
+    const decryptedConnection = {
+      ...connection,
+      accessToken: safeDecryptToken(connection.accessToken),
+      refreshToken: connection.refreshToken
+        ? safeDecryptToken(connection.refreshToken)
+        : connection.refreshToken,
+    };
+
     const startedAt = new Date();
 
     // Create sync log entry
@@ -205,7 +215,7 @@ class SyncScheduler {
 
     try {
       // 1. Sync account metrics
-      const accountResult = await syncService.syncAccountMetrics(userId, connection);
+      const accountResult = await syncService.syncAccountMetrics(userId, decryptedConnection);
       if (accountResult.success && accountResult.data) {
         const today = new Date().toISOString().split('T')[0];
         await db
@@ -246,7 +256,7 @@ class SyncScheduler {
       }
 
       // 2. Sync content list
-      const contentResult = await syncService.syncContentList(userId, connection);
+      const contentResult = await syncService.syncContentList(userId, decryptedConnection);
       if (contentResult.success && contentResult.items?.length) {
         const contentIds: string[] = [];
 
@@ -290,7 +300,7 @@ class SyncScheduler {
         if (contentIds.length > 0) {
           const metricsResult = await syncService.syncContentMetrics(
             userId,
-            connection,
+            decryptedConnection,
             contentIds
           );
           if (metricsResult.success && metricsResult.metrics?.length) {
