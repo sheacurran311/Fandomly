@@ -281,6 +281,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }));
   }, [setAccessToken]);
 
+  // Shared helper: clear all local auth state (used by logout + cross-tab sync).
+  const clearLocalAuthState = useCallback(() => {
+    setAccessToken(null);
+    setState({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    });
+    setLinkRequired(null);
+    queryClient.clear();
+
+    try {
+      window.dispatchEvent(new CustomEvent('auth:fandomly-logout'));
+    } catch {
+      // noop
+    }
+  }, [setAccessToken, queryClient]);
+
+  const clearLocalAuthStateRef = useRef<() => void>(() => {});
+  clearLocalAuthStateRef.current = clearLocalAuthState;
+
   // Initialize auth state on mount
   useEffect(() => {
     fetchCurrentUser();
@@ -311,6 +334,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener('auth:token-expired', onTokenExpired as EventListener);
     };
   }, [refreshToken]);
+
+  // Cross-tab logout: when another tab writes 'auth:logout' to localStorage,
+  // the `storage` event fires here so we clear local state in this tab too.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'auth:logout' && e.newValue) {
+        console.log('[Auth] Logout detected from another tab');
+        clearLocalAuthStateRef.current();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // Login with provider — no userType parameter.
   // All users authenticate first, then choose their type on /user-type-selection.
@@ -601,28 +637,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('[Auth] Logout error:', error);
     }
 
-    setAccessToken(null);
-    setState({
-      user: null,
-      accessToken: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-    });
-    setLinkRequired(null);
+    clearLocalAuthState();
 
-    // Clear all queries
-    queryClient.clear();
-
-    // Notify ParticleAuthListener to also disconnect the Particle session.
-    // This prevents the auth bridge from re-authenticating on the next render
-    // when Particle's session is still active after a Fandomly logout.
+    // Signal other tabs to also clear their state.
+    // The `storage` event fires in every OTHER tab when localStorage changes.
     try {
-      window.dispatchEvent(new CustomEvent('auth:fandomly-logout'));
+      localStorage.setItem('auth:logout', Date.now().toString());
+      localStorage.removeItem('auth:logout');
     } catch {
-      // noop
+      // localStorage unavailable (incognito quota, etc.)
     }
-  }, [setAccessToken, queryClient]);
+  }, [clearLocalAuthState]);
 
   // Clear link required state
   const clearLinkRequired = useCallback(() => {

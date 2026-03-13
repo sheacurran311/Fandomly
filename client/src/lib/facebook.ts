@@ -374,28 +374,27 @@ class FacebookSDKManager {
   }
 
   private static finalizeInitialization(appId: string): void {
-    // Check what App ID was previously initialized (by index.html)
     const previousAppId = (window as any).__FB_CURRENT_APP_ID__;
     console.log(
       `[FB Manager] finalizeInitialization - previous: ${previousAppId?.substring(0, 6)}, new: ${appId.substring(0, 6)}`
     );
 
-    // status: false — do NOT trigger an async getLoginStatus check here.
-    // Calling FB.init({ status: true }) puts the SDK into an intermediate state that
-    // interferes with the subsequent FB.login() call, causing the popup to be suppressed
-    // in the calling window and picked up by other tabs sharing the same App ID.
-    window.FB.init({
-      appId: appId,
-      cookie: true,
-      xfbml: true,
-      version: FB_API_VERSION,
-      status: false,
-    } as any);
+    if (previousAppId === appId) {
+      // index.html already called FB.init with this exact App ID — skip re-init
+      // to avoid resetting internal SDK state which can suppress the next FB.login() popup.
+      console.log(`[FB Manager] Adopting existing init (same App ID), skipping FB.init()`);
+    } else {
+      window.FB.init({
+        appId: appId,
+        cookie: true,
+        xfbml: true,
+        version: FB_API_VERSION,
+        status: false,
+      } as any);
 
-    // Update the global tracker
-    (window as any).__FB_CURRENT_APP_ID__ = appId;
-
-    window.FB.AppEvents.logPageView();
+      (window as any).__FB_CURRENT_APP_ID__ = appId;
+      window.FB.AppEvents.logPageView();
+    }
 
     this.currentAppId = appId;
     this.isInitialized = true;
@@ -433,27 +432,20 @@ class FacebookSDKManager {
   }
 
   /**
-   * Secure login with permissions verification
+   * Fire FB.login synchronously — MUST be called within the user-gesture
+   * (click) call-stack or the browser will suppress the popup.
+   *
+   * When preLoginUserID is provided, the callback compares the returned userID
+   * against it.  If they match and the accessToken is unchanged, the user
+   * simply closed the popup without re-authorizing — treat as cancelled.
    */
-  static async secureLogin(userType: UserType): Promise<FacebookLoginResult> {
-    await this.ensureFBReady(userType);
-
-    // Verify SDK is actually ready
-    if (!window.FB) {
-      console.error('[FB Manager] SDK not available after ensureFBReady');
-      return {
-        success: false,
-        error: 'Facebook SDK failed to load. Please refresh the page and try again.',
-        errorCode: 'SDK_NOT_LOADED',
-      };
-    }
-
-    const configKey = (userType === 'creator' ? 'creator' : 'fan') as keyof typeof FB_APP_CONFIG;
-    const config = FB_APP_CONFIG[configKey];
-    const scope = config.requiredScopes.join(',');
-
-    console.log(`[FB Manager] Starting secure login for ${userType}`);
-
+  private static fireLogin(
+    scope: string,
+    userType: UserType,
+    requiredScopes: string[],
+    preLoginUserID?: string | null,
+    preLoginToken?: string | null,
+  ): Promise<FacebookLoginResult> {
     return new Promise((resolve) => {
       console.log(`[FB Manager] Calling FB.login with scope: ${scope}`);
 
@@ -462,21 +454,39 @@ class FacebookSDKManager {
           (response) => {
             console.log(`[FB Manager] Login completed with status: ${response.status}`, {
               hasAuthResponse: !!response.authResponse,
+              preLoginUserID: preLoginUserID?.substring(0, 6),
               errorReason: (response as any).error_reason,
               errorDescription: (response as any).error_description,
             });
 
             if (response.status === 'connected' && response.authResponse) {
+              // If the user was already connected before clicking the button
+              // AND the token didn't change, they just closed the popup without
+              // performing a fresh login — treat as cancelled.
+              if (
+                preLoginUserID &&
+                response.authResponse.userID === preLoginUserID &&
+                preLoginToken &&
+                response.authResponse.accessToken === preLoginToken
+              ) {
+                console.log('[FB Manager] Token unchanged after popup — treating as cancelled');
+                resolve({
+                  success: false,
+                  error: 'Login was cancelled.',
+                  errorCode: 'POPUP_CLOSED',
+                });
+                return;
+              }
+
               const isAuthFlow = userType !== 'fan' && userType !== 'creator';
               this.handleSuccessfulLogin(
                 response,
                 response.authResponse.accessToken,
-                config.requiredScopes,
+                requiredScopes,
                 resolve,
                 isAuthFlow
               );
             } else if (response.status === 'unknown') {
-              // 'unknown' typically means popup was closed or blocked
               resolve({
                 success: false,
                 error:
@@ -512,6 +522,89 @@ class FacebookSDKManager {
         });
       }
     });
+  }
+
+  /**
+   * Synchronously snapshot the current FB login state so fireLogin can
+   * detect "popup closed without re-authorizing" vs "fresh login".
+   */
+  private static snapshotPreLoginState(): { userID: string | null; token: string | null } {
+    try {
+      const auth = (window.FB as any)?.getAuthResponse?.();
+      if (auth && auth.userID) {
+        return { userID: auth.userID, token: auth.accessToken || null };
+      }
+    } catch {
+      // SDK not ready
+    }
+    return { userID: null, token: null };
+  }
+
+  static async secureLogin(userType: UserType): Promise<FacebookLoginResult> {
+    const configKey = (userType === 'creator' ? 'creator' : 'fan') as keyof typeof FB_APP_CONFIG;
+    const config = FB_APP_CONFIG[configKey];
+    const scope = config.requiredScopes.join(',');
+
+    console.log(`[FB Manager] Starting secure login for ${userType}`);
+
+    // CRITICAL: FB.login() opens a popup which browsers only allow from a
+    // synchronous user-gesture call-stack.  Any real async gap (setTimeout,
+    // fetch, network poll) between the click and FB.login() will cause the
+    // browser to silently suppress the popup.
+    //
+    // Fast-path: if the SDK is already loaded + initialised with the right
+    // App ID, fire FB.login() immediately — zero awaits.
+    const requiredAppId = config.appId;
+    if (window.FB && this.isInitialized && this.currentAppId === requiredAppId) {
+      console.log('[FB Manager] SDK ready (fast path) — calling FB.login synchronously');
+      const pre = this.snapshotPreLoginState();
+      return this.fireLogin(scope, userType, config.requiredScopes, pre.userID, pre.token);
+    }
+
+    // SDK ready but not yet adopted by the manager — adopt synchronously
+    if (window.FB && !this.isInitialized) {
+      console.log('[FB Manager] Adopting SDK inline before FB.login');
+      this.finalizeInitialization(requiredAppId);
+      const pre = this.snapshotPreLoginState();
+      return this.fireLogin(scope, userType, config.requiredScopes, pre.userID, pre.token);
+    }
+
+    // SDK ready but wrong App ID — reinit synchronously then fire
+    if (window.FB && this.currentAppId && this.currentAppId !== requiredAppId) {
+      console.log('[FB Manager] Switching App ID inline before FB.login');
+      window.FB.init({
+        appId: requiredAppId,
+        cookie: true,
+        xfbml: true,
+        version: FB_API_VERSION,
+        status: false,
+      } as any);
+      (window as any).__FB_CURRENT_APP_ID__ = requiredAppId;
+      this.currentAppId = requiredAppId;
+      this.isInitialized = true;
+      const pre = this.snapshotPreLoginState();
+      return this.fireLogin(scope, userType, config.requiredScopes, pre.userID, pre.token);
+    }
+
+    // Slow path: SDK not yet loaded — we must await, then fire.
+    // The popup may be blocked by the browser in this case, but there's no
+    // alternative; we log a clear message so it's diagnosable.
+    console.warn(
+      '[FB Manager] SDK not loaded yet — awaiting init (popup may be blocked by browser)'
+    );
+    await this.ensureFBReady(userType);
+
+    if (!window.FB) {
+      console.error('[FB Manager] SDK not available after ensureFBReady');
+      return {
+        success: false,
+        error: 'Facebook SDK failed to load. Please refresh the page and try again.',
+        errorCode: 'SDK_NOT_LOADED',
+      };
+    }
+
+    const pre = this.snapshotPreLoginState();
+    return this.fireLogin(scope, userType, config.requiredScopes, pre.userID, pre.token);
   }
 
   private static handleSuccessfulLogin(

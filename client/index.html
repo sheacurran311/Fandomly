@@ -45,7 +45,8 @@
               appId      : INITIAL_APP_ID,
               cookie     : true,
               xfbml      : true,
-              version    : API_VERSION
+              version    : API_VERSION,
+              status     : false
             });
             window.__FB_CURRENT_APP_ID__ = INITIAL_APP_ID;
             // [FB index.html] FB.init completed with App ID:', INITIAL_APP_ID);
@@ -58,7 +59,7 @@
           window.reinitializeFacebookApp = function(appId) {
             try {
               if (!appId) appId = INITIAL_APP_ID;
-              FB.init({ appId: appId, cookie: true, xfbml: true, version: API_VERSION });
+              FB.init({ appId: appId, cookie: true, xfbml: true, version: API_VERSION, status: false });
               window.__FB_CURRENT_APP_ID__ = appId;
               return true;
             } catch (e) {

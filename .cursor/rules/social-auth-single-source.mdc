@@ -126,6 +126,36 @@ window.FB.api('/me', 'GET', { fields: 'id,name,email' }, callback);
 
 This applies to `/me`, `/me/permissions`, `/me/accounts`, and any other Graph API call in `facebook.ts`.
 
+### Facebook SDK — Popup and Init Fixes (MANDATORY)
+
+These fixes prevent the Facebook login popup from being silently suppressed or treating a cancelled popup as a successful login.
+
+**1. `status: false` in FB.init()**
+
+Both `client/index.html` and `client/src/lib/facebook.ts` MUST pass `status: false` to `FB.init()`. When `status: true` (the default), the SDK fires an async `getLoginStatus()` on load, which races with `FB.login()` and can suppress the popup in the calling window.
+
+```typescript
+FB.init({ appId, cookie: true, xfbml: true, version, status: false });
+```
+
+**2. Synchronous FB.login() — no awaits before it**
+
+`FB.login()` opens a popup; browsers only allow popups from a **synchronous** user-gesture call stack. Any `await` between the click and `FB.login()` breaks the gesture chain and the browser silently suppresses the popup.
+
+- Pre-initialize the SDK when the auth modal opens (`auth-modal.tsx` useEffect calling `ensureFBReady('auth')`).
+- In `facebook.ts` `secureLogin()`, when the SDK is already ready, call `FB.login()` immediately with zero awaits — no `await ensureFBReady()` before the call.
+- If the SDK isn't loaded yet, there is no alternative; the popup may be blocked (log a warning).
+
+**3. Skip redundant FB.init() when adopting from index.html**
+
+When `index.html` already called `FB.init()` with the same App ID, do NOT call `FB.init()` again in `finalizeInitialization()`. Re-initializing can reset internal SDK state and suppress the next `FB.login()` popup. Compare `__FB_CURRENT_APP_ID__` to the requested App ID; if they match, adopt state without re-init.
+
+**4. Treat "popup closed without re-authorizing" as cancelled**
+
+With `cookie: true`, the SDK caches a session. If the user was already connected and closes the popup without interacting, the SDK returns `status: 'connected'` from the cached session. That would incorrectly authenticate them.
+
+Before calling `FB.login()`, snapshot `userID` and `accessToken` from `FB.getAuthResponse()`. In the callback, if the returned `userID` and `accessToken` are **identical** to the snapshot, treat as `POPUP_CLOSED` (cancelled), not success. Only a fresh authorization returns a new token.
+
 ## 3. Particle Network (wallet only)
 
 **Purpose:** Embedded wallet creation, gas sponsorship, on-chain operations.
@@ -139,6 +169,39 @@ This applies to `/me`, `/me/permissions`, `/me/accounts`, and any other Graph AP
 - If wallet creation fails, the Fandomly session is unaffected (non-blocking)
 - Particle disconnect only fires on Fandomly logout (via `auth:fandomly-logout` event)
 - NEVER use Particle's social login for primary auth — it doesn't provide API scopes
+
+### Auth Context — Cross-Tab Logout and State Patterns (MANDATORY)
+
+**1. Cross-tab logout synchronization**
+
+Auth state lives in memory. When one tab logs out, other tabs still have `isAuthenticated: true` until they refresh. Use the `storage` event to sync logout across tabs:
+
+- On logout: call `POST /api/auth/logout`, clear local state, then `localStorage.setItem('auth:logout', timestamp)` and immediately `localStorage.removeItem('auth:logout')`.
+- Register a `storage` event listener. When `e.key === 'auth:logout'` and `e.newValue` is truthy, clear local auth state in that tab.
+- The `storage` event fires only in **other** tabs, not the tab that wrote the key — so the logout tab clears its own state; other tabs clear theirs via the listener.
+
+**2. clearLocalAuthState ref pattern — avoid TDZ in useEffect**
+
+If a `useEffect` (e.g. the storage listener) depends on `clearLocalAuthState` in its dependency array, React may evaluate it before `clearLocalAuthState` is initialized, causing "Cannot access before initialization".
+
+Use a ref instead:
+
+```typescript
+const clearLocalAuthStateRef = useRef<() => void>(() => {});
+clearLocalAuthStateRef.current = clearLocalAuthState;
+
+useEffect(() => {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === 'auth:logout' && e.newValue) {
+      clearLocalAuthStateRef.current();
+    }
+  };
+  window.addEventListener('storage', onStorage);
+  return () => window.removeEventListener('storage', onStorage);
+}, []); // Empty deps — ref is updated every render
+```
+
+The ref is initialized with a no-op; `.current` is updated each render. The effect never references `clearLocalAuthState` directly, so no TDZ.
 
 ## Critical Don'ts
 

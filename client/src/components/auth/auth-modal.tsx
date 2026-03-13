@@ -8,7 +8,7 @@
  * To fix a social auth bug, fix it in the source file (twitter.ts,
  * facebook.ts, or social-integrations.ts), NOT here.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -136,6 +136,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     callbackData: any;
   } | null>(null);
   const [isLinking, setIsLinking] = useState(false);
+
+  // Pre-warm the Facebook SDK so it's adopted/ready before the user clicks.
+  // This ensures FB.login() can fire synchronously from the click handler.
+  useEffect(() => {
+    if (isOpen) {
+      FacebookSDKManager.ensureFBReady('auth').catch(() => {});
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
