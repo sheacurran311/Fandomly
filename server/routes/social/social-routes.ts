@@ -665,7 +665,7 @@ export function registerSocialRoutes(app: Express) {
       return res.sendStatus(400);
     }
 
-    const isValidSignature = verifyWebhookSignature(req.body, signature);
+    const isValidSignature = verifyWebhookSignature(req.body, signature, (req as any).rawBody);
     if (!isValidSignature) {
       console.error('[Instagram Webhooks] Invalid signature — rejecting request');
       return res.sendStatus(403);

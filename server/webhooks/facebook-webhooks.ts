@@ -11,7 +11,12 @@ import { matchAndVerifyTask } from '../services/webhook-auto-verify';
 
 // Verify webhook signature for Facebook
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function verifyFacebookSignature(body: any, signature: string, appSecret: string): boolean {
+function verifyFacebookSignature(
+  body: any,
+  signature: string,
+  appSecret: string,
+  rawBody?: Buffer
+): boolean {
   if (!signature || !appSecret) {
     console.log(
       '[Facebook Webhooks] Signature verification skipped - missing signature or app secret'
@@ -19,8 +24,12 @@ function verifyFacebookSignature(body: any, signature: string, appSecret: string
     return false;
   }
 
-  // Convert body to string for signature verification
-  const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+  // Use raw body buffer for accurate signature verification (JSON.stringify may differ from original)
+  const bodyString = rawBody
+    ? rawBody.toString('utf8')
+    : typeof body === 'string'
+      ? body
+      : JSON.stringify(body);
 
   const expectedSignature = crypto.createHmac('sha256', appSecret).update(bodyString).digest('hex');
 
@@ -56,6 +65,9 @@ async function processPageEvent(entry: any) {
       value: JSON.stringify(value).substring(0, 200),
     });
 
+    // Facebook events use sender_id OR from.id depending on the event type
+    const senderId = value.sender_id || value.from?.id;
+
     switch (field) {
       case 'feed':
         // Post created, edited, or deleted
@@ -63,14 +75,32 @@ async function processPageEvent(entry: any) {
           item: value.item,
           verb: value.verb,
           postId: value.post_id,
-          senderId: value.sender_id,
+          senderId,
         });
         // Auto-verify share/post tasks when a new post or share is created
-        if (value.verb === 'add' && value.sender_id) {
+        if (value.verb === 'add' && senderId) {
           const taskType = value.item === 'share' ? 'share' : 'post';
-          await matchAndVerifyTask(value.sender_id, 'facebook', taskType, {
+          await matchAndVerifyTask(senderId, 'facebook', taskType, {
             postId: value.post_id,
             item: value.item,
+            pageId: entry.id,
+          });
+        }
+        break;
+
+      case 'mention':
+        // Page or user mentioned in a post
+        console.log('[Facebook Pages] 📢 Mention event:', {
+          postId: value.post_id,
+          senderId,
+          senderName: value.sender_name,
+          item: value.item,
+          verb: value.verb,
+        });
+        if (value.verb === 'add' && senderId) {
+          await matchAndVerifyTask(senderId, 'facebook', 'post', {
+            postId: value.post_id,
+            item: 'mention',
             pageId: entry.id,
           });
         }
@@ -83,12 +113,12 @@ async function processPageEvent(entry: any) {
           postId: value.post_id,
           parentId: value.parent_id,
           message: value.message,
-          senderId: value.sender_id,
+          senderId,
           verb: value.verb,
         });
         // Auto-verify comment tasks
-        if (value.verb === 'add' && value.sender_id) {
-          await matchAndVerifyTask(value.sender_id, 'facebook', 'comment', {
+        if (value.verb === 'add' && senderId) {
+          await matchAndVerifyTask(senderId, 'facebook', 'comment', {
             commentId: value.comment_id,
             postId: value.post_id,
           });
@@ -100,12 +130,12 @@ async function processPageEvent(entry: any) {
         console.log('[Facebook Pages] ❤️ Reaction event:', {
           reactionType: value.reaction_type,
           postId: value.post_id,
-          senderId: value.sender_id,
+          senderId,
           verb: value.verb,
         });
         // Auto-verify like/reaction tasks
-        if (value.verb === 'add' && value.sender_id) {
-          await matchAndVerifyTask(value.sender_id, 'facebook', 'like', {
+        if (value.verb === 'add' && senderId) {
+          await matchAndVerifyTask(senderId, 'facebook', 'like', {
             postId: value.post_id,
             reactionType: value.reaction_type,
           });
@@ -273,9 +303,9 @@ export function registerFacebookWebhooks(app: Express) {
     const body = req.body;
     const signature = req.headers['x-hub-signature-256'] as string;
 
-    // Verify signature
+    // Verify signature using raw body for accurate HMAC comparison
     if (signature && appSecret) {
-      const isValid = verifyFacebookSignature(body, signature, appSecret);
+      const isValid = verifyFacebookSignature(body, signature, appSecret, (req as any).rawBody);
       if (!isValid) {
         console.error('[Facebook Pages Webhooks] ❌ Invalid signature');
         return res.sendStatus(403);
@@ -360,9 +390,9 @@ export function registerFacebookWebhooks(app: Express) {
     const body = req.body;
     const signature = req.headers['x-hub-signature-256'] as string;
 
-    // Verify signature
+    // Verify signature using raw body for accurate HMAC comparison
     if (signature && appSecret) {
-      const isValid = verifyFacebookSignature(body, signature, appSecret);
+      const isValid = verifyFacebookSignature(body, signature, appSecret, (req as any).rawBody);
       if (!isValid) {
         console.error('[Facebook Users Webhooks] ❌ Invalid signature');
         return res.sendStatus(403);

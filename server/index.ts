@@ -3,6 +3,7 @@ checkEnvironment();
 
 import './lib/sentry';
 import express, { type Request } from 'express';
+import type { IncomingMessage } from 'http';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -80,7 +81,14 @@ app.use((req, res, next) => {
   if (req.path === '/api/stripe/webhook') {
     return next();
   }
-  express.json()(req, res, next);
+  // Capture raw body for webhook signature verification (Facebook/Instagram HMAC)
+  express.json({
+    verify: (req: IncomingMessage, _res, buf) => {
+      if (req.url?.startsWith('/webhooks/')) {
+        (req as IncomingMessage & { rawBody?: Buffer }).rawBody = buf;
+      }
+    },
+  })(req, res, next);
 });
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
