@@ -56,22 +56,27 @@ export default function YouTubeCallback() {
             console.error('[YouTube Callback] Failed to store result in localStorage:', e);
           }
         }
-        if (window.opener && !window.opener.closed) {
-          try {
-            window.opener.postMessage(
-              { type: 'youtube-oauth-result', result },
-              window.location.origin
-            );
-          } catch (e) {
-            console.warn('[YouTube Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        // Wrap entire opener block — window.opener.closed can itself throw in COOP environments
+        try {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage(
+                { type: 'youtube-oauth-result', result },
+                window.location.origin
+              );
+            } catch (e) {
+              console.warn('[YouTube Callback] postMessage blocked (cross-origin), using localStorage fallback');
+            }
+            try {
+              (window.opener as any).youtubeCallbackData = result;
+            } catch {
+              // Cross-origin property assignment blocked — localStorage fallback already set above
+            }
+            window.close();
+            return true;
           }
-          try {
-            (window.opener as any).youtubeCallbackData = result;
-          } catch {
-            // Cross-origin frame access blocked — localStorage fallback already set above
-          }
-          window.close();
-          return true;
+        } catch {
+          // window.opener/.closed access blocked by COOP — fall through to localStorage close
         }
         if (state && state.startsWith('youtube_')) {
           window.close();

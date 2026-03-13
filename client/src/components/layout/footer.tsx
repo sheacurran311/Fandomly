@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
             <div className="flex items-center mb-4">
-              <img src="/fandomly2.png" alt="Fandomly" className="h-20 w-auto" />
+              <img src="/fandomly-logo-white-fuchsia.png" alt="Fandomly" className="h-12 w-auto" />
             </div>
             <p className="text-gray-300 mb-6 max-w-md">
               The ultimate platform for athlets, musicians, and content creators to build lasting relationships with their fans through innovative loyalty programs and Web3 rewards.

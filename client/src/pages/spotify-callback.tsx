@@ -48,22 +48,26 @@ export default function SpotifyCallback() {
             console.error('[Spotify Callback] Failed to store result in localStorage:', e);
           }
         }
-        if (window.opener && !window.opener.closed) {
-          try {
-            window.opener.postMessage(
-              { type: 'spotify-oauth-result', result },
-              window.location.origin
-            );
-          } catch (e) {
-            console.warn('[Spotify Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        try {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage(
+                { type: 'spotify-oauth-result', result },
+                window.location.origin
+              );
+            } catch (e) {
+              console.warn('[Spotify Callback] postMessage blocked (cross-origin), using localStorage fallback');
+            }
+            try {
+              (window.opener as any).spotifyCallbackData = result;
+            } catch {
+              // Cross-origin property assignment blocked — localStorage fallback already set above
+            }
+            window.close();
+            return true;
           }
-          try {
-            (window.opener as any).spotifyCallbackData = result;
-          } catch {
-            // Cross-origin frame access blocked — localStorage fallback already set above
-          }
-          window.close();
-          return true;
+        } catch {
+          // window.opener/.closed access blocked by COOP — fall through to localStorage close
         }
         if (state && state.startsWith('spotify_')) {
           window.close();

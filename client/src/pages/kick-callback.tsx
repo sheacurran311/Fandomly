@@ -50,19 +50,23 @@ export default function KickCallbackPage() {
             console.error('[Kick Callback] Failed to store result in localStorage:', e);
           }
         }
-        if (window.opener && !window.opener.closed) {
-          try {
-            window.opener.postMessage({ type: 'kick-oauth-result', result }, window.location.origin);
-          } catch (e) {
-            console.warn('[Kick Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        try {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage({ type: 'kick-oauth-result', result }, window.location.origin);
+            } catch (e) {
+              console.warn('[Kick Callback] postMessage blocked (cross-origin), using localStorage fallback');
+            }
+            try {
+              (window.opener as any).kickCallbackData = result;
+            } catch {
+              // Cross-origin property assignment blocked — localStorage fallback already set above
+            }
+            window.close();
+            return true;
           }
-          try {
-            (window.opener as any).kickCallbackData = result;
-          } catch {
-            // Cross-origin frame access blocked — localStorage fallback already set above
-          }
-          window.close();
-          return true;
+        } catch {
+          // window.opener/.closed access blocked by COOP — fall through to localStorage close
         }
         if (state && (state.startsWith('kick_') || state.includes('kick'))) {
           window.close();

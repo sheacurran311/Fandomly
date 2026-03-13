@@ -258,7 +258,6 @@ function App() {
   // Define public routes that should show the full footer
   const publicRoutes = [
     '/',
-    '/find-creators',
     '/privacy-policy',
     '/data-deletion',
     '/privacy/data-deletion',

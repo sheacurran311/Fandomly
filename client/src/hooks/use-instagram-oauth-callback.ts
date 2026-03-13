@@ -72,34 +72,36 @@ export function useInstagramOAuthCallback({
 
 function handleOAuthError(error: string, errorDescription: string | null) {
   // If opened in popup, communicate result to parent
-  if (window.opener) {
-    console.log('[Instagram OAuth] Communicating error to parent window');
-    try {
-      window.opener.postMessage(
-        {
-          type: 'instagram-oauth-result',
-          result: {
-            success: false,
-            error: errorDescription || error,
+  try {
+    if (window.opener && !window.opener.closed) {
+      console.log('[Instagram OAuth] Communicating error to parent window');
+      try {
+        window.opener.postMessage(
+          {
+            type: 'instagram-oauth-result',
+            result: {
+              success: false,
+              error: errorDescription || error,
+            },
           },
-        },
-        window.location.origin
-      );
-    } catch (e) {
-      console.warn('[Instagram OAuth] postMessage blocked (cross-origin)');
+          window.location.origin
+        );
+      } catch (e) {
+        console.warn('[Instagram OAuth] postMessage blocked (cross-origin)');
+      }
+      try {
+        (window.opener as any).instagramCallbackData = {
+          success: false,
+          error: errorDescription || error,
+        };
+      } catch {
+        // Cross-origin property assignment blocked
+      }
+      setTimeout(() => window.close(), 500);
+      return;
     }
-    try {
-      (window.opener as any).instagramCallbackData = {
-        success: false,
-        error: errorDescription || error,
-      };
-    } catch {
-      // Cross-origin frame access blocked
-    }
-
-    // Close the popup after a short delay
-    setTimeout(() => window.close(), 500);
-    return;
+  } catch {
+    // window.opener/.closed access blocked by COOP — fall through to main window handling
   }
 
   // Show error in main window
@@ -134,7 +136,14 @@ async function handleOAuthSuccess(
   localStorage.removeItem('instagram_oauth_state');
 
   // Check if we're in a popup
-  if (window.opener) {
+  let isPopup = false;
+  try {
+    isPopup = !!(window.opener && !window.opener.closed);
+  } catch {
+    // window.opener/.closed access blocked by COOP
+  }
+
+  if (isPopup) {
     console.log('[Instagram OAuth] Popup detected - communicating with parent');
 
     try {
@@ -158,7 +167,7 @@ async function handleOAuthSuccess(
           state: effectiveState,
         };
       } catch {
-        // Cross-origin frame access blocked
+        // Cross-origin property assignment blocked
       }
 
       setTimeout(() => window.close(), 500);

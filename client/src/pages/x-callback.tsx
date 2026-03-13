@@ -74,23 +74,27 @@ export default function XCallback() {
         }
       }
 
-      if ((window as any).opener) {
-        try {
-          console.log('[X-Callback] Posting result to opener');
-          (window as any).opener.postMessage(
-            { type: 'twitter-oauth-result', result },
-            window.location.origin
-          );
-        } catch (e) {
-          console.warn('[X-Callback] postMessage blocked (cross-origin), using localStorage fallback');
+      try {
+        if ((window as any).opener && !(window as any).opener.closed) {
+          try {
+            console.log('[X-Callback] Posting result to opener');
+            (window as any).opener.postMessage(
+              { type: 'twitter-oauth-result', result },
+              window.location.origin
+            );
+          } catch (e) {
+            console.warn('[X-Callback] postMessage blocked (cross-origin), using localStorage fallback');
+          }
+          try {
+            (window as any).opener.twitterCallbackData = result;
+          } catch {
+            // Cross-origin property assignment blocked — localStorage fallback already set above
+          }
+          window.close();
+          return;
         }
-        try {
-          (window as any).opener.twitterCallbackData = result;
-        } catch {
-          // Cross-origin frame access blocked — localStorage fallback already set above
-        }
-        window.close();
-        return;
+      } catch {
+        // window.opener/.closed access blocked by COOP — fall through to localStorage close
       }
 
       // If no opener but state looks like popup flow (COOP blocked opener), close anyway

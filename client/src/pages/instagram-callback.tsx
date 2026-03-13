@@ -42,22 +42,26 @@ export default function InstagramCallback() {
             console.error('[Instagram Callback] Failed to store result in localStorage:', e);
           }
         }
-        if (window.opener) {
-          try {
-            window.opener.postMessage(
-              { type: 'instagram-oauth-result', result },
-              window.location.origin
-            );
-          } catch (e) {
-            console.warn('[Instagram Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        try {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage(
+                { type: 'instagram-oauth-result', result },
+                window.location.origin
+              );
+            } catch (e) {
+              console.warn('[Instagram Callback] postMessage blocked (cross-origin), using localStorage fallback');
+            }
+            try {
+              (window.opener as any).instagramCallbackData = result;
+            } catch {
+              // Cross-origin property assignment blocked — localStorage fallback already set above
+            }
+            window.close();
+            return true;
           }
-          try {
-            (window.opener as any).instagramCallbackData = result;
-          } catch {
-            // Cross-origin frame access blocked — localStorage fallback already set above
-          }
-          window.close();
-          return true;
+        } catch {
+          // window.opener/.closed access blocked by COOP — fall through to localStorage close
         }
         if (state && state.startsWith('instagram_')) {
           window.close();

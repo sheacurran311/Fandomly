@@ -11,6 +11,7 @@ import { Search, Users, Trophy, TrendingUp, Sparkles, Zap, CheckCircle } from "l
 import CreatorCard from "@/components/creator/creator-card";
 import { type Creator } from "@shared/schema";
 import DashboardLayout from "@/components/layout/dashboard-layout";
+import MinimalFooter from "@/components/layout/minimal-footer";
 import { useAuth } from "@/hooks/use-auth";
 import { useAuthModal } from "@/hooks/use-auth-modal";
 
@@ -348,5 +349,10 @@ export default function FindCreators() {
     <DashboardLayout userType={userData.userType as "fan" | "creator"}>
       {content}
     </DashboardLayout>
-  ) : content;
+  ) : (
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1">{content}</div>
+      <MinimalFooter />
+    </div>
+  );
 }

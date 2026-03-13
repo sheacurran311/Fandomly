@@ -49,22 +49,26 @@ export default function TikTokCallback() {
             console.error('[TikTok Callback] Failed to store result in localStorage:', e);
           }
         }
-        if (window.opener && !window.opener.closed) {
-          try {
-            window.opener.postMessage(
-              { type: 'tiktok-oauth-result', result },
-              window.location.origin
-            );
-          } catch (e) {
-            console.warn('[TikTok Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        try {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage(
+                { type: 'tiktok-oauth-result', result },
+                window.location.origin
+              );
+            } catch (e) {
+              console.warn('[TikTok Callback] postMessage blocked (cross-origin), using localStorage fallback');
+            }
+            try {
+              (window.opener as any).tiktokCallbackData = result;
+            } catch {
+              // Cross-origin property assignment blocked — localStorage fallback already set above
+            }
+            window.close();
+            return true;
           }
-          try {
-            (window.opener as any).tiktokCallbackData = result;
-          } catch {
-            // Cross-origin frame access blocked — localStorage fallback already set above
-          }
-          window.close();
-          return true;
+        } catch {
+          // window.opener/.closed access blocked by COOP — fall through to localStorage close
         }
         if (state && state.startsWith('tiktok_')) {
           window.close();

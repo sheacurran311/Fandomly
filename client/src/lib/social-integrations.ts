@@ -438,7 +438,8 @@ export class YouTubeAPI {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/youtube.readonly',
+      scope:
+        'openid email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.channel-memberships.creator',
       access_type: 'offline',
       prompt: 'consent',
       state: csrfState,

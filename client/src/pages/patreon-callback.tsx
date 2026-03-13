@@ -48,17 +48,21 @@ export default function PatreonCallbackPage() {
             console.error('[Patreon Callback] Failed to store result in localStorage:', e);
           }
         }
-        if (window.opener && !window.opener.closed) {
-          try {
-            window.opener.postMessage(
-              { type: 'patreon-oauth-result', result },
-              window.location.origin
-            );
-          } catch (e) {
-            console.warn('[Patreon Callback] postMessage blocked (cross-origin), using localStorage fallback');
+        try {
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage(
+                { type: 'patreon-oauth-result', result },
+                window.location.origin
+              );
+            } catch (e) {
+              console.warn('[Patreon Callback] postMessage blocked (cross-origin), using localStorage fallback');
+            }
+            window.close();
+            return true;
           }
-          window.close();
-          return true;
+        } catch {
+          // window.opener/.closed access blocked by COOP — fall through to localStorage close
         }
         if (state && state.startsWith('patreon_')) {
           window.close();
