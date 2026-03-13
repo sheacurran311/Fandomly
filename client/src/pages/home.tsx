@@ -633,7 +633,7 @@ export default function Home() {
       <nav className="sticky top-0 z-40 bg-[#0a0118]/80 backdrop-blur-lg border-b border-white/[0.05]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center">
-            <img src="/fandomly-logo-white-fuchsia.png" alt="Fandomly" className="h-10 w-auto" />
+            <img src="/fandomly-logo-white-fuchsia.png" alt="Fandomly" className="h-7 sm:h-8 md:h-10 w-auto max-w-[140px] sm:max-w-[180px] object-contain shrink-0" />
           </Link>
           <div className="hidden md:flex items-center gap-6">
             <a
@@ -1661,7 +1661,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
             <Link href="/" className="flex-shrink-0">
-              <img src="/fandomly-logo-white-fuchsia.png" alt="Fandomly" className="h-10 w-auto" />
+              <img src="/fandomly-logo-white-fuchsia.png" alt="Fandomly" className="h-7 sm:h-8 md:h-10 w-auto max-w-[140px] sm:max-w-[180px] object-contain shrink-0" />
             </Link>
             <div className="flex items-center gap-4">
               {[

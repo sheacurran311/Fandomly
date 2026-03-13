@@ -349,12 +349,16 @@ class FacebookSDKManager {
     this.isInitialized = false;
     this.initPromise = null;
 
+    // status: false — do NOT trigger an async getLoginStatus check here.
+    // Calling FB.init({ status: true }) puts the SDK into an intermediate state that
+    // interferes with the subsequent FB.login() call, causing the popup to be suppressed
+    // in the calling window and picked up by other tabs sharing the same App ID.
     window.FB.init({
       appId: newAppId,
       cookie: true,
       xfbml: true,
       version: FB_API_VERSION,
-      status: true,
+      status: false,
     } as any);
 
     // Update the global tracker
@@ -376,12 +380,16 @@ class FacebookSDKManager {
       `[FB Manager] finalizeInitialization - previous: ${previousAppId?.substring(0, 6)}, new: ${appId.substring(0, 6)}`
     );
 
+    // status: false — do NOT trigger an async getLoginStatus check here.
+    // Calling FB.init({ status: true }) puts the SDK into an intermediate state that
+    // interferes with the subsequent FB.login() call, causing the popup to be suppressed
+    // in the calling window and picked up by other tabs sharing the same App ID.
     window.FB.init({
       appId: appId,
       cookie: true,
       xfbml: true,
       version: FB_API_VERSION,
-      status: true,
+      status: false,
     } as any);
 
     // Update the global tracker

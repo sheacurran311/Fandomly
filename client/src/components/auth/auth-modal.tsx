@@ -397,7 +397,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <img
                 src="/fandomly-logo-white-fuchsia.png"
                 alt="Fandomly"
-                className="h-10 mx-auto mb-5 opacity-90"
+                className="h-8 sm:h-10 w-auto max-w-[160px] mx-auto mb-5 opacity-90 object-contain"
               />
               <h2 className="text-[22px] font-bold text-white tracking-tight">Welcome back</h2>
               <p className="text-gray-400 text-sm mt-1.5">
