@@ -1,27 +1,39 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
 /**
  * Facebook Task Builder Component
- * 
+ *
  * Allows creators to create Facebook-based tasks with:
  * - Follow (Like Page) tasks
  * - Like Post tasks
  */
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { NumberInput } from "@/components/ui/number-input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
-import { SiFacebook } from "react-icons/si";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
-import { useFacebookConnection } from "@/hooks/use-social-connection";
-import TaskBuilderBase from "./TaskBuilderBase";
-import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ContentPickerModal } from './ContentPickerModal';
+import { NumberInput } from '@/components/ui/number-input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  CheckCircle2,
+  AlertCircle,
+  Lock,
+  Info,
+  ShieldCheck,
+  Shield,
+  ShieldAlert,
+} from 'lucide-react';
+import { SiFacebook } from 'react-icons/si';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { useFacebookConnection } from '@/hooks/use-social-connection';
+import TaskBuilderBase from './TaskBuilderBase';
+import { TIER_GUIDANCE, type VerificationTier } from '@shared/taskTemplates';
 
 // Task type to verification tier mapping for Facebook
 // Like tasks are T3 (manual), Comment tasks with required text are T2 (code-based)
@@ -36,20 +48,32 @@ interface FacebookTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'facebook_like_page' | 'facebook_like_post' | 'facebook_comment_post' | 'facebook_comment_photo';
+  taskType:
+    | 'facebook_like_page'
+    | 'facebook_like_post'
+    | 'facebook_comment_post'
+    | 'facebook_comment_photo';
   initialData?: any;
   isEditMode?: boolean;
   programSelector?: React.ReactNode;
 }
 
-export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: FacebookTaskBuilderProps) {
+export default function FacebookTaskBuilder({
+  onSave,
+  onPublish,
+  onBack,
+  taskType,
+  initialData,
+  isEditMode,
+  programSelector,
+}: FacebookTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Get verification tier for this task type
   const tier = FACEBOOK_TASK_TIERS[taskType] || 'T3';
   const tierGuidance = TIER_GUIDANCE[tier];
-  
+
   // Use unified Facebook connection hook
   const {
     isConnected: facebookConnected,
@@ -57,12 +81,13 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     userInfo: facebookUserInfo,
     connect: connectFacebook,
   } = useFacebookConnection();
-  
+
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [pageUrl, setPageUrl] = useState('');
   const [postUrl, setPostUrl] = useState('');
+  const [showContentPicker, setShowContentPicker] = useState(false);
   const [requiredText, setRequiredText] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -77,17 +102,17 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
       setPoints(defaults.points);
     }
   }, [taskType, isEditMode]);
-  
+
   // Load initial data if editing - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
       setPoints(initialData.pointsToReward || initialData.points || 50);
-      
+
       // Check both settings and customSettings (backend stores in customSettings)
       const settings = initialData.settings || initialData.customSettings || {};
-      
+
       const derivedPageUrl = settings.pageUrl || settings.profileUrl || settings.contentUrl;
       const derivedPostUrl = settings.postUrl || settings.contentUrl;
 
@@ -106,7 +131,13 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
 
   // Auto-fill page URL when Facebook connects
   useEffect(() => {
-    if (facebookConnected && facebookUserInfo?.id && taskType === 'facebook_like_page' && !pageUrl && !isEditMode) {
+    if (
+      facebookConnected &&
+      facebookUserInfo?.id &&
+      taskType === 'facebook_like_page' &&
+      !pageUrl &&
+      !isEditMode
+    ) {
       setPageUrl(`https://facebook.com/${facebookUserInfo.id}`);
     }
   }, [facebookConnected, facebookUserInfo?.id, taskType, pageUrl, isEditMode]);
@@ -115,7 +146,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     // Get tier-appropriate recommended points
     const taskTier = FACEBOOK_TASK_TIERS[taskType] || 'T3';
     const guidance = TIER_GUIDANCE[taskTier];
-    
+
     switch (taskType) {
       case 'facebook_like_page':
         return {
@@ -163,7 +194,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     if (points < 1 || points > 10000) {
       errors.push('Points must be between 1 and 10,000');
     }
-    
+
     if (taskType === 'facebook_like_page') {
       if (!pageUrl.trim()) {
         errors.push('Facebook page URL is required');
@@ -180,7 +211,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
 
     setValidationErrors(errors);
     setIsValid(errors.length === 0);
-    
+
     return errors.length > 0 ? errors[0] : null;
   };
 
@@ -231,9 +262,9 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     const error = validateForm();
     if (error) {
       toast({
-        title: "Validation Error",
+        title: 'Validation Error',
         description: error,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
@@ -244,9 +275,9 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     const error = validateForm();
     if (error) {
       toast({
-        title: "Cannot Publish Task",
+        title: 'Cannot Publish Task',
         description: error,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
@@ -275,10 +306,19 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
         <h4 className="font-semibold text-white">Task Preview</h4>
       </div>
       <div className="space-y-2 text-sm">
-        <p><span className="text-blue-400">Type:</span> {getTaskTypeLabel()}</p>
-        <p><span className="text-blue-400">Name:</span> {taskName || 'Untitled Task'}</p>
-        <p><span className="text-blue-400">Points:</span> {points} points</p>
-        <p><span className="text-blue-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
+        <p>
+          <span className="text-blue-400">Type:</span> {getTaskTypeLabel()}
+        </p>
+        <p>
+          <span className="text-blue-400">Name:</span> {taskName || 'Untitled Task'}
+        </p>
+        <p>
+          <span className="text-blue-400">Points:</span> {points} points
+        </p>
+        <p>
+          <span className="text-blue-400">Verification:</span>{' '}
+          {useApiVerification ? 'API' : 'Manual'}
+        </p>
       </div>
     </div>
   );
@@ -308,7 +348,9 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
               <div className="flex items-center justify-between">
                 <div>
                   <strong>Facebook Not Connected</strong>
-                  <p className="text-sm mt-1">You must connect your Facebook account before creating Facebook tasks.</p>
+                  <p className="text-sm mt-1">
+                    You must connect your Facebook account before creating Facebook tasks.
+                  </p>
                 </div>
                 <Button
                   onClick={connectFacebook}
@@ -367,34 +409,59 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
             </div>
 
             {/* Verification Tier Guidance */}
-            <div className={`p-4 rounded-lg border ${
-              tier === 'T1' ? 'bg-green-500/10 border-green-500/30' :
-              tier === 'T2' ? 'bg-blue-500/10 border-blue-500/30' :
-              'bg-amber-500/10 border-amber-500/30'
-            }`}>
+            <div
+              className={`p-4 rounded-lg border ${
+                tier === 'T1'
+                  ? 'bg-green-500/10 border-green-500/30'
+                  : tier === 'T2'
+                    ? 'bg-blue-500/10 border-blue-500/30'
+                    : 'bg-amber-500/10 border-amber-500/30'
+              }`}
+            >
               <div className="flex items-center gap-2 mb-2">
-                {tier === 'T1' ? <ShieldCheck className="h-4 w-4 text-green-400" /> :
-                 tier === 'T2' ? <Shield className="h-4 w-4 text-blue-400" /> :
-                 <ShieldAlert className="h-4 w-4 text-amber-400" />}
-                <span className={`font-medium ${
-                  tier === 'T1' ? 'text-green-400' :
-                  tier === 'T2' ? 'text-blue-400' :
-                  'text-amber-400'
-                }`}>{tierGuidance.label}</span>
-                <Badge variant="outline" className={`text-xs ${
-                  tier === 'T1' ? 'border-green-500/30 text-green-400' :
-                  tier === 'T2' ? 'border-blue-500/30 text-blue-400' :
-                  'border-amber-500/30 text-amber-400'
-                }`}>
+                {tier === 'T1' ? (
+                  <ShieldCheck className="h-4 w-4 text-green-400" />
+                ) : tier === 'T2' ? (
+                  <Shield className="h-4 w-4 text-blue-400" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4 text-amber-400" />
+                )}
+                <span
+                  className={`font-medium ${
+                    tier === 'T1'
+                      ? 'text-green-400'
+                      : tier === 'T2'
+                        ? 'text-blue-400'
+                        : 'text-amber-400'
+                  }`}
+                >
+                  {tierGuidance.label}
+                </span>
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${
+                    tier === 'T1'
+                      ? 'border-green-500/30 text-green-400'
+                      : tier === 'T2'
+                        ? 'border-blue-500/30 text-blue-400'
+                        : 'border-amber-500/30 text-amber-400'
+                  }`}
+                >
                   {tierGuidance.trustLevel}
                 </Badge>
               </div>
               <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
-              <p className={`text-sm font-medium ${
-                tier === 'T1' ? 'text-green-400' :
-                tier === 'T2' ? 'text-blue-400' :
-                'text-amber-400'
-              }`}>{tierGuidance.pointsRange}</p>
+              <p
+                className={`text-sm font-medium ${
+                  tier === 'T1'
+                    ? 'text-green-400'
+                    : tier === 'T2'
+                      ? 'text-blue-400'
+                      : 'text-amber-400'
+                }`}
+              >
+                {tierGuidance.pointsRange}
+              </p>
               {tierGuidance.warning && (
                 <p className="text-xs text-amber-400 mt-2">{tierGuidance.warning}</p>
               )}
@@ -425,7 +492,8 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
               </p>
               {tier === 'T3' && points > 25 && (
                 <p className="text-xs text-amber-400">
-                  ⚠️ High points for a manually verified task. Consider lowering to reduce abuse potential.
+                  ⚠️ High points for a manually verified task. Consider lowering to reduce abuse
+                  potential.
                 </p>
               )}
             </div>
@@ -441,30 +509,55 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                   className={`bg-white/5 border-white/10 text-white ${!facebookConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
                   disabled={!facebookConnected}
                 />
-                <p className="text-xs text-gray-400">
-                  The full URL of your Facebook page
-                </p>
+                <p className="text-xs text-gray-400">The full URL of your Facebook page</p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-white">
-                    {taskType === 'facebook_comment_photo' ? 'Facebook Photo URL' : 'Facebook Post URL'}
+                    {taskType === 'facebook_comment_photo'
+                      ? 'Facebook Photo URL'
+                      : 'Facebook Post URL'}
                   </Label>
-                  <Input
-                    value={postUrl}
-                    onChange={(e) => setPostUrl(e.target.value)}
-                    placeholder="https://facebook.com/username/posts/1234567890"
-                    className={`bg-white/5 border-white/10 text-white ${!facebookConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    disabled={!facebookConnected}
+                  <div className="flex gap-2">
+                    <Input
+                      value={postUrl}
+                      onChange={(e) => setPostUrl(e.target.value)}
+                      placeholder="https://facebook.com/username/posts/1234567890"
+                      className={`bg-white/5 border-white/10 text-white flex-1 ${!facebookConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={!facebookConnected}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowContentPicker(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Pick Content
+                    </Button>
+                  </div>
+                  <ContentPickerModal
+                    open={showContentPicker}
+                    onClose={() => setShowContentPicker(false)}
+                    platform="facebook"
+                    onSelect={({ url }) => {
+                      setPostUrl(url);
+                      setShowContentPicker(false);
+                    }}
                   />
                   <p className="text-xs text-gray-400">
-                    The full URL of the Facebook {taskType === 'facebook_comment_photo' ? 'photo' : 'post'} you want fans to {taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo' ? 'comment on' : 'like'}
+                    The full URL of the Facebook{' '}
+                    {taskType === 'facebook_comment_photo' ? 'photo' : 'post'} you want fans to{' '}
+                    {taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo'
+                      ? 'comment on'
+                      : 'like'}
                   </p>
                 </div>
 
                 {/* Required Text field for comment tasks */}
-                {(taskType === 'facebook_comment_post' || taskType === 'facebook_comment_photo') && (
+                {(taskType === 'facebook_comment_post' ||
+                  taskType === 'facebook_comment_photo') && (
                   <div className="space-y-2">
                     <Label className="text-white">Required Text (Optional)</Label>
                     <Input
@@ -490,9 +583,7 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                     <Label className="text-white font-semibold">Reward Frequency</Label>
                     <Lock className="h-4 w-4 text-gray-400" />
                   </div>
-                  <p className="text-xs text-gray-400">
-                    Social engagement tasks are one-time only
-                  </p>
+                  <p className="text-xs text-gray-400">Social engagement tasks are one-time only</p>
                 </div>
                 <Badge variant="outline" className="border-blue-500/30 text-blue-400">
                   One-time
@@ -501,7 +592,8 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
               <Alert className="bg-blue-500/10 border-blue-500/20">
                 <Info className="h-4 w-4 text-blue-400" />
                 <AlertDescription className="text-blue-400 text-sm">
-                  This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+                  This task can only be completed once per user. Multipliers and verification
+                  cadence can be configured at the campaign level.
                 </AlertDescription>
               </Alert>
             </div>
@@ -515,24 +607,23 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
                     Use Facebook API to verify task completion (requires Facebook connection)
                   </p>
                 </div>
-                <Switch
-                  checked={useApiVerification}
-                  onCheckedChange={setUseApiVerification}
-                />
+                <Switch checked={useApiVerification} onCheckedChange={setUseApiVerification} />
               </div>
 
               {useApiVerification ? (
                 <Alert className="bg-green-500/10 border-green-500/20">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
                   <AlertDescription className="text-green-400 text-sm">
-                    <strong>Instant Rewards:</strong> Fans will get points immediately after completing the task!
+                    <strong>Instant Rewards:</strong> Fans will get points immediately after
+                    completing the task!
                   </AlertDescription>
                 </Alert>
               ) : (
                 <Alert className="bg-yellow-500/10 border-yellow-500/20">
                   <AlertCircle className="h-4 w-4 text-yellow-400" />
                   <AlertDescription className="text-yellow-400 text-sm">
-                    <strong>Manual Verification:</strong> You'll need to manually approve each completion.
+                    <strong>Manual Verification:</strong> You&apos;ll need to manually approve each
+                    completion.
                   </AlertDescription>
                 </Alert>
               )}
@@ -572,4 +663,3 @@ export default function FacebookTaskBuilder({ onSave, onPublish, onBack, taskTyp
     </TaskBuilderBase>
   );
 }
-

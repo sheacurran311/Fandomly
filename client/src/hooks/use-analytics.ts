@@ -1,12 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Analytics Hooks
- * 
+ *
  * React Query hooks for the cross-platform analytics API.
  * Provides overview, per-platform, content, growth, and comparison data.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchApi, apiRequest } from '@/lib/queryClient';
+import { apiRequest } from '@/lib/queryClient';
 
 // ============================================================================
 // Types
@@ -243,8 +244,16 @@ export function useSyncPreferences() {
   });
 
   const updateFrequency = useMutation({
-    mutationFn: async ({ platform, syncFrequencyMinutes }: { platform: string; syncFrequencyMinutes: number }) => {
-      const res = await apiRequest('PUT', `/api/sync-preferences/${platform}`, { syncFrequencyMinutes });
+    mutationFn: async ({
+      platform,
+      syncFrequencyMinutes,
+    }: {
+      platform: string;
+      syncFrequencyMinutes: number;
+    }) => {
+      const res = await apiRequest('PUT', `/api/sync-preferences/${platform}`, {
+        syncFrequencyMinutes,
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -286,4 +295,57 @@ export function useSyncHistory(limit?: number) {
     queryKey: ['/api/analytics/sync-history' + (qs ? `?${qs}` : '')],
     staleTime: 30_000,
   });
+}
+
+// ============================================================================
+// Sync Status (diagnostics)
+// ============================================================================
+
+export interface PlatformSyncStatus {
+  platform: string;
+  hasToken: boolean;
+  isActive: boolean;
+  syncEnabled: boolean;
+  syncStatus: string;
+  lastSyncAt: string | null;
+  nextSyncAt: string | null;
+  errorMessage: string | null;
+  lastLogStatus: string | null;
+  lastLogItemsSynced: number | null;
+  lastLogDurationMs: number | null;
+  lastLogError: string | null;
+}
+
+export interface SyncStatusResponse {
+  platforms: PlatformSyncStatus[];
+  schedulerRunning: boolean;
+}
+
+/**
+ * Fetch sync health diagnostics for all connected platforms
+ */
+export function useSyncStatus() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery<SyncStatusResponse>({
+    queryKey: ['/api/sync-preferences/status'],
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+
+  const syncNow = useMutation({
+    mutationFn: async (platform: string) => {
+      const res = await apiRequest('POST', `/api/sync-preferences/${platform}/sync-now`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sync-preferences/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sync-preferences'] });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+      }, 3000);
+    },
+  });
+
+  return { ...query, syncNow };
 }

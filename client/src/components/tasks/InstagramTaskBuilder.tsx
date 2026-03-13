@@ -1,27 +1,40 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/immutability */
 /**
  * Instagram Task Builder Component
- * 
+ *
  * Allows creators to create Instagram-based tasks with:
  * - Follow tasks
  * - Like Post tasks
  */
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { NumberInput } from "@/components/ui/number-input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Lock, Info, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
-import { SiInstagram } from "react-icons/si";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
-import { useInstagramConnection } from "@/hooks/use-social-connection";
-import TaskBuilderBase from "./TaskBuilderBase";
-import { TIER_GUIDANCE, type VerificationTier } from "@shared/taskTemplates";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ContentPickerModal } from './ContentPickerModal';
+import { NumberInput } from '@/components/ui/number-input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  CheckCircle2,
+  AlertCircle,
+  Lock,
+  Info,
+  ShieldCheck,
+  Shield,
+  ShieldAlert,
+} from 'lucide-react';
+import { SiInstagram } from 'react-icons/si';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { useInstagramConnection } from '@/hooks/use-social-connection';
+import TaskBuilderBase from './TaskBuilderBase';
+import { TIER_GUIDANCE, type VerificationTier } from '@shared/taskTemplates';
 
 // Task type to verification tier mapping for Instagram
 // Instagram lacks public API for follows/likes, so those are T3 (manual)
@@ -38,20 +51,33 @@ interface InstagramTaskBuilderProps {
   onSave: (config: any) => void;
   onPublish: (config: any) => void;
   onBack: () => void;
-  taskType: 'instagram_follow' | 'instagram_like_post' | 'comment_code' | 'mention_story' | 'keyword_comment';
+  taskType:
+    | 'instagram_follow'
+    | 'instagram_like_post'
+    | 'comment_code'
+    | 'mention_story'
+    | 'keyword_comment';
   initialData?: any;
   isEditMode?: boolean;
   programSelector?: React.ReactNode;
 }
 
-export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskType, initialData, isEditMode, programSelector }: InstagramTaskBuilderProps) {
+export default function InstagramTaskBuilder({
+  onSave,
+  onPublish,
+  onBack,
+  taskType,
+  initialData,
+  isEditMode,
+  programSelector,
+}: InstagramTaskBuilderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Get verification tier for this task type
   const tier = INSTAGRAM_TASK_TIERS[taskType] || 'T3';
   const tierGuidance = TIER_GUIDANCE[tier];
-  
+
   // Use unified Instagram connection hook
   const {
     isConnected: instagramConnected,
@@ -59,15 +85,16 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     userInfo: instagramUserInfo,
     connect: connectInstagram,
   } = useInstagramConnection();
-  
+
   // Derived from hook
   const instagramHandle = instagramUserInfo?.username || null;
-  
+
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [username, setUsername] = useState('');
   const [postUrl, setPostUrl] = useState('');
+  const [showContentPicker, setShowContentPicker] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [requireHashtag, setRequireHashtag] = useState('');
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
@@ -78,7 +105,13 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
 
   // Auto-populate username when Instagram connects
   useEffect(() => {
-    if (instagramConnected && instagramHandle && taskType === 'instagram_follow' && !username && !isEditMode) {
+    if (
+      instagramConnected &&
+      instagramHandle &&
+      taskType === 'instagram_follow' &&
+      !username &&
+      !isEditMode
+    ) {
       setUsername(instagramHandle);
     }
   }, [instagramConnected, instagramHandle, taskType, username, isEditMode]);
@@ -92,17 +125,17 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
       setPoints(defaults.points);
     }
   }, [taskType, isEditMode]);
-  
+
   // Load initial data if editing - check both settings and customSettings (backend stores in customSettings)
   useEffect(() => {
     if (initialData && isEditMode) {
       setTaskName(initialData.name || '');
       setDescription(initialData.description || '');
       setPoints(initialData.pointsToReward || initialData.points || 50);
-      
+
       // Check both settings and customSettings (backend stores in customSettings)
       const settings = initialData.settings || initialData.customSettings || {};
-      
+
       if (settings.username) {
         setUsername(settings.username);
       }
@@ -123,7 +156,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     // Get tier-appropriate recommended points
     const taskTier = INSTAGRAM_TASK_TIERS[taskType] || 'T3';
     const guidance = TIER_GUIDANCE[taskTier];
-    
+
     switch (taskType) {
       case 'instagram_follow':
         return {
@@ -172,7 +205,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     if (points < 1 || points > 10000) {
       errors.push('Points must be between 1 and 10,000');
     }
-    
+
     if (taskType === 'instagram_follow') {
       if (!username.trim()) {
         errors.push('Instagram username is required');
@@ -189,7 +222,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
       } else if (!postUrl.includes('instagram.com')) {
         errors.push('Invalid Instagram post URL');
       }
-      
+
       // keyword_comment needs keyword
       if (taskType === 'keyword_comment' && !keyword.trim()) {
         errors.push('Keyword is required for keyword comment tasks');
@@ -198,7 +231,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
 
     setValidationErrors(errors);
     setIsValid(errors.length === 0);
-    
+
     return errors.length > 0 ? errors[0] : null;
   };
 
@@ -273,9 +306,9 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
   const extractMediaIdFromUrl = (url: string): string => {
     try {
       const urlObj = new URL(url);
-      const pathSegments = urlObj.pathname.split('/').filter(s => s);
+      const pathSegments = urlObj.pathname.split('/').filter((s) => s);
       // Instagram URLs are like /p/{mediaId}/ or /reel/{mediaId}/
-      const mediaIdIndex = (pathSegments.indexOf('p') + 1) || (pathSegments.indexOf('reel') + 1);
+      const mediaIdIndex = pathSegments.indexOf('p') + 1 || pathSegments.indexOf('reel') + 1;
       if (mediaIdIndex > 0 && pathSegments[mediaIdIndex]) {
         return pathSegments[mediaIdIndex];
       }
@@ -283,16 +316,21 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
       console.error('Error extracting media ID from URL:', url, error);
     }
     // Fallback: return the last segment of the path
-    return url.split('/').filter(s => s).pop() || '';
+    return (
+      url
+        .split('/')
+        .filter((s) => s)
+        .pop() || ''
+    );
   };
 
   const handleSaveClick = () => {
     const error = validateForm();
     if (error) {
       toast({
-        title: "Validation Error",
+        title: 'Validation Error',
         description: error,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
@@ -303,9 +341,9 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     const error = validateForm();
     if (error) {
       toast({
-        title: "Cannot Publish Task",
+        title: 'Cannot Publish Task',
         description: error,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
@@ -336,10 +374,19 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
         <h4 className="font-semibold text-white">Task Preview</h4>
       </div>
       <div className="space-y-2 text-sm">
-        <p><span className="text-pink-400">Type:</span> {getTaskTypeLabel()}</p>
-        <p><span className="text-pink-400">Name:</span> {taskName || 'Untitled Task'}</p>
-        <p><span className="text-pink-400">Points:</span> {points} points</p>
-        <p><span className="text-pink-400">Verification:</span> {useApiVerification ? 'API' : 'Manual'}</p>
+        <p>
+          <span className="text-pink-400">Type:</span> {getTaskTypeLabel()}
+        </p>
+        <p>
+          <span className="text-pink-400">Name:</span> {taskName || 'Untitled Task'}
+        </p>
+        <p>
+          <span className="text-pink-400">Points:</span> {points} points
+        </p>
+        <p>
+          <span className="text-pink-400">Verification:</span>{' '}
+          {useApiVerification ? 'API' : 'Manual'}
+        </p>
       </div>
     </div>
   );
@@ -367,7 +414,9 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
             <div className="flex items-center justify-between">
               <div>
                 <strong>Instagram Not Connected</strong>
-                <p className="text-sm mt-1">You must connect your Instagram account before creating Instagram tasks.</p>
+                <p className="text-sm mt-1">
+                  You must connect your Instagram account before creating Instagram tasks.
+                </p>
               </div>
               <button
                 onClick={connectInstagram}
@@ -423,34 +472,59 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
             </div>
 
             {/* Verification Tier Guidance */}
-            <div className={`p-4 rounded-lg border ${
-              tier === 'T1' ? 'bg-green-500/10 border-green-500/30' :
-              tier === 'T2' ? 'bg-blue-500/10 border-blue-500/30' :
-              'bg-amber-500/10 border-amber-500/30'
-            }`}>
+            <div
+              className={`p-4 rounded-lg border ${
+                tier === 'T1'
+                  ? 'bg-green-500/10 border-green-500/30'
+                  : tier === 'T2'
+                    ? 'bg-blue-500/10 border-blue-500/30'
+                    : 'bg-amber-500/10 border-amber-500/30'
+              }`}
+            >
               <div className="flex items-center gap-2 mb-2">
-                {tier === 'T1' ? <ShieldCheck className="h-4 w-4 text-green-400" /> :
-                 tier === 'T2' ? <Shield className="h-4 w-4 text-blue-400" /> :
-                 <ShieldAlert className="h-4 w-4 text-amber-400" />}
-                <span className={`font-medium ${
-                  tier === 'T1' ? 'text-green-400' :
-                  tier === 'T2' ? 'text-blue-400' :
-                  'text-amber-400'
-                }`}>{tierGuidance.label}</span>
-                <Badge variant="outline" className={`text-xs ${
-                  tier === 'T1' ? 'border-green-500/30 text-green-400' :
-                  tier === 'T2' ? 'border-blue-500/30 text-blue-400' :
-                  'border-amber-500/30 text-amber-400'
-                }`}>
+                {tier === 'T1' ? (
+                  <ShieldCheck className="h-4 w-4 text-green-400" />
+                ) : tier === 'T2' ? (
+                  <Shield className="h-4 w-4 text-blue-400" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4 text-amber-400" />
+                )}
+                <span
+                  className={`font-medium ${
+                    tier === 'T1'
+                      ? 'text-green-400'
+                      : tier === 'T2'
+                        ? 'text-blue-400'
+                        : 'text-amber-400'
+                  }`}
+                >
+                  {tierGuidance.label}
+                </span>
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${
+                    tier === 'T1'
+                      ? 'border-green-500/30 text-green-400'
+                      : tier === 'T2'
+                        ? 'border-blue-500/30 text-blue-400'
+                        : 'border-amber-500/30 text-amber-400'
+                  }`}
+                >
                   {tierGuidance.trustLevel}
                 </Badge>
               </div>
               <p className="text-sm text-gray-300 mb-2">{tierGuidance.description}</p>
-              <p className={`text-sm font-medium ${
-                tier === 'T1' ? 'text-green-400' :
-                tier === 'T2' ? 'text-blue-400' :
-                'text-amber-400'
-              }`}>{tierGuidance.pointsRange}</p>
+              <p
+                className={`text-sm font-medium ${
+                  tier === 'T1'
+                    ? 'text-green-400'
+                    : tier === 'T2'
+                      ? 'text-blue-400'
+                      : 'text-amber-400'
+                }`}
+              >
+                {tierGuidance.pointsRange}
+              </p>
               {tierGuidance.warning && (
                 <p className="text-xs text-amber-400 mt-2">{tierGuidance.warning}</p>
               )}
@@ -480,7 +554,8 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
               </p>
               {tier === 'T3' && points > 25 && (
                 <p className="text-xs text-amber-400">
-                  ⚠️ High points for a manually verified task. Consider lowering to reduce abuse potential.
+                  ⚠️ High points for a manually verified task. Consider lowering to reduce abuse
+                  potential.
                 </p>
               )}
             </div>
@@ -495,17 +570,16 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
                   placeholder="@username or username"
                   className="bg-white/5 border-white/10 text-white"
                 />
-                <p className="text-xs text-gray-400">
-                  Your Instagram username (with or without @)
-                </p>
+                <p className="text-xs text-gray-400">Your Instagram username (with or without @)</p>
               </div>
             ) : taskType === 'mention_story' ? (
               <div className="space-y-2">
                 <Alert className="bg-blue-500/10 border-blue-500/20 text-blue-400">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Fans will post an Instagram Story mentioning your connected Instagram account (@{instagramHandle || 'your_username'}).
-                    No post URL is required - the task verifies automatically when they mention you.
+                    Fans will post an Instagram Story mentioning your connected Instagram account (@
+                    {instagramHandle || 'your_username'}). No post URL is required - the task
+                    verifies automatically when they mention you.
                   </AlertDescription>
                 </Alert>
                 <div className="space-y-2 mt-4">
@@ -525,14 +599,37 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-white">Instagram Post URL</Label>
-                  <Input
-                    value={postUrl}
-                    onChange={(e) => setPostUrl(e.target.value)}
-                    placeholder="https://instagram.com/p/ABC123..."
-                    className="bg-white/5 border-white/10 text-white"
+                  <div className="flex gap-2">
+                    <Input
+                      value={postUrl}
+                      onChange={(e) => setPostUrl(e.target.value)}
+                      placeholder="https://instagram.com/p/ABC123..."
+                      className="bg-white/5 border-white/10 text-white flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowContentPicker(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Pick Content
+                    </Button>
+                  </div>
+                  <ContentPickerModal
+                    open={showContentPicker}
+                    onClose={() => setShowContentPicker(false)}
+                    platform="instagram"
+                    onSelect={({ url }) => {
+                      setPostUrl(url);
+                      setShowContentPicker(false);
+                    }}
                   />
                   <p className="text-xs text-gray-400">
-                    The full URL of the Instagram post you want fans to {taskType === 'comment_code' || taskType === 'keyword_comment' ? 'comment on' : 'like'}
+                    The full URL of the Instagram post you want fans to{' '}
+                    {taskType === 'comment_code' || taskType === 'keyword_comment'
+                      ? 'comment on'
+                      : 'like'}
                   </p>
                 </div>
 
@@ -562,9 +659,7 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
                     <Label className="text-white font-semibold">Reward Frequency</Label>
                     <Lock className="h-4 w-4 text-gray-400" />
                   </div>
-                  <p className="text-xs text-gray-400">
-                    Social engagement tasks are one-time only
-                  </p>
+                  <p className="text-xs text-gray-400">Social engagement tasks are one-time only</p>
                 </div>
                 <Badge variant="outline" className="border-pink-500/30 text-pink-400">
                   One-time
@@ -573,7 +668,8 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
               <Alert className="bg-pink-500/10 border-pink-500/20">
                 <Info className="h-4 w-4 text-pink-400" />
                 <AlertDescription className="text-pink-400 text-sm">
-                  This task can only be completed once per user. Multipliers and verification cadence can be configured at the campaign level.
+                  This task can only be completed once per user. Multipliers and verification
+                  cadence can be configured at the campaign level.
                 </AlertDescription>
               </Alert>
             </div>
@@ -587,24 +683,23 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
                     Use Instagram API to verify task completion (requires Instagram connection)
                   </p>
                 </div>
-                <Switch
-                  checked={useApiVerification}
-                  onCheckedChange={setUseApiVerification}
-                />
+                <Switch checked={useApiVerification} onCheckedChange={setUseApiVerification} />
               </div>
 
               {useApiVerification ? (
                 <Alert className="bg-green-500/10 border-green-500/20">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
                   <AlertDescription className="text-green-400 text-sm">
-                    <strong>Instant Rewards:</strong> Fans will get points immediately after completing the task!
+                    <strong>Instant Rewards:</strong> Fans will get points immediately after
+                    completing the task!
                   </AlertDescription>
                 </Alert>
               ) : (
                 <Alert className="bg-yellow-500/10 border-yellow-500/20">
                   <AlertCircle className="h-4 w-4 text-yellow-400" />
                   <AlertDescription className="text-yellow-400 text-sm">
-                    <strong>Manual Verification:</strong> You'll need to manually approve each completion.
+                    <strong>Manual Verification:</strong> You&apos;ll need to manually approve each
+                    completion.
                   </AlertDescription>
                 </Alert>
               )}
@@ -644,4 +739,3 @@ export default function InstagramTaskBuilder({ onSave, onPublish, onBack, taskTy
     </TaskBuilderBase>
   );
 }
-

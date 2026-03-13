@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +29,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useTikTokConnection } from '@/hooks/use-social-connection';
 import TaskBuilderBase from './TaskBuilderBase';
+import { ContentPickerModal } from './ContentPickerModal';
 import { TIER_GUIDANCE, type VerificationTier } from '@shared/taskTemplates';
 
 // Task type to verification tier mapping for TikTok
@@ -79,6 +81,7 @@ export default function TikTokTaskBuilder({
   const [points, setPoints] = useState(tierGuidance.recommendedPoints);
   const [username, setUsername] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [showContentPicker, setShowContentPicker] = useState(false);
   const [requiredText, setRequiredText] = useState(''); // For comment tasks
   const [requiredHashtags, setRequiredHashtags] = useState(''); // For post tasks (comma-separated)
   const [useApiVerification, setUseApiVerification] = useState(true); // Automatic verification by default
@@ -493,11 +496,31 @@ export default function TikTokTaskBuilder({
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-white">TikTok Video URL</Label>
-                  <Input
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://tiktok.com/@user/video/..."
-                    className="bg-white/5 border-white/10 text-white"
+                  <div className="flex gap-2">
+                    <Input
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="https://tiktok.com/@user/video/..."
+                      className="bg-white/5 border-white/10 text-white flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowContentPicker(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Pick Content
+                    </Button>
+                  </div>
+                  <ContentPickerModal
+                    open={showContentPicker}
+                    onClose={() => setShowContentPicker(false)}
+                    platform="tiktok"
+                    onSelect={({ url }) => {
+                      setVideoUrl(url);
+                      setShowContentPicker(false);
+                    }}
                   />
                   <p className="text-xs text-gray-400">
                     The full URL of the TikTok video you want fans to{' '}

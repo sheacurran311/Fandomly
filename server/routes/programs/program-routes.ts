@@ -2,7 +2,15 @@
 import { Express } from 'express';
 import { z } from 'zod';
 import { db } from '../../db';
-import { loyaltyPrograms, campaigns, tasks } from '@shared/schema';
+import {
+  loyaltyPrograms,
+  campaigns,
+  tasks,
+  creators,
+  platformContent,
+  platformContentMetrics,
+} from '@shared/schema';
+import { inArray } from 'drizzle-orm';
 import { eq, and, desc, sql, or } from 'drizzle-orm';
 import { authenticateUser, type AuthenticatedRequest } from '../../middleware/rbac';
 import { publicEndpointLimiter } from '../../middleware/rate-limit';
@@ -48,6 +56,7 @@ const createProgramSchema = z.object({
           showLeaderboard: z.boolean().optional(),
           showActivityFeed: z.boolean().optional(),
           showFanWidget: z.boolean().optional(),
+          showSocialFeed: z.boolean().optional(),
           profileData: z
             .object({
               showBio: z.boolean().optional(),
@@ -1077,4 +1086,96 @@ export function registerProgramRoutes(app: Express) {
       }
     }
   );
+
+  /**
+   * GET /api/programs/:programId/content
+   * Public endpoint: fetch synced social content for a program's creator
+   */
+  app.get('/api/programs/:programId/content', publicEndpointLimiter, async (req: any, res: any) => {
+    try {
+      const { programId } = req.params;
+      const platformFilter = req.query.platform as string | undefined;
+      const sortBy = (req.query.sortBy as string) || 'recent';
+      const limit = Math.min(Number(req.query.limit) || 20, 50);
+      const offset = Number(req.query.offset) || 0;
+
+      // Get program with creator
+      const [programRow] = await db
+        .select({
+          creatorId: loyaltyPrograms.creatorId,
+          pageConfig: loyaltyPrograms.pageConfig,
+        })
+        .from(loyaltyPrograms)
+        .where(eq(loyaltyPrograms.id, programId))
+        .limit(1);
+
+      if (!programRow) {
+        return res.status(404).json({ error: 'Program not found' });
+      }
+
+      // Check visibility toggle
+      const visibility = (programRow.pageConfig as any)?.visibility || {};
+      if (visibility.showSocialFeed === false) {
+        return res.status(403).json({ error: 'Social content feed is disabled for this program' });
+      }
+
+      // Look up creator's userId
+      const [creator] = await db
+        .select({ userId: creators.userId })
+        .from(creators)
+        .where(eq(creators.id, programRow.creatorId))
+        .limit(1);
+
+      if (!creator) {
+        return res.status(404).json({ error: 'Creator not found' });
+      }
+
+      // Build order clause
+      let orderClause;
+      switch (sortBy) {
+        case 'popular':
+          orderClause = sql`COALESCE(MAX(${platformContentMetrics.views}), 0) DESC`;
+          break;
+        case 'recent':
+        default:
+          orderClause = sql`${platformContent.publishedAt} DESC NULLS LAST`;
+      }
+
+      // Build where conditions
+      const conditions = [eq(platformContent.userId, creator.userId)];
+      if (platformFilter && platformFilter !== 'all') {
+        const platforms = platformFilter.split(',').map((p) => p.trim());
+        conditions.push(inArray(platformContent.platform, platforms));
+      }
+
+      const content = await db
+        .select({
+          id: platformContent.id,
+          platform: platformContent.platform,
+          platformContentId: platformContent.platformContentId,
+          contentType: platformContent.contentType,
+          title: platformContent.title,
+          description: platformContent.description,
+          url: platformContent.url,
+          thumbnailUrl: platformContent.thumbnailUrl,
+          publishedAt: platformContent.publishedAt,
+          views: sql<number>`COALESCE(MAX(${platformContentMetrics.views}), 0)`,
+          likes: sql<number>`COALESCE(MAX(${platformContentMetrics.likes}), 0)`,
+          comments: sql<number>`COALESCE(MAX(${platformContentMetrics.comments}), 0)`,
+          shares: sql<number>`COALESCE(MAX(${platformContentMetrics.shares}), 0)`,
+        })
+        .from(platformContent)
+        .leftJoin(platformContentMetrics, eq(platformContent.id, platformContentMetrics.contentId))
+        .where(and(...conditions))
+        .groupBy(platformContent.id)
+        .orderBy(orderClause)
+        .limit(limit)
+        .offset(offset);
+
+      res.json({ content, total: content.length });
+    } catch (error) {
+      console.error('Error fetching program content:', error);
+      res.status(500).json({ error: 'Failed to fetch program content' });
+    }
+  });
 }

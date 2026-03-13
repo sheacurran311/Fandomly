@@ -1,6 +1,6 @@
 /**
  * Sync Scheduler
- * 
+ *
  * Background service that periodically syncs social platform data
  * for creators who have sync enabled. Also manages materialized view refreshes.
  */
@@ -15,9 +15,9 @@ import {
   platformContentMetrics,
   syncLog,
 } from '@shared/schema';
-import { eq, and, lte, sql } from 'drizzle-orm';
+import { eq, and, lte, desc } from 'drizzle-orm';
 import { getSyncService } from './index';
-import type { ContentItem, ContentMetricsData } from './types';
+import type { ContentMetricsData } from './types';
 
 interface SchedulerConfig {
   /** How often to check for pending syncs (ms) */
@@ -58,10 +58,7 @@ class SyncScheduler {
     console.log(`[SyncScheduler] Starting (check every ${this.config.checkIntervalMs / 1000}s)`);
 
     // Start sync check interval
-    this.syncInterval = setInterval(
-      () => this.processPendingSyncs(),
-      this.config.checkIntervalMs
-    );
+    this.syncInterval = setInterval(() => this.processPendingSyncs(), this.config.checkIntervalMs);
 
     // Start materialized view refresh (hourly)
     this.viewRefreshInterval = setInterval(
@@ -130,7 +127,10 @@ class SyncScheduler {
           await this.syncPlatform(pref.userId, pref.platform, pref.id);
           processed++;
         } catch (error) {
-          console.error(`[SyncScheduler] Error syncing ${pref.platform} for ${pref.userId}:`, error);
+          console.error(
+            `[SyncScheduler] Error syncing ${pref.platform} for ${pref.userId}:`,
+            error
+          );
           failed++;
 
           // Mark as error
@@ -147,7 +147,9 @@ class SyncScheduler {
 
       const duration = Date.now() - startTime;
       if (this.config.verbose) {
-        console.log(`[SyncScheduler] Completed in ${duration}ms - Processed: ${processed}, Failed: ${failed}`);
+        console.log(
+          `[SyncScheduler] Completed in ${duration}ms - Processed: ${processed}, Failed: ${failed}`
+        );
       }
     } catch (error) {
       console.error('[SyncScheduler] processPendingSyncs error:', error);
@@ -188,13 +190,16 @@ class SyncScheduler {
     const startedAt = new Date();
 
     // Create sync log entry
-    const [logEntry] = await db.insert(syncLog).values({
-      userId,
-      platform,
-      syncType: 'full',
-      status: 'started',
-      startedAt,
-    }).returning();
+    const [logEntry] = await db
+      .insert(syncLog)
+      .values({
+        userId,
+        platform,
+        syncType: 'full',
+        status: 'started',
+        startedAt,
+      })
+      .returning();
 
     let totalItemsSynced = 0;
 
@@ -220,7 +225,11 @@ class SyncScheduler {
             platformSpecific: accountResult.data.platformSpecific || {},
           })
           .onConflictDoUpdate({
-            target: [platformAccountMetricsDaily.userId, platformAccountMetricsDaily.platform, platformAccountMetricsDaily.date],
+            target: [
+              platformAccountMetricsDaily.userId,
+              platformAccountMetricsDaily.platform,
+              platformAccountMetricsDaily.date,
+            ],
             set: {
               followers: accountResult.data.followers ?? null,
               following: accountResult.data.following ?? null,
@@ -243,7 +252,7 @@ class SyncScheduler {
 
         for (const item of contentResult.items) {
           try {
-            const [savedContent] = await db
+            await db
               .insert(platformContent)
               .values({
                 userId,
@@ -279,7 +288,11 @@ class SyncScheduler {
 
         // 3. Sync content metrics
         if (contentIds.length > 0) {
-          const metricsResult = await syncService.syncContentMetrics(userId, connection, contentIds);
+          const metricsResult = await syncService.syncContentMetrics(
+            userId,
+            connection,
+            contentIds
+          );
           if (metricsResult.success && metricsResult.metrics?.length) {
             await this.saveContentMetrics(platform, metricsResult.metrics);
             totalItemsSynced += metricsResult.metrics.length;
@@ -320,7 +333,6 @@ class SyncScheduler {
         .update(socialConnections)
         .set({ lastSyncedAt: completedAt })
         .where(eq(socialConnections.id, connection.id));
-
     } catch (error) {
       // Update sync log as failed
       await db
@@ -400,12 +412,12 @@ class SyncScheduler {
       if (this.config.verbose) {
         console.log('[SyncScheduler] Refreshing materialized views...');
       }
-      
+
       const client = await pool.connect();
       try {
         // Refresh high-frequency views
         await client.query('SELECT refresh_hourly_analytics_views()');
-        
+
         if (this.config.verbose) {
           console.log('[SyncScheduler] Materialized views refreshed');
         }
@@ -415,6 +427,119 @@ class SyncScheduler {
     } catch (error) {
       console.error('[SyncScheduler] Error refreshing materialized views:', error);
     }
+  }
+
+  /**
+   * Sync a platform for a user by looking up (or creating) syncPreference.
+   * Intended for inline sync-now calls from API routes.
+   */
+  async syncPlatformForUser(
+    userId: string,
+    platform: string
+  ): Promise<{ success: boolean; itemsSynced?: number; error?: string }> {
+    try {
+      // Find or create sync preference
+      let pref = await db.query.syncPreferences.findFirst({
+        where: and(eq(syncPreferences.userId, userId), eq(syncPreferences.platform, platform)),
+      });
+
+      if (!pref) {
+        const [created] = await db
+          .insert(syncPreferences)
+          .values({
+            userId,
+            platform,
+            syncEnabled: true,
+            syncFrequencyMinutes: 60,
+            nextSyncAt: new Date(Date.now() + 60 * 60 * 1000),
+            syncStatus: 'idle',
+          })
+          .returning();
+        pref = created;
+      }
+
+      await this.syncPlatform(userId, platform, pref.id);
+
+      // Read back the latest sync log to get itemsSynced
+      const [latestLog] = await db
+        .select({ itemsSynced: syncLog.itemsSynced })
+        .from(syncLog)
+        .where(
+          and(
+            eq(syncLog.userId, userId),
+            eq(syncLog.platform, platform),
+            eq(syncLog.status, 'completed')
+          )
+        )
+        .orderBy(desc(syncLog.completedAt))
+        .limit(1);
+
+      return { success: true, itemsSynced: latestLog?.itemsSynced ?? 0 };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get per-platform sync status for a user.
+   * Returns connected platforms with their sync health info.
+   */
+  async getSyncStatus(userId: string) {
+    // Get all connected platforms
+    const connections = await db.query.socialConnections.findMany({
+      where: and(eq(socialConnections.userId, userId), eq(socialConnections.isActive, true)),
+    });
+
+    // Get sync preferences
+    const prefs = await db.query.syncPreferences.findMany({
+      where: eq(syncPreferences.userId, userId),
+    });
+
+    // Get latest sync log per platform (most recent completed or failed)
+    const latestLogs = await db
+      .select()
+      .from(syncLog)
+      .where(eq(syncLog.userId, userId))
+      .orderBy(desc(syncLog.completedAt))
+      .limit(50);
+
+    // Build per-platform map for latest log
+    const logByPlatform = new Map<string, (typeof latestLogs)[number]>();
+    for (const log of latestLogs) {
+      if (!logByPlatform.has(log.platform)) {
+        logByPlatform.set(log.platform, log);
+      }
+    }
+
+    const prefByPlatform = new Map(prefs.map((p) => [p.platform, p]));
+
+    const platforms = connections.map((conn) => {
+      const pref = prefByPlatform.get(conn.platform);
+      const log = logByPlatform.get(conn.platform);
+
+      return {
+        platform: conn.platform,
+        hasToken: !!conn.accessToken,
+        isActive: conn.isActive,
+        syncEnabled: pref?.syncEnabled ?? false,
+        syncStatus: pref?.syncStatus ?? 'no_preference',
+        lastSyncAt: pref?.lastSyncAt ?? null,
+        nextSyncAt: pref?.nextSyncAt ?? null,
+        errorMessage: pref?.errorMessage ?? null,
+        lastLogStatus: log?.status ?? null,
+        lastLogItemsSynced: log?.itemsSynced ?? null,
+        lastLogDurationMs: log?.durationMs ?? null,
+        lastLogError: log?.errorDetails ?? null,
+      };
+    });
+
+    return {
+      platforms,
+      schedulerRunning: this.isRunning,
+    };
   }
 
   /**

@@ -1,6 +1,6 @@
 /**
  * Sync Preferences API Routes
- * 
+ *
  * Allows creators to control which platforms sync analytics data,
  * view sync status, and trigger manual syncs.
  */
@@ -11,6 +11,7 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { syncActionLimiter, analyticsLimiter } from '../../middleware/rate-limit';
 import { db } from '../../db';
 import { syncPreferences, socialConnections } from '@shared/schema';
+import { syncScheduler } from '../../services/analytics/sync/sync-scheduler';
 
 export function registerSyncPreferencesRoutes(app: Express) {
   /**
@@ -37,7 +38,7 @@ export function registerSyncPreferencesRoutes(app: Express) {
           where: eq(socialConnections.userId, userId),
         });
 
-        const connectedPlatforms = [...new Set(connections.map(c => c.platform))];
+        const connectedPlatforms = [...new Set(connections.map((c) => c.platform))];
 
         res.json({
           preferences: prefs,
@@ -67,10 +68,7 @@ export function registerSyncPreferencesRoutes(app: Express) {
         }
 
         const pref = await db.query.syncPreferences.findFirst({
-          where: and(
-            eq(syncPreferences.userId, userId),
-            eq(syncPreferences.platform, platform)
-          ),
+          where: and(eq(syncPreferences.userId, userId), eq(syncPreferences.platform, platform)),
         });
 
         if (!pref) {
@@ -107,22 +105,23 @@ export function registerSyncPreferencesRoutes(app: Express) {
         if (syncFrequencyMinutes !== undefined) {
           const freq = Number(syncFrequencyMinutes);
           if (isNaN(freq) || freq < 15 || freq > 1440) {
-            return res.status(400).json({ error: 'Sync frequency must be between 15 and 1440 minutes' });
+            return res
+              .status(400)
+              .json({ error: 'Sync frequency must be between 15 and 1440 minutes' });
           }
         }
 
         const existing = await db.query.syncPreferences.findFirst({
-          where: and(
-            eq(syncPreferences.userId, userId),
-            eq(syncPreferences.platform, platform)
-          ),
+          where: and(eq(syncPreferences.userId, userId), eq(syncPreferences.platform, platform)),
         });
 
         if (existing) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const updateData: Record<string, any> = {};
           if (syncEnabled !== undefined) updateData.syncEnabled = syncEnabled;
-          if (syncFrequencyMinutes !== undefined) updateData.syncFrequencyMinutes = Number(syncFrequencyMinutes);
-          
+          if (syncFrequencyMinutes !== undefined)
+            updateData.syncFrequencyMinutes = Number(syncFrequencyMinutes);
+
           // If enabling sync, schedule next sync
           if (syncEnabled === true) {
             const freq = syncFrequencyMinutes || existing.syncFrequencyMinutes || 60;
@@ -169,7 +168,7 @@ export function registerSyncPreferencesRoutes(app: Express) {
 
   /**
    * POST /api/sync-preferences/:platform/sync-now
-   * Trigger an immediate sync for a platform
+   * Trigger an immediate inline sync for a platform
    */
   app.post(
     '/api/sync-preferences/:platform/sync-now',
@@ -188,7 +187,8 @@ export function registerSyncPreferencesRoutes(app: Express) {
         const connection = await db.query.socialConnections.findFirst({
           where: and(
             eq(socialConnections.userId, userId),
-            eq(socialConnections.platform, platform)
+            eq(socialConnections.platform, platform),
+            eq(socialConnections.isActive, true)
           ),
         });
 
@@ -196,40 +196,50 @@ export function registerSyncPreferencesRoutes(app: Express) {
           return res.status(404).json({ error: `No ${platform} connection found` });
         }
 
-        // Update sync preference to trigger immediate sync
-        const existing = await db.query.syncPreferences.findFirst({
-          where: and(
-            eq(syncPreferences.userId, userId),
-            eq(syncPreferences.platform, platform)
-          ),
-        });
-
-        if (existing) {
-          await db
-            .update(syncPreferences)
-            .set({
-              nextSyncAt: new Date(), // Schedule for now
-              syncStatus: 'idle',
-            })
-            .where(eq(syncPreferences.id, existing.id));
-        } else {
-          // Create sync pref and schedule immediately
-          await db
-            .insert(syncPreferences)
-            .values({
-              userId,
-              platform,
-              syncEnabled: true,
-              syncFrequencyMinutes: 60,
-              nextSyncAt: new Date(),
-              syncStatus: 'idle',
-            });
+        if (!connection.accessToken) {
+          return res
+            .status(400)
+            .json({ error: `No access token for ${platform}. Please reconnect.` });
         }
 
-        res.json({ success: true, message: `Sync queued for ${platform}` });
+        // Execute sync inline via the scheduler
+        const result = await syncScheduler.syncPlatformForUser(userId, platform);
+
+        res.json({
+          success: result.success,
+          itemsSynced: result.itemsSynced ?? 0,
+          error: result.error ?? null,
+          message: result.success
+            ? `Synced ${result.itemsSynced ?? 0} items from ${platform}`
+            : `Sync failed: ${result.error}`,
+        });
       } catch (error) {
         console.error('Error triggering sync:', error);
         res.status(500).json({ error: 'Failed to trigger sync' });
+      }
+    }
+  );
+
+  /**
+   * GET /api/sync-preferences/status
+   * Get sync health diagnostics for all connected platforms
+   */
+  app.get(
+    '/api/sync-preferences/status',
+    authenticateUser,
+    analyticsLimiter,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ error: 'User ID required' });
+        }
+
+        const status = await syncScheduler.getSyncStatus(userId);
+        res.json(status);
+      } catch (error) {
+        console.error('Error fetching sync status:', error);
+        res.status(500).json({ error: 'Failed to fetch sync status' });
       }
     }
   );

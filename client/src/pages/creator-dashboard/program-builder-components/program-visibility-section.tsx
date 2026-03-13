@@ -22,6 +22,7 @@ interface ProgramVisibilitySectionProps {
   showLeaderboard: boolean;
   showActivityFeed: boolean;
   showFanWidget: boolean;
+  showSocialFeed: boolean;
   profileData: ProfileDataVisibility;
   onShowProfileChange: (show: boolean) => void;
   onShowCampaignsChange: (show: boolean) => void;
@@ -30,6 +31,7 @@ interface ProgramVisibilitySectionProps {
   onShowLeaderboardChange: (show: boolean) => void;
   onShowActivityFeedChange: (show: boolean) => void;
   onShowFanWidgetChange: (show: boolean) => void;
+  onShowSocialFeedChange: (show: boolean) => void;
   onProfileDataChange: (data: ProfileDataVisibility) => void;
 }
 
@@ -42,6 +44,7 @@ export function ProgramVisibilitySection({
   showLeaderboard,
   showActivityFeed,
   showFanWidget,
+  showSocialFeed,
   profileData,
   onShowProfileChange,
   onShowCampaignsChange,
@@ -50,6 +53,7 @@ export function ProgramVisibilitySection({
   onShowLeaderboardChange,
   onShowActivityFeedChange,
   onShowFanWidgetChange,
+  onShowSocialFeedChange,
   onProfileDataChange,
 }: ProgramVisibilitySectionProps) {
   return (
@@ -211,6 +215,15 @@ export function ProgramVisibilitySection({
             <p className="text-sm text-gray-400">Display community stats and engagement metrics</p>
           </div>
           <Switch checked={showFanWidget} onCheckedChange={onShowFanWidgetChange} />
+        </div>
+        <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+          <div>
+            <p className="text-white font-medium">Show Social Content Feed</p>
+            <p className="text-sm text-gray-400">
+              Display your synced posts and videos from connected platforms
+            </p>
+          </div>
+          <Switch checked={showSocialFeed} onCheckedChange={onShowSocialFeedChange} />
         </div>
       </CardContent>
     </Card>

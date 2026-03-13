@@ -350,6 +350,7 @@ function ProgramCustomizer({
     showLeaderboard: program.pageConfig?.visibility?.showLeaderboard ?? true,
     showActivityFeed: program.pageConfig?.visibility?.showActivityFeed ?? true,
     showFanWidget: program.pageConfig?.visibility?.showFanWidget ?? true,
+    showSocialFeed: program.pageConfig?.visibility?.showSocialFeed ?? false,
     // Granular profile data visibility
     profileData: program.pageConfig?.visibility?.profileData || {
       showBio: true,
@@ -401,6 +402,7 @@ function ProgramCustomizer({
       showLeaderboard: program.pageConfig?.visibility?.showLeaderboard ?? true,
       showActivityFeed: program.pageConfig?.visibility?.showActivityFeed ?? true,
       showFanWidget: program.pageConfig?.visibility?.showFanWidget ?? true,
+      showSocialFeed: program.pageConfig?.visibility?.showSocialFeed ?? false,
       profileData: program.pageConfig?.visibility?.profileData || {
         showBio: true,
         showSocialLinks: true,
@@ -523,6 +525,7 @@ function ProgramCustomizer({
       showLeaderboard: visibility.showLeaderboard ?? true,
       showActivityFeed: visibility.showActivityFeed ?? true,
       showFanWidget: visibility.showFanWidget ?? true,
+      showSocialFeed: visibility.showSocialFeed ?? prev.showSocialFeed,
     }));
 
     toast({
@@ -591,6 +594,7 @@ function ProgramCustomizer({
           showLeaderboard: merged.showLeaderboard,
           showActivityFeed: merged.showActivityFeed,
           showFanWidget: merged.showFanWidget,
+          showSocialFeed: merged.showSocialFeed,
           profileData: merged.profileData,
         },
       },
@@ -1154,6 +1158,7 @@ function ProgramCustomizer({
             showLeaderboard={customizeData.showLeaderboard}
             showActivityFeed={customizeData.showActivityFeed}
             showFanWidget={customizeData.showFanWidget}
+            showSocialFeed={customizeData.showSocialFeed}
             profileData={customizeData.profileData}
             onShowProfileChange={(showProfile) =>
               setCustomizeData({ ...customizeData, showProfile })
@@ -1173,6 +1178,9 @@ function ProgramCustomizer({
             }
             onShowFanWidgetChange={(showFanWidget) =>
               setCustomizeData({ ...customizeData, showFanWidget })
+            }
+            onShowSocialFeedChange={(showSocialFeed) =>
+              setCustomizeData({ ...customizeData, showSocialFeed })
             }
             onProfileDataChange={(profileData) =>
               setCustomizeData({ ...customizeData, profileData })

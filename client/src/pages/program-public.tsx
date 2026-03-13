@@ -21,6 +21,7 @@ import {
   Instagram,
   MessageCircle,
   Globe,
+  Rss,
 } from 'lucide-react';
 import type { Program, Task, Campaign } from '@shared/schema';
 import { FanTaskCard } from '@/components/tasks/FanTaskCard';
@@ -37,6 +38,7 @@ import { transformImageUrl } from '@/lib/image-utils';
 import { getThemeColors, isDarkTheme } from '@/lib/theme-utils';
 import { useAuth } from '@/hooks/use-auth';
 import { VerifiedBadgeNFT } from '@/components/creator/VerifiedBadgeNFT';
+import { SocialContentFeed } from '@/components/program/social-content-feed';
 
 interface ProgramCreator {
   id: string;
@@ -88,7 +90,7 @@ export default function ProgramPublic() {
   const isPreviewMode = !!programId; // Preview uses programId instead of slug
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'profile' | 'campaigns' | 'tasks' | 'rewards'
+    'dashboard' | 'profile' | 'campaigns' | 'tasks' | 'rewards' | 'content'
   >('dashboard');
   const [isEnrolled, setIsEnrolled] = useState(false);
 
@@ -367,6 +369,7 @@ export default function ProgramPublic() {
     showLeaderboard: true,
     showActivityFeed: true,
     showFanWidget: true,
+    showSocialFeed: false,
   };
 
   const activeCampaigns = campaigns?.filter((c) => c.status === 'active') ?? [];
@@ -695,6 +698,23 @@ export default function ProgramPublic() {
                 Rewards
               </TabsTrigger>
             )}
+            {visibility.showSocialFeed && (
+              <TabsTrigger
+                value="content"
+                style={styles.textSecondary}
+                className="data-[state=active]:text-white"
+                data-active-bg={brandColors.primary}
+              >
+                <style>{`
+                  [data-active-bg="${brandColors.primary}"][data-state="active"] {
+                    background-color: ${brandColors.primary} !important;
+                    color: white !important;
+                  }
+                `}</style>
+                <Rss className="h-4 w-4 mr-2" />
+                Content
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Main Content Area with Sidebar */}
@@ -733,6 +753,12 @@ export default function ProgramPublic() {
               <TabsContent value="rewards" className="mt-0">
                 <RewardsTab programId={programData.id} />
               </TabsContent>
+
+              {visibility.showSocialFeed && (
+                <TabsContent value="content" className="mt-0">
+                  <SocialContentFeed programId={programData.id} />
+                </TabsContent>
+              )}
             </div>
 
             {/* Right Sidebar Widgets (1/3 width) */}

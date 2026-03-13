@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
-  BarChart3,
   TrendingUp,
   DollarSign,
   Users,
@@ -15,15 +14,9 @@ import {
   Calendar,
   Settings,
   AlertTriangle,
-} from "lucide-react";
+} from 'lucide-react';
 
-function ErrorBanner({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry?: () => void;
-}) {
+function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-4 py-3 text-yellow-200">
       <AlertTriangle className="h-5 w-5 flex-shrink-0" />
@@ -36,38 +29,65 @@ function ErrorBanner({
     </div>
   );
 }
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
-import { NetworkSelector } from "@/components/analytics/NetworkSelector";
-import { AnalyticsOverviewCards } from "@/components/analytics/AnalyticsOverview";
-import { PlatformBreakdown } from "@/components/analytics/PlatformBreakdown";
-import { GrowthChart } from "@/components/analytics/GrowthChart";
-import { ContentPerformance } from "@/components/analytics/ContentPerformance";
-import { PlatformComparison } from "@/components/analytics/PlatformComparison";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Link } from 'wouter';
+import { NetworkSelector } from '@/components/analytics/NetworkSelector';
+import { AnalyticsOverviewCards } from '@/components/analytics/AnalyticsOverview';
+import { PlatformBreakdown } from '@/components/analytics/PlatformBreakdown';
+import { GrowthChart } from '@/components/analytics/GrowthChart';
+import { ContentPerformance } from '@/components/analytics/ContentPerformance';
+import { PlatformComparison } from '@/components/analytics/PlatformComparison';
 import {
   useAnalyticsOverview,
   useGrowthAnalytics,
   useContentAnalytics,
   useComparisonAnalytics,
-} from "@/hooks/use-analytics";
-import { AIInsightsPanel } from "@/components/analytics/AIInsightsPanel";
+} from '@/hooks/use-analytics';
+import { AIInsightsPanel } from '@/components/analytics/AIInsightsPanel';
+import { SyncStatusPanel } from '@/components/analytics/SyncStatusPanel';
 
 export default function AnalyticsOverview() {
   const { user } = useAuth();
   const [selectedPlatforms, setSelectedPlatforms] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState("30d");
+  const [dateRange, setDateRange] = useState('30d');
 
-  const platformsParam = selectedPlatforms || "all";
+  const platformsParam = selectedPlatforms || 'all';
 
   // Fetch real analytics data
-  const { data: overview, isLoading: overviewLoading, isError: overviewError } = useAnalyticsOverview(platformsParam, dateRange);
-  const { data: growthData, isLoading: growthLoading, isError: growthError } = useGrowthAnalytics(platformsParam, dateRange);
-  const { data: contentData, isLoading: contentLoading, isError: contentError } = useContentAnalytics(platformsParam, 'views', 5);
-  const { data: comparisonData, isLoading: comparisonLoading, isError: comparisonError } = useComparisonAnalytics(dateRange);
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewError,
+  } = useAnalyticsOverview(platformsParam, dateRange);
+  const {
+    data: growthData,
+    isLoading: growthLoading,
+    isError: growthError,
+  } = useGrowthAnalytics(platformsParam, dateRange);
+  const {
+    data: contentData,
+    isLoading: contentLoading,
+    isError: contentError,
+  } = useContentAnalytics(platformsParam, 'views', 5);
+  const {
+    data: comparisonData,
+    isLoading: comparisonLoading,
+    isError: comparisonError,
+  } = useComparisonAnalytics(dateRange);
 
   // Fetch weekly metrics from database (platform metrics)
-  const { data: weeklyMetrics, isLoading: weeklyLoading, isError: weeklyError } = useQuery({
+  const {
+    data: weeklyMetrics,
+    isLoading: weeklyLoading,
+    isError: weeklyError,
+  } = useQuery({
     queryKey: ['/api/creator/weekly-metrics', user?.id],
     queryFn: async () => {
       const response = await fetch(`/api/creator/weekly-metrics/${user?.id}`);
@@ -123,6 +143,9 @@ export default function AnalyticsOverview() {
           onSelectionChange={setSelectedPlatforms}
         />
 
+        {/* Sync Status Diagnostics */}
+        <SyncStatusPanel />
+
         {/* Weekly Metrics Cards (Platform Data) */}
         <div>
           <div className="flex items-center gap-2 mb-4">
@@ -166,7 +189,9 @@ export default function AnalyticsOverview() {
                   <div>
                     <p className="text-sm text-purple-200">Tasks Completed</p>
                     <p className="text-3xl font-bold text-white mt-1">
-                      {weeklyLoading ? '...' : (weeklyMetrics?.tasksCompleted || 0).toLocaleString()}
+                      {weeklyLoading
+                        ? '...'
+                        : (weeklyMetrics?.tasksCompleted || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-purple-300 mt-1">Fan engagement</p>
                   </div>
@@ -181,7 +206,9 @@ export default function AnalyticsOverview() {
                   <div>
                     <p className="text-sm text-yellow-200">Rewards Redeemed</p>
                     <p className="text-3xl font-bold text-white mt-1">
-                      {weeklyLoading ? '...' : (weeklyMetrics?.rewardsRedeemed || 0).toLocaleString()}
+                      {weeklyLoading
+                        ? '...'
+                        : (weeklyMetrics?.rewardsRedeemed || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-yellow-300 mt-1">This week</p>
                   </div>
@@ -205,7 +232,13 @@ export default function AnalyticsOverview() {
             <AnalyticsOverviewCards
               data={overview?.overview}
               isLoading={overviewLoading}
-              dateRangeLabel={dateRange === '7d' ? 'this week' : dateRange === '30d' ? 'this month' : 'this quarter'}
+              dateRangeLabel={
+                dateRange === '7d'
+                  ? 'this week'
+                  : dateRange === '30d'
+                    ? 'this month'
+                    : 'this quarter'
+              }
             />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
@@ -236,7 +269,8 @@ export default function AnalyticsOverview() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-gray-400">
-                      View detailed growth trends, fan engagement metrics, and platform-specific insights
+                      View detailed growth trends, fan engagement metrics, and platform-specific
+                      insights
                     </p>
                   </CardContent>
                 </Card>
