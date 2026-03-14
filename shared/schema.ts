@@ -215,7 +215,10 @@ export const socialConnections = pgTable(
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (table) => [index('social_connections_user_platform_idx').on(table.userId, table.platform)]
+  (table) => [
+    index('social_connections_user_platform_idx').on(table.userId, table.platform),
+    index('social_connections_user_id_idx').on(table.userId),
+  ]
 );
 
 export const users = pgTable('users', {
@@ -947,33 +950,42 @@ export const loyaltyProgramTiers = pgTable(
   (table) => [index('loyalty_tiers_program_idx').on(table.programId, table.tierOrder)]
 );
 
-export const fanPrograms = pgTable('fan_programs', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant
-  fanId: varchar('fan_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-  programId: varchar('program_id')
-    .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
-    .notNull(),
-  currentPoints: integer('current_points').default(0),
-  totalPointsEarned: integer('total_points_earned').default(0),
-  currentTier: text('current_tier'),
-  currentTierId: varchar('current_tier_id').references(() => loyaltyProgramTiers.id),
-  lifetimePoints: integer('lifetime_points').default(0),
-  joinedAt: timestamp('joined_at').defaultNow(),
+export const fanPrograms = pgTable(
+  'fan_programs',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant
+    fanId: varchar('fan_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    programId: varchar('program_id')
+      .references(() => loyaltyPrograms.id, { onDelete: 'cascade' })
+      .notNull(),
+    currentPoints: integer('current_points').default(0),
+    totalPointsEarned: integer('total_points_earned').default(0),
+    currentTier: text('current_tier'),
+    currentTierId: varchar('current_tier_id').references(() => loyaltyProgramTiers.id),
+    lifetimePoints: integer('lifetime_points').default(0),
+    joinedAt: timestamp('joined_at').defaultNow(),
 
-  // Soft-delete fields (SaaS industry standard)
-  deletedAt: timestamp('deleted_at'),
-  deletedBy: varchar('deleted_by'),
-  deletionReason: text('deletion_reason'),
+    // Soft-delete fields (SaaS industry standard)
+    deletedAt: timestamp('deleted_at'),
+    deletedBy: varchar('deleted_by'),
+    deletionReason: text('deletion_reason'),
 
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('fan_programs_fan_id_idx').on(table.fanId),
+    index('fan_programs_program_id_idx').on(table.programId),
+    index('fan_programs_fan_program_idx').on(table.fanId, table.programId),
+    index('fan_programs_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 export const tierProgressionHistory = pgTable(
   'tier_progression_history',
@@ -1045,39 +1057,46 @@ export const pointTransactions = pgTable(
   ]
 );
 
-export const rewardRedemptions = pgTable('reward_redemptions', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .references(() => tenants.id, { onDelete: 'restrict' })
-    .notNull(), // Belongs to tenant - financial audit trail
-  fanId: varchar('fan_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-  userId: varchar('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'set null' }),
-  rewardId: varchar('reward_id')
-    .references(() => rewards.id, { onDelete: 'restrict' })
-    .notNull(),
-  pointsSpent: integer('points_spent').notNull(),
-  quantity: integer('quantity').default(1),
-  shippingAddress: jsonb('shipping_address'),
-  metadata: jsonb('metadata'),
-  status: text('status').default('pending'), // "pending" | "completed" | "failed"
-  redemptionData: jsonb('redemption_data').$type<{
-    nftTxHash?: string;
-    tokenTxHash?: string;
-    deliveryInfo?: unknown;
-  }>(),
-  trackingNumber: text('tracking_number'),
-  trackingUrl: text('tracking_url'),
-  fulfillmentNotes: text('fulfillment_notes'),
-  redeemedAt: timestamp('redeemed_at').defaultNow(),
-  fulfilledAt: timestamp('fulfilled_at'),
-  fulfilledBy: varchar('fulfilled_by').references(() => users.id),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+export const rewardRedemptions = pgTable(
+  'reward_redemptions',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .references(() => tenants.id, { onDelete: 'restrict' })
+      .notNull(), // Belongs to tenant - financial audit trail
+    fanId: varchar('fan_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: varchar('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    programId: varchar('program_id').references(() => loyaltyPrograms.id, { onDelete: 'set null' }),
+    rewardId: varchar('reward_id')
+      .references(() => rewards.id, { onDelete: 'restrict' })
+      .notNull(),
+    pointsSpent: integer('points_spent').notNull(),
+    quantity: integer('quantity').default(1),
+    shippingAddress: jsonb('shipping_address'),
+    metadata: jsonb('metadata'),
+    status: text('status').default('pending'), // "pending" | "completed" | "failed"
+    redemptionData: jsonb('redemption_data').$type<{
+      nftTxHash?: string;
+      tokenTxHash?: string;
+      deliveryInfo?: unknown;
+    }>(),
+    trackingNumber: text('tracking_number'),
+    trackingUrl: text('tracking_url'),
+    fulfillmentNotes: text('fulfillment_notes'),
+    redeemedAt: timestamp('redeemed_at').defaultNow(),
+    fulfilledAt: timestamp('fulfilled_at'),
+    fulfilledBy: varchar('fulfilled_by').references(() => users.id),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('reward_redemptions_user_id_idx').on(table.userId),
+    index('reward_redemptions_tenant_id_idx').on(table.tenantId),
+  ]
+);
 
 // Notifications - In-app notification system
 export const notificationTypeEnum = pgEnum('notification_type', [
@@ -1434,6 +1453,8 @@ export const campaigns = pgTable(
     index('campaigns_creator_id_idx').on(table.creatorId),
     index('campaigns_tenant_id_idx').on(table.tenantId),
     index('campaigns_status_idx').on(table.status),
+    index('campaigns_tenant_status_idx').on(table.tenantId, table.status),
+    index('campaigns_program_id_idx').on(table.programId),
   ]
 );
 
@@ -1678,6 +1699,7 @@ export const tasks = pgTable(
   (table) => [
     index('tasks_creator_id_idx').on(table.creatorId),
     index('tasks_tenant_id_idx').on(table.tenantId),
+    index('tasks_program_id_idx').on(table.programId),
   ]
 );
 
@@ -1993,6 +2015,7 @@ export const taskCompletions = pgTable(
     index('task_completions_campaign_id_idx').on(table.campaignId),
     index('task_completions_completed_at_idx').on(table.completedAt),
     index('task_completions_last_activity_idx').on(table.lastActivityAt),
+    index('task_completions_status_idx').on(table.status),
   ]
 );
 
@@ -2100,23 +2123,30 @@ export const verificationAttempts = pgTable('verification_attempts', {
 });
 
 // Platform Points Transactions - Track platform-wide points separate from creator programs
-export const platformPointsTransactions = pgTable('platform_points_transactions', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar('user_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-  points: integer('points').notNull(),
-  source: varchar('source').notNull(), // 'task_completion' | 'daily_bonus' | 'referral' | 'admin_grant'
-  description: text('description'),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
-  expiresAt: timestamp('expires_at'),
-  isExpired: boolean('is_expired').default(false),
-  expiredAt: timestamp('expired_at'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+export const platformPointsTransactions = pgTable(
+  'platform_points_transactions',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    points: integer('points').notNull(),
+    source: varchar('source').notNull(), // 'task_completion' | 'daily_bonus' | 'referral' | 'admin_grant'
+    description: text('description'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    expiresAt: timestamp('expires_at'),
+    isExpired: boolean('is_expired').default(false),
+    expiredAt: timestamp('expired_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('platform_points_txns_user_id_idx').on(table.userId),
+    index('platform_points_txns_user_created_idx').on(table.userId, table.createdAt),
+  ]
+);
 
 // Reward Distribution Log - Track all point awards
 export const rewardDistributions = pgTable('reward_distributions', {

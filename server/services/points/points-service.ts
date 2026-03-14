@@ -99,12 +99,11 @@ export class FandomlyPointsService {
    * Get user's Fandomly Points balance
    */
   async getBalance(userId: string): Promise<number> {
-    const transactions = await db.query.platformPointsTransactions.findMany({
-      where: eq(platformPointsTransactions.userId, userId),
-    });
-
-    const balance = transactions.reduce((sum, tx) => sum + (tx.points ?? 0), 0);
-    return Math.max(0, balance);
+    const [result] = await db
+      .select({ balance: sql<number>`COALESCE(SUM(${platformPointsTransactions.points}), 0)` })
+      .from(platformPointsTransactions)
+      .where(eq(platformPointsTransactions.userId, userId));
+    return Math.max(0, result?.balance ?? 0);
   }
 
   /**
@@ -250,32 +249,33 @@ export class CreatorPointsService {
   async getBalance(userId: string, creatorId: string, tenantId: string): Promise<number> {
     const fanProgramId = await this.resolveFanProgramId(userId, creatorId, tenantId);
     if (!fanProgramId) return 0;
-    const transactions = await db.query.pointTransactions.findMany({
-      where: eq(pointTransactions.fanProgramId, fanProgramId),
-    });
-    return Math.max(
-      0,
-      transactions.reduce((sum, tx) => sum + (tx.points ?? 0), 0)
-    );
+    const [result] = await db
+      .select({ balance: sql<number>`COALESCE(SUM(${pointTransactions.points}), 0)` })
+      .from(pointTransactions)
+      .where(eq(pointTransactions.fanProgramId, fanProgramId));
+    return Math.max(0, result?.balance ?? 0);
   }
 
   /**
    * Get all creator points balances for a user
    */
   async getAllBalances(userId: string): Promise<Record<string, number>> {
-    const fps = await db.query.fanPrograms.findMany({
-      where: eq(fanPrograms.fanId, userId),
-      with: { program: true },
-    });
+    const results = await db
+      .select({
+        creatorId: loyaltyPrograms.creatorId,
+        balance: sql<number>`COALESCE(SUM(${pointTransactions.points}), 0)`,
+      })
+      .from(fanPrograms)
+      .innerJoin(loyaltyPrograms, eq(fanPrograms.programId, loyaltyPrograms.id))
+      .innerJoin(pointTransactions, eq(pointTransactions.fanProgramId, fanPrograms.id))
+      .where(eq(fanPrograms.fanId, userId))
+      .groupBy(loyaltyPrograms.creatorId);
+
     const balances: Record<string, number> = {};
-    for (const fp of fps) {
-      const creatorId = fp.program?.creatorId;
-      if (!creatorId) continue;
-      const txs = await db.query.pointTransactions.findMany({
-        where: eq(pointTransactions.fanProgramId, fp.id),
-      });
-      const balance = txs.reduce((sum, tx) => sum + (tx.points ?? 0), 0);
-      if (balance > 0) balances[creatorId] = balance;
+    for (const row of results) {
+      if (row.creatorId && row.balance > 0) {
+        balances[row.creatorId] = row.balance;
+      }
     }
     return balances;
   }
