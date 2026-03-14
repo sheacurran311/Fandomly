@@ -10,6 +10,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { getSafeLeaderboardView } from '../../utils/safe-sql';
+import { storage } from '../../core/storage';
 
 export function registerLeaderboardRoutes(app: Express) {
   // ============================================
@@ -617,4 +618,63 @@ export function registerLeaderboardRoutes(app: Express) {
       }
     }
   );
+
+  // ============================================
+  // BADGE REWARDS
+  // ============================================
+
+  /**
+   * POST /api/leaderboards/badge-rewards
+   * Configure automatic badge rewards for leaderboard positions
+   * Requires: admin or creator role
+   */
+  app.post(
+    '/api/leaderboards/badge-rewards',
+    authenticateUser,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        // Check if user is admin or creator
+        const user = await storage.getUser(req.user?.id || '');
+        if (!user || (user.role !== 'fandomly_admin' && user.userType !== 'creator')) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const { leaderboardType, targetId, badgeId, minRank, maxRank } = req.body;
+
+        const result = await db.execute(sql`
+        INSERT INTO leaderboard_badge_rewards (leaderboard_type, target_id, badge_id, min_rank, max_rank)
+        VALUES (${leaderboardType}, ${targetId}, ${badgeId}, ${minRank || 1}, ${maxRank || 1})
+        RETURNING *
+      `);
+
+        res.json(result.rows[0]);
+      } catch (error: any) {
+        console.error('Failed to configure badge reward:', error);
+        res.status(500).json({ error: 'Failed to configure badge reward' });
+      }
+    }
+  );
+
+  /**
+   * GET /api/leaderboards/badge-rewards/:type/:targetId?
+   * Get badge reward configurations for a leaderboard
+   */
+  app.get('/api/leaderboards/badge-rewards/:type/:targetId?', async (req, res) => {
+    try {
+      const { type, targetId } = req.params;
+
+      const result = await db.execute(sql`
+        SELECT * FROM leaderboard_badge_rewards
+        WHERE leaderboard_type = ${type}
+        AND (${targetId}::VARCHAR IS NULL OR target_id = ${targetId})
+        AND is_active = true
+        ORDER BY min_rank
+      `);
+
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error('Failed to fetch badge rewards:', error);
+      res.status(500).json({ error: 'Failed to fetch badge rewards' });
+    }
+  });
 }
