@@ -1,6 +1,6 @@
 import { type Express, type Response } from 'express';
 import { db } from '../../db';
-import { sql, eq, and, desc, ilike, or, count, asc } from 'drizzle-orm';
+import { sql, eq, and, desc, ilike, or, count, asc, type SQL } from 'drizzle-orm';
 import {
   users,
   creators,
@@ -519,43 +519,35 @@ export function registerAdminRoutes(app: Express) {
       const page = Math.max(0, parseInt(req.query.page as string) || 0);
       const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 25));
 
-      // Use raw SQL for the join + aggregation + pagination
-      const conditions: string[] = ['c.deleted_at IS NULL'];
-      const params: unknown[] = [];
-      let paramIdx = 0;
+      // Build parameterized conditions to prevent SQL injection
+      const conditions: SQL[] = [sql`c.deleted_at IS NULL`];
 
       if (search) {
-        paramIdx++;
+        const searchPattern = `%${search}%`;
         conditions.push(
-          `(c.display_name ILIKE $${paramIdx} OR u.username ILIKE $${paramIdx} OR u.email ILIKE $${paramIdx})`
+          sql`(c.display_name ILIKE ${searchPattern} OR u.username ILIKE ${searchPattern} OR u.email ILIKE ${searchPattern})`
         );
-        params.push(`%${search}%`);
       }
       if (tier && tier !== 'all') {
-        paramIdx++;
-        conditions.push(`t.subscription_tier = $${paramIdx}`);
-        params.push(tier);
+        conditions.push(sql`t.subscription_tier = ${tier}`);
       }
       if (verified === 'true') {
-        conditions.push('c.is_verified = true');
+        conditions.push(sql`c.is_verified = true`);
       } else if (verified === 'false') {
-        conditions.push('c.is_verified = false');
+        conditions.push(sql`c.is_verified = false`);
       }
 
-      const whereStr = conditions.join(' AND ');
+      const whereClause = sql.join(conditions, sql` AND `);
 
-      const countResult = await db.execute(
-        sql.raw(`
+      const countResult = await db.execute(sql`
         SELECT COUNT(*) as total
         FROM creators c
         LEFT JOIN users u ON u.id = c.user_id
         LEFT JOIN tenants t ON t.id = c.tenant_id
-        WHERE ${whereStr}
-      `)
-      );
+        WHERE ${whereClause}
+      `);
 
-      const dataResult = await db.execute(
-        sql.raw(`
+      const dataResult = await db.execute(sql`
         SELECT
           c.id,
           c.display_name,
@@ -573,11 +565,10 @@ export function registerAdminRoutes(app: Express) {
         FROM creators c
         LEFT JOIN users u ON u.id = c.user_id
         LEFT JOIN tenants t ON t.id = c.tenant_id
-        WHERE ${whereStr}
+        WHERE ${whereClause}
         ORDER BY c.created_at DESC
         LIMIT ${pageSize} OFFSET ${page * pageSize}
-      `)
-      );
+      `);
 
       const totalCount =
         Number(
@@ -834,9 +825,9 @@ export function registerAdminRoutes(app: Express) {
         UPDATE manual_review_queue
         SET status = 'approved',
             reviewed_at = NOW(),
-            reviewed_by = ${req.user?.id ? parseInt(req.user.id) : null},
+            reviewed_by = ${req.user?.id || null},
             review_notes = ${notes || null}
-        WHERE id = ${parseInt(reviewId)}
+        WHERE id = ${reviewId}
       `);
 
         res.json({ success: true });
@@ -866,9 +857,9 @@ export function registerAdminRoutes(app: Express) {
         UPDATE manual_review_queue
         SET status = 'rejected',
             reviewed_at = NOW(),
-            reviewed_by = ${req.user?.id ? parseInt(req.user.id) : null},
+            reviewed_by = ${req.user?.id || null},
             review_notes = ${notes}
-        WHERE id = ${parseInt(reviewId)}
+        WHERE id = ${reviewId}
       `);
 
         res.json({ success: true });
@@ -888,7 +879,7 @@ export function registerAdminRoutes(app: Express) {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const { ids, action, notes } = req.body as {
-          ids: number[];
+          ids: string[];
           action: 'approve' | 'reject';
           notes?: string;
         };
@@ -900,13 +891,13 @@ export function registerAdminRoutes(app: Express) {
           return res.status(400).json({ error: 'Notes are required for bulk rejection' });
         }
 
-        const idList = ids.map(Number).filter((n) => !isNaN(n));
+        const idList = ids.map(String).filter((s) => s.length > 0);
 
         await db.execute(sql`
         UPDATE manual_review_queue
         SET status = ${action === 'approve' ? 'approved' : 'rejected'},
             reviewed_at = NOW(),
-            reviewed_by = ${req.user?.id ? parseInt(req.user.id) : null},
+            reviewed_by = ${req.user?.id || null},
             review_notes = ${notes || null}
         WHERE id = ANY(${idList})
       `);

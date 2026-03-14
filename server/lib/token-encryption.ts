@@ -14,11 +14,13 @@ const AUTH_TAG_LENGTH = 16;
 function getEncryptionKey(): Buffer {
   const key = process.env.TOKEN_ENCRYPTION_KEY;
   if (!key) {
-    // In development, fall back to a derived key (not secure for production)
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('TOKEN_ENCRYPTION_KEY is required in production');
+    }
     console.warn(
       '[TokenEncryption] TOKEN_ENCRYPTION_KEY not set, using fallback. Set this in production!'
     );
-    return Buffer.from('0'.repeat(64), 'hex'); // 32-byte zero key for dev
+    return Buffer.from('0'.repeat(64), 'hex'); // 32-byte zero key for dev only
   }
   // Key should be a 64-char hex string (32 bytes)
   if (key.length !== 64) {

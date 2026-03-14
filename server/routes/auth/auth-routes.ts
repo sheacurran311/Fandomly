@@ -13,6 +13,7 @@ import {
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/rbac';
 import { nanoid } from 'nanoid';
 import { claimBetaWelcomePoints } from '../../services/beta-signup-service';
+import { encryptToken } from '../../lib/token-encryption';
 
 /**
  * Register general authentication routes
@@ -87,7 +88,7 @@ export function registerAuthRoutes(app: Express) {
         await db
           .update(socialConnections)
           .set({
-            accessToken: access_token,
+            accessToken: encryptToken(access_token),
             profileData: profile_data || existingConnection.profileData,
             lastSyncedAt: new Date(),
             updatedAt: new Date(),
@@ -105,14 +106,19 @@ export function registerAuthRoutes(app: Express) {
             // User exists with this email but logged in via a different provider before.
             // Auto-link: create the social connection and log them in directly.
             // This is safe because the email was verified by the OAuth provider.
-            console.log('[Social Auth] Auto-linking provider', provider, 'to existing user', user.id);
+            console.log(
+              '[Social Auth] Auto-linking provider',
+              provider,
+              'to existing user',
+              user.id
+            );
             await db.insert(socialConnections).values({
               userId: user.id,
               platform: provider,
               platformUserId: platform_user_id,
               platformUsername: username,
               platformDisplayName: display_name,
-              accessToken: access_token,
+              accessToken: encryptToken(access_token),
               profileData: profile_data,
               connectedAt: new Date(),
               isActive: true,
@@ -158,7 +164,7 @@ export function registerAuthRoutes(app: Express) {
             platformUserId: platform_user_id,
             platformUsername: username,
             platformDisplayName: display_name,
-            accessToken: access_token,
+            accessToken: encryptToken(access_token),
             profileData: profile_data,
             connectedAt: new Date(),
             isActive: true,
@@ -312,7 +318,7 @@ export function registerAuthRoutes(app: Express) {
           .update(socialConnections)
           .set({
             userId: user.id,
-            accessToken: access_token,
+            accessToken: encryptToken(access_token),
             profileData: profile_data ?? existingConnection.profileData,
             isActive: true,
             updatedAt: new Date(),
@@ -323,7 +329,7 @@ export function registerAuthRoutes(app: Express) {
           userId: user.id,
           platform: provider,
           platformUserId: platform_user_id,
-          accessToken: access_token,
+          accessToken: encryptToken(access_token),
           profileData: profile_data ?? undefined,
           connectedAt: new Date(),
           isActive: true,
@@ -718,7 +724,7 @@ export function registerAuthRoutes(app: Express) {
         await db
           .update(socialConnections)
           .set({
-            accessToken: access_token,
+            accessToken: encryptToken(access_token),
             platformUsername: username,
             platformDisplayName: display_name,
             profileData: profile_data,
@@ -734,7 +740,7 @@ export function registerAuthRoutes(app: Express) {
           platformUserId: platform_user_id,
           platformUsername: username,
           platformDisplayName: display_name,
-          accessToken: access_token,
+          accessToken: encryptToken(access_token),
           profileData: profile_data,
           connectedAt: new Date(),
           isActive: true,

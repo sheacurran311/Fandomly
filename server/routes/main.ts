@@ -2006,7 +2006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Loyalty program routes
-  app.post('/api/loyalty-programs', async (req, res) => {
+  app.post('/api/loyalty-programs', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const programData = insertLoyaltyProgramSchema.parse(req.body);
       const program = await storage.createLoyaltyProgram(programData);

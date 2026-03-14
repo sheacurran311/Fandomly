@@ -299,14 +299,8 @@ export function registerRedemptionRoutes(app: Express) {
           });
         }
 
-        // Check stock
-        if (reward.stockQuantity !== null && reward.stockQuantity < quantity) {
-          return res.status(400).json({
-            error: 'Insufficient stock',
-            requested: quantity,
-            available: reward.stockQuantity,
-          });
-        }
+        // Stock is checked atomically inside the transaction (WHERE stock_quantity >= quantity)
+        // to prevent race conditions between concurrent redemptions
 
         // Check per-user redemption limit
         const maxPerUser = (reward.redemptionRules as any)?.maxPerUser;
@@ -641,7 +635,7 @@ export function registerRedemptionRoutes(app: Express) {
             } catch (mintError) {
               console.error('[Redemption] NFT minting failed:', mintError);
 
-              // Record failed mint in nftMints table so retry logic can pick it up
+              // Record failed mint in nftMints table
               try {
                 await db.insert(nftMints).values({
                   crossmintActionId: `redemption-failed-${Date.now()}-${userId}`,
@@ -661,20 +655,50 @@ export function registerRedemptionRoutes(app: Express) {
                 /* best-effort */
               }
 
+              // Refund points since NFT mint failed
+              try {
+                await db.execute(sql`
+                  UPDATE fan_programs
+                  SET current_points = current_points + ${totalPointsCost}
+                  WHERE id = ${fanProgram.id}
+                `);
+                await db.execute(sql`
+                  INSERT INTO point_transactions
+                    (fan_program_id, tenant_id, points, type, source, metadata, created_at)
+                  VALUES
+                    (${fanProgram.id}, ${reward.tenantId || ''}, ${totalPointsCost}, 'earned', 'nft_mint_refund',
+                     ${JSON.stringify({ rewardId, reason: 'NFT mint failed' })}, NOW())
+                `);
+                // Restore stock if tracked
+                if (reward.stockQuantity !== null) {
+                  await db.execute(sql`
+                    UPDATE rewards SET stock_quantity = stock_quantity + ${quantity}
+                    WHERE id = ${rewardId}
+                  `);
+                }
+                console.log(
+                  `[Redemption] Points refunded for failed NFT mint: ${totalPointsCost} points to fan_program ${fanProgram.id}`
+                );
+              } catch (refundError) {
+                console.error(
+                  '[Redemption] CRITICAL: Failed to refund points after NFT mint failure:',
+                  refundError
+                );
+              }
+
               // Update redemption to indicate failed mint
               await db
                 .update(rewardRedemptions)
                 .set({
+                  status: 'failed',
                   metadata: {
                     ...((result.metadata as any) || {}),
                     nftMintStatus: 'failed',
                     nftMintError: mintError instanceof Error ? mintError.message : 'Unknown error',
+                    pointsRefunded: true,
                   },
                 })
                 .where(eq(rewardRedemptions.id, result.id));
-
-              // Don't fail the entire redemption - points were already spent
-              // Failed mints are recorded in nft_mints with status='failed' for retry
             }
           } else {
             // Auto-mint is disabled - mark for manual fulfillment

@@ -23,10 +23,30 @@ const app = express();
 // Trust proxy for rate limiting behind reverse proxies (Replit, load balancer, etc.)
 app.set('trust proxy', 1);
 
-// CORS — allow same-origin and Replit dev preview origins
+// CORS — whitelist known origins
+const ALLOWED_ORIGINS = (
+  process.env.ALLOWED_ORIGINS || 'https://fandomly.ai,https://www.fandomly.ai'
+)
+  .split(',')
+  .map((s) => s.trim());
+
 app.use(
   cors({
-    origin: true, // Reflect the request origin (same-origin + Replit subdomains)
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server, mobile apps, same-origin)
+      if (!origin) return callback(null, true);
+      // Allow exact matches from whitelist
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      // Allow Replit dev preview subdomains in development
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        (origin.includes('.replit.dev') ||
+          origin.includes('.repl.co') ||
+          origin.startsWith('http://localhost'))
+      )
+        return callback(null, true);
+      callback(new Error('CORS not allowed'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Social-Token'],
@@ -43,7 +63,7 @@ app.use(
         scriptSrc: [
           "'self'",
           "'unsafe-inline'",
-          "'unsafe-eval'", // Required for Vite in dev
+          ...(process.env.NODE_ENV !== 'production' ? ["'unsafe-eval'"] : []), // Only for Vite HMR in dev
           'https://connect.facebook.net',
           'https://apis.google.com',
           'https://accounts.google.com',
